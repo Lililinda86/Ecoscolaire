@@ -32,6 +32,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveDBToStorage(currentDb);
     }
     
+    // Auto-inject default Super Admin if none exists (SaaS bootstrap)
+    if (!currentDb.users) currentDb.users = [];
+    const hasSuperAdmin = currentDb.users.some(u => u.role === 'superAdmin');
+    if (!hasSuperAdmin) {
+      currentDb.users.push({
+        id: 'super-admin-1',
+        emailOrPhone: 'kyrialove@gmail.com',
+        pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', // SHA-256 de '1234'
+        role: 'superAdmin',
+        isActive: true,
+        mustChangePin: true
+      });
+      saveDBToStorage(currentDb);
+    }
+    
     setDb(currentDb);
 
     // Restore session
@@ -66,15 +81,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const pinHashed = await hashPIN(pin);
 
     // Super Admin login bypasses schoolCode
-    if (emailOrPhone === 'admin@ecoscolaire.com' && pinHashed === db.users.find(u => u.role === 'superAdmin')?.pinHash) {
-      const admin = db.users.find(u => u.role === 'superAdmin');
-      if (admin) {
-        setCurrentUser(admin);
-        setCurrentSchool(null);
-        localStorage.setItem('ecoscolaire_user_id', admin.id);
-        localStorage.removeItem('ecoscolaire_school_id');
-        return true;
-      }
+    const superAdmin = db.users.find(u => u.role === 'superAdmin' && u.emailOrPhone === emailOrPhone);
+    if (superAdmin && superAdmin.pinHash === pinHashed) {
+      setCurrentUser(superAdmin);
+      setCurrentSchool(null);
+      localStorage.setItem('ecoscolaire_user_id', superAdmin.id);
+      localStorage.removeItem('ecoscolaire_school_id');
+      return true;
     }
 
     // Normal User / Parent login
