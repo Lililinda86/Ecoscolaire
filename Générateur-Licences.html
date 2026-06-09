@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Clés de Licence - EcoScolaire</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-width: 500px; width: 100%; text-align: center; border-top: 5px solid #4f46e5; }
+        h1 { color: #1f2937; font-size: 1.5rem; margin-top: 0; }
+        button { background: #4f46e5; color: white; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 5px; cursor: pointer; transition: background 0.2s; width: 100%; font-weight: bold; }
+        button:hover { background: #4338ca; }
+        .key-box { margin-top: 1.5rem; padding: 1rem; background: #eef2ff; border: 2px dashed #4f46e5; color: #4f46e5; font-size: 1.5rem; font-family: monospace; border-radius: 5px; letter-spacing: 2px; }
+        .history { margin-top: 2rem; text-align: left; max-height: 150px; overflow-y: auto; font-size: 0.9rem; color: #4b5563; }
+        .history ul { list-style: none; padding: 0; }
+        .history li { border-bottom: 1px solid #e5e7eb; padding: 0.5rem 0; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>🔐 Générateur de Licence - EcoScolaire</h1>
+        <p style="color: #6b7280; font-size: 0.9rem;">Créez une clé unique pour chaque acheteur.</p>
+        
+        <button onclick="generateKey()">Générer une nouvelle clé unique</button>
+
+        <div id="result" class="key-box" style="display: none;">
+            <!-- La clé apparaitra ici -->
+        </div>
+
+        <div class="history">
+            <strong>Historique de la session :</strong>
+            <ul id="historyList"></ul>
+        </div>
+    </div>
+
+    <script>
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        function generateKey() {
+            // Partie 1 : 5 caractères aléatoires (Pour rendre la clé unique)
+            const part1 = generateRandomString(5);
+            
+            // Partie 2 : Calcul de la signature algorithmique attendue par l'Application
+            let sum = 0;
+            for(let i = 0; i < part1.length; i++) {
+                sum += part1.charCodeAt(i);
+            }
+            const expectedPart2 = (sum * 3).toString(36).toUpperCase().padStart(5, '0');
+            
+            // Format Final
+            const finalKey = `ECO-${part1}-${expectedPart2}`;
+            
+            // Affichage
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerText = finalKey;
+
+            // Ajout à l'historique
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${finalKey}</strong> - Générée le ${new Date().toLocaleTimeString()}`;
+            document.getElementById('historyList').prepend(li);
+        }
+    </script>
+</body>
+</html>
