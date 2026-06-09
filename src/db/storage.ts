@@ -8,6 +8,10 @@ import type {
   StaffAttendance,
   Grade,
   Bus,
+  BusRoute,
+  FuelExpense,
+  Maintenance,
+  Breakdown,
   Payment,
   InventoryItem,
   InventoryTransaction
@@ -24,6 +28,10 @@ export interface Database {
   staffAttendance: StaffAttendance[];
   grades: Grade[];
   buses: Bus[];
+  busRoutes: BusRoute[];
+  fuelExpenses: FuelExpense[];
+  maintenances: Maintenance[];
+  breakdowns: Breakdown[];
   payments: Payment[];
   expenses: any[];
   inventory: InventoryItem[];
@@ -71,6 +79,10 @@ const initialDB: Database = {
   staffAttendance: [],
   grades: [],
   buses: [],
+  busRoutes: [],
+  fuelExpenses: [],
+  maintenances: [],
+  breakdowns: [],
   payments: [],
   expenses: [],
   inventory: [],

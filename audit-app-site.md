@@ -28,6 +28,7 @@ Les interfaces sont riches et denses, suggérant de nombreuses fonctionnalités 
   - `Setup.tsx` et `Activation.tsx` : Amorçage du compte école et activation logicielle.
 - **Opérations Courantes** :
   - **Paiements (`Payments.tsx` - ~40 Ko)** : Cœur financier, gestion des tranches de scolarité (T1, T2, T3), transport, uniformes. Sûrement lié aux paiements cash/mobile money.
+  - **Transport & Bus (`Buses.tsx`)** : Nouveau module avancé avec un tableau de bord dédié (alertes pannes/entretiens, coûts carburant) et une structure en onglets pour le CRUD complet de la flotte (bus), des lignes, des conducteurs, du carburant et de la mécanique.
   - **Élèves (`Students.tsx` - ~27 Ko)** : Gestion de la base de données des étudiants, importations Excel, attributions de classes.
   - **Présences et Notes (`Attendance.tsx`, `Grades.tsx` - ~24 Ko)** : Modules massifs de relevés journaliers et génération des bulletins.
   - **Inventaire (`Inventory.tsx` - ~15 Ko)** : Gestion du stock avec seuils d'alerte et traçabilité des entrées/sorties.

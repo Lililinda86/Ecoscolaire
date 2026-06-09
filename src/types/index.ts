@@ -61,6 +61,10 @@ export interface Staff {
   name: string;
   role: 'teacher' | 'driver' | 'assistant' | 'director' | 'secretary';
   assignedClassId?: string;
+  phone?: string;
+  licenseNumber?: string;
+  assignedBusId?: string;
+  status?: 'actif' | 'absent' | 'remplacé';
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'left_early';
@@ -95,7 +99,49 @@ export interface Grade {
 export interface Bus {
   id: string;
   name: string;
-  route: string;
+  plate?: string;
+  capacity?: number;
+  status?: 'actif' | 'en_panne' | 'en_entretien';
+  routeId?: string;
+}
+
+export interface BusRoute {
+  id: string;
+  name: string;
+  areas: string;
+  departureTime: string;
+  returnTime: string;
+}
+
+export interface FuelExpense {
+  id: string;
+  date: string;
+  busId: string;
+  amount: number;
+  liters: number;
+  mileage: number;
+  comment: string;
+}
+
+export interface Maintenance {
+  id: string;
+  date: string;
+  busId: string;
+  type: string;
+  amount: number;
+  garage: string;
+  nextMaintenanceDate: string;
+}
+
+export interface Breakdown {
+  id: string;
+  date: string;
+  busId: string;
+  description: string;
+  severity: 'légère' | 'moyenne' | 'urgente';
+  status: 'signalée' | 'en_réparation' | 'réparée';
+  estimatedCost: number;
+  actualCost?: number;
 }
 
 export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'other';
