@@ -9,6 +9,9 @@ interface AppContextProps {
   saveDB: (newDb: Database) => void;
   currentUser: User | Parent | null;
   currentSchool: School | null;
+  isSupervising: boolean;
+  enterSupervision: (schoolId: string) => void;
+  exitSupervision: () => void;
   login: (schoolCode: string, emailOrPhone: string, pin: string) => Promise<boolean>;
   logout: () => void;
 }
@@ -19,6 +22,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [db, setDb] = useState<Database | null>(null);
   const [currentUser, setCurrentUser] = useState<User | Parent | null>(null);
   const [currentSchool, setCurrentSchool] = useState<School | null>(null);
+  const [isSupervising, setIsSupervising] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,8 +75,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const saveDB = (newDb: Database) => {
+    if (isSupervising) {
+      const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les données de cette école. Êtes-vous sûr ?");
+      if (!confirm) return;
+    }
     setDb(newDb);
     saveDBToStorage(newDb);
+  };
+
+  const enterSupervision = (schoolId: string) => {
+    if (currentUser?.role !== 'superAdmin') return;
+    const targetSchool = db?.schools.find(s => s.id === schoolId);
+    if (targetSchool) {
+      setCurrentSchool(targetSchool);
+      setIsSupervising(true);
+    }
+  };
+
+  const exitSupervision = () => {
+    if (currentUser?.role !== 'superAdmin') return;
+    setCurrentSchool(null);
+    setIsSupervising(false);
   };
 
   const login = async (schoolCode: string, emailOrPhone: string, pin: string): Promise<boolean> => {
@@ -131,6 +154,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     setCurrentSchool(null);
+    setIsSupervising(false);
     localStorage.removeItem('ecoscolaire_user_id');
     localStorage.removeItem('ecoscolaire_school_id');
   };
@@ -144,7 +168,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   return (
-    <AppContext.Provider value={{ db, saveDB, currentUser, currentSchool, login, logout }}>
+    <AppContext.Provider value={{ 
+      db, saveDB, currentUser, currentSchool, 
+      isSupervising, enterSupervision, exitSupervision, 
+      login, logout 
+    }}>
       {children}
     </AppContext.Provider>
   );

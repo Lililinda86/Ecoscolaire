@@ -1,18 +1,34 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
-import { LayoutDashboard, UserSquare2, Bus as BusIcon, Package, CheckSquare, Settings, DollarSign, BookOpen } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
+import { LayoutDashboard, UserSquare2, Bus as BusIcon, Package, CheckSquare, Settings, DollarSign, BookOpen, AlertTriangle } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
+  const { isSupervising, currentSchool, exitSupervision } = useAppContext();
 
   const toggleLang = () => {
     setLang(lang === 'fr' ? 'en' : 'fr');
   };
 
   return (
-    <div className="app-layout">
-      <aside className="sidebar">
+    <div className="app-layout" style={{ position: 'relative' }}>
+      {isSupervising && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000, background: '#ef4444', color: 'white', padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 'bold' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertTriangle size={20} />
+            MODE SUPERVISION — École : {currentSchool?.name}
+          </div>
+          <button 
+            onClick={exitSupervision}
+            style={{ background: 'white', color: '#ef4444', border: 'none', padding: '0.25rem 0.75rem', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            Retour Super Admin
+          </button>
+        </div>
+      )}
+      <aside className="sidebar" style={{ paddingTop: isSupervising ? '3rem' : undefined }}>
         <h2>EcoScolaire</h2>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>

@@ -75,9 +75,8 @@ const SuperAdmin: React.FC = () => {
           <thead style={{ background: 'var(--bg-color)' }}>
             <tr>
               <th style={{ padding: '1rem', textAlign: 'left' }}>Code / Nom</th>
-              <th style={{ padding: '1rem', textAlign: 'left' }}>Abonnement</th>
-              <th style={{ padding: '1rem', textAlign: 'left' }}>Statut</th>
-              <th style={{ padding: '1rem', textAlign: 'left' }}>Expiration</th>
+              <th style={{ padding: '1rem', textAlign: 'left' }}>Abonnement / Statut</th>
+              <th style={{ padding: '1rem', textAlign: 'left' }}>Dates & Revenus</th>
               <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
@@ -86,26 +85,60 @@ const SuperAdmin: React.FC = () => {
               <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <td style={{ padding: '1rem' }}><strong>{s.schoolCode}</strong><br/><small style={{ color: 'var(--text-muted)' }}>{s.name}</small></td>
                 <td style={{ padding: '1rem' }}>
-                  <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)' }}>
-                    {s.subscriptionPlan?.toUpperCase()}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)' }}>
+                      {s.subscriptionPlan?.toUpperCase()}
+                    </span>
+                    <span style={{ 
+                      padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                      color: s.subscriptionStatus === 'active' ? '#10b981' : s.subscriptionStatus === 'trial' ? '#3b82f6' : '#ef4444',
+                      background: s.subscriptionStatus === 'active' ? 'rgba(16, 185, 129, 0.1)' : s.subscriptionStatus === 'trial' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+                    }}>
+                      {s.subscriptionStatus?.toUpperCase()}
+                    </span>
+                  </div>
                 </td>
-                <td style={{ padding: '1rem' }}>
-                  <span style={{ 
-                    padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                    color: s.subscriptionStatus === 'active' ? '#10b981' : s.subscriptionStatus === 'trial' ? '#3b82f6' : '#ef4444',
-                    background: s.subscriptionStatus === 'active' ? 'rgba(16, 185, 129, 0.1)' : s.subscriptionStatus === 'trial' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)'
-                  }}>
-                    {s.subscriptionStatus?.toUpperCase()}
-                  </span>
+                <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <span><strong>Exp:</strong> {s.subscriptionEndDate || '---'}</span>
+                    <span><strong>Paiement:</strong> {s.nextPaymentDate || '---'}</span>
+                    <span><strong>Revenus:</strong> {s.amountPaid ? `${s.amountPaid} FCFA` : '0 FCFA'}</span>
+                  </div>
                 </td>
-                <td style={{ padding: '1rem' }}>{s.subscriptionEndDate || 'Non défini'}</td>
                 <td style={{ padding: '1rem', textAlign: 'right' }}>
-                  <button className="secondary" onClick={() => { setCurrentSchool(s); setModalOpen(true); }}><Edit2 size={16} /> Gérer</button>
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <button 
+                      className="primary" 
+                      onClick={() => useAppContext().enterSupervision(s.id)}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    >
+                      <Play size={14} style={{ marginRight: '0.25rem' }} /> Accéder
+                    </button>
+                    <button 
+                      className="secondary" 
+                      onClick={() => { setCurrentSchool(s); setModalOpen(true); }}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    >
+                      <Edit2 size={14} style={{ marginRight: '0.25rem' }} /> Gérer
+                    </button>
+                    <button 
+                      className="danger" 
+                      onClick={() => {
+                        const newStatus: SubscriptionStatus = s.subscriptionStatus === 'active' ? 'suspended' : 'active';
+                        if (window.confirm(`Voulez-vous ${newStatus === 'suspended' ? 'suspendre' : 'réactiver'} cette école ?`)) {
+                          const newDb = { ...db, schools: db.schools.map(school => school.id === s.id ? { ...school, subscriptionStatus: newStatus } : school) };
+                          saveDB(newDb);
+                        }
+                      }}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: s.subscriptionStatus === 'active' ? '#fee2e2' : '#dcfce7', color: s.subscriptionStatus === 'active' ? '#ef4444' : '#10b981', border: 'none' }}
+                    >
+                      <AlertCircle size={14} style={{ marginRight: '0.25rem' }} /> {s.subscriptionStatus === 'active' ? 'Suspendre' : 'Réactiver'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
-            {schools.length === 0 && <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center' }}>Aucune école cliente.</td></tr>}
+            {schools.length === 0 && <tr><td colSpan={4} style={{ padding: '2rem', textAlign: 'center' }}>Aucune école cliente.</td></tr>}
           </tbody>
         </table>
       </div>

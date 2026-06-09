@@ -18,7 +18,7 @@ import SuperAdmin from './pages/SuperAdmin';
 import ParentPortal from './pages/ParentPortal';
 
 function App() {
-  const { db, saveDB, currentUser } = useAppContext();
+  const { db, saveDB, currentUser, isSupervising } = useAppContext();
 
   useEffect(() => {
     if (!db.school) return;
@@ -101,8 +101,8 @@ function App() {
     );
   }
 
-  // Super Admin
-  if (currentUser.role === 'superAdmin') {
+  // Super Admin (hors supervision)
+  if (currentUser.role === 'superAdmin' && !isSupervising) {
     return (
       <HashRouter>
         <Routes>
