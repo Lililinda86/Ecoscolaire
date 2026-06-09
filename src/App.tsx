@@ -17,6 +17,8 @@ import Login from './pages/Login';
 import SuperAdmin from './pages/SuperAdmin';
 import ParentPortal from './pages/ParentPortal';
 
+import Diagnostic from './pages/Diagnostic';
+
 function App() {
   const { db, saveDB, currentUser, isSupervising } = useAppContext();
 
@@ -95,6 +97,7 @@ function App() {
     return (
       <HashRouter>
         <Routes>
+          <Route path="/diagnostic" element={<Diagnostic />} />
           <Route path="*" element={<Login />} />
         </Routes>
       </HashRouter>
@@ -106,6 +109,7 @@ function App() {
     return (
       <HashRouter>
         <Routes>
+          <Route path="/diagnostic" element={<Diagnostic />} />
           <Route path="*" element={<SuperAdmin />} />
         </Routes>
       </HashRouter>

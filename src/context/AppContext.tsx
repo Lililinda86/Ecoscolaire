@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Database } from '../db/storage';
-import { getDB as getDefaultDB, defaultDB, saveDB as saveDBToStorage } from '../db/storage';
+import { defaultDB, saveDB as saveDBToStorage } from '../db/storage';
 import type { User, Parent, School } from '../types';
 import { hashPIN } from '../utils/crypto';
 
@@ -14,6 +14,8 @@ interface AppContextProps {
   exitSupervision: () => void;
   login: (schoolCode: string, emailOrPhone: string, pin: string) => Promise<boolean>;
   logout: () => void;
+  isFirestoreConnected: boolean | null;
+  firestoreError: string | null;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -24,63 +26,126 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentSchool, setCurrentSchool] = useState<School | null>(null);
   const [isSupervising, setIsSupervising] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isFirestoreConnected, setIsFirestoreConnected] = useState<boolean | null>(null);
+  const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadedDb = getDefaultDB();
-    let currentDb = { ...loadedDb };
-    
-    // Auto-inject missing classes
-    const missingClasses = defaultDB.classes.filter(defCls => !currentDb.classes.some(c => c.id === defCls.id));
-    if (missingClasses.length > 0) {
-      currentDb.classes = [...currentDb.classes, ...missingClasses];
-      saveDBToStorage(currentDb);
-    }
-    
-    // Auto-inject default Super Admin if none exists (SaaS bootstrap)
-    if (!currentDb.users) currentDb.users = [];
-    const hasSuperAdmin = currentDb.users.some(u => u.role === 'superAdmin');
-    if (!hasSuperAdmin) {
-      currentDb.users.push({
-        id: 'super-admin-1',
-        emailOrPhone: 'kyrialove@gmail.com',
-        pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', // SHA-256 de '1234'
-        role: 'superAdmin',
-        isActive: true,
-        mustChangePin: true
-      });
-      saveDBToStorage(currentDb);
-    }
-    
-    setDb(currentDb);
+    const initializeFirebaseData = async () => {
+      try {
+        const { db: firestoreDb } = await import('../db/firebase');
+        const { collection, getDocs } = await import('firebase/firestore');
 
-    // Restore session
-    const savedUserId = localStorage.getItem('ecoscolaire_user_id');
-    const savedSchoolId = localStorage.getItem('ecoscolaire_school_id');
-    
-    if (savedUserId) {
-      const user = currentDb.users.find(u => u.id === savedUserId) || currentDb.parents.find(p => p.id === savedUserId);
-      if (user) {
-        setCurrentUser(user as any);
-        if (savedSchoolId) {
-          const school = currentDb.schools.find(s => s.id === savedSchoolId) || null;
-          setCurrentSchool(school);
+        const collectionsToFetch = ['schools', 'users', 'classes', 'students', 'staff', 'buses', 'inventory', 'grades', 'payments', 'attendance', 'parents'];
+        const loadedDb: any = { ...defaultDB };
+
+        for (const colName of collectionsToFetch) {
+          const snapshot = await getDocs(collection(firestoreDb, colName));
+          loadedDb[colName] = snapshot.docs.map(doc => doc.data());
         }
-      } else {
-        localStorage.removeItem('ecoscolaire_user_id');
-        localStorage.removeItem('ecoscolaire_school_id');
-      }
-    }
 
-    setLoading(false);
+        setIsFirestoreConnected(true);
+        setFirestoreError(null);
+        
+        // Auto-inject missing default classes if none exist
+        const missingClasses = defaultDB.classes.filter(defCls => !loadedDb.classes.some((c: any) => c.id === defCls.id));
+        if (missingClasses.length > 0) {
+          loadedDb.classes = [...loadedDb.classes, ...missingClasses];
+          // We will sync them via saveDB later if needed
+        }
+
+        // Auto-inject default Super Admin if none exists
+        if (!loadedDb.users) loadedDb.users = [];
+        const hasSuperAdmin = loadedDb.users.some((u: any) => u.role === 'superAdmin');
+        if (!hasSuperAdmin) {
+          loadedDb.users.push({
+            id: 'super-admin-1',
+            emailOrPhone: 'kyrialove@gmail.com',
+            pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
+            role: 'superAdmin',
+            isActive: true,
+            mustChangePin: true
+          });
+        }
+
+        setDb(loadedDb);
+        restoreSession(loadedDb);
+        setLoading(false);
+
+      } catch (error: any) {
+        console.error("Firestore Error:", error);
+        setIsFirestoreConnected(false);
+        setFirestoreError(error.message || "Erreur de connexion à Firestore");
+        setLoading(false);
+      }
+    };
+
+    const restoreSession = (currentDb: any) => {
+      const savedUserId = localStorage.getItem('ecoscolaire_user_id');
+      const savedSchoolId = localStorage.getItem('ecoscolaire_school_id');
+      
+      if (savedUserId) {
+        const user = currentDb.users.find((u: any) => u.id === savedUserId) || currentDb.parents.find((p: any) => p.id === savedUserId);
+        if (user) {
+          setCurrentUser(user as any);
+          if (savedSchoolId) {
+            const school = currentDb.schools.find((s: any) => s.id === savedSchoolId) || null;
+            setCurrentSchool(school);
+          }
+        } else {
+          localStorage.removeItem('ecoscolaire_user_id');
+          localStorage.removeItem('ecoscolaire_school_id');
+        }
+      }
+    };
+
+    initializeFirebaseData();
   }, []);
 
-  const saveDB = (newDb: Database) => {
+  const saveDB = async (newDb: Database) => {
     if (isSupervising) {
       const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les données de cette école. Êtes-vous sûr ?");
       if (!confirm) return;
     }
+    
+    // Update local state immediately for snappy UI
     setDb(newDb);
-    saveDBToStorage(newDb);
+    saveDBToStorage(newDb); // Keep local fallback just in case
+
+    // Diff Engine to sync only changed items to Firestore
+    try {
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
+
+      const collections = ['schools', 'users', 'classes', 'students', 'staff', 'buses', 'inventory', 'grades', 'payments', 'attendance', 'parents'] as const;
+      
+      for (const col of collections) {
+        const oldArray = db ? (db[col] as any[]) : [];
+        const newArray = newDb[col] as any[];
+
+        // Maps for quick lookup
+        const oldMap = new Map(oldArray.map(item => [item.id, item]));
+        const newMap = new Map(newArray.map(item => [item.id, item]));
+
+        // Finds Adds & Updates
+        for (const newItem of newArray) {
+          const oldItem = oldMap.get(newItem.id);
+          if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(newItem)) {
+            // Added or Updated
+            await setDoc(doc(firestoreDb, col, newItem.id), newItem);
+          }
+        }
+
+        // Finds Deletes
+        for (const oldItem of oldArray) {
+          if (!newMap.has(oldItem.id)) {
+            // Deleted
+            await deleteDoc(doc(firestoreDb, col, oldItem.id));
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Diffing Sync Error:", e);
+    }
   };
 
   const enterSupervision = (schoolId: string) => {
@@ -171,7 +236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{ 
       db, saveDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
-      login, logout 
+      login, logout, isFirestoreConnected, firestoreError
     }}>
       {children}
     </AppContext.Provider>

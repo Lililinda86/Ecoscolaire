@@ -32,7 +32,6 @@ const Login: React.FC = () => {
 
   const handleRecoverySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulation d'envoi d'email
     setRecoverySent(true);
     setTimeout(() => {
       setRecoveryModalOpen(false);
@@ -40,6 +39,8 @@ const Login: React.FC = () => {
       setRecoveryEmail('');
     }, 4000);
   };
+
+  const { isFirestoreConnected, firestoreError } = useAppContext();
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)', padding: '1rem' }}>
@@ -51,6 +52,18 @@ const Login: React.FC = () => {
           <h1 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--text-color)' }}>EcoScolaire SaaS</h1>
           <p style={{ color: 'var(--text-muted)', margin: '0.5rem 0 0 0' }}>Connectez-vous à votre espace</p>
         </div>
+
+        {isFirestoreConnected === false && (
+          <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.75rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem', border: '1px solid #f87171' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <AlertTriangle size={18} /> <strong>Erreur de Base de Données</strong>
+            </div>
+            {firestoreError}
+            <div style={{ marginTop: '0.5rem' }}>
+              <a href="#/diagnostic" style={{ color: '#991b1b', textDecoration: 'underline', fontWeight: 600 }}>Voir le Diagnostic complet</a>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.75rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem', border: '1px solid #f87171' }}>
