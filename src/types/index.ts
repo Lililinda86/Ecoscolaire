@@ -1,10 +1,22 @@
+export type SubscriptionPlan = 'starter' | 'standard' | 'premium';
+export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired';
+
 export interface School {
-  id: string;
-  name: string;
+  id: string; // schoolId
+  schoolCode: string;
+  name: string; // schoolName
   academicYear: string;
   logo?: string;
   adminPin?: string;
   createdAt: string;
+  // --- Nouveaux champs SaaS ---
+  subscriptionPlan?: SubscriptionPlan;
+  subscriptionStatus?: SubscriptionStatus;
+  subscriptionStartDate?: string;
+  subscriptionEndDate?: string;
+  amountPaid?: number;
+  nextPaymentDate?: string;
+  // --- Fin champs SaaS ---
   globalFees?: {
     feeT1: number;
     feeT2: number;
@@ -18,10 +30,38 @@ export interface School {
   };
 }
 
+export type GlobalRole = 'superAdmin' | 'schoolAdmin' | 'accountant' | 'teacher' | 'parent' | 'driver';
+
+export interface User {
+  id: string;
+  schoolId?: string; // Null pour le superAdmin
+  emailOrPhone: string;
+  pinHash: string;
+  role: GlobalRole;
+  isActive: boolean;
+  mustChangePin: boolean; // Forcer le changement au premier login
+}
+
+export interface Parent {
+  id: string;
+  schoolId: string;
+  firstName: string;
+  lastName: string;
+  phoneWhatsApp: string;
+  email?: string;
+  address?: string;
+  studentIds: string[]; // Liens avec les enfants
+  isActive: boolean;
+  role: 'parent';
+  pinHash?: string;
+  mustChangePin?: boolean;
+}
+
 export type SectionType = 'francophone' | 'anglophone';
 
 export interface ClassSection {
   id: string;
+  schoolId?: string;
   name: string;
   type: SectionType;
   subjects?: string[]; // Allowed subjects for this class
@@ -31,11 +71,13 @@ export interface ClassSection {
 
 export interface Subject {
   id: string;
+  schoolId?: string;
   name: string;
 }
 
 export interface Student {
   id: string;
+  schoolId?: string;
   matricule?: string;
   name: string;
   gender: 'M' | 'F';
@@ -52,12 +94,14 @@ export interface Student {
   feeT3?: number; // Tranche 3
   feeTransport?: number;
   feeUniforms?: number;
+  financialBypass?: { t1: boolean, t2: boolean, t3: boolean }; // Pour débloquer les notes
   rawClassName?: string; // Used for Excel import preview
   detectedClassName?: string; // Used for Excel import preview
 }
 
 export interface Staff {
   id: string;
+  schoolId?: string;
   name: string;
   role: 'teacher' | 'driver' | 'assistant' | 'director' | 'secretary';
   assignedClassId?: string;
@@ -71,6 +115,7 @@ export type AttendanceStatus = 'present' | 'absent' | 'late' | 'left_early';
 
 export interface Attendance {
   id: string;
+  schoolId?: string;
   studentId: string;
   date: string;
   present: boolean;
@@ -80,6 +125,7 @@ export interface Attendance {
 
 export interface StaffAttendance {
   id: string;
+  schoolId?: string;
   staffId: string;
   date: string;
   present: boolean;
@@ -89,15 +135,17 @@ export interface StaffAttendance {
 
 export interface Grade {
   id: string;
+  schoolId?: string;
   studentId: string;
   subjectId: string;
-  date: string; // e.g. "2023-10-01" or a semester id
+  date: string; // e.g. "2023-10-01" ou un ID de semestre
   score: number;
   maxScore?: number;
 }
 
 export interface Bus {
   id: string;
+  schoolId?: string;
   name: string;
   plate?: string;
   capacity?: number;
@@ -107,6 +155,7 @@ export interface Bus {
 
 export interface BusRoute {
   id: string;
+  schoolId?: string;
   name: string;
   areas: string;
   departureTime: string;
@@ -115,6 +164,7 @@ export interface BusRoute {
 
 export interface FuelExpense {
   id: string;
+  schoolId?: string;
   date: string;
   busId: string;
   amount: number;
@@ -125,6 +175,7 @@ export interface FuelExpense {
 
 export interface Maintenance {
   id: string;
+  schoolId?: string;
   date: string;
   busId: string;
   type: string;
@@ -135,6 +186,7 @@ export interface Maintenance {
 
 export interface Breakdown {
   id: string;
+  schoolId?: string;
   date: string;
   busId: string;
   description: string;
@@ -148,6 +200,7 @@ export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'other';
 
 export interface Payment {
   id: string;
+  schoolId?: string;
   studentId: string;
   amount: number;
   type: PaymentType;
@@ -160,6 +213,7 @@ export interface Payment {
 
 export interface Expense {
   id: string;
+  schoolId?: string;
   amount: number;
   date: string;
   person: string;
@@ -168,6 +222,7 @@ export interface Expense {
 
 export interface InventoryItem {
   id: string;
+  schoolId?: string;
   name: string;
   quantity: number;
   alertThreshold: number;
@@ -175,6 +230,7 @@ export interface InventoryItem {
 
 export interface InventoryTransaction {
   id: string;
+  schoolId?: string;
   itemId: string;
   type: 'IN' | 'OUT';
   quantity: number;

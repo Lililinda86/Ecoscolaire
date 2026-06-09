@@ -9,14 +9,16 @@ import Staff from './pages/Staff';
 import Attendance from './pages/Attendance';
 import Buses from './pages/Buses';
 import Inventory from './pages/Inventory';
-import Setup from './pages/Setup';
 import Settings from './pages/Settings';
 import Grades from './pages/Grades';
 import Payments from './pages/Payments';
 import Classes from './pages/Classes';
+import Login from './pages/Login';
+import SuperAdmin from './pages/SuperAdmin';
+import ParentPortal from './pages/ParentPortal';
 
 function App() {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentUser } = useAppContext();
 
   useEffect(() => {
     if (!db.school) return;
@@ -28,13 +30,11 @@ function App() {
     newClasses = newClasses.map(c => {
       if (c.name.match(/m[èe]re/i)) {
         shouldSave = true;
-        // Fix typo: replace 'maternelle' with the properly capitalized version
         return { ...c, name: c.name.replace(/m[èe]re/ig, 'Maternelle') };
       }
       return c;
     });
 
-    // 2. Ensure ALL standard curriculum classes exist globally
     const standardFranco = ['Maternelle 1', 'Maternelle 2', 'Maternelle 3', 'SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'];
     const standardAnglo = ['Nursery 1', 'Nursery 2', 'Nursery 3', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6'];
     
@@ -57,7 +57,6 @@ function App() {
       }
     });
 
-    // 3. Deduplicate classes to fix any previously created duplicates
     const uniqueClassesMap = new Map<string, string>(); // hash -> id
     const duplicateClassIdsToRemap = new Map<string, string>(); // oldId -> newId
     const deduplicatedClasses: typeof newClasses = [];
@@ -77,11 +76,11 @@ function App() {
       const payload: any = { ...db, classes: deduplicatedClasses };
       
       if (duplicateClassIdsToRemap.size > 0) {
-        payload.students = db.students.map(s => s.classId && duplicateClassIdsToRemap.has(s.classId) 
+        payload.students = db.students.map((s: any) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
           ? { ...s, classId: duplicateClassIdsToRemap.get(s.classId)! } 
           : s
         );
-        payload.staff = db.staff.map(s => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
+        payload.staff = db.staff.map((s: any) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
           ? { ...s, assignedClassId: duplicateClassIdsToRemap.get(s.assignedClassId)! }
           : s
         );
@@ -91,16 +90,40 @@ function App() {
     }
   }, [db.classes, db.school]);
 
-  if (!db.school) {
+  // Non connecté
+  if (!currentUser) {
     return (
       <HashRouter>
         <Routes>
-          <Route path="*" element={<Setup />} />
+          <Route path="*" element={<Login />} />
         </Routes>
       </HashRouter>
     );
   }
 
+  // Super Admin
+  if (currentUser.role === 'superAdmin') {
+    return (
+      <HashRouter>
+        <Routes>
+          <Route path="*" element={<SuperAdmin />} />
+        </Routes>
+      </HashRouter>
+    );
+  }
+
+  // Parent
+  if (currentUser.role === 'parent') {
+    return (
+      <HashRouter>
+        <Routes>
+          <Route path="*" element={<ParentPortal />} />
+        </Routes>
+      </HashRouter>
+    );
+  }
+
+  // School Admin & autres staffs
   return (
     <HashRouter>
       <Layout>

@@ -19,6 +19,7 @@ const Setup: React.FC = () => {
     const newDb = { ...db };
     newDb.school = {
       id: crypto.randomUUID(),
+      schoolCode: `ECO-${Math.floor(Math.random() * 10000)}`,
       name: schoolName,
       academicYear: `${new Date().getFullYear()} - ${new Date().getFullYear() + 1}`,
       adminPin: adminPin || '0000',

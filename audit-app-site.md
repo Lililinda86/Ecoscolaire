@@ -25,8 +25,10 @@ Les données sont strictement typées :
 ## 3. Cartographie de l'UI (Pages et Composants)
 Les interfaces sont riches et denses, suggérant de nombreuses fonctionnalités intégrées :
 - **Authentification / Amorce** : 
-  - `Setup.tsx` et `Activation.tsx` : Amorçage du compte école et activation logicielle.
+  - `Setup.tsx` (Création de client) et `SuperAdmin.tsx` (Tableau de bord de gestion globale des abonnements).
+  - `Login.tsx` : Page de connexion centralisée (Multi-tenant) utilisant le Code École, l'identifiant et un PIN haché (SHA-256).
 - **Opérations Courantes** :
+  - **Portail Parent (`ParentPortal.tsx`)** : Vue restreinte aux enfants liés. Implémente une **logique de blocage financier** : un trimestre n'est visible que si la tranche de pension correspondante est payée (ex: T1 bloqué si Tranche 1 impayée).
   - **Paiements (`Payments.tsx` - ~40 Ko)** : Cœur financier, gestion des tranches de scolarité (T1, T2, T3), transport, uniformes. Sûrement lié aux paiements cash/mobile money.
   - **Transport & Bus (`Buses.tsx`)** : Nouveau module avancé avec un tableau de bord dédié (alertes pannes/entretiens, coûts carburant) et une structure en onglets pour le CRUD complet de la flotte (bus), des lignes, des conducteurs, du carburant et de la mécanique.
   - **Élèves (`Students.tsx` - ~27 Ko)** : Gestion de la base de données des étudiants, importations Excel, attributions de classes.
@@ -39,10 +41,18 @@ Les interfaces sont riches et denses, suggérant de nombreuses fonctionnalités 
 - **Résilience** : La logique de `AppContext` tolère les erreurs de snapshot Firebase (mode hors-ligne partiel).
 - **Auto-Correction** : Le fichier `App.tsx` contient une routine qui corrige automatiquement les erreurs de saisie sur les noms des classes (ex: "Mère" -> "Maternelle") et injecte les classes standards manquantes si elles ont été supprimées par erreur.
 
-## 5. Recommandations et Axes d'Amélioration
-- **Performances de rendu** : Le `AppContext` stocke *toute* la base de données (élèves, notes, inventaire) dans un seul gros objet de state `db`. Cela signifie que chaque modification de note d'un élève pourrait potentiellement déclencher un re-rendu de composants n'ayant pas de lien (ex: composants utilisant l'inventaire). Il serait recommandé de scinder le contexte ou d'utiliser une librairie comme `Zustand` ou `React Query`.
-- **Firebase Firestore Queries** : Actuellement, l'application récupère toute la base Firestore en mémoire (Collections). À mesure que l'école grandit (des milliers d'élèves, notes, et paiements accumulés sur plusieurs années), cette approche (`onSnapshot` sur toute la collection sans filtre de pagination ni limite) causera de sérieux problèmes de consommation de bande passante et de facturation Firebase.
+## 4. Points d'Attention / Sécurité & Accès (SaaS)
+- L'application vient d'être restructurée pour un modèle **SaaS Multi-écoles (Multi-tenant)**.
+- **Rôles Globaux** : `superAdmin`, `schoolAdmin`, `accountant`, `teacher`, `parent`, `driver`.
+- **Authentification** : Les PINs ne sont plus en clair mais hachés via l'API Web Crypto (SHA-256) avant d'être sauvegardés ou comparés.
+- **Sécurité des données** : Tous les modèles (`Student`, `Class`, etc.) possèdent désormais un champ `schoolId`. Le Contexte de l'application filtre strictement l'affichage des entités par école.
+- **Abonnements** : Formules `starter`, `standard`, `premium` et statuts (`trial`, `active`, `expired`) gérés par le Super Admin pour bloquer/limiter les écoles non à jour.
+
+## 5. Recommandations
+- Les scripts d'exportation/importation de base de données devront être adaptés pour le Super Admin uniquement, afin d'éviter la fuite de données d'une école à l'autre.
+- La migration complète vers Firebase/Firestore (API asynchrone) est préparée via la structure de la BDD, mais nécessite un mapping de toutes les anciennes requêtes synchrones vers Firebase.
+- **Performances de rendu** : Le `AppContext` stocke *toute* la base de données (élèves, notes, inventaire) dans un seul gros objet de state `db`. Il serait recommandé de scinder le contexte ou d'utiliser une librairie comme `Zustand` ou `React Query`.
+- **Firebase Firestore Queries** : Actuellement, l'application récupère toute la base Firestore en mémoire (Collections). À mesure que l'école grandit, cette approche (`onSnapshot` sur toute la collection sans filtre de pagination ni limite) causera de sérieux problèmes de consommation de bande passante et de facturation Firebase.
 - **Sécurité** : 
   - Stockage potentiel de clés secrètes (`flutterwaveSecret`) dans la base de données. Il est crucial que les règles Firebase (`firebase.rules`) empêchent l'accès public en lecture à ces clés.
-  - Vérifier la robustesse du système d'authentification : s'il n'y a pas d'authentification Firebase standard (via email/mot de passe) mais juste un `adminPin` géré côté client, la base de données est vulnérable.
 - **Export PDF (`html2canvas` + `jspdf`)** : L'utilisation de ces librairies peut entraîner des blocages de thread (UI gelée) lors de l'exportation par lots (ex: impression de 50 bulletins). Il conviendrait de déporter cette tâche sur un Web Worker ou un service externe.

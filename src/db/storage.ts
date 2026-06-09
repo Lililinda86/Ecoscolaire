@@ -14,10 +14,18 @@ import type {
   Breakdown,
   Payment,
   InventoryItem,
-  InventoryTransaction
+  InventoryTransaction,
+  User,
+  Parent
 } from '../types';
 
 export interface Database {
+  // --- SaaS Collections (Globales) ---
+  schools: School[];
+  users: User[];
+  parents: Parent[];
+
+  // --- Current Tenant Context ---
   isActivated?: boolean;
   school: School | null;
   students: Student[];
@@ -41,6 +49,21 @@ export interface Database {
 const DB_KEY = 'ecoscolaire_data';
 
 const initialDB: Database = {
+  // Global SaaS
+  schools: [],
+  users: [
+    {
+      id: 'super-admin-1',
+      emailOrPhone: 'admin@ecoscolaire.com',
+      pinHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', // SHA-256 de 'admin'
+      role: 'superAdmin',
+      isActive: true,
+      mustChangePin: false
+    }
+  ],
+  parents: [],
+
+  // Current Tenant
   school: null,
   isActivated: false,
   students: [],
