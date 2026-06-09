@@ -54,11 +54,11 @@ const initialDB: Database = {
   users: [
     {
       id: 'super-admin-1',
-      emailOrPhone: 'admin@ecoscolaire.com',
-      pinHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', // SHA-256 de 'admin'
+      emailOrPhone: 'kyrialove@gmail.com',
+      pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', // SHA-256 de '1234'
       role: 'superAdmin',
       isActive: true,
-      mustChangePin: false
+      mustChangePin: true // Force le changement à la première connexion
     }
   ],
   parents: [],

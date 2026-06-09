@@ -94,6 +94,16 @@ const Login: React.FC = () => {
             </div>
           </div>
 
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+            <button 
+              type="button" 
+              onClick={() => alert("Procédure de récupération : Veuillez contacter l'administrateur système ou le support technique d'EcoScolaire (support@ecoscolaire.com) pour réinitialiser votre code PIN sécurisé.")}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0, fontWeight: 500 }}
+            >
+              Code PIN oublié ?
+            </button>
+          </div>
+
           <button 
             type="submit" 
             disabled={loading}
