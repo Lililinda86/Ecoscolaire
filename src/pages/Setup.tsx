@@ -66,7 +66,7 @@ const Setup: React.FC = () => {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif" }}>
       {/* Colonne Image (Cachée sur petits écrans) */}
-      <div style={{ flex: 1, display: 'none', '@media (minWidth: 768px)': { display: 'block' }, position: 'relative' }} className="setup-image-container">
+      <div style={{ flex: 1, display: 'none', position: 'relative' }} className="setup-image-container">
         <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(79, 70, 229, 0.4)', mixBlendMode: 'multiply' }}></div>
         <img 
           src={setupBg} 
@@ -90,7 +90,7 @@ const Setup: React.FC = () => {
           <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div>
               <label htmlFor="schoolName" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#334155', marginBottom: '0.5rem' }}>
-                {t('school_name', 'Nom de l\\'établissement')}
+                {t('school_name', "Nom de l'établissement")}
               </label>
               <input 
                 id="schoolName"
