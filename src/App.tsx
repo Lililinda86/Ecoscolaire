@@ -25,7 +25,7 @@ function App() {
   const { db, saveDB, currentUser, isSupervising } = useAppContext();
 
   useEffect(() => {
-    if (!db.school) return;
+    if (!db || !db.school) return;
 
     let shouldSave = false;
     let newClasses = [...db.classes];
@@ -92,7 +92,7 @@ function App() {
 
       saveDB(payload);
     }
-  }, [db.classes, db.school]);
+  }, [db?.classes, db?.school, saveDB]);
 
   // Non connecté
   if (!currentUser) {
