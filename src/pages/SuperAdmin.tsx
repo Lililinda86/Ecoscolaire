@@ -13,20 +13,39 @@ const SuperAdmin: React.FC = () => {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Accès refusé. Réservé au Super Admin.</div>;
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const newDb = { ...db };
     
-    if (currentSchool.id) {
-      newDb.schools = (newDb.schools || []).map(s => s.id === currentSchool.id ? { ...s, ...currentSchool } as School : s);
-    } else {
-      const newSchool = { ...currentSchool, id: crypto.randomUUID(), createdAt: new Date().toISOString() } as School;
-      console.log("🟢 [SuperAdmin] Création d'une nouvelle école dans l'état local :", newSchool);
-      newDb.schools = [...(newDb.schools || []), newSchool];
+    try {
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { doc, setDoc, collection, getDocs } = await import('firebase/firestore');
+
+      if (currentSchool.id) {
+        const updatedSchool = { ...currentSchool } as School;
+        await setDoc(doc(firestoreDb, 'schools', updatedSchool.id), updatedSchool);
+        console.log("🟢 [SuperAdmin] setDoc exécuté avec succès pour mise à jour :", updatedSchool.id);
+        newDb.schools = (newDb.schools || []).map(s => s.id === updatedSchool.id ? updatedSchool : s);
+      } else {
+        const newSchool = { ...currentSchool, id: crypto.randomUUID(), createdAt: new Date().toISOString() } as School;
+        console.log("🟢 [SuperAdmin] Création d'une nouvelle école dans l'état local :", newSchool);
+        
+        await setDoc(doc(firestoreDb, 'schools', newSchool.id), newSchool);
+        console.log("🟢 [SuperAdmin] setDoc exécuté avec succès pour création :", newSchool.id);
+        
+        newDb.schools = [...(newDb.schools || []), newSchool];
+      }
+      
+      saveDB(newDb);
+      setModalOpen(false);
+
+      const snap = await getDocs(collection(firestoreDb, 'schools'));
+      console.log(`🟢 [SuperAdmin] Nombre d'écoles dans Firestore après création/update : ${snap.docs.length}`);
+
+    } catch (err) {
+      console.error("❌ Erreur lors de la sauvegarde de l'école :", err);
+      alert("Erreur critique lors de la sauvegarde de l'école.");
     }
-    
-    saveDB(newDb);
-    setModalOpen(false);
   };
 
   const schools = db.schools || [];

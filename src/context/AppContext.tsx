@@ -263,6 +263,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         for (const oldItem of oldArray) {
           if (!newMap.has(oldItem.id)) {
+            if (col === 'schools') {
+              console.log(`🛡️ [AppContext] Protection activée : Suppression de l'école ${oldItem.id} bloquée.`);
+              continue;
+            }
             await deleteDoc(doc(firestoreDb, col, oldItem.id));
           }
         }
@@ -280,10 +284,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsSupervising(true);
   };
 
-  const exitSupervision = () => {
+  const exitSupervision = async () => {
     if (currentUser?.role !== 'superAdmin') return;
+    console.log("🔵 [AppContext] exitSupervision appelé. Retour au mode Global.");
     setSupervisionSchoolId(null);
     setIsSupervising(false);
+    
+    try {
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { collection, getDocs } = await import('firebase/firestore');
+      const snap = await getDocs(collection(firestoreDb, 'schools'));
+      console.log(`🔵 [AppContext] Nombre d'écoles dans Firestore après retour Super Admin : ${snap.docs.length}`);
+    } catch (err) {
+      console.error("Erreur lors de la vérification Firestore au retour :", err);
+    }
   };
 
   const login = async (email: string, pin: string): Promise<boolean> => {
