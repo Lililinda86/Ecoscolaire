@@ -149,11 +149,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance'
         ];
 
+        console.log("================ DIAGNOSTIC AppContext ===============");
+        console.log("1. userData.role :", userData.role);
+        console.log("2. supervisionSchoolId :", supervisionSchoolId);
+
         if (userData.role === 'superAdmin' && !supervisionSchoolId) {
           // Mode Global Super Admin
-          console.log("🔵 [AppContext] Lecture Firestore - Mode Global Super Admin initié.");
+          console.log("3. Branche exécutée : Mode Global Super Admin");
           console.log("🔵 [AppContext] Collection interrogée : /schools");
           const schoolsSnap = await getDocs(collection(firestoreDb, 'schools'));
+          console.log("4. schoolsSnap.size :", schoolsSnap.size);
           
           const docsInfo = schoolsSnap.docs.map(d => ({id: d.id, name: d.data().name}));
           console.log(`🔵 [AppContext] Nombre de documents retournés dans /schools : ${schoolsSnap.docs.length}`);
@@ -163,6 +168,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           loadedDb.schools = schoolsSnap.docs.map(d => ({id: d.id, ...d.data()}));
           const usersSnap = await getDocs(collection(firestoreDb, 'users'));
           loadedDb.users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
+          console.log("5. Contenu de loadedDb.schools avant setDb :", loadedDb.schools);
           
           setIsFirestoreConnected(true);
           setDb(loadedDb);
@@ -171,8 +177,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         // Mode École
+        console.log("3. Branche exécutée : Mode Supervision / École (targetSchoolId requis)");
         const targetSchoolId = supervisionSchoolId || userData.schoolId;
         if (!targetSchoolId) {
+          console.warn("⚠️ targetSchoolId est VITE. userData.role =", userData.role, "- L'utilisateur n'est pas superAdmin et n'a pas d'école assignée. loadedDb.schools =", loadedDb.schools);
           setDb(loadedDb);
           setLoading(false);
           return;
@@ -220,6 +228,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         results.forEach((res: any) => {
           loadedDb[res.colName] = res.data;
         });
+
+        console.log("5. Contenu de loadedDb.schools avant setDb final (Mode École) :", loadedDb.schools);
 
         setIsFirestoreConnected(true);
         setFirestoreError(null);
