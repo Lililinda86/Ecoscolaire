@@ -146,8 +146,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (userData.role === 'superAdmin' && !supervisionSchoolId) {
           // Mode Global Super Admin
+          console.log("🔵 [AppContext] Lecture Firestore - Mode Global Super Admin initié.");
           const schoolsSnap = await getDocs(collection(firestoreDb, 'schools'));
           loadedDb.schools = schoolsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+          console.log(`🔵 [AppContext] Lecture Firestore : ${loadedDb.schools.length} école(s) chargée(s) (F5 ou rechargement).`);
           const usersSnap = await getDocs(collection(firestoreDb, 'users'));
           loadedDb.users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
           
@@ -254,6 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (!newItem.schoolId && col !== 'schools' && col !== 'users' && currentSchool) {
               newItem.schoolId = currentSchool.id;
             }
+            console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour ou ajout dans [${col}] :`, newItem);
             await setDoc(doc(firestoreDb, col, newItem.id), newItem);
           }
         }

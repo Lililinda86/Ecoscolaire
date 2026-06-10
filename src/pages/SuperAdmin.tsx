@@ -18,9 +18,11 @@ const SuperAdmin: React.FC = () => {
     const newDb = { ...db };
     
     if (currentSchool.id) {
-      newDb.schools = newDb.schools.map(s => s.id === currentSchool.id ? { ...s, ...currentSchool } as School : s);
+      newDb.schools = (newDb.schools || []).map(s => s.id === currentSchool.id ? { ...s, ...currentSchool } as School : s);
     } else {
-      newDb.schools.push({ ...currentSchool, id: crypto.randomUUID(), createdAt: new Date().toISOString() } as School);
+      const newSchool = { ...currentSchool, id: crypto.randomUUID(), createdAt: new Date().toISOString() } as School;
+      console.log("🟢 [SuperAdmin] Création d'une nouvelle école dans l'état local :", newSchool);
+      newDb.schools = [...(newDb.schools || []), newSchool];
     }
     
     saveDB(newDb);
