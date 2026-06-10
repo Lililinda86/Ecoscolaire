@@ -16,6 +16,7 @@ interface AppContextProps {
   isFirestoreConnected: boolean | null;
   firestoreError: string | null;
   lastSyncDate: Date | null;
+  supervisionSchoolId: string | null;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -377,7 +378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{ 
       db, saveDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
-      login, logout, isFirestoreConnected, firestoreError, lastSyncDate
+      login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId
     }}>
       {children}
     </AppContext.Provider>
