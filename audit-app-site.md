@@ -10,23 +10,25 @@
   - `lucide-react` : Bibliothèque d'icônes standardisée.
 - **Typage & Qualité :** TypeScript robuste avec des interfaces bien définies, ESLint.
 
-## 2. Architecture des Données & Gestion d'État
+## 2. Architecture des Données & Gestion d'État (100% Firestore)
 ### 2.1 Le Contexte Principal (`AppContext.tsx`)
-Le cœur de l'application repose sur un contexte React (`AppContext`) qui agit comme une couche d'abstraction entre l'UI et la base de données (Firebase / LocalStorage).
-- **Synchronisation Hybride** : L'app gère une transition `localStorage` vers `Firebase Firestore`. Lors du chargement initial, elle écoute 12 collections (`classes`, `subjects`, `students`, `staff`, `buses`, `attendance`, `staffAttendance`, `grades`, `payments`, `expenses`, `inventory`, `inventoryTransactions`) et un document de configuration globale (`school/main`).
-- **Optimistic UI Update** : L'interface est mise à jour immédiatement via `setDb` avant que l'enregistrement Firebase (`setDoc`/`deleteDoc`) ne s'achève, garantissant une grande fluidité pour l'utilisateur.
+Le cœur de l'application repose sur un contexte React (`AppContext`) qui agit comme le chef d'orchestre entre l'UI et la base de données Firestore. Toute dépendance au `localStorage` pour les données métier a été supprimée.
+- **Synchronisation au démarrage (Read)** : L'application télécharge 11 collections Firestore (`schools`, `users`, `classes`, `students`, `staff`, `buses`, `inventory`, `grades`, `payments`, `attendance`, `parents`) en mémoire pour une utilisation réactive.
+- **Moteur de Diffing (Write)** : La fonction `saveDB(newDb)` compare l'ancienne base avec la nouvelle, identifie les éléments exacts ajoutés, modifiés ou supprimés, et envoie uniquement ces deltas à Firestore via `setDoc` ou `deleteDoc`.
+- **Persistance Hors-Ligne (IndexedDB)** : Le SDK Firestore est configuré avec `enableIndexedDbPersistence`, ce qui permet à l'application de fonctionner même sans connexion Internet. Les données modifiées hors-ligne seront synchronisées automatiquement au retour de la connexion.
 
 ### 2.2 Modélisation (`types/index.ts`)
 Les données sont strictement typées :
-- `School` : Configuration globale de l'école (frais de scolarité, clés API pour Flutterwave, logo, etc.).
+- `School` : Configuration globale de l'école (frais de scolarité, abonnement SaaS, etc.).
 - `ClassSection` : Gestion du type `francophone` ou `anglophone` et du niveau (`maternelle` ou `primaire`).
 - `Student`, `Staff`, `Attendance`, `Grade`, `Payment`, `InventoryTransaction` : Les interfaces métiers complètes pour modéliser tout l'écosystème scolaire.
 
 ## 3. Cartographie de l'UI (Pages et Composants)
 Les interfaces sont riches et denses, suggérant de nombreuses fonctionnalités intégrées :
 - **Authentification / Amorce** : 
-  - `Setup.tsx` (Création de client) et `SuperAdmin.tsx` (Tableau de bord de gestion globale des abonnements).
+  - `SuperAdmin.tsx` : Tableau de bord SaaS de gestion globale des abonnements (création d'écoles clientes, suspension, supervision).
   - `Login.tsx` : Page de connexion centralisée (Multi-tenant) utilisant le Code École, l'identifiant et un PIN haché (SHA-256).
+  - `Diagnostic.tsx` (`#/diagnostic`) : Outil en temps réel permettant de vérifier la santé de la connexion Firestore, le nombre d'éléments synchronisés et la dernière date de synchronisation.
 - **Opérations Courantes** :
   - **Portail Parent (`ParentPortal.tsx`)** : Vue restreinte aux enfants liés. Implémente une **logique de blocage financier** : un trimestre n'est visible que si la tranche de pension correspondante est payée (ex: T1 bloqué si Tranche 1 impayée).
   - **Paiements (`Payments.tsx` - ~40 Ko)** : Cœur financier, gestion des tranches de scolarité (T1, T2, T3), transport, uniformes. Sûrement lié aux paiements cash/mobile money.
@@ -36,23 +38,14 @@ Les interfaces sont riches et denses, suggérant de nombreuses fonctionnalités 
   - **Inventaire (`Inventory.tsx` - ~15 Ko)** : Gestion du stock avec seuils d'alerte et traçabilité des entrées/sorties.
   - **Paramètres (`Settings.tsx` - ~15 Ko)** : Configuration des tarifs, années scolaires et clés de paiement.
 
-## 4. Points Forts de l'Application
-- **Bilinguisme natif** : L'architecture supporte nativement le cursus Anglophone (Nursery, Class) et Francophone (Maternelle, SIL, CP, etc.).
-- **Résilience** : La logique de `AppContext` tolère les erreurs de snapshot Firebase (mode hors-ligne partiel).
-- **Auto-Correction** : Le fichier `App.tsx` contient une routine qui corrige automatiquement les erreurs de saisie sur les noms des classes (ex: "Mère" -> "Maternelle") et injecte les classes standards manquantes si elles ont été supprimées par erreur.
-
-## 4. Points d'Attention / Sécurité & Accès (SaaS)
-- L'application vient d'être restructurée pour un modèle **SaaS Multi-écoles (Multi-tenant)**.
+## 4. Sécurité & Modèle SaaS
+- **SaaS Multi-écoles (Multi-tenant)** : L'architecture est totalement multi-tenant. Chaque entité (`Student`, `Class`, `Payment`, etc.) possède un champ `schoolId`.
+- **Mode Supervision** : Le `superAdmin` peut accéder au tableau de bord d'une école cliente et visualiser toutes ses données en direct. Une sécurité bloque l'édition accidentelle avec un avertissement de confirmation explicite.
 - **Rôles Globaux** : `superAdmin`, `schoolAdmin`, `accountant`, `teacher`, `parent`, `driver`.
-- **Authentification** : Les PINs ne sont plus en clair mais hachés via l'API Web Crypto (SHA-256) avant d'être sauvegardés ou comparés.
-- **Sécurité des données** : Tous les modèles (`Student`, `Class`, etc.) possèdent désormais un champ `schoolId`. Le Contexte de l'application filtre strictement l'affichage des entités par école.
+- **Sécurité des mots de passe** : L'API Web Crypto est utilisée pour hacher en SHA-256 les codes PIN avant de les enregistrer dans Firestore ou de vérifier une connexion.
 - **Abonnements** : Formules `starter`, `standard`, `premium` et statuts (`trial`, `active`, `expired`) gérés par le Super Admin pour bloquer/limiter les écoles non à jour.
 
-## 5. Recommandations
-- Les scripts d'exportation/importation de base de données devront être adaptés pour le Super Admin uniquement, afin d'éviter la fuite de données d'une école à l'autre.
-- La migration complète vers Firebase/Firestore (API asynchrone) est préparée via la structure de la BDD, mais nécessite un mapping de toutes les anciennes requêtes synchrones vers Firebase.
-- **Performances de rendu** : Le `AppContext` stocke *toute* la base de données (élèves, notes, inventaire) dans un seul gros objet de state `db`. Il serait recommandé de scinder le contexte ou d'utiliser une librairie comme `Zustand` ou `React Query`.
-- **Firebase Firestore Queries** : Actuellement, l'application récupère toute la base Firestore en mémoire (Collections). À mesure que l'école grandit, cette approche (`onSnapshot` sur toute la collection sans filtre de pagination ni limite) causera de sérieux problèmes de consommation de bande passante et de facturation Firebase.
-- **Sécurité** : 
-  - Stockage potentiel de clés secrètes (`flutterwaveSecret`) dans la base de données. Il est crucial que les règles Firebase (`firebase.rules`) empêchent l'accès public en lecture à ces clés.
-- **Export PDF (`html2canvas` + `jspdf`)** : L'utilisation de ces librairies peut entraîner des blocages de thread (UI gelée) lors de l'exportation par lots (ex: impression de 50 bulletins). Il conviendrait de déporter cette tâche sur un Web Worker ou un service externe.
+## 5. Recommandations & Optimisations Futures
+- **Optimisation des Requêtes Firestore** : Actuellement, l'application récupère toute la base de données de toutes les collections au démarrage (`getDocs`). À mesure que les écoles clientes auront des milliers d'élèves, cette approche causera des lenteurs au premier chargement (bien que mis en cache via IndexedDB ensuite) et de potentiels surcoûts Firebase. Il conviendrait de remplacer `getDocs` par des requêtes ciblées filtrées par le `schoolId` de l'utilisateur connecté, afin qu'il ne télécharge que les données de son école.
+- **Règles de Sécurité (Firebase Rules)** : Il est crucial de configurer les `firestore.rules` du projet Google Cloud pour restreindre les opérations de lecture et d'écriture au `schoolId` approprié, afin d'assurer l'étanchéité stricte entre les écoles sur le serveur (actuellement filtré par le client).
+- **Export PDF (`html2canvas` + `jspdf`)** : L'utilisation de ces librairies peut entraîner des blocages de thread (UI gelée) lors de l'exportation par lots (ex: impression de 50 bulletins). Déporter cette tâche sur un Web Worker améliorerait l'expérience utilisateur.
