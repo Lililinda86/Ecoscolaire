@@ -3,11 +3,12 @@ import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import type { Staff } from '../types';
 import Modal from '../components/Modal';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Printer } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
+import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const StaffPage: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentSchool } = useAppContext();
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<Partial<Staff>>({});
@@ -37,22 +38,44 @@ const StaffPage: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="page-container" id="staff-page">
+      <style>
+        {`
+          @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 2rem; background: #fff !important; }
+            .no-print { display: none !important; }
+            .sidebar { display: none !important; }
+            .card { border: none !important; box-shadow: none !important; }
+          }
+        `}
+      </style>
+      <div className="page-header no-print">
         <h1>{t('staff')}</h1>
-        <button onClick={() => handleOpenModal()}>
-          <Plus size={18} />
-          {t('add', 'Ajouter')}
-        </button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button className="secondary" onClick={() => window.print()}>
+            <Printer size={18} /> Imprimer la liste
+          </button>
+          <button onClick={() => handleOpenModal()}>
+            <Plus size={18} />
+            {t('add', 'Ajouter')}
+          </button>
+        </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card print-area" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '2rem 2rem 0 2rem', display: 'none' }} className="print-area-header">
+           <SchoolDocumentHeader school={currentSchool} documentTitle="Liste du Personnel" />
+        </div>
+        <style>{`@media print { .print-area-header { display: block !important; } }`}</style>
+        
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
             <tr>
               <th style={{ padding: '1rem', textAlign: 'left' }}>{t('name')}</th>
               <th style={{ padding: '1rem', textAlign: 'left' }}>{t('role')}</th>
-              <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+              <th className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -69,7 +92,7 @@ const StaffPage: React.FC = () => {
                   <td style={{ padding: '1rem', textTransform: 'capitalize' }}>
                     {s.role} {s.role === 'teacher' && s.assignedClassId ? ` - ${db.classes.find(c => c.id === s.assignedClassId)?.name || ''}` : ''}
                   </td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                  <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
                     <button className="secondary" onClick={() => handleOpenModal(s)} style={{ marginRight: '0.5rem' }}>
                       <Edit2 size={16} />
                     </button>

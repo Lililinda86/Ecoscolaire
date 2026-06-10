@@ -3,8 +3,9 @@ import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
-import { Plus, Edit2, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit2, Trash2, FileSpreadsheet, Printer } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
+import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 
 const Students: React.FC = () => {
@@ -268,10 +269,25 @@ const Students: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="page-container" id="students-page">
+      <style>
+        {`
+          @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 2rem; background: #fff !important; }
+            .no-print { display: none !important; }
+            .sidebar { display: none !important; }
+            .card { border: none !important; box-shadow: none !important; }
+          }
+        `}
+      </style>
+      <div className="page-header no-print">
         <h1>{t('students', 'Élèves')}</h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <button className="secondary" onClick={() => window.print()}>
+            <Printer size={18} /> Imprimer la liste
+          </button>
           <button className="secondary" onClick={handleDeleteAll} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>
             <Trash2 size={18} /> Vider la liste
           </button>
@@ -284,8 +300,13 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', background: '#f8f9fa' }}>
+      <div className="card print-area" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '2rem 2rem 0 2rem', display: 'none' }} className="print-area-header">
+           <SchoolDocumentHeader school={currentSchool} documentTitle="Liste des Élèves" />
+        </div>
+        <style>{`@media print { .print-area-header { display: block !important; } }`}</style>
+        
+        <div className="no-print" style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', background: '#f8f9fa' }}>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <input 
               type="text" 
@@ -317,7 +338,7 @@ const Students: React.FC = () => {
                 <th style={{ padding: '1rem', textAlign: 'left' }}>{t('parent_name', 'Tuteur / Parent')}</th>
                 <th style={{ padding: '1rem', textAlign: 'left' }}>Contact</th>
                 <th style={{ padding: '1rem', textAlign: 'left' }}>Adresse</th>
-                <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+                <th className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -338,7 +359,7 @@ const Students: React.FC = () => {
                     <td style={{ padding: '1rem' }}>{student.parentName}</td>
                     <td style={{ padding: '1rem' }}>{student.parentPhone || '-'}</td>
                     <td style={{ padding: '1rem' }}>{student.address || '-'}</td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
                       <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }} title="Modifier">
                         <Edit2 size={16} />
                       </button>

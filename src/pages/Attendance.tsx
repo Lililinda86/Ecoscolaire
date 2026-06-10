@@ -3,11 +3,12 @@ import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 
 import { sortClasses } from '../utils/sortClasses';
-import { Check, X, Calendar, Clock, LogOut } from 'lucide-react';
+import { Check, X, Calendar, Clock, LogOut, Printer } from 'lucide-react';
 import Modal from '../components/Modal';
+import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const Attendance: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentSchool } = useAppContext();
   const { t } = useI18n();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [month, setMonth] = useState(new Date().toISOString().substring(0, 7));
@@ -141,10 +142,26 @@ const Attendance: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="page-container" id="attendance-page">
+      <style>
+        {`
+          @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 2rem; background: #fff !important; }
+            .no-print { display: none !important; }
+            .sidebar { display: none !important; }
+            .card { border: none !important; box-shadow: none !important; }
+            .print-area-header { display: block !important; }
+          }
+        `}
+      </style>
+      <div className="page-header no-print">
         <h1>{t('attendance', 'Présences')}</h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <button className="secondary" onClick={() => window.print()}>
+            <Printer size={18} /> Imprimer le rapport
+          </button>
           <select value={target} onChange={e => {setTarget(e.target.value as any); setClassFilter('all');}}>
             <option value="students">Élèves</option>
             <option value="staff">Personnel</option>
@@ -187,7 +204,11 @@ const Attendance: React.FC = () => {
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card print-area" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '2rem 2rem 0 2rem', display: 'none' }} className="print-area-header">
+               <SchoolDocumentHeader school={currentSchool} documentTitle={`Rapport de Présences (${new Date(date).toLocaleDateString('fr-FR')})`} />
+               <p><strong>Cible :</strong> {target === 'students' ? 'Élèves' : 'Personnel'} | <strong>Classe :</strong> {target === 'students' && classFilter !== 'all' ? db.classes.find(c => c.id === classFilter)?.name : 'Toutes'}</p>
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
                 <tr>
@@ -283,7 +304,11 @@ const Attendance: React.FC = () => {
               P: Présent | A: Absent | R: Retard | S: Sortie
             </span>
           </div>
-          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+          <div className="card print-area" style={{ padding: 0, overflowX: 'auto' }}>
+            <div style={{ padding: '2rem 2rem 0 2rem', display: 'none' }} className="print-area-header">
+               <SchoolDocumentHeader school={currentSchool} documentTitle={`Rapport Mensuel (${month})`} />
+               <p><strong>Cible :</strong> {target === 'students' ? 'Élèves' : 'Personnel'} | <strong>Classe :</strong> {target === 'students' && classFilter !== 'all' ? db.classes.find(c => c.id === classFilter)?.name : 'Toutes'}</p>
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
                 <tr>

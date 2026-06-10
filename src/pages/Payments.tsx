@@ -4,6 +4,7 @@ import { useI18n } from '../context/I18nContext';
 import type { Payment, Expense } from '../types';
 import Modal from '../components/Modal';
 import { Plus, Minus, Wallet, ClipboardList, Trash2 } from 'lucide-react';
+import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const Payments: React.FC = () => {
   const { db, saveDB, currentUser, currentSchool } = useAppContext();
@@ -177,8 +178,19 @@ const Payments: React.FC = () => {
   const soldeTiroirCaisse = totalCashReceived - totalExpenses;
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="page-container" id="payments-page">
+      <style>
+        {`
+          @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 2rem; background: #fff !important; }
+            .no-print { display: none !important; }
+            .sidebar { display: none !important; }
+          }
+        `}
+      </style>
+      <div className="page-header no-print">
         <h1>{t('payments', 'Comptabilité Générale')}</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <button onClick={handleOpenModal} style={{ background: 'var(--success)' }}>
@@ -472,17 +484,20 @@ const Payments: React.FC = () => {
                
                return (
                  <>
-                   <h3 style={{ margin: 0, color: '#f57f17', fontSize: '1.2rem' }}>Montant Total devant se trouver physiquement dans la caisse</h3>
-                   <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#f57f17', margin: '1rem 0' }}>
-                     {expectedCash.toLocaleString('fr-FR')} <span style={{ fontSize: '1.5rem' }}>FCFA</span>
+                   <div className="print-area">
+                     <SchoolDocumentHeader school={currentSchool} documentTitle="Brouillard de Clôture (Tiroir Caisse)" />
+                     <h3 style={{ margin: 0, color: '#f57f17', fontSize: '1.2rem', marginTop: '1rem' }}>Montant Total devant se trouver physiquement dans la caisse</h3>
+                     <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#f57f17', margin: '1rem 0' }}>
+                       {expectedCash.toLocaleString('fr-FR')} <span style={{ fontSize: '1.5rem' }}>FCFA</span>
+                     </div>
+                     <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', color: '#555' }}>
+                        <div>Encaissements Cash du jour : <strong style={{color:'var(--success)'}}>+{totalCashIn.toLocaleString('fr-FR')}</strong></div>
+                        <div>Sorties Cash du jour : <strong style={{color:'var(--danger)'}}>-{totalCashOut.toLocaleString('fr-FR')}</strong></div>
+                     </div>
+                     
+                     <p style={{ marginTop: '2rem', color: '#888', fontSize: '0.9rem', fontStyle: 'italic' }}>Je soussigné(e), déclare sur l'honneur que ce montant de {expectedCash.toLocaleString('fr-FR')} FCFA a été compté et remis à l'administrateur.</p>
                    </div>
-                   <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', color: '#555' }}>
-                      <div>Encaissements Cash du jour : <strong style={{color:'var(--success)'}}>+{totalCashIn.toLocaleString('fr-FR')}</strong></div>
-                      <div>Sorties Cash du jour : <strong style={{color:'var(--danger)'}}>-{totalCashOut.toLocaleString('fr-FR')}</strong></div>
-                   </div>
-                   
-                   <p style={{ marginTop: '2rem', color: '#888', fontSize: '0.9rem', fontStyle: 'italic' }}>Je soussigné(e), déclare sur l'honneur que ce montant de {expectedCash.toLocaleString('fr-FR')} FCFA a été compté et remis à l'administrateur.</p>
-                   <button style={{ marginTop: '1rem', background: '#fbc02d', color: '#000', fontWeight: 'bold' }} onClick={() => window.print()}>
+                   <button className="no-print" style={{ marginTop: '1rem', background: '#fbc02d', color: '#000', fontWeight: 'bold' }} onClick={() => window.print()}>
                      🖨️ Imprimer le Brouillard de Clôture
                    </button>
                  </>

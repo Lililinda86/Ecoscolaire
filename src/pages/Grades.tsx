@@ -5,6 +5,7 @@ import type { Grade } from '../types';
 import Modal from '../components/Modal';
 import { Plus, Printer, Trophy } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
+import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 export const getAppreciation = (score: number, max: number = 20) => {
   const normalized = (score / max) * 20;
@@ -194,9 +195,9 @@ const Grades: React.FC = () => {
 
           {selectedStudent && student && (
              <div className="card print-area print-bulletin" style={{ padding: '2rem', background: '#fff' }}>
-               <div style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #000', paddingBottom: '1rem' }}>
-                 <h2>{db.school?.name}</h2>
-                 <h3>Bulletin Trimestriel - {student.name}</h3>
+               <SchoolDocumentHeader school={currentSchool} documentTitle="Bulletin Trimestriel" />
+               <div style={{ textAlign: 'center', marginBottom: '2rem', paddingBottom: '1rem' }}>
+                 <h3>{student.name}</h3>
                  <p>Classe : {studentClass?.name || student.section} | Date : {new Date().toLocaleDateString('fr-FR')}</p>
                </div>
                
@@ -272,9 +273,9 @@ const Grades: React.FC = () => {
 
           {selectedClassRank && currentRankClass && (
             <div className="card print-area print-ranking" style={{ padding: '2rem', background: '#fff' }}>
-              <div style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #000', paddingBottom: '1rem' }}>
-                <h2>{db.school?.name}</h2>
-                <h3>Palmarès Trimestriel & Classement</h3>
+              <SchoolDocumentHeader school={currentSchool} documentTitle="Palmarès Trimestriel" />
+              <div style={{ textAlign: 'center', marginBottom: '2rem', paddingBottom: '1rem' }}>
+                <h3>Classement et Palmarès</h3>
                 <p>Classe : {currentRankClass.name} | Effectif classé : {rankingData.length}</p>
               </div>
 
@@ -337,9 +338,9 @@ const Grades: React.FC = () => {
           </div>
 
           <div className="card print-area print-school" style={{ padding: '2rem', background: '#fff' }}>
-            <div style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #000', paddingBottom: '1rem' }}>
-              <h2>{db.school?.name}</h2>
-              <h3>Classement Global des Classes de l'École</h3>
+            <SchoolDocumentHeader school={currentSchool} documentTitle="Classement Global" />
+            <div style={{ textAlign: 'center', marginBottom: '2rem', paddingBottom: '1rem' }}>
+              <h3>Classement de l'École par Classe</h3>
               <p>Basé sur la moyenne générale de chaque classe | Date : {new Date().toLocaleDateString('fr-FR')}</p>
             </div>
 

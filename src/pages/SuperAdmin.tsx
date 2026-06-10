@@ -13,6 +13,57 @@ const SuperAdmin: React.FC = () => {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Accès refusé. Réservé au Super Admin.</div>;
   }
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Erreur : Le fichier est trop lourd (max 2 Mo).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          const base64String = canvas.toDataURL('image/jpeg', 0.8);
+          
+          if (base64String.length > 200000) {
+            alert("Erreur : L'image reste trop lourde après compression. Veuillez choisir un logo plus simple.");
+            return;
+          }
+
+          setCurrentSchool({ 
+            ...currentSchool, 
+            logoUrl: base64String, 
+            logoFileName: file.name,
+            logoUpdatedAt: new Date().toISOString()
+          });
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const newDb = { ...db };
@@ -121,7 +172,19 @@ const SuperAdmin: React.FC = () => {
           <tbody>
             {schools.map(s => (
               <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '1rem' }}><strong>{s.schoolCode}</strong><br/><small style={{ color: 'var(--text-muted)' }}>{s.name}</small></td>
+                <td style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  {s.logoUrl ? (
+                    <img src={s.logoUrl} alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+                  ) : (
+                    <div style={{ width: '40px', height: '40px', background: '#e2e8f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Building size={20} color="#94a3b8" />
+                    </div>
+                  )}
+                  <div>
+                    <strong>{s.schoolCode}</strong><br/>
+                    <small style={{ color: 'var(--text-muted)' }}>{s.name}</small>
+                  </div>
+                </td>
                 <td style={{ padding: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
                     <span style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)' }}>
@@ -197,6 +260,26 @@ const SuperAdmin: React.FC = () => {
             <div className="form-group"><label>Code École (Unique)</label><input required value={currentSchool.schoolCode || ''} onChange={e => setCurrentSchool({...currentSchool, schoolCode: e.target.value})} /></div>
           </div>
           <div className="form-group"><label>Année Académique</label><input required value={currentSchool.academicYear || ''} onChange={e => setCurrentSchool({...currentSchool, academicYear: e.target.value})} placeholder="Ex: 2023-2024" /></div>
+          
+          <div className="form-group" style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+            <label>Logo de l'école (PNG, JPG, WEBP - Max 2Mo)</label>
+            <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleLogoUpload} style={{ marginBottom: '1rem' }} />
+            
+            {currentSchool.logoUrl && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ width: '80px', height: '80px', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <img src={currentSchool.logoUrl} alt="Aperçu logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                  Aperçu du logo (Optimisé en Base64 JPEG)
+                  {currentSchool.logoUpdatedAt && <div>Mis à jour : {new Date(currentSchool.logoUpdatedAt).toLocaleString()}</div>}
+                </div>
+                <button type="button" className="danger" onClick={() => setCurrentSchool({ ...currentSchool, logoUrl: undefined, logoFileName: undefined, logoUpdatedAt: undefined })} style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
+                  Retirer
+                </button>
+              </div>
+            )}
+          </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">

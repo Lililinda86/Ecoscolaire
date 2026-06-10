@@ -6,7 +6,9 @@ export interface School {
   schoolCode: string;
   name: string; // schoolName
   academicYear: string;
-  logo?: string;
+  logoUrl?: string; // Image en Base64
+  logoFileName?: string;
+  logoUpdatedAt?: string;
   adminPin?: string;
   createdAt: string;
   // --- Nouveaux champs SaaS ---
