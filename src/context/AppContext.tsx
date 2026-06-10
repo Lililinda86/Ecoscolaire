@@ -90,7 +90,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoading(true);
       try {
         const { db: firestoreDb } = await import('../db/firebase');
-        const { doc, getDoc, setDoc, collection, getDocs, query, where } = await import('firebase/firestore');
+        const { doc, getDoc, setDoc, collection, getDocs, query, where, serverTimestamp } = await import('firebase/firestore');
 
         // Fetch user profile
         console.log("Utilisateur Firebase connecté:", firebaseUser.email, firebaseUser.uid);
@@ -99,16 +99,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (!userDoc.exists()) {
           console.log("Document Firestore non trouvé pour:", firebaseUser.email);
-          userData = {
-            id: firebaseUser.uid,
-            email: firebaseUser.email,
-            role: firebaseUser.email === 'kyrialove@gmail.com' ? 'superAdmin' : 'staff',
-            isActive: true,
-            schoolId: firebaseUser.email === 'kyrialove@gmail.com' ? null : null,
-            createdAt: new Date().toISOString()
-          };
-          await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), userData);
-          console.log("Document Firestore créé automatiquement avec succès:", userData);
+          if (firebaseUser.email === 'kyrialove@gmail.com') {
+            try {
+              userData = {
+                id: firebaseUser.uid,
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                role: 'superAdmin',
+                active: true,
+                isActive: true,
+                schoolId: null,
+                createdAt: serverTimestamp()
+              };
+              await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), userData);
+              console.log("Profil créé avec succès pour superAdmin:", userData);
+            } catch (err: any) {
+              console.error("Erreur lors de la création du profil Firestore:", err);
+              alert("Erreur: Impossible de créer le profil dans Firestore. " + err.message);
+              // On ne déconnecte pas, on continue avec un objet local temporaire
+              userData = { id: firebaseUser.uid, email: firebaseUser.email, role: 'superAdmin', active: true, isActive: true };
+            }
+          } else {
+            console.error("Profil utilisateur introuvable et non autorisé à la création automatique.");
+            const { auth } = await import('../db/firebase');
+            auth.signOut();
+            return;
+          }
         } else {
           console.log("Document Firestore trouvé:", userDoc.data());
           userData = { id: userDoc.id, ...userDoc.data() } as User;

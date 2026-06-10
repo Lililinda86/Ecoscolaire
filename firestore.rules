@@ -84,15 +84,19 @@ service cloud.firestore {
       // Un utilisateur peut lire son propre document.
       // Le superAdmin peut lire tous les utilisateurs.
       // L'owner, le directeur et la secrétaire peuvent lire les utilisateurs de leur école.
-      allow read: if isAuthenticated() && isActive() && (
+      allow read: if isAuthenticated() && (
         request.auth.uid == userId ||
-        isSuperAdmin() ||
-        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+        (isActive() && (
+          isSuperAdmin() ||
+          ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+        ))
       );
 
-      // Un utilisateur ne peut pas modifier son propre rôle (bloqué via la UI et backend idéalement, 
-      // ici on autorise seulement owner/superAdmin à éditer).
-      allow create: if isAuthenticated() && (isSuperAdmin() || isOwner());
+      // Autorise superAdmin/owner à créer, OU le premier superAdmin via email
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() || isOwner() || 
+        (request.auth.token.email == 'kyrialove@gmail.com' && request.auth.uid == userId)
+      );
       allow update: if isAuthenticated() && isActive() && (isSuperAdmin() || (isOwner() && hasSchoolAccess(resource.data.schoolId)));
       allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
     }
