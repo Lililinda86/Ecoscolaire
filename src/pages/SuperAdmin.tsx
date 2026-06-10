@@ -19,12 +19,21 @@ const SuperAdmin: React.FC = () => {
     
     try {
       const { db: firestoreDb } = await import('../db/firebase');
-      const { doc, setDoc, collection, getDocs } = await import('firebase/firestore');
+      const { doc, setDoc, getDoc, collection, getDocs } = await import('firebase/firestore');
 
       if (currentSchool.id) {
         const updatedSchool = { ...currentSchool } as School;
         await setDoc(doc(firestoreDb, 'schools', updatedSchool.id), updatedSchool);
         console.log("🟢 [SuperAdmin] setDoc exécuté avec succès pour mise à jour :", updatedSchool.id);
+        
+        // --- Vérification obligatoire ---
+        const checkDoc = await getDoc(doc(firestoreDb, 'schools', updatedSchool.id));
+        if (!checkDoc.exists()) {
+          alert("École non sauvegardée dans Firestore");
+        } else {
+          alert("École sauvegardée dans Firestore");
+        }
+        
         newDb.schools = (newDb.schools || []).map(s => s.id === updatedSchool.id ? updatedSchool : s);
       } else {
         const newSchool = { ...currentSchool, id: crypto.randomUUID(), createdAt: new Date().toISOString() } as School;
@@ -32,6 +41,14 @@ const SuperAdmin: React.FC = () => {
         
         await setDoc(doc(firestoreDb, 'schools', newSchool.id), newSchool);
         console.log("🟢 [SuperAdmin] setDoc exécuté avec succès pour création :", newSchool.id);
+        
+        // --- Vérification obligatoire ---
+        const checkDoc = await getDoc(doc(firestoreDb, 'schools', newSchool.id));
+        if (!checkDoc.exists()) {
+          alert("École non sauvegardée dans Firestore");
+        } else {
+          alert("École sauvegardée dans Firestore");
+        }
         
         newDb.schools = [...(newDb.schools || []), newSchool];
       }

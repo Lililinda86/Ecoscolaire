@@ -152,9 +152,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (userData.role === 'superAdmin' && !supervisionSchoolId) {
           // Mode Global Super Admin
           console.log("🔵 [AppContext] Lecture Firestore - Mode Global Super Admin initié.");
+          console.log("🔵 [AppContext] Collection interrogée : /schools");
           const schoolsSnap = await getDocs(collection(firestoreDb, 'schools'));
+          
+          const docsInfo = schoolsSnap.docs.map(d => ({id: d.id, name: d.data().name}));
+          console.log(`🔵 [AppContext] Nombre de documents retournés dans /schools : ${schoolsSnap.docs.length}`);
+          console.log(`🔵 [AppContext] IDs trouvés : ${docsInfo.map(d => d.id).join(', ')}`);
+          console.log(`🔵 [AppContext] Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
+          
           loadedDb.schools = schoolsSnap.docs.map(d => ({id: d.id, ...d.data()}));
-          console.log(`🔵 [AppContext] Lecture Firestore : ${loadedDb.schools.length} école(s) chargée(s) (F5 ou rechargement).`);
           const usersSnap = await getDocs(collection(firestoreDb, 'users'));
           loadedDb.users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
           

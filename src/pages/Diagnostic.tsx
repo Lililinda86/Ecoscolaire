@@ -39,6 +39,39 @@ const Diagnostic: React.FC = () => {
     }
   };
 
+  const runSchoolCreationTest = async () => {
+    try {
+      setTestResult("Création de l'école test en cours...");
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { doc, setDoc, getDocs, collection } = await import('firebase/firestore');
+      
+      const testId = `test-school-${Date.now()}`;
+      const testSchool = {
+        id: testId,
+        name: "TEST FIRESTORE",
+        code: "TEST-001",
+        academicYear: "2026-2027",
+        subscriptionPlan: "premium",
+        subscriptionStatus: "trial",
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      
+      await setDoc(doc(firestoreDb, "schools", testSchool.id), testSchool);
+      
+      const snap = await getDocs(collection(firestoreDb, "schools"));
+      const docsInfo = snap.docs.map(d => ({id: d.id, name: d.data().name}));
+      
+      setTestResult(`✅ Succès ! 
+Nombre d'écoles dans /schools : ${snap.docs.length}
+IDs trouvés : ${docsInfo.map(d => d.id).join(', ')}
+Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
+
+    } catch (err: any) {
+      setTestResult(`❌ Erreur : ${err.message}`);
+    }
+  };
+
   const firebaseConfigValues = {
     projectId: "ecoscolaire-c5861",
     authDomain: "ecoscolaire-c5861.firebaseapp.com",
@@ -71,16 +104,27 @@ const Diagnostic: React.FC = () => {
           </div>
 
           <div style={{ padding: '1.5rem', background: '#f1f5f9', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-            <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Zap size={18}/> Test d'écriture en direct (__test_connection)</h3>
-            <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Ce test prouve que l'application déployée écrit physiquement dans le projet {firebaseConfigValues.projectId}.</p>
-            <button 
-              onClick={runConnectionTest}
-              style={{ background: '#4f46e5', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem' }}
-            >
-              Exécuter le Test Firestore
-            </button>
+            <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Zap size={18}/> Tests d'écriture en direct</h3>
+            <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Exécutez ces tests pour valider physiquement l'écriture dans Firestore.</p>
+            
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <button 
+                onClick={runConnectionTest}
+                style={{ background: '#4f46e5', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Test de Base (__test_connection)
+              </button>
+              
+              <button 
+                onClick={runSchoolCreationTest}
+                style={{ background: '#059669', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Créer école test Firestore /schools
+              </button>
+            </div>
+
             {testResult && (
-              <div style={{ padding: '1rem', background: testResult.includes('✅') ? '#dcfce7' : '#fee2e2', color: testResult.includes('✅') ? '#166534' : '#991b1b', borderRadius: '8px', fontWeight: 'bold' }}>
+              <div style={{ padding: '1rem', background: testResult.includes('✅') ? '#dcfce7' : '#fee2e2', color: testResult.includes('✅') ? '#166534' : '#991b1b', borderRadius: '8px', fontWeight: 'bold', whiteSpace: 'pre-wrap' }}>
                 {testResult}
               </div>
             )}
