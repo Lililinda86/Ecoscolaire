@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Database } from '../db/storage';
-import { defaultDB, saveDB as saveDBToStorage } from '../db/storage';
+import { defaultDB } from '../db/storage';
 import type { User, Parent, School } from '../types';
 import { hashPIN } from '../utils/crypto';
 
@@ -109,7 +109,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     // Update local state immediately for snappy UI
     setDb(newDb);
-    saveDBToStorage(newDb); // Keep local fallback just in case
 
     // Diff Engine to sync only changed items to Firestore
     try {

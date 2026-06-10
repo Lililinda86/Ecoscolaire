@@ -46,8 +46,6 @@ export interface Database {
   inventoryTransactions: InventoryTransaction[];
 }
 
-const DB_KEY = 'ecoscolaire_data';
-
 const initialDB: Database = {
   // Global SaaS
   schools: [],
@@ -113,21 +111,3 @@ const initialDB: Database = {
 };
 
 export const defaultDB = initialDB;
-
-export const getDB = (): Database => {
-  const data = localStorage.getItem(DB_KEY);
-  if (!data) return initialDB;
-  try {
-    return JSON.parse(data);
-  } catch (e) {
-    return initialDB;
-  }
-};
-
-export const saveDB = (db: Database) => {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-};
-
-export const resetDB = () => {
-    localStorage.setItem(DB_KEY, JSON.stringify(initialDB));
-};
