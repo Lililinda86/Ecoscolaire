@@ -5,7 +5,7 @@ import { Building2, Plus, Edit2, Play, AlertCircle, CreditCard, LogOut } from 'l
 import type { School, SubscriptionPlan, SubscriptionStatus } from '../types';
 
 const SuperAdmin: React.FC = () => {
-  const { db, saveDB, currentUser, logout } = useAppContext();
+  const { db, saveDB, currentUser, logout, enterSupervision } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentSchool, setCurrentSchool] = useState<Partial<School>>({});
 
@@ -109,7 +109,15 @@ const SuperAdmin: React.FC = () => {
                   <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                     <button 
                       className="primary" 
-                      onClick={() => useAppContext().enterSupervision(s.id)}
+                      onClick={() => {
+                        console.log("--- Redirection Super Admin ---");
+                        console.log("École sélectionnée :", s.name);
+                        console.log("schoolId :", s.id);
+                        console.log("Fonction appelée : enterSupervision");
+                        console.log("Route de destination : /school-dashboard");
+                        enterSupervision(s.id);
+                        window.location.hash = '#/school-dashboard';
+                      }}
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                     >
                       <Play size={14} style={{ marginRight: '0.25rem' }} /> Accéder

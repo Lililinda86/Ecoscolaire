@@ -136,6 +136,7 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/school-dashboard" element={<Dashboard />} />
           <Route path="/students" element={<Students />} />
           <Route path="/classes" element={<Classes />} />
           <Route path="/staff" element={<Staff />} />
