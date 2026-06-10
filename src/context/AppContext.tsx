@@ -34,17 +34,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const initializeFirebaseData = async () => {
       try {
+        console.log("[Firebase] Démarrage de l'initialisation...");
         const { db: firestoreDb } = await import('../db/firebase');
         const { collection, getDocs } = await import('firebase/firestore');
 
         const collectionsToFetch = ['schools', 'users', 'classes', 'students', 'staff', 'buses', 'inventory', 'grades', 'payments', 'attendance', 'parents'];
         const loadedDb: any = { ...defaultDB };
 
-        for (const colName of collectionsToFetch) {
-          const snapshot = await getDocs(collection(firestoreDb, colName));
-          loadedDb[colName] = snapshot.docs.map(doc => doc.data());
-        }
+        console.log("[Firebase] Téléchargement des collections...", collectionsToFetch);
 
+        const fetchPromise = (async () => {
+          for (const colName of collectionsToFetch) {
+            const snapshot = await getDocs(collection(firestoreDb, colName));
+            loadedDb[colName] = snapshot.docs.map(doc => doc.data());
+          }
+        })();
+
+        // Timeout de sécurité de 10 secondes
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Délai d'attente dépassé (10s) : Firebase n'a pas pu charger les données.")), 10000)
+        );
+
+        await Promise.race([fetchPromise, timeoutPromise]);
+
+        console.log("[Firebase] Chargement terminé avec succès !");
         setIsFirestoreConnected(true);
         setFirestoreError(null);
         setLastSyncDate(new Date());
@@ -75,9 +88,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLoading(false);
 
       } catch (error: any) {
-        console.error("Firestore Error:", error);
+        console.error("[Firebase] Erreur Critique :", error);
         setIsFirestoreConnected(false);
-        setFirestoreError(error.message || "Erreur de connexion à Firestore");
+        setFirestoreError(error.message || "Impossible de communiquer avec la base de données Firestore.");
         setLoading(false);
       }
     };
@@ -227,13 +240,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('ecoscolaire_school_id');
   };
 
-  if (loading || !db) {
+  if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#334155' }}>
         <h2 style={{ marginTop: '1.5rem', fontWeight: 600 }}>Chargement de la plateforme...</h2>
+        <p style={{ color: '#64748b' }}>Connexion à Firebase en cours, veuillez patienter...</p>
       </div>
     );
   }
+
+  if (!db && firestoreError) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#991b1b', padding: '2rem', textAlign: 'center' }}>
+        <h2 style={{ marginTop: '1.5rem', fontWeight: 600 }}>Erreur Critique de Démarrage</h2>
+        <p style={{ maxWidth: '600px', margin: '1rem auto' }}>
+          L'application n'a pas pu se connecter à la base de données Firestore.
+          <br /><br />
+          <strong>Détail de l'erreur :</strong> {firestoreError}
+        </p>
+        <button onClick={() => window.location.hash = '#/diagnostic'} style={{ marginTop: '1rem', padding: '0.75rem 1.5rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+          Ouvrir l'outil de Diagnostic
+        </button>
+      </div>
+    );
+  }
+
+  if (!db) return null;
 
   return (
     <AppContext.Provider value={{ 
