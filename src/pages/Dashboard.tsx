@@ -5,7 +5,7 @@ import { Users, UserCircle2, Bus as BusIcon, PackageCheck, TrendingUp } from 'lu
 import dashboardBanner from '../assets/dashboard-banner.png';
 
 const Dashboard: React.FC = () => {
-  const { db } = useAppContext();
+  const { db, isFirestoreConnected } = useAppContext();
   const { t } = useI18n();
 
   return (
@@ -74,12 +74,14 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Info Card */}
         <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '2rem', borderRadius: '20px' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e3a8a', marginTop: 0 }}>{t('quick_actions', 'Informations Système')}</h2>
           <p style={{ color: '#1e40af', lineHeight: 1.6, margin: '1rem 0' }}>Utilisez le menu de navigation à gauche pour accéder aux différentes sections (Élèves, Paiements, Notes, etc.).</p>
-          <div style={{ display: 'inline-block', backgroundColor: '#dbeafe', color: '#1e40af', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }}>
-            Mode 100% Local Actif - Vos données sont stockées sécuritairement sur cet appareil.
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: isFirestoreConnected ? '#dcfce7' : '#fee2e2', color: isFirestoreConnected ? '#166534' : '#991b1b', padding: '0.5rem 1rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isFirestoreConnected ? '#22c55e' : '#ef4444' }}></div>
+            {isFirestoreConnected 
+              ? "Connecté à Firestore - Vos données sont synchronisées dans le cloud en temps réel." 
+              : "Erreur de connexion Cloud - Mode dégradé ou hors ligne."}
           </div>
         </div>
       </div>
