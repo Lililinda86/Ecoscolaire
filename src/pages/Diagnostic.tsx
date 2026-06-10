@@ -4,7 +4,7 @@ import { Activity, Database, Server, Users, Building, ChevronLeft, ShieldCheck, 
 import { useNavigate } from 'react-router-dom';
 
 const Diagnostic: React.FC = () => {
-  const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, isSupervising, supervisionSchoolId } = useAppContext();
+  const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, supervisionSchoolId } = useAppContext();
   const navigate = useNavigate();
   const [testResult, setTestResult] = useState<string | null>(null);
   const [directFetchData, setDirectFetchData] = useState<any>(null);
