@@ -12,6 +12,7 @@ const Students: React.FC = () => {
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const { currentUser, currentSchool } = useAppContext();
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
@@ -60,10 +61,36 @@ const Students: React.FC = () => {
     setModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm(t('delete') + ' ?')) {
-      const newDb = { ...db, students: db.students.filter(s => s.id !== id) };
-      saveDB(newDb);
+  const handleDelete = (student: Student) => {
+    if (!currentUser || !currentSchool) return;
+    
+    if (confirm(t('delete') + ' cet élève ?')) {
+      const canDeleteDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
+      
+      const newDb = { ...db };
+      
+      if (canDeleteDirectly) {
+        newDb.students = db.students.filter(s => s.id !== student.id);
+        saveDB(newDb);
+        alert("Élève supprimé avec succès.");
+      } else {
+        // Créer une requête de validation
+        if (!newDb.validation_requests) newDb.validation_requests = [];
+        newDb.validation_requests.push({
+          id: crypto.randomUUID(),
+          schoolId: currentSchool.id,
+          requesterId: currentUser.id,
+          requesterRole: currentUser.role,
+          actionType: 'DELETE_STUDENT',
+          targetCollection: 'students',
+          targetDocumentId: student.id,
+          proposedData: student,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        });
+        saveDB(newDb);
+        alert("Demande de suppression envoyée pour validation (Directeur / Super Admin).");
+      }
     }
   };
 
@@ -312,10 +339,10 @@ const Students: React.FC = () => {
                     <td style={{ padding: '1rem' }}>{student.parentPhone || '-'}</td>
                     <td style={{ padding: '1rem' }}>{student.address || '-'}</td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }}>
+                      <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }} title="Modifier">
                         <Edit2 size={16} />
                       </button>
-                      <button className="secondary" onClick={() => handleDelete(student.id)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                      <button className="secondary" onClick={() => handleDelete(student)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} title="Supprimer (Soumis à validation)">
                         <Trash2 size={16} />
                       </button>
                     </td>

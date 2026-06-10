@@ -6,7 +6,7 @@ import Modal from '../components/Modal';
 import { Plus, Minus, Wallet, ClipboardList, Trash2 } from 'lucide-react';
 
 const Payments: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool } = useAppContext();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
@@ -83,10 +83,36 @@ const Payments: React.FC = () => {
 
   const handleSaveExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentExpense.amount || !currentExpense.person) return;
+    if (!currentExpense.amount || !currentExpense.person || !currentUser || !currentSchool) return;
+    
+    const amount = currentExpense.amount;
+    const canSaveDirectly = amount <= 50000 || ['superAdmin', 'owner'].includes(currentUser.role);
+    
     const newDb = { ...db, expenses: [...(db.expenses || [])] };
-    newDb.expenses.push({ ...currentExpense, id: crypto.randomUUID() } as Expense);
-    saveDB(newDb);
+    const expenseObj: Expense = { ...currentExpense, id: crypto.randomUUID() } as Expense;
+    
+    if (canSaveDirectly) {
+      newDb.expenses.push(expenseObj);
+      saveDB(newDb);
+      alert("Dépense enregistrée avec succès.");
+    } else {
+      if (!newDb.validation_requests) newDb.validation_requests = [];
+      newDb.validation_requests.push({
+        id: crypto.randomUUID(),
+        schoolId: currentSchool.id,
+        requesterId: currentUser.id,
+        requesterRole: currentUser.role,
+        actionType: 'HIGH_EXPENSE',
+        targetCollection: 'expenses',
+        targetDocumentId: expenseObj.id,
+        proposedData: expenseObj,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      saveDB(newDb);
+      alert(`Dépense de ${amount} FCFA soumise pour validation au Fondateur.`);
+    }
+    
     setExpenseModalOpen(false);
   };
 

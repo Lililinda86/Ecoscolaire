@@ -30,31 +30,43 @@ export interface School {
   };
 }
 
-export type GlobalRole = 'superAdmin' | 'schoolAdmin' | 'accountant' | 'teacher' | 'parent' | 'driver';
+export type GlobalRole = 'superAdmin' | 'owner' | 'director' | 'secretary' | 'accountant' | 'teacher' | 'driver' | 'parent' | 'student';
 
 export interface User {
-  id: string;
+  id: string; // uid from Firebase Auth
   schoolId?: string; // Null pour le superAdmin
-  emailOrPhone: string;
-  pinHash: string;
+  email: string;
   role: GlobalRole;
   isActive: boolean;
-  mustChangePin: boolean; // Forcer le changement au premier login
+  createdAt: string;
+  // Spécifique Parent
+  studentIds?: string[];
+  // Legacy / Mots de passe
+  mustChangePin?: boolean;
 }
 
-export interface Parent {
+export interface ValidationRequest {
   id: string;
   schoolId: string;
-  firstName: string;
-  lastName: string;
-  phoneWhatsApp: string;
-  email?: string;
-  address?: string;
-  studentIds: string[]; // Liens avec les enfants
-  isActive: boolean;
-  role: 'parent';
-  pinHash?: string;
-  mustChangePin?: boolean;
+  requesterId: string;
+  requesterRole: GlobalRole;
+  actionType: 'UPDATE_GRADE' | 'DELETE_STUDENT' | 'HIGH_EXPENSE' | 'CHANGE_ROLE';
+  targetCollection: string;
+  targetDocumentId?: string;
+  proposedData: any;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  schoolId: string;
+  userId: string; // destinataire
+  title: string;
+  message: string;
+  type: 'UNPAID_FEE' | 'GRADE_AVAILABLE' | 'ABSENCE' | 'SUBSCRIPTION_EXPIRY' | 'INFO';
+  read: boolean;
+  createdAt: string;
 }
 
 export type SectionType = 'francophone' | 'anglophone';

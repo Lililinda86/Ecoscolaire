@@ -16,6 +16,8 @@ import Classes from './pages/Classes';
 import Login from './pages/Login';
 import SuperAdmin from './pages/SuperAdmin';
 import ParentPortal from './pages/ParentPortal';
+import UsersManagement from './pages/UsersManagement';
+import ValidationDashboard from './pages/ValidationDashboard';
 
 import Diagnostic from './pages/Diagnostic';
 
@@ -110,6 +112,7 @@ function App() {
       <HashRouter>
         <Routes>
           <Route path="/diagnostic" element={<Diagnostic />} />
+          <Route path="/users" element={<UsersManagement />} />
           <Route path="*" element={<SuperAdmin />} />
         </Routes>
       </HashRouter>
@@ -142,6 +145,8 @@ function App() {
           <Route path="/grades" element={<Grades />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/payments" element={<Payments />} />
+          <Route path="/users" element={<UsersManagement />} />
+          <Route path="/validations" element={<ValidationDashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

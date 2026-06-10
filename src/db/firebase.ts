@@ -29,3 +29,19 @@ enableIndexedDbPersistence(db).catch((err) => {
 });
 
 export const auth = getAuth(app);
+
+// Application secondaire pour créer des comptes sans déconnecter l'admin
+export const createSecondaryUser = async (email: string, pass: string) => {
+  const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp');
+  const secondaryAuth = getAuth(secondaryApp);
+  const { createUserWithEmailAndPassword, signOut } = await import('firebase/auth');
+  
+  const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
+  await signOut(secondaryAuth);
+  
+  // Clean up
+  const { deleteApp } = await import('firebase/app');
+  await deleteApp(secondaryApp);
+  
+  return userCredential.user;
+};

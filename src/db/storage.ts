@@ -16,14 +16,16 @@ import type {
   InventoryItem,
   InventoryTransaction,
   User,
-  Parent
+  ValidationRequest,
+  Notification
 } from '../types';
 
 export interface Database {
   // --- SaaS Collections (Globales) ---
   schools: School[];
   users: User[];
-  parents: Parent[];
+  validation_requests: ValidationRequest[];
+  notifications: Notification[];
 
   // --- Current Tenant Context ---
   isActivated?: boolean;
@@ -51,15 +53,15 @@ const initialDB: Database = {
   schools: [],
   users: [
     {
-      id: 'super-admin-1',
-      emailOrPhone: 'kyrialove@gmail.com',
-      pinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', // SHA-256 de '1234'
+      id: 'super-admin-1', // sera remplacé par l'UID Firebase Auth
+      email: 'kyrialove@gmail.com',
       role: 'superAdmin',
       isActive: true,
-      mustChangePin: true // Force le changement à la première connexion
+      createdAt: new Date().toISOString()
     }
   ],
-  parents: [],
+  validation_requests: [],
+  notifications: [],
 
   // Current Tenant
   school: null,

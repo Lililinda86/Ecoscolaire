@@ -5,10 +5,9 @@ import Modal from '../components/Modal';
 
 const Login: React.FC = () => {
   const { login } = useAppContext();
-  const [schoolCode, setSchoolCode] = useState('');
-  const [ident, setIdent] = useState('');
-  const [pin, setPin] = useState('');
-  const [showPin, setShowPin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +21,7 @@ const Login: React.FC = () => {
     setError('');
     setLoading(true);
 
-    const success = await login(schoolCode, ident, pin);
+    const success = await login(email, password);
     if (!success) {
       setError("Identifiants incorrects ou accès refusé.");
     }
@@ -73,53 +72,38 @@ const Login: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Code École</label>
-            <div style={{ position: 'relative' }}>
-              <Building size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input 
-                type="text" 
-                placeholder="Ex: ECO-2023" 
-                value={schoolCode} 
-                onChange={e => setSchoolCode(e.target.value)}
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-              />
-            </div>
-            <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>* Laissez vide pour un accès Super Admin</small>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email ou Téléphone</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email de connexion</label>
             <div style={{ position: 'relative' }}>
               <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
                 type="text" 
                 required 
                 placeholder="Ex: kyrialove@gmail.com" 
-                value={ident} 
-                onChange={e => setIdent(e.target.value)}
+                value={email} 
+                onChange={e => setEmail(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
               />
             </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Code PIN</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Mot de passe (Min. 6 caractères)</label>
             <div style={{ position: 'relative' }}>
               <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
-                type={showPin ? "text" : "password"} 
+                type={showPassword ? "text" : "password"} 
                 required 
-                placeholder="••••" 
-                value={pin} 
-                onChange={e => setPin(e.target.value)}
+                placeholder="••••••" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 2.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
               />
               <button 
                 type="button" 
-                onClick={() => setShowPin(!showPin)}
+                onClick={() => setShowPassword(!showPassword)}
                 style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.5rem' }}
               >
-                {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
@@ -130,7 +114,7 @@ const Login: React.FC = () => {
               onClick={() => setRecoveryModalOpen(true)}
               style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0, fontWeight: 500 }}
             >
-              Code PIN oublié ?
+              Mot de passe oublié ?
             </button>
           </div>
 
@@ -145,12 +129,12 @@ const Login: React.FC = () => {
       </div>
 
       {/* Modal de récupération */}
-      <Modal isOpen={isRecoveryModalOpen} onClose={() => setRecoveryModalOpen(false)} title="Récupération du Code PIN">
+      <Modal isOpen={isRecoveryModalOpen} onClose={() => setRecoveryModalOpen(false)} title="Récupération du mot de passe">
         {recoverySent ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <CheckCircle size={48} style={{ color: 'var(--success)', margin: '0 auto 1rem' }} />
             <h3 style={{ margin: '0 0 0.5rem 0' }}>Demande envoyée !</h3>
-            <p style={{ color: 'var(--text-muted)' }}>Si cet identifiant correspond à un compte, vous recevrez un email contenant un lien pour réinitialiser votre code PIN.</p>
+            <p style={{ color: 'var(--text-muted)' }}>Si cet identifiant correspond à un compte, vous recevrez un email contenant un lien pour réinitialiser votre mot de passe.</p>
           </div>
         ) : (
           <form onSubmit={handleRecoverySubmit}>

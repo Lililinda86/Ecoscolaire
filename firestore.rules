@@ -1,0 +1,220 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================
+    // UTILS : FONCTIONS DE SÉCURITÉ
+    // ==========================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      // Les données de l'utilisateur qui fait la requête
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getRole() {
+      return getUserData().role;
+    }
+
+    function getUserSchoolId() {
+      return getUserData().schoolId;
+    }
+
+    function isActive() {
+      return getUserData().active == true;
+    }
+
+    // --- Rôles ---
+    function isSuperAdmin() {
+      return getRole() == 'superAdmin';
+    }
+    function isOwner() {
+      return getRole() == 'owner';
+    }
+    function isDirector() {
+      return getRole() == 'director';
+    }
+    function isSecretary() {
+      return getRole() == 'secretary';
+    }
+    function isAccountant() {
+      return getRole() == 'accountant';
+    }
+    function isTeacher() {
+      return getRole() == 'teacher';
+    }
+    function isDriver() {
+      return getRole() == 'driver';
+    }
+    function isParent() {
+      return getRole() == 'parent';
+    }
+    function isStudent() {
+      return getRole() == 'student';
+    }
+
+    // --- Droits Composés ---
+    function isAdminOrOwner() {
+      return isSuperAdmin() || isOwner();
+    }
+    function hasSchoolAccess(schoolId) {
+      return isSuperAdmin() || getUserSchoolId() == schoolId;
+    }
+    function canManageSchool(schoolId) {
+      return isSuperAdmin() || (isOwner() && getUserSchoolId() == schoolId);
+    }
+    function canManagePedagogy(schoolId) {
+      return hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
+    }
+
+    // ==========================================
+    // RULES PER COLLECTION
+    // ==========================================
+
+    // Par défaut, tout refuser.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- USERS ---
+    match /users/{userId} {
+      // Un utilisateur peut lire son propre document.
+      // Le superAdmin peut lire tous les utilisateurs.
+      // L'owner, le directeur et la secrétaire peuvent lire les utilisateurs de leur école.
+      allow read: if isAuthenticated() && isActive() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+      );
+
+      // Un utilisateur ne peut pas modifier son propre rôle (bloqué via la UI et backend idéalement, 
+      // ici on autorise seulement owner/superAdmin à éditer).
+      allow create: if isAuthenticated() && (isSuperAdmin() || isOwner());
+      allow update: if isAuthenticated() && isActive() && (isSuperAdmin() || (isOwner() && hasSchoolAccess(resource.data.schoolId)));
+      allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
+    }
+
+    // --- SCHOOLS ---
+    match /schools/{schoolId} {
+      // Tout utilisateur authentifié et actif peut lire les infos de son école, ou le superAdmin peut tout lire.
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
+      
+      // Seul le superAdmin peut créer ou supprimer des écoles
+      allow create, delete: if isAuthenticated() && isSuperAdmin();
+      // Le propriétaire peut modifier son école (mais pas l'abonnement)
+      allow update: if isAuthenticated() && isActive() && (isSuperAdmin() || canManageSchool(schoolId));
+    }
+
+    // --- STUDENTS & PARENTS ---
+    match /students/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() || 
+        ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().studentIds)
+      );
+      // Création/Update par Owner, Director, Secretary
+      allow create, update: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      // Delete (Demande validation dans le client, mais ici la vraie suppression requiert owner)
+      allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
+    }
+
+    match /parents/{parentId} {
+      // Les parents sont migrés dans `users`, mais si on garde une collection séparée pour l'historique
+      allow read, write: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+    }
+
+    // --- CLASSES & SUBJECTS ---
+    match /classes/{classId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+    }
+    match /subjects/{subjectId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+    }
+
+    // --- GRADES & ATTENDANCE ---
+    match /grades/{gradeId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() || 
+        ((isOwner() || isDirector() || isSecretary() || isTeacher()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (isParent() && hasSchoolAccess(resource.data.schoolId)) // La logique "uniquement si payé" est gérée par le client, on peut difficilement la faire en rules sans check croisé de /payments/
+      );
+      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isTeacher()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow delete: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary() || isTeacher()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+    match /staffAttendance/{attendanceId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+    }
+
+    // --- FINANCE (PAYMENTS & EXPENSES) ---
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() || 
+        ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (isParent() && hasSchoolAccess(resource.data.schoolId))
+      );
+      // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
+      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId);
+      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+
+    // --- INVENTORY ---
+    match /inventory/{itemId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+    match /inventoryTransactions/{txId} {
+      allow read, write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+
+    // --- TRANSPORT ---
+    match /buses/{busId} {
+      // Driver voit le transport
+      allow read: if isAuthenticated() && isActive() && (
+        hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isSecretary() || isAccountant() || isDriver())
+      );
+      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+    match /busRoutes/{routeId} {
+      allow read, write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+    match /fuelExpenses/{expId} {
+      allow read, write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+    match /maintenances/{mId} {
+      allow read, write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+    match /breakdowns/{bId} {
+      allow read, write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+    }
+
+    // --- VALIDATION REQUESTS ---
+    match /validation_requests/{reqId} {
+      // N'importe quel membre du staff peut créer une requête
+      allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId);
+      // Tout le staff peut lire les requêtes de son école
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      // Seuls les approbateurs peuvent modifier/résoudre
+      allow update, delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId);
+    }
+
+    // --- NOTIFICATIONS ---
+    match /notifications/{notifId} {
+      // Tout utilisateur connecté peut recevoir/créer des notifications dans son école
+      allow read, write: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+    }
+  }
+}

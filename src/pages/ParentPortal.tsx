@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { LogOut, User as UserIcon, BookOpen, AlertTriangle, CheckCircle, CreditCard, Calendar, Bus } from 'lucide-react';
-import type { Parent, Student } from '../types';
+import type { Student } from '../types';
 
 const ParentPortal: React.FC = () => {
   const { db, currentUser, currentSchool, logout } = useAppContext();
@@ -11,10 +11,10 @@ const ParentPortal: React.FC = () => {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Accès réservé aux parents de l'école.</div>;
   }
 
-  const parent = currentUser as Parent;
+  const parent = currentUser;
   
   // Filter children belonging to this parent and this school
-  const children = db.students.filter(s => s.schoolId === currentSchool.id && parent.studentIds.includes(s.id));
+  const children = db.students.filter(s => s.schoolId === currentSchool.id && (parent.studentIds || []).includes(s.id));
 
   // Helper to check if a specific Tranche is fully paid for a student
   const isTranchePaid = (student: Student, tranche: 'T1' | 'T2' | 'T3') => {
@@ -69,7 +69,7 @@ const ParentPortal: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ margin: 0 }}>Portail Parent - {currentSchool.name}</h1>
-          <p style={{ color: 'var(--text-muted)', margin: 0 }}>Bienvenue, {parent.firstName} {parent.lastName}</p>
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>Bienvenue, {parent.email}</p>
         </div>
         <button className="secondary" onClick={logout}><LogOut size={18} /> Déconnexion</button>
       </div>

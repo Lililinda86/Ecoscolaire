@@ -18,7 +18,7 @@ export const getAppreciation = (score: number, max: number = 20) => {
 };
 
 const Grades: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool } = useAppContext();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
@@ -51,25 +51,52 @@ const Grades: React.FC = () => {
 
   const handleSaveBulk = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bulkStudentId) return;
+    if (!bulkStudentId || !currentUser || !currentSchool) return;
     
+    const canSaveDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
     const newDb = { ...db };
+    let hasValidations = false;
+
     Object.keys(bulkGrades).forEach(subjectId => {
       const g = bulkGrades[subjectId];
       if (g.score !== '') {
-        newDb.grades.push({
+        const gradeObj: Grade = {
           id: crypto.randomUUID(),
           studentId: bulkStudentId,
           subjectId,
           score: parseFloat(g.score),
           maxScore: parseFloat(g.maxScore) || 20,
           date: bulkDate
-        } as Grade);
+        };
+
+        if (canSaveDirectly) {
+          newDb.grades.push(gradeObj);
+        } else {
+          hasValidations = true;
+          if (!newDb.validation_requests) newDb.validation_requests = [];
+          newDb.validation_requests.push({
+            id: crypto.randomUUID(),
+            schoolId: currentSchool.id,
+            requesterId: currentUser.id,
+            requesterRole: currentUser.role,
+            actionType: 'UPDATE_GRADE',
+            targetCollection: 'grades',
+            targetDocumentId: gradeObj.id,
+            proposedData: gradeObj,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+          });
+        }
       }
     });
     
     saveDB(newDb);
     setModalOpen(false);
+    if (hasValidations) {
+      alert("Les notes ont été soumises pour validation par le Directeur.");
+    } else {
+      alert("Notes enregistrées avec succès.");
+    }
   };
 
   const handlePrint = (selector: string, filename: string) => {

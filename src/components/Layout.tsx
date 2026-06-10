@@ -2,11 +2,11 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
 import { useAppContext } from '../context/AppContext';
-import { LayoutDashboard, UserSquare2, Bus as BusIcon, Package, CheckSquare, Settings, DollarSign, BookOpen, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, UserSquare2, Bus as BusIcon, Package, CheckSquare, Settings, DollarSign, BookOpen, AlertTriangle, Shield, ShieldAlert } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
-  const { isSupervising, currentSchool, exitSupervision } = useAppContext();
+  const { currentUser, isSupervising, currentSchool, exitSupervision } = useAppContext();
 
   const toggleLang = () => {
     setLang(lang === 'fr' ? 'en' : 'fr');
@@ -71,6 +71,19 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             <Settings size={20} />
             Paramètres
           </NavLink>
+          
+          {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+            <>
+              <NavLink to="/validations" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <ShieldAlert size={20} />
+                Validations
+              </NavLink>
+              <NavLink to="/users" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Shield size={20} />
+                Accès & Rôles
+              </NavLink>
+            </>
+          )}
         </div>
 
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
