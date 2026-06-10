@@ -85,6 +85,60 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
     }
   };
 
+  const exportSchoolsToJSON = async () => {
+    try {
+      setTestResult("Exportation en cours...");
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { getDocs, collection } = await import('firebase/firestore');
+      const snap = await getDocs(collection(firestoreDb, 'schools'));
+      const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `schools-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setTestResult(`✅ Export réussi ! ${data.length} école(s) sauvegardée(s).`);
+    } catch (e: any) {
+      setTestResult(`❌ Erreur d'export: ${e.message}`);
+    }
+  };
+
+  const handleImportJSON = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setTestResult("Restauration en cours...");
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const content = e.target?.result as string;
+          const schools = JSON.parse(content);
+          if (!Array.isArray(schools)) throw new Error("Le fichier JSON doit contenir un tableau d'écoles.");
+          
+          const { db: firestoreDb } = await import('../db/firebase');
+          const { doc, setDoc } = await import('firebase/firestore');
+          
+          for (const school of schools) {
+            if (school.id) {
+              await setDoc(doc(firestoreDb, 'schools', school.id), school);
+            }
+          }
+          setTestResult(`✅ Restauration réussie ! ${schools.length} école(s) importée(s). Veuillez rafraîchir la page (F5).`);
+        } catch (err: any) {
+          setTestResult(`❌ Erreur de parsing JSON: ${err.message}`);
+        }
+      };
+      reader.readAsText(file);
+    } catch (e: any) {
+      setTestResult(`❌ Erreur lors de l'import: ${e.message}`);
+    }
+    event.target.value = ''; // Reset input
+  };
+
   const firebaseConfigValues = {
     projectId: "ecoscolaire-c5861",
     authDomain: "ecoscolaire-c5861.firebaseapp.com",
@@ -134,6 +188,18 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
               >
                 Créer école test Firestore /schools
               </button>
+              
+              <button 
+                onClick={exportSchoolsToJSON}
+                style={{ background: '#ca8a04', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Sauvegarde Firestore (Export JSON)
+              </button>
+              
+              <label style={{ background: '#db2777', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'inline-block' }}>
+                Restaurer Firestore (Import JSON)
+                <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
+              </label>
             </div>
 
             {testResult && (
