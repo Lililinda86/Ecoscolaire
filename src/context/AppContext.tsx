@@ -90,18 +90,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoading(true);
       try {
         const { db: firestoreDb } = await import('../db/firebase');
-        const { doc, getDoc, collection, getDocs, query, where } = await import('firebase/firestore');
+        const { doc, getDoc, setDoc, collection, getDocs, query, where } = await import('firebase/firestore');
 
         // Fetch user profile
-        const userDoc = await getDoc(doc(firestoreDb, 'users', firebaseUser.uid));
+        console.log("Utilisateur Firebase connecté:", firebaseUser.email, firebaseUser.uid);
+        let userDoc = await getDoc(doc(firestoreDb, 'users', firebaseUser.uid));
+        let userData: any;
+
         if (!userDoc.exists()) {
-          console.error("Profil utilisateur introuvable dans Firestore");
-          const { auth } = await import('../db/firebase');
-          auth.signOut();
-          return;
+          console.log("Document Firestore non trouvé pour:", firebaseUser.email);
+          userData = {
+            id: firebaseUser.uid,
+            email: firebaseUser.email,
+            role: firebaseUser.email === 'kyrialove@gmail.com' ? 'superAdmin' : 'staff',
+            isActive: true,
+            schoolId: firebaseUser.email === 'kyrialove@gmail.com' ? null : null,
+            createdAt: new Date().toISOString()
+          };
+          await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), userData);
+          console.log("Document Firestore créé automatiquement avec succès:", userData);
+        } else {
+          console.log("Document Firestore trouvé:", userDoc.data());
+          userData = { id: userDoc.id, ...userDoc.data() } as User;
         }
 
-        const userData = { id: userDoc.id, ...userDoc.data() } as User;
+        console.log("Rôle détecté:", userData.role);
+        console.log("Redirection gérée par App.tsx en fonction de ce rôle.");
         if (!userData.isActive) {
           alert("Votre compte est désactivé.");
           const { auth } = await import('../db/firebase');
