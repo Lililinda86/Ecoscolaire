@@ -4,13 +4,26 @@ import { Activity, Database, Server, Users, Building, ChevronLeft, ShieldCheck, 
 import { useNavigate } from 'react-router-dom';
 
 const Diagnostic: React.FC = () => {
-  const { db, isFirestoreConnected, firestoreError, lastSyncDate } = useAppContext();
+  const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, isSupervising, supervisionSchoolId } = useAppContext();
   const navigate = useNavigate();
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [directFetchData, setDirectFetchData] = useState<any>(null);
 
   useEffect(() => {
-    import('../db/firebase').then(({ db: firestoreDb }) => {
+    import('../db/firebase').then(async ({ db: firestoreDb }) => {
       console.log("Firebase Project ID:", firestoreDb.app.options.projectId);
+      
+      try {
+        const { getDocs, collection } = await import('firebase/firestore');
+        const snap = await getDocs(collection(firestoreDb, 'schools'));
+        const docsInfo = snap.docs.map(d => ({ id: d.id, name: d.data().name }));
+        setDirectFetchData({
+          count: snap.docs.length,
+          docs: docsInfo
+        });
+      } catch (e) {
+        console.error("Erreur direct fetch:", e);
+      }
     });
   }, []);
 
@@ -148,6 +161,47 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
                 </p>
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+            <Server /> Analyse AppContext & Variables d'État
+          </h2>
+          
+          <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontFamily: 'monospace' }}>
+              <div><strong style={{color: '#475569'}}>currentUser.role:</strong> <span style={{color: '#0369a1'}}>{currentUser?.role || 'null'}</span></div>
+              <div><strong style={{color: '#475569'}}>currentUser.email:</strong> <span style={{color: '#0369a1'}}>{currentUser?.email || 'null'}</span></div>
+              <div><strong style={{color: '#475569'}}>supervisionSchoolId:</strong> <span style={{color: '#c2410c'}}>{supervisionSchoolId || 'null'}</span></div>
+              <div><strong style={{color: '#475569'}}>db.schools.length:</strong> <span style={{color: '#15803d'}}>{db?.schools?.length || 0}</span></div>
+              <div style={{ gridColumn: '1 / -1', marginTop: '1rem', padding: '1rem', background: '#fff', border: '1px dashed #94a3b8', borderRadius: '4px' }}>
+                <strong style={{color: '#475569'}}>Branche AppContext déduite :</strong><br/>
+                <span style={{ fontSize: '1.1rem', color: '#b91c1c', fontWeight: 'bold' }}>
+                  {currentUser?.role === 'superAdmin' && !supervisionSchoolId 
+                    ? '=> Mode Global Super Admin' 
+                    : '=> Mode Supervision / École'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Database size={18}/> Lecture Directe Firestore (/schools)</h3>
+          <div style={{ padding: '1.5rem', background: '#f1f5f9', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+            {directFetchData ? (
+              <div style={{ fontFamily: 'monospace' }}>
+                <div style={{ marginBottom: '0.5rem' }}><strong>Écoles physiquement trouvées dans Firestore:</strong> <span style={{ fontSize: '1.2rem', color: '#15803d', fontWeight: 'bold' }}>{directFetchData.count}</span></div>
+                <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
+                  {directFetchData.docs.map((d: any, i: number) => (
+                    <li key={i} style={{ padding: '0.5rem', background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                      <span style={{ color: '#0369a1' }}>ID: {d.id}</span> | <strong>Nom: {d.name}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div style={{ color: '#64748b' }}>Chargement direct de /schools en cours...</div>
+            )}
           </div>
         </div>
 
