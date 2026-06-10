@@ -142,7 +142,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser(userData);
 
         const loadedDb: any = { ...defaultDB };
-        const collectionsToFetch = ['classes', 'students', 'staff', 'buses', 'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications'];
+        const collectionsToFetch = [
+          'classes', 'students', 'staff', 'buses', 'inventory', 
+          'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
+          'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
+          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance'
+        ];
 
         if (userData.role === 'superAdmin' && !supervisionSchoolId) {
           // Mode Global Super Admin
@@ -193,9 +198,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               q = query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId));
             }
             const snap = await getDocs(q);
+            console.log(`🔵 [AppContext] Lecture Firestore [${colName}] : ${snap.docs.length} document(s) chargé(s).`);
             return { colName, data: snap.docs.map(d => ({id: d.id, ...d.data()})) };
           } catch (e) {
-            console.warn(`Lecture bloquée ou erreur pour ${colName}`, e);
+            console.warn(`❌ [AppContext] Erreur ou lecture bloquée pour [${colName}]`, e);
             return { colName, data: [] };
           }
         });
@@ -240,7 +246,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { db: firestoreDb } = await import('../db/firebase');
       const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
 
-      const collections = ['schools', 'users', 'classes', 'students', 'staff', 'buses', 'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications'] as const;
+      const collections = [
+        'schools', 'users', 'classes', 'students', 'staff', 'buses', 
+        'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
+        'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
+        'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance'
+      ] as const;
       
       for (const col of collections) {
         const oldArray = (db as any)[col] || [];
