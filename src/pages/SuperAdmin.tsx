@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import Modal from '../components/Modal';
-import { Building2, Plus, Edit2, Play, AlertCircle, CreditCard, LogOut } from 'lucide-react';
+import { Building2, Plus, Edit2, Play, AlertCircle, CreditCard, LogOut, Building } from 'lucide-react';
 import type { School, SubscriptionPlan, SubscriptionStatus } from '../types';
 
 const SuperAdmin: React.FC = () => {
