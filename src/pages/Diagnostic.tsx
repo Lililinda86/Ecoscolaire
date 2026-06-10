@@ -4,7 +4,7 @@ import { Activity, Database, Server, Users, Building, ChevronLeft } from 'lucide
 import { useNavigate } from 'react-router-dom';
 
 const Diagnostic: React.FC = () => {
-  const { db, isFirestoreConnected, firestoreError } = useAppContext();
+  const { db, isFirestoreConnected, firestoreError, lastSyncDate } = useAppContext();
   const navigate = useNavigate();
 
   return (
@@ -62,6 +62,22 @@ const Diagnostic: React.FC = () => {
                   <Users size={18} /> Utilisateurs
                 </div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{db.users?.length || 0}</div>
+              </div>
+
+              <div style={{ padding: '1rem', background: '#f1f5f9', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                  <Database size={18} /> Collections Firestore
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>11</div>
+              </div>
+
+              <div style={{ padding: '1rem', background: '#f1f5f9', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                  <Activity size={18} /> Dernière synchro
+                </div>
+                <div style={{ fontSize: '1rem', fontWeight: 'bold', color: lastSyncDate ? '#16a34a' : '#64748b' }}>
+                  {lastSyncDate ? lastSyncDate.toLocaleTimeString() : 'En attente...'}
+                </div>
               </div>
 
               <div style={{ padding: '1rem', background: '#f1f5f9', borderRadius: '8px' }}>

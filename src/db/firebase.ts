@@ -2,14 +2,15 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
-// Remplacez ces valeurs par celles de votre projet Firebase
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "VOTRE_API_KEY",
-  authDomain: "votre-projet.firebaseapp.com",
-  projectId: "votre-projet",
-  storageBucket: "votre-projet.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  apiKey: "AIzaSyCWm59UvkOsyHWx9gJXHf0m9qH7d3Droh0",
+  authDomain: "ecoscolaire-c5861.firebaseapp.com",
+  projectId: "ecoscolaire-c5861",
+  storageBucket: "ecoscolaire-c5861.firebasestorage.app",
+  messagingSenderId: "329523025972",
+  appId: "1:329523025972:web:052855ab83a9da2ea49261",
+  measurementId: "G-L9QJQYQGHH"
 };
 
 // Initialiser Firebase

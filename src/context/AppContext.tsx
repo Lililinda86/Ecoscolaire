@@ -16,6 +16,7 @@ interface AppContextProps {
   logout: () => void;
   isFirestoreConnected: boolean | null;
   firestoreError: string | null;
+  lastSyncDate: Date | null;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -28,6 +29,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [isFirestoreConnected, setIsFirestoreConnected] = useState<boolean | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
+  const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
 
   useEffect(() => {
     const initializeFirebaseData = async () => {
@@ -45,6 +47,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         setIsFirestoreConnected(true);
         setFirestoreError(null);
+        setLastSyncDate(new Date());
         
         // Auto-inject missing default classes if none exist
         const missingClasses = defaultDB.classes.filter(defCls => !loadedDb.classes.some((c: any) => c.id === defCls.id));
@@ -142,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       }
+      setLastSyncDate(new Date());
     } catch (e) {
       console.error("Diffing Sync Error:", e);
     }
@@ -235,7 +239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{ 
       db, saveDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
-      login, logout, isFirestoreConnected, firestoreError
+      login, logout, isFirestoreConnected, firestoreError, lastSyncDate
     }}>
       {children}
     </AppContext.Provider>
