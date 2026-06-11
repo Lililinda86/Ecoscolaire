@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
 import { useAppContext } from '../context/AppContext';
-import { LayoutDashboard, UserSquare2, Bus as BusIcon, Package, CheckSquare, Settings, DollarSign, BookOpen, AlertTriangle, Shield, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, UserSquare2, Bus as BusIcon, Package, CheckSquare, Settings, DollarSign, BookOpen, AlertTriangle, Shield, ShieldAlert, Users, Calendar, ClipboardList, Briefcase, CreditCard, MessageSquare } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
@@ -30,61 +30,75 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       )}
       <aside className="sidebar" style={{ paddingTop: isSupervising ? '3rem' : undefined }}>
         <h2>EcoScolaire</h2>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}>
+          <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>
             <LayoutDashboard size={20} />
             {t('dashboard')}
           </NavLink>
-          <NavLink to="/students" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <UserSquare2 size={20} />
+          
+          <div className="sidebar-category">ACADÉMIQUE</div>
+          <NavLink to="/students" className={({ isActive }) => isActive ? 'active' : ''}>
+            <Users size={20} />
             {t('students', 'Élèves')}
           </NavLink>
-          <NavLink to="/classes" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink to="/classes" className={({ isActive }) => isActive ? 'active' : ''}>
             <BookOpen size={20} />
             {t('classes', 'Classes')}
           </NavLink>
-          <NavLink to="/grades" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <CheckSquare size={20} />
+          <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''}>
+            <ClipboardList size={20} />
             Notes & Bulletins
           </NavLink>
-          <NavLink to="/attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <CheckSquare size={20} />
+          <NavLink to="/attendance" className={({ isActive }) => isActive ? 'active' : ''}>
+            <Calendar size={20} />
             Présences
           </NavLink>
-          <NavLink to="/staff" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <UserSquare2 size={20} />
+          
+          <div className="sidebar-category">ADMINISTRATION</div>
+          <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : ''}>
+            <Briefcase size={20} />
             {t('staff')}
           </NavLink>
-          <NavLink to="/buses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink to="/buses" className={({ isActive }) => isActive ? 'active' : ''}>
             <BusIcon size={20} />
             {t('buses')}
           </NavLink>
-          <NavLink to="/payments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <DollarSign size={20} />
-            {t('payments', 'Paiements')}
-          </NavLink>
-          <NavLink to="/inventory" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''}>
             <Package size={20} />
             {t('inventory')}
           </NavLink>
-          <NavLink to="/settings" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          
+          <div className="sidebar-category">FINANCES</div>
+          <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''}>
+            <CreditCard size={20} />
+            {t('payments', 'Paiements')}
+          </NavLink>
+          
+          <div className="sidebar-category">COMMUNICATION</div>
+          <NavLink to="/communication" className={({ isActive }) => isActive ? 'active' : ''}>
+            <MessageSquare size={20} />
+            Messages & WhatsApp
+          </NavLink>
+
+          <div className="sidebar-category">PARAMÈTRES</div>
+          <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}>
             <Settings size={20} />
             Paramètres
           </NavLink>
           
           {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
             <>
-              <NavLink to="/validations" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <NavLink to="/validations" className={({ isActive }) => isActive ? 'active' : ''}>
                 <ShieldAlert size={20} />
                 Validations
               </NavLink>
-              <NavLink to="/users" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''}>
                 <Shield size={20} />
                 Accès & Rôles
               </NavLink>
             </>
           )}
-        </div>
+        </nav>
 
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <button className="secondary" onClick={toggleLang} style={{ width: '100%' }}>

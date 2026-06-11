@@ -1,23 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --primary: #4F46E5;
-  --primary-hover: #4338CA;
-  --bg-color: #F3F4F6;
-  --surface: #FFFFFF;
-  --text-main: #111827;
-  --text-muted: #6B7280;
-  --border-color: #E5E7EB;
-  --danger: #EF4444;
-  --success: #10B981;
-  --warning: #F59E0B;
+  --primary-color: #4f46e5;
+  --primary-hover: #4338ca;
+  --secondary-color: #f1f5f9;
+  --accent-color: #0ea5e9;
+  --bg-color: #f8fafc;
+  --text-color: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --danger: #ef4444;
+  --success: #10b981;
+  --warning: #f59e0b;
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   
-  --radius-md: 0.5rem;
-  --radius-lg: 1rem;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   
   --transition: all 0.2s ease-in-out;
 }
@@ -32,9 +33,10 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background-color: var(--bg-color);
-  color: var(--text-main);
+  color: var(--text-color);
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -49,7 +51,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 a {
-  color: var(--primary);
+  color: var(--primary-color);
   text-decoration: none;
 }
 
@@ -61,7 +63,7 @@ a:hover {
 button {
   cursor: pointer;
   border: none;
-  background: var(--primary);
+  background: var(--primary-color);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
@@ -85,13 +87,13 @@ button:active {
 }
 
 button.secondary {
-  background: var(--surface);
-  color: var(--text-main);
+  background: white;
+  color: var(--text-color);
   border: 1px solid var(--border-color);
 }
 
 button.secondary:hover {
-  background: var(--bg-color);
+  background: var(--secondary-color);
 }
 
 /* Forms */
@@ -100,8 +102,8 @@ input, select, textarea {
   padding: 0.6rem 0.75rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  background: var(--surface);
-  color: var(--text-main);
+  background: white;
+  color: var(--text-color);
   font-family: inherit;
   transition: var(--transition);
   font-size: 0.95rem;
@@ -109,55 +111,82 @@ input, select, textarea {
 
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
 }
 
 /* Layout */
-.app-layout {
+.app-container {
   display: flex;
   min-height: 100vh;
-  width: 100%;
 }
 
 .sidebar {
-  width: 250px;
-  background: var(--surface);
-  border-right: 1px solid var(--border-color);
+  width: 260px;
+  background-color: #ffffff;
+  color: var(--text-color);
   padding: 1.5rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  border-right: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
 }
 
 .sidebar h2 {
-  color: var(--primary);
   font-size: 1.25rem;
-  font-weight: 700;
   margin-bottom: 2rem;
   text-align: center;
+  color: var(--primary-color);
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
 
-.nav-link {
+.sidebar-category {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 0.75rem;
+}
+
+.sidebar nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar nav a, .sidebar nav button {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  font-weight: 500;
-  transition: var(--transition);
-}
-
-.nav-link:hover {
-  background: var(--bg-color);
-  color: var(--text-main);
+  color: var(--text-color);
   text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 
-.nav-link.active {
-  background: rgba(79, 70, 229, 0.1);
-  color: var(--primary);
+.sidebar nav a:hover, .sidebar nav button:hover {
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+}
+
+.sidebar nav a.active {
+  background-color: rgba(79, 70, 229, 0.1);
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
 .main-content {
@@ -173,12 +202,12 @@ input:focus, select:focus, textarea:focus {
 
 /* Cards */
 .card {
-  background: var(--surface);
+  background: #fff;
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);
-  transition: var(--transition);
+  transition: box-shadow 0.2s ease;
 }
 
 .card:hover {
