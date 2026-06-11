@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { useI18n } from '../context/I18nContext';
 import { 
   UserPlus, GraduationCap, DollarSign, AlertCircle, 
   CheckCircle2, XCircle, FileText, MessageSquare, Briefcase, PlusCircle
