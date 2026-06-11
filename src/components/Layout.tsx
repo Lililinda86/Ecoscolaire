@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
 import { useAppContext } from '../context/AppContext';
-import { LayoutDashboard, UserSquare2, Bus as BusIcon, Package, CheckSquare, Settings, DollarSign, BookOpen, AlertTriangle, Shield, ShieldAlert, Users, Calendar, ClipboardList, Briefcase, CreditCard, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Bus as BusIcon, Package, Settings, BookOpen, AlertTriangle, Shield, ShieldAlert, Users, Calendar, ClipboardList, Briefcase, CreditCard, MessageSquare } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
