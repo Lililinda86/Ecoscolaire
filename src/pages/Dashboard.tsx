@@ -3,13 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { 
-  Users, UserPlus, GraduationCap, DollarSign, AlertCircle, 
-  CheckCircle2, XCircle, FileText, Bell, MessageSquare, Briefcase, PlusCircle
+  UserPlus, GraduationCap, DollarSign, AlertCircle, 
+  CheckCircle2, XCircle, FileText, MessageSquare, Briefcase, PlusCircle
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const { db, isFirestoreConnected } = useAppContext();
-  const { t } = useI18n();
   const navigate = useNavigate();
 
   // Mock data for KPIs - In a real scenario these would be calculated from db
