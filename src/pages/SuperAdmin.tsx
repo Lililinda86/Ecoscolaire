@@ -261,10 +261,6 @@ const SuperAdmin: React.FC = () => {
           </div>
           <div className="form-group"><label>Année Académique</label><input required value={currentSchool.academicYear || ''} onChange={e => setCurrentSchool({...currentSchool, academicYear: e.target.value})} placeholder="Ex: 2023-2024" /></div>
           
-          <div style={{background:'red',color:'white',padding:'10px',marginBottom:'1rem',fontWeight:'bold'}}>
-            TEST LOGO BLOCK
-          </div>
-          
           <div className="form-group" style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
             <label>Logo de l'école (PNG, JPG, WEBP - Max 2Mo)</label>
             <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleLogoUpload} style={{ marginBottom: '1rem' }} />
