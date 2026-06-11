@@ -111,6 +111,9 @@ export interface Student {
   financialBypass?: { t1: boolean, t2: boolean, t3: boolean }; // Pour débloquer les notes
   rawClassName?: string; // Used for Excel import preview
   detectedClassName?: string; // Used for Excel import preview
+  allergies?: string;
+  medicalConditions?: string;
+  emergencyContact?: string;
 }
 
 export interface Staff {

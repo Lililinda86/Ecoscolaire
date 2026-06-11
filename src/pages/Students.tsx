@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
+import { Download, Upload, Plus, Edit2, Trash2, Search, HeartPulse } from 'lucide-react';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
-import { Plus, Edit2, Trash2, FileSpreadsheet, Printer } from 'lucide-react';
+import { Plus as PlusIcon, Edit2 as EditIcon, Trash2 as TrashIcon, FileSpreadsheet, Printer } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
@@ -352,7 +353,12 @@ const Students: React.FC = () => {
                 filteredStudents.map(student => (
                   <tr key={student.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '1rem', fontWeight: 'bold' }}>{student.matricule || '-'}</td>
-                    <td style={{ padding: '1rem' }}>{student.name}</td>
+                    <td style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {student.name}
+                      {(student.allergies || student.medicalConditions) && (
+                        <HeartPulse size={16} color="#dc2626" title={`Santé: ${student.allergies ? 'Allergies ' : ''}${student.medicalConditions ? 'Conditions Médicales' : ''}`} />
+                      )}
+                    </td>
                     <td style={{ padding: '1rem' }}>
                       {db.classes.find(c => c.id === student.classId)?.name || '-'} <span style={{fontSize: '0.85em', color: 'var(--text-muted)'}}>({student.section})</span>
                     </td>
@@ -463,6 +469,33 @@ const Students: React.FC = () => {
             <div className="form-group" style={{ flex: 1 }}>
               <label>Adresse d'habitation</label>
               <input value={currentStudent.address || ''} onChange={e => setCurrentStudent({...currentStudent, address: e.target.value})} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Contact d'Urgence</label>
+              <input value={currentStudent.emergencyContact || ''} onChange={e => setCurrentStudent({...currentStudent, emergencyContact: e.target.value})} placeholder="Numéro en cas d'urgence" />
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label style={{ color: '#92400e' }}>Allergies (Santé)</label>
+              <textarea 
+                value={currentStudent.allergies || ''} 
+                onChange={e => setCurrentStudent({...currentStudent, allergies: e.target.value})} 
+                placeholder="Ex: Arachides, Pénicilline..."
+                rows={2}
+                style={{ width: '100%', borderColor: '#fcd34d' }}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label style={{ color: '#92400e' }}>Conditions Médicales Particulières</label>
+              <textarea 
+                value={currentStudent.medicalConditions || ''} 
+                onChange={e => setCurrentStudent({...currentStudent, medicalConditions: e.target.value})} 
+                placeholder="Ex: Asthme, Diabète..."
+                rows={2}
+                style={{ width: '100%', borderColor: '#fcd34d' }}
+              />
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
