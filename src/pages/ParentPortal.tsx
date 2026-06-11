@@ -111,23 +111,53 @@ const ParentPortal: React.FC = () => {
 
                 {activeTab === 'grades' && (
                   <div>
-                    <h3>Notes du Trimestre 1</h3>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BookOpen size={20} color="var(--primary-color)" /> Notes du Trimestre 1</h3>
                     {isTranchePaid(student, 'T1') ? (
-                      <p>✅ Accès autorisé. Les notes s'afficheront ici.</p>
+                      <div className="card" style={{ background: '#f8fafc', padding: '1rem' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
+                              <th style={{ padding: '0.5rem' }}>Matière</th>
+                              <th style={{ padding: '0.5rem' }}>Note/20</th>
+                              <th style={{ padding: '0.5rem' }}>Appréciation</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '0.5rem' }}>Mathématiques</td>
+                              <td style={{ padding: '0.5rem', fontWeight: 600 }}>16.5</td>
+                              <td style={{ padding: '0.5rem', color: 'var(--success)' }}>Très bien</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '0.5rem' }}>Français</td>
+                              <td style={{ padding: '0.5rem', fontWeight: 600 }}>14.0</td>
+                              <td style={{ padding: '0.5rem', color: 'var(--primary-color)' }}>Bien</td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '0.5rem' }}>Sciences</td>
+                              <td style={{ padding: '0.5rem', fontWeight: 600 }}>18.0</td>
+                              <td style={{ padding: '0.5rem', color: 'var(--success)' }}>Excellent</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div style={{ marginTop: '1rem', textAlign: 'right' }}>
+                          <button className="primary" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Télécharger le Bulletin Complet (PDF)</button>
+                        </div>
+                      </div>
                     ) : (
                       renderBlockadeAlert(student, 1)
                     )}
 
-                    <h3 style={{ marginTop: '2rem' }}>Notes du Trimestre 2</h3>
+                    <h3 style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BookOpen size={20} color="var(--primary-color)" /> Notes du Trimestre 2</h3>
                     {isTranchePaid(student, 'T2') ? (
-                      <p>✅ Accès autorisé. Les notes s'afficheront ici.</p>
+                      <p style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>✅ Trimestre en cours. Le bulletin n'est pas encore généré.</p>
                     ) : (
                       renderBlockadeAlert(student, 2)
                     )}
 
-                    <h3 style={{ marginTop: '2rem' }}>Notes du Trimestre 3</h3>
+                    <h3 style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BookOpen size={20} color="var(--primary-color)" /> Notes du Trimestre 3</h3>
                     {isTranchePaid(student, 'T3') ? (
-                      <p>✅ Accès autorisé. Les notes s'afficheront ici.</p>
+                      <p style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>✅ Trimestre non débuté.</p>
                     ) : (
                       renderBlockadeAlert(student, 3)
                     )}
@@ -163,7 +193,43 @@ const ParentPortal: React.FC = () => {
 
                 {activeTab === 'attendance' && (
                   <div>
-                    <p>Historique des présences disponible prochainement.</p>
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                      <div style={{ background: '#f0fdf4', color: '#166534', padding: '1rem', borderRadius: '8px', flex: 1, border: '1px solid #bbf7d0' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0' }}>Jours de présence</h4>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>85</div>
+                      </div>
+                      <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1rem', borderRadius: '8px', flex: 1, border: '1px solid #fecaca' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0' }}>Absences justifiées</h4>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>2</div>
+                      </div>
+                      <div style={{ background: '#fffbeb', color: '#92400e', padding: '1rem', borderRadius: '8px', flex: 1, border: '1px solid #fde68a' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0' }}>Absences non justifiées</h4>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>0</div>
+                      </div>
+                    </div>
+                    
+                    <h4>Dernières absences</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead style={{ background: 'var(--bg-color)' }}>
+                        <tr>
+                          <th style={{ padding: '0.75rem', textAlign: 'left' }}>Date</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left' }}>Motif</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left' }}>Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.75rem' }}>12/04/2024</td>
+                          <td style={{ padding: '0.75rem' }}>Maladie</td>
+                          <td style={{ padding: '0.75rem', color: 'var(--success)' }}>Justifié</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.75rem' }}>05/03/2024</td>
+                          <td style={{ padding: '0.75rem' }}>Rendez-vous médical</td>
+                          <td style={{ padding: '0.75rem', color: 'var(--success)' }}>Justifié</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 )}
 
