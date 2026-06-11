@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
-import { Download, Upload, Plus, Edit2, Trash2, Search, HeartPulse } from 'lucide-react';
+import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer } from 'lucide-react';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
-import { Plus as PlusIcon, Edit2 as EditIcon, Trash2 as TrashIcon, FileSpreadsheet, Printer } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
@@ -356,7 +355,9 @@ const Students: React.FC = () => {
                     <td style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {student.name}
                       {(student.allergies || student.medicalConditions) && (
-                        <HeartPulse size={16} color="#dc2626" title={`Santé: ${student.allergies ? 'Allergies ' : ''}${student.medicalConditions ? 'Conditions Médicales' : ''}`} />
+                        <span title={`Santé: ${student.allergies ? 'Allergies ' : ''}${student.medicalConditions ? 'Conditions Médicales' : ''}`}>
+                          <HeartPulse size={16} color="#dc2626" />
+                        </span>
                       )}
                     </td>
                     <td style={{ padding: '1rem' }}>
