@@ -579,7 +579,13 @@ const Payments: React.FC = () => {
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 1rem', background: paymentMethod === 'mobile_money' ? '#fff' : 'transparent', border: paymentMethod === 'mobile_money' ? '1px solid #f97316' : '1px solid transparent', borderRadius: '4px', boxShadow: paymentMethod === 'mobile_money' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
                 <input type="radio" name="method" checked={paymentMethod === 'mobile_money'} onChange={() => setPaymentMethod('mobile_money')} style={{ margin: 0 }} />
-                <span style={{ color: '#ea580c', fontWeight: paymentMethod === 'mobile_money' ? 600 : 400 }}>📱 Mobile Money (En Ligne)</span>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ color: '#ea580c', fontWeight: paymentMethod === 'mobile_money' ? 600 : 400 }}>📱 Mobile Money (En Ligne)</span>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <span style={{ fontSize: '0.7rem', background: '#ff6600', color: 'white', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>Orange Money</span>
+                    <span style={{ fontSize: '0.7rem', background: '#ffcc00', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>MTN MoMo</span>
+                  </div>
+                </div>
               </label>
             </div>
           </div>
