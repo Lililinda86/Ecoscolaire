@@ -76,7 +76,11 @@ const Login: React.FC = () => {
             <div style={{ position: 'relative' }}>
               <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
-                type="text" 
+                type="email" 
+                name="email"
+                autoComplete="email"
+                data-testid="login-email"
+                aria-label="Email"
                 required 
                 placeholder="Ex: kyrialove@gmail.com" 
                 value={email} 
@@ -92,6 +96,10 @@ const Login: React.FC = () => {
               <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
                 type={showPassword ? "text" : "password"} 
+                name="password"
+                autoComplete="current-password"
+                data-testid="login-password"
+                aria-label="Mot de passe"
                 required 
                 placeholder="••••••" 
                 value={password} 
@@ -120,6 +128,7 @@ const Login: React.FC = () => {
 
           <button 
             type="submit" 
+            data-testid="login-submit"
             disabled={loading}
             style={{ width: '100%', padding: '0.875rem', borderRadius: '8px', fontWeight: 600, fontSize: '1rem' }}
           >

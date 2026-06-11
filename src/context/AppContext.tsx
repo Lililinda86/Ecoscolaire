@@ -17,6 +17,7 @@ interface AppContextProps {
   firestoreError: string | null;
   lastSyncDate: Date | null;
   supervisionSchoolId: string | null;
+  authLoading: boolean;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -38,32 +39,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubscribe: any;
     const initAuth = async () => {
       try {
-        const { auth, db: firestoreDb } = await import('../db/firebase');
-        const { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import('firebase/auth');
-        const { doc, setDoc } = await import('firebase/firestore');
-
-        // Création automatique du Super Admin s'il n'existe pas
-        const superAdminEmail = 'kyrialove@gmail.com';
-        const superAdminPin = '123456';
-        try {
-          await signInWithEmailAndPassword(auth, superAdminEmail, superAdminPin);
-        } catch (e: any) {
-          if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-            try {
-              const res = await createUserWithEmailAndPassword(auth, superAdminEmail, superAdminPin);
-              await setDoc(doc(firestoreDb, 'users', res.user.uid), {
-                id: res.user.uid,
-                email: superAdminEmail,
-                role: 'superAdmin',
-                isActive: true,
-                createdAt: new Date().toISOString()
-              });
-              console.log("Compte Super Admin créé avec succès !");
-            } catch (err) {
-              console.error("Impossible de créer le super admin automatique :", err);
-            }
-          }
-        }
+        const { auth } = await import('../db/firebase');
+        const { onAuthStateChanged } = await import('firebase/auth');
 
         unsubscribe = onAuthStateChanged(auth, (user) => {
           setFirebaseUser(user);
@@ -354,14 +331,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
-        <h2 style={{ marginTop: '1.5rem', fontWeight: 600 }}>Chargement de la plateforme...</h2>
-      </div>
-    );
-  }
-
   if (!db && firestoreError && firebaseUser) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#991b1b', padding: '2rem' }}>
@@ -378,7 +347,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{ 
       db, saveDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
-      login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId
+      login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
+      authLoading: loading
     }}>
       {children}
     </AppContext.Provider>

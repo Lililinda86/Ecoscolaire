@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
 
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Staff from './pages/Staff';
@@ -25,7 +26,7 @@ import Communication from './pages/Communication';
 import Diagnostic from './pages/Diagnostic';
 
 function App() {
-  const { db, saveDB, currentUser, isSupervising } = useAppContext();
+  const { db, saveDB } = useAppContext();
 
   useEffect(() => {
     if (!db || !db.school) return;
@@ -97,66 +98,69 @@ function App() {
     }
   }, [db?.classes, db?.school, saveDB]);
 
-  // Non connecté
-  if (!currentUser) {
-    return (
-      <HashRouter>
-        <Routes>
-          <Route path="/diagnostic" element={<Diagnostic />} />
-          <Route path="*" element={<Login />} />
-        </Routes>
-      </HashRouter>
-    );
-  }
-
-  // Super Admin (hors supervision)
-  if (currentUser.role === 'superAdmin' && !isSupervising) {
-    return (
-      <HashRouter>
-        <Routes>
-          <Route path="/diagnostic" element={<Diagnostic />} />
-          <Route path="/users" element={<UsersManagement />} />
-          <Route path="*" element={<SuperAdmin />} />
-        </Routes>
-      </HashRouter>
-    );
-  }
-
-  // Parent
-  if (currentUser.role === 'parent') {
-    return (
-      <HashRouter>
-        <Routes>
-          <Route path="*" element={<ParentPortal />} />
-        </Routes>
-      </HashRouter>
-    );
-  }
-
-  // School Admin & autres staffs
   return (
     <HashRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/school-dashboard" element={<Dashboard />} />
-          <Route path="/students" element={<Students />} />
-          <Route path="/classes" element={<Classes />} />
-          <Route path="/staff" element={<Staff />} />
-          <Route path="/attendance" element={<Attendance />} />
-          <Route path="/buses" element={<Buses />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/grades" element={<Grades />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/users" element={<UsersManagement />} />
-          <Route path="/validations" element={<ValidationDashboard />} />
-          <Route path="/ai-director" element={<AIDirector />} />
-          <Route path="/ai-teacher" element={<AITeacher />} />
-          <Route path="/communication" element={<Communication />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/diagnostic" element={<Diagnostic />} />
+        
+        {/* Route Parent Portal protégée */}
+        <Route path="/parent" element={
+          <ProtectedRoute allowedRoles={['parent']}>
+            <ParentPortal />
+          </ProtectedRoute>
+        } />
+        
+        {/* Route Super Admin protégée */}
+        <Route path="/superadmin" element={
+          <ProtectedRoute allowedRoles={['superAdmin']}>
+            <SuperAdmin />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/superadmin/users" element={
+          <ProtectedRoute allowedRoles={['superAdmin']}>
+            <UsersManagement />
+          </ProtectedRoute>
+        } />
+
+        {/* Routes du Dashboard avec Layout */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Layout><Dashboard /></Layout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Layout><Dashboard /></Layout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/school-dashboard" element={
+          <ProtectedRoute>
+            <Layout><Dashboard /></Layout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/students" element={<ProtectedRoute><Layout><Students /></Layout></ProtectedRoute>} />
+        <Route path="/classes" element={<ProtectedRoute><Layout><Classes /></Layout></ProtectedRoute>} />
+        <Route path="/staff" element={<ProtectedRoute><Layout><Staff /></Layout></ProtectedRoute>} />
+        <Route path="/attendance" element={<ProtectedRoute><Layout><Attendance /></Layout></ProtectedRoute>} />
+        <Route path="/buses" element={<ProtectedRoute><Layout><Buses /></Layout></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute><Layout><Inventory /></Layout></ProtectedRoute>} />
+        <Route path="/grades" element={<ProtectedRoute><Layout><Grades /></Layout></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute><Layout><Payments /></Layout></ProtectedRoute>} />
+        <Route path="/users" element={<ProtectedRoute><Layout><UsersManagement /></Layout></ProtectedRoute>} />
+        <Route path="/validations" element={<ProtectedRoute><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/ai-director" element={<ProtectedRoute><Layout><AIDirector /></Layout></ProtectedRoute>} />
+        <Route path="/ai-teacher" element={<ProtectedRoute><Layout><AITeacher /></Layout></ProtectedRoute>} />
+        <Route path="/communication" element={<ProtectedRoute><Layout><Communication /></Layout></ProtectedRoute>} />
+        
+        {/* Redirection fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </HashRouter>
   );
 }
