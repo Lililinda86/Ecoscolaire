@@ -108,6 +108,60 @@ const Settings: React.FC = () => {
             />
           </div>
         </div>
+
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Directeur / Fondateur</label>
+            <input 
+              value={db.school?.directorName || ''} 
+              onChange={e => saveDB({ ...db, school: { ...(db.school as any), directorName: e.target.value } })}
+              style={{ width: '100%' }}
+              placeholder="Nom du Directeur"
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Numéro d'Agrément</label>
+            <input 
+              value={db.school?.accreditationNumber || ''} 
+              onChange={e => saveDB({ ...db, school: { ...(db.school as any), accreditationNumber: e.target.value } })}
+              style={{ width: '100%' }}
+              placeholder="Ex: Arrêté N° 123/MINEDUB/..."
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Téléphone Officiel</label>
+            <input 
+              value={db.school?.phone || ''} 
+              onChange={e => saveDB({ ...db, school: { ...(db.school as any), phone: e.target.value } })}
+              style={{ width: '100%' }}
+              placeholder="Ex: (+237) 600 00 00 00"
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Email Officiel</label>
+            <input 
+              type="email"
+              value={db.school?.email || ''} 
+              onChange={e => saveDB({ ...db, school: { ...(db.school as any), email: e.target.value } })}
+              style={{ width: '100%' }}
+              placeholder="Ex: contact@ecole.com"
+            />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Adresse Complète</label>
+          <input 
+            value={db.school?.address || ''} 
+            onChange={e => saveDB({ ...db, school: { ...(db.school as any), address: e.target.value } })}
+            style={{ width: '100%' }}
+            placeholder="Ex: Quartier Bonamoussadi, BP 1234 Douala, Cameroun"
+          />
+        </div>
+
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div style={{ flex: 1 }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nouveau Code PIN Administrateur</label>

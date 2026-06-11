@@ -11,6 +11,11 @@ export interface School {
   logoUpdatedAt?: string;
   adminPin?: string;
   createdAt: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  directorName?: string;
+  accreditationNumber?: string;
   // --- Nouveaux champs SaaS ---
   subscriptionPlan?: SubscriptionPlan;
   subscriptionStatus?: SubscriptionStatus;
