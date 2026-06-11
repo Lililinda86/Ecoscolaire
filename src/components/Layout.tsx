@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
 import { useAppContext } from '../context/AppContext';
-import { LayoutDashboard, Bus as BusIcon, Package, Settings, BookOpen, AlertTriangle, Shield, ShieldAlert, Users, Calendar, ClipboardList, Briefcase, CreditCard, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Bus as BusIcon, Package, Settings, BookOpen, AlertTriangle, Shield, ShieldAlert, Users, Calendar, ClipboardList, Briefcase, CreditCard, MessageSquare, Bot } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
@@ -74,10 +74,18 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             {t('payments', 'Paiements')}
           </NavLink>
           
-          <div className="sidebar-category">COMMUNICATION</div>
+          <div className="sidebar-category">COMMUNICATION & IA</div>
           <NavLink to="/communication" className={({ isActive }) => isActive ? 'active' : ''}>
             <MessageSquare size={20} />
             Messages & WhatsApp
+          </NavLink>
+          <NavLink to="/ai-director" className={({ isActive }) => isActive ? 'active' : ''}>
+            <Bot size={20} />
+            Assistant IA Directeur
+          </NavLink>
+          <NavLink to="/ai-teacher" className={({ isActive }) => isActive ? 'active' : ''}>
+            <Bot size={20} />
+            Assistant IA Enseignant
           </NavLink>
 
           <div className="sidebar-category">PARAMÈTRES</div>

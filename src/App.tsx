@@ -18,6 +18,8 @@ import SuperAdmin from './pages/SuperAdmin';
 import ParentPortal from './pages/ParentPortal';
 import UsersManagement from './pages/UsersManagement';
 import ValidationDashboard from './pages/ValidationDashboard';
+import AIDirector from './pages/AIDirector';
+import AITeacher from './pages/AITeacher';
 
 import Diagnostic from './pages/Diagnostic';
 
@@ -148,6 +150,8 @@ function App() {
           <Route path="/payments" element={<Payments />} />
           <Route path="/users" element={<UsersManagement />} />
           <Route path="/validations" element={<ValidationDashboard />} />
+          <Route path="/ai-director" element={<AIDirector />} />
+          <Route path="/ai-teacher" element={<AITeacher />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
