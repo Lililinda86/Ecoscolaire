@@ -1,11 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
 import { aiService } from '../services/AIService';
 import type { AIProvider } from '../services/AIService';
 import { Send, Bot, User, Loader2, Settings } from 'lucide-react';
 
 const AIDirector: React.FC = () => {
-  const { db } = useAppContext();
   const [messages, setMessages] = useState<{role: 'user'|'assistant', content: string}[]>([
     { role: 'assistant', content: "Bonjour M./Mme le Directeur. Je suis votre assistant EcoScolaire IA. Je peux vous aider à analyser vos finances, surveiller les absences, ou suivre les paiements. Que souhaitez-vous savoir ?" }
   ]);
