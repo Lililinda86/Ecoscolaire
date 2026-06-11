@@ -20,6 +20,7 @@ import UsersManagement from './pages/UsersManagement';
 import ValidationDashboard from './pages/ValidationDashboard';
 import AIDirector from './pages/AIDirector';
 import AITeacher from './pages/AITeacher';
+import Communication from './pages/Communication';
 
 import Diagnostic from './pages/Diagnostic';
 
@@ -152,6 +153,7 @@ function App() {
           <Route path="/validations" element={<ValidationDashboard />} />
           <Route path="/ai-director" element={<AIDirector />} />
           <Route path="/ai-teacher" element={<AITeacher />} />
+          <Route path="/communication" element={<Communication />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
