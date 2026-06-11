@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { aiService, AIProvider } from '../services/AIService';
+import { aiService } from '../services/AIService';
+import type { AIProvider } from '../services/AIService';
 import { Send, Bot, User, Loader2, Settings, BookOpen } from 'lucide-react';
 
 const AITeacher: React.FC = () => {

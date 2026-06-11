@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { aiService, AIProvider } from '../services/AIService';
+import { aiService } from '../services/AIService';
+import type { AIProvider } from '../services/AIService';
 import { Send, Bot, User, Loader2, Settings } from 'lucide-react';
 
 const AIDirector: React.FC = () => {
@@ -32,7 +33,6 @@ const AIDirector: React.FC = () => {
 
     try {
       // In a real app, we might pass some context about the school db to the prompt
-      const contextPrompt = `Context: School ${db.school?.name}. \nUser: ${userMessage}`;
       const response = await aiService.generateResponse(userMessage, { provider });
       
       setMessages(prev => [...prev, { role: 'assistant', content: response.content }]);
