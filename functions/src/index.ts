@@ -1,44 +1,44 @@
-// @ts-nocheck
-// Imports are commented out because npm install hangs on this environment for firebase native dependencies
-// import * as functions from 'firebase-functions';
-// import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
 
-const admin = {
-  initializeApp: () => {},
-  firestore: () => ({})
-};
+// Initialize the Firebase Admin SDK
 admin.initializeApp();
 
-const functions = {
-  https: {
-    onCall: (fn: any) => fn,
-    onRequest: (fn: any) => fn,
-    HttpsError: class HttpsError { constructor(code: string, msg: string) {} }
-  },
-  pubsub: {
-    schedule: () => ({ onRun: (fn: any) => fn })
-  }
-};
-
-export const createSaaSCheckout = functions.https.onCall(async (data: any, context: any) => {
+// ----------------------------------------------------------------------
+// 1. createSaaSCheckout
+// Callable function to initiate a payment securely from the frontend.
+// ----------------------------------------------------------------------
+export const createSaaSCheckout = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
   }
   return { status: 'mock_success', message: 'Not implemented yet' };
 });
 
-export const campayWebhook = functions.https.onRequest(async (req: any, res: any) => {
+// ----------------------------------------------------------------------
+// 2. campayWebhook
+// HTTP function to receive status updates from Campay.
+// ----------------------------------------------------------------------
+export const campayWebhook = functions.https.onRequest(async (req, res) => {
   res.status(200).send('OK');
 });
 
-export const verifySaaSPayment = functions.https.onCall(async (data: any, context: any) => {
+// ----------------------------------------------------------------------
+// 3. verifySaaSPayment
+// Callable function to manually poll the payment status if webhook failed.
+// ----------------------------------------------------------------------
+export const verifySaaSPayment = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
   }
   return { status: 'mock_checked', message: 'Not implemented yet' };
 });
 
-export const dailySubscriptionCheck = functions.pubsub.schedule('every day 00:00').onRun(async (context: any) => {
+// ----------------------------------------------------------------------
+// 4. dailySubscriptionCheck
+// Scheduled function (Cron) running daily at midnight to suspend expired schools.
+// ----------------------------------------------------------------------
+export const dailySubscriptionCheck = functions.pubsub.schedule('every day 00:00').onRun(async (context) => {
   const db = admin.firestore();
   const now = new Date();
   console.log(`Cron execution at ${now.toISOString()}`);

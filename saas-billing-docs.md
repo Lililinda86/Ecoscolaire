@@ -18,6 +18,13 @@ L'architecture s'articule autour de 4 fonctions principales :
 4.  **`dailySubscriptionCheck` (Pub/Sub Cron)** :
     Tâche planifiée exécutée tous les jours à minuit. Vérifie si des abonnements ont expiré (`endDate < aujourd'hui`) et les suspend automatiquement pour bloquer l'accès à la plateforme.
 
+## État Actuel (Phase 1)
+> [!WARNING]
+> - Les Cloud Functions ont été initialisées **structurellement** uniquement.
+> - Les dépendances (`node_modules`) **ne sont pas installées localement**.
+> - Le build des functions est **non validé** en raison de l'absence des dépendances.
+> - Le déploiement des functions est **non prêt** et échouera en l'état.
+
 ## Modèles de Données
 
 Les modèles TypeScript partagés sont stockés dans `functions/src/models/billing.ts` :
