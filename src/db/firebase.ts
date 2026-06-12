@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -20,6 +20,8 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 // Activer la persistance hors-ligne
+// Désactivé pour les tests E2E pour éviter les problèmes de cache
+/*
 enableIndexedDbPersistence(db).catch((err) => {
   if (err.code === 'failed-precondition') {
     console.error("Plusieurs onglets ouverts en même temps, la persistance ne peut être activée que dans un onglet.");
@@ -27,6 +29,7 @@ enableIndexedDbPersistence(db).catch((err) => {
     console.error("Le navigateur actuel ne supporte pas la persistance IndexedDB pour Firestore.");
   }
 });
+*/
 
 export const auth = getAuth(app);
 

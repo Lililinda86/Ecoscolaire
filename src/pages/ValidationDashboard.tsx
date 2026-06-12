@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, Clock, ShieldAlert } from 'lucide-react';
 import type { ValidationRequest } from '../types';
 
 const ValidationDashboard: React.FC = () => {
-  const { db, saveDB, currentUser } = useAppContext();
+  const { db, saveDB, currentUser, logAuditAction } = useAppContext();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   if (!db || !currentUser) return null;
@@ -55,6 +55,12 @@ const ValidationDashboard: React.FC = () => {
       }
 
       await saveDB(newDb);
+      logAuditAction({
+        action: 'APPROVE_VALIDATION_REQUEST',
+        targetType: 'VALIDATION_REQUEST',
+        targetId: req.id,
+        targetName: getActionLabel(req.actionType)
+      });
     } catch (err) {
       alert("Erreur lors de l'approbation.");
       console.error(err);
@@ -73,6 +79,12 @@ const ValidationDashboard: React.FC = () => {
         newDb.validation_requests[reqIndex] = { ...newDb.validation_requests[reqIndex], status: 'rejected' };
       }
       await saveDB(newDb);
+      logAuditAction({
+        action: 'REJECT_VALIDATION_REQUEST',
+        targetType: 'VALIDATION_REQUEST',
+        targetId: req.id,
+        targetName: getActionLabel(req.actionType)
+      });
     } catch (err) {
       console.error(err);
     }

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 const roles = [
   { name: 'owner', email: 'owner.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
@@ -19,6 +20,6 @@ for (const role of roles) {
     
     // Check successful login by waiting for dashboard/portal to load
     // Assuming a sign-out button or specific dashboard element appears
-    await expect(page.locator('button:has-text("Déconnexion"), button:has-text("Logout"), .lucide-log-out').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('logout-button').first()).toBeVisible({ timeout: 15000 });
   });
 }

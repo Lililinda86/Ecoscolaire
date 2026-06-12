@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 test('Anonymous user cannot access /dashboard', async ({ page }) => {
   await page.goto('/#/dashboard');

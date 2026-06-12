@@ -1,11 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 test('Super Admin login and dashboard access', async ({ page }) => {
-  await page.goto('/');
-  
-  await page.getByTestId('login-email').fill('superadmin.test@ecoscolaire.com');
-  await page.getByTestId('login-password').fill('Test@2026Super!');
-  await page.getByTestId('login-submit').click();
+  await loginAs(page, 'superadmin.test@ecoscolaire.com', 'Test@2026Super!');
   
   // Verify Dashboard Super Admin visibility
   // Wait for the URL to change or specific dashboard elements

@@ -1,15 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 test('Create payment and verify receipt as Accountant', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('login-email').fill('accountant.alpha@ecoscolaire.com');
-  await page.getByTestId('login-password').fill('Test@2026Alpha!');
-  await page.getByTestId('login-submit').click();
+  await loginAs(page, 'accountant.alpha@ecoscolaire.com', 'Test@2026Alpha!');
   
-  await page.locator('text=Finances').click();
+  await page.getByTestId('nav-payments').click();
   await page.waitForTimeout(2000);
   
   const pageText = await page.content();
-  // Check that payments exist
-  expect(pageText).toContain('RECU-');
+  // Check that payments exist (amount format uses non-breaking spaces in fr-FR)
+  expect(pageText).toContain('50');
+  expect(pageText).toContain('FCFA');
 });

@@ -18,6 +18,7 @@ interface AppContextProps {
   lastSyncDate: Date | null;
   supervisionSchoolId: string | null;
   authLoading: boolean;
+  logAuditAction: (params: { action: string, targetType: string, targetId: string, targetName: string, details?: any }) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -305,11 +306,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const logAuditAction = async (params: { action: string, targetType: string, targetId: string, targetName: string, details?: any }) => {
+    if (!currentUser) return;
+    try {
+      const { collection, addDoc } = await import('firebase/firestore');
+      const { db: firestoreDb } = await import('../db/firebase');
+      await addDoc(collection(firestoreDb, 'audit_logs'), {
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        userRole: currentUser.role,
+        schoolId: currentSchool?.id || currentUser.schoolId || null,
+        action: params.action,
+        targetType: params.targetType,
+        targetId: params.targetId,
+        targetName: params.targetName,
+        timestamp: new Date().toISOString(),
+        details: params.details || {}
+      });
+    } catch (e) {
+      console.error("Failed to log audit action", e);
+    }
+  };
+
   const login = async (email: string, pin: string): Promise<boolean> => {
     try {
-      const { auth } = await import('../db/firebase');
+      const { auth, db: firestoreDb } = await import('../db/firebase');
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      await signInWithEmailAndPassword(auth, email, pin);
+      const { doc, getDoc, collection, addDoc } = await import('firebase/firestore');
+
+      const cred = await signInWithEmailAndPassword(auth, email, pin);
+
+      try {
+        const userDoc = await getDoc(doc(firestoreDb, 'users', cred.user.uid));
+        const userData = userDoc.data();
+        if (userData) {
+          await addDoc(collection(firestoreDb, 'audit_logs'), {
+            userId: cred.user.uid,
+            userEmail: email,
+            userRole: userData.role,
+            schoolId: userData.schoolId || null,
+            action: 'LOGIN',
+            targetType: 'SYSTEM',
+            targetId: cred.user.uid,
+            targetName: email,
+            timestamp: new Date().toISOString(),
+            details: {}
+          });
+        }
+      } catch (e) {
+        console.error("Failed to log LOGIN action", e);
+      }
+
       return true;
     } catch (error: any) {
       console.error("Login Error:", error);
@@ -324,6 +371,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = async () => {
     try {
+      if (currentUser) {
+        await logAuditAction({
+          action: 'LOGOUT',
+          targetType: 'SYSTEM',
+          targetId: currentUser.id,
+          targetName: currentUser.email
+        });
+      }
       const { auth } = await import('../db/firebase');
       await auth.signOut();
     } catch (e) {
@@ -348,7 +403,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       db, saveDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
-      authLoading: loading
+      authLoading: loading, logAuditAction
     }}>
       {children}
     </AppContext.Provider>

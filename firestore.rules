@@ -141,6 +141,12 @@ service cloud.firestore {
     }
 
     // --- GRADES & ATTENDANCE ---
+    match /audit_logs/{logId} {
+      allow create: if isAuthenticated();
+      allow read: if isSuperAdmin() || ((isOwner() || isDirector()) && resource.data.schoolId == getUserSchoolId());
+      allow update, delete: if false; // Immuable
+    }
+
     match /grades/{gradeId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() || 

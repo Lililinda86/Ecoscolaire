@@ -1,10 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 test('Parent Portal - Visibility and Blockage', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('login-email').fill('parent1.alpha@ecoscolaire.com');
-  await page.getByTestId('login-password').fill('Test@2026Alpha!');
-  await page.getByTestId('login-submit').click();
+  await loginAs(page, 'parent1.alpha@ecoscolaire.com', 'Test@2026Alpha!');
   
   await page.waitForTimeout(2000);
   const pageText = await page.content();

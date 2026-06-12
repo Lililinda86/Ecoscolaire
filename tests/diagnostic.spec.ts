@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 import * as fs from 'fs';
 
 test('Diagnostic - Capture HTML and Errors', async ({ page }) => {

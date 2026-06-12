@@ -6,7 +6,7 @@ import Modal from '../components/Modal';
 import { createSecondaryUser } from '../db/firebase';
 
 const UsersManagement: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -59,6 +59,13 @@ const UsersManagement: React.FC = () => {
         
         newDb.users.push(newUser);
         await saveDB(newDb);
+        
+        await logAuditAction({
+          action: 'CREATE_USER',
+          targetType: 'USER',
+          targetId: newUser.id,
+          targetName: newUser.email
+        });
       }
       setModalOpen(false);
     } catch (err: any) {

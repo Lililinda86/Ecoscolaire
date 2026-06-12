@@ -5,7 +5,7 @@ import { Building2, Plus, Edit2, Play, AlertCircle, CreditCard, LogOut, Building
 import type { School, SubscriptionPlan, SubscriptionStatus } from '../types';
 
 const SuperAdmin: React.FC = () => {
-  const { db, saveDB, currentUser, logout, enterSupervision } = useAppContext();
+  const { db, saveDB, currentUser, logout, enterSupervision, logAuditAction } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentSchool, setCurrentSchool] = useState<Partial<School>>({});
 
@@ -57,6 +57,13 @@ const SuperAdmin: React.FC = () => {
             logoFileName: file.name,
             logoUpdatedAt: new Date().toISOString()
           });
+          
+          logAuditAction({
+            action: 'UPLOAD_LOGO',
+            targetType: 'SCHOOL',
+            targetId: currentSchool.id || 'NEW_SCHOOL',
+            targetName: `Upload de logo: ${file.name}`
+          });
         }
       };
       img.src = event.target?.result as string;
@@ -102,6 +109,13 @@ const SuperAdmin: React.FC = () => {
         }
         
         newDb.schools = [...(newDb.schools || []), newSchool];
+
+        logAuditAction({
+          action: 'CREATE_SCHOOL',
+          targetType: 'SCHOOL',
+          targetId: newSchool.id,
+          targetName: newSchool.name
+        });
       }
       
       saveDB(newDb);
@@ -131,7 +145,7 @@ const SuperAdmin: React.FC = () => {
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}><Building2 /> Espace Super Admin SaaS</h1>
           <p style={{ color: 'var(--text-muted)', margin: 0 }}>Gestion globale des écoles clientes</p>
         </div>
-        <button className="danger" onClick={logout}><LogOut size={18} /> Déconnexion</button>
+        <button className="danger" onClick={logout} data-testid="logout-button"><LogOut size={18} /> Déconnexion</button>
       </div>
 
       {/* Stats */}

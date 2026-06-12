@@ -9,11 +9,10 @@ import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 
 const Students: React.FC = () => {
-  const { db, saveDB } = useAppContext();
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const { currentUser, currentSchool } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
@@ -40,8 +39,8 @@ const Students: React.FC = () => {
       setIsEditing(true);
       setCurrentStudent(student);
     } else {
+      setCurrentStudent({ id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '' });
       setIsEditing(false);
-      setCurrentStudent({ gender: 'M', section: 'francophone', classId: '' });
     }
     setModalOpen(true);
   };
@@ -60,6 +59,13 @@ const Students: React.FC = () => {
     }
     saveDB(newDb);
     setModalOpen(false);
+
+    logAuditAction({
+      action: isEditing ? 'UPDATE_STUDENT' : 'CREATE_STUDENT',
+      targetType: 'STUDENT',
+      targetId: currentStudent.id as string,
+      targetName: currentStudent.name as string
+    });
   };
 
   const handleDelete = (student: Student) => {
@@ -74,6 +80,12 @@ const Students: React.FC = () => {
         newDb.students = db.students.filter(s => s.id !== student.id);
         saveDB(newDb);
         alert("Élève supprimé avec succès.");
+        logAuditAction({
+          action: 'DELETE_STUDENT',
+          targetType: 'STUDENT',
+          targetId: student.id,
+          targetName: student.name
+        });
       } else {
         // Créer une requête de validation
         if (!newDb.validation_requests) newDb.validation_requests = [];

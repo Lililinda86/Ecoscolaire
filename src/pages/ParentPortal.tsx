@@ -71,7 +71,7 @@ const ParentPortal: React.FC = () => {
           <h1 style={{ margin: 0 }}>Portail Parent - {currentSchool.name}</h1>
           <p style={{ color: 'var(--text-muted)', margin: 0 }}>Bienvenue, {parent.email}</p>
         </div>
-        <button className="secondary" onClick={logout}><LogOut size={18} /> Déconnexion</button>
+        <button className="secondary" onClick={logout} data-testid="logout-button"><LogOut size={18} /> Déconnexion</button>
       </div>
 
       {children.length === 0 ? (

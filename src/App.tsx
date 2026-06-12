@@ -22,8 +22,21 @@ import ValidationDashboard from './pages/ValidationDashboard';
 import AIDirector from './pages/AIDirector';
 import AITeacher from './pages/AITeacher';
 import Communication from './pages/Communication';
+import AuditLogs from './pages/AuditLogs';
 
 import Diagnostic from './pages/Diagnostic';
+
+const ProtectedRouteForLogin = ({ children }: { children: React.ReactNode }) => {
+  const { currentUser, authLoading } = useAppContext();
+  
+  if (authLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Chargement en cours...</div>;
+  if (currentUser) {
+    if (currentUser.role === 'superAdmin') return <Navigate to="/superadmin" replace />;
+    if (currentUser.role === 'parent') return <Navigate to="/parent" replace />;
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
 
 function App() {
   const { db, saveDB } = useAppContext();
@@ -101,7 +114,11 @@ function App() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={
+          <ProtectedRouteForLogin>
+            <Login />
+          </ProtectedRouteForLogin>
+        } />
         <Route path="/diagnostic" element={<Diagnostic />} />
         
         {/* Route Parent Portal protégée */}
@@ -157,6 +174,7 @@ function App() {
         <Route path="/ai-director" element={<ProtectedRoute><Layout><AIDirector /></Layout></ProtectedRoute>} />
         <Route path="/ai-teacher" element={<ProtectedRoute><Layout><AITeacher /></Layout></ProtectedRoute>} />
         <Route path="/communication" element={<ProtectedRoute><Layout><Communication /></Layout></ProtectedRoute>} />
+        <Route path="/audit" element={<ProtectedRoute><Layout><AuditLogs /></Layout></ProtectedRoute>} />
         
         {/* Redirection fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

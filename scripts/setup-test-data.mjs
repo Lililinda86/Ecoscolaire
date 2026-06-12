@@ -162,9 +162,9 @@ const setupTestData = async () => {
 
     // 4. Classes (Alpha)
     const classes = [
-      { id: 'alpha-class-cp', schoolId: alphaId, name: 'CP', level: 'Primaire' },
-      { id: 'alpha-class-ce1', schoolId: alphaId, name: 'CE1', level: 'Primaire' },
-      { id: 'alpha-class-ce2', schoolId: alphaId, name: 'CE2', level: 'Primaire' }
+      { id: 'alpha-class-cp', schoolId: alphaId, name: 'CP', level: 'Primaire', type: 'francophone' },
+      { id: 'alpha-class-ce1', schoolId: alphaId, name: 'CE1', level: 'Primaire', type: 'francophone' },
+      { id: 'alpha-class-ce2', schoolId: alphaId, name: 'CE2', level: 'Primaire', type: 'francophone' }
     ];
     for (const c of classes) {
       if (!isDryRun) await setDoc(doc(db, 'classes', c.id), c);
@@ -177,8 +177,12 @@ const setupTestData = async () => {
       if (!isDryRun) {
         await setDoc(doc(db, 'students', studentIds[i-1]), {
           id: studentIds[i-1], schoolId: alphaId, classId: classRef,
-          firstName: `Élève${i}`, lastName: `TestAlpha`, matricule: `MAT2026${i.toString().padStart(3,'0')}`,
-          gender: i%2===0?'F':'M', createdAt: isoDate()
+          name: `Élève${i} TestAlpha`, matricule: `MAT2026${i.toString().padStart(3,'0')}`,
+          gender: i%2===0?'F':'M', createdAt: isoDate(),
+          section: 'francophone',
+          parentName: `Parent ${i}`,
+          parentPhone: `+2376000000${i.toString().padStart(2,'0')}`,
+          feeT1: 50000, feeT2: 0, feeT3: 0
         });
       }
     }

@@ -1,13 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 test('Multi-tenant isolation: Alpha owner cannot see Beta students', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('login-email').fill('owner.alpha@ecoscolaire.com');
-  await page.getByTestId('login-password').fill('Test@2026Alpha!');
-  await page.getByTestId('login-submit').click();
+  await loginAs(page, 'owner.alpha@ecoscolaire.com', 'Test@2026Alpha!');
   
   // Go to students section
-  await page.locator('text=Élèves').click();
+  await page.getByTestId('nav-students').click();
   
   // Wait for the table to load
   await page.waitForTimeout(2000);
@@ -15,16 +13,13 @@ test('Multi-tenant isolation: Alpha owner cannot see Beta students', async ({ pa
   // Check that at least one Alpha student exists and no Beta mentions
   const pageText = await page.content();
   expect(pageText).toContain('TestAlpha');
-  expect(pageText).not.toContain('Beta');
+  expect(pageText).not.toContain('TestBeta');
 });
 
 test('Multi-tenant isolation: Beta owner cannot see Alpha students', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('login-email').fill('owner.beta@ecoscolaire.com');
-  await page.getByTestId('login-password').fill('Test@2026Beta!');
-  await page.getByTestId('login-submit').click();
+  await loginAs(page, 'owner.beta@ecoscolaire.com', 'Test@2026Beta!');
   
-  await page.locator('text=Élèves').click();
+  await page.getByTestId('nav-students').click();
   await page.waitForTimeout(2000);
   
   const pageText = await page.content();

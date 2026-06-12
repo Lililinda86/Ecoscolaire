@@ -6,7 +6,7 @@ import { LayoutDashboard, Bus as BusIcon, Package, Settings, BookOpen, AlertTria
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
-  const { currentUser, isSupervising, currentSchool, exitSupervision } = useAppContext();
+  const { currentUser, isSupervising, currentSchool, exitSupervision, logout } = useAppContext();
 
   const toggleLang = () => {
     setLang(lang === 'fr' ? 'en' : 'fr');
@@ -28,79 +28,121 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           </button>
         </div>
       )}
-      <aside className="sidebar" style={{ paddingTop: isSupervising ? '3rem' : undefined }}>
+      <aside className="sidebar" data-testid="sidebar" style={{ paddingTop: isSupervising ? '3rem' : undefined }}>
         <h2>EcoScolaire</h2>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}>
-          <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>
+          <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-dashboard">
             <LayoutDashboard size={20} />
             {t('dashboard')}
           </NavLink>
           
-          <div className="sidebar-category">ACADÉMIQUE</div>
-          <NavLink to="/students" className={({ isActive }) => isActive ? 'active' : ''}>
-            <Users size={20} />
-            {t('students', 'Élèves')}
-          </NavLink>
-          <NavLink to="/classes" className={({ isActive }) => isActive ? 'active' : ''}>
-            <BookOpen size={20} />
-            {t('classes', 'Classes')}
-          </NavLink>
-          <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''}>
-            <ClipboardList size={20} />
-            Notes & Bulletins
-          </NavLink>
-          <NavLink to="/attendance" className={({ isActive }) => isActive ? 'active' : ''}>
-            <Calendar size={20} />
-            Présences
-          </NavLink>
+          {currentUser && ['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'accountant'].includes(currentUser.role) && (
+            <>
+              <div className="sidebar-category">ACADÉMIQUE</div>
+              {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
+                <>
+                  <NavLink to="/students" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-students">
+                    <Users size={20} />
+                    {t('students', 'Élèves')}
+                  </NavLink>
+                  <NavLink to="/classes" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-classes">
+                    <BookOpen size={20} />
+                    {t('classes', 'Classes')}
+                  </NavLink>
+                </>
+              )}
+              {['superAdmin', 'owner', 'director', 'teacher', 'secretary'].includes(currentUser.role) && (
+                <>
+                  <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-grades">
+                    <ClipboardList size={20} />
+                    Notes & Bulletins
+                  </NavLink>
+                  <NavLink to="/attendance" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-attendance">
+                    <Calendar size={20} />
+                    Présences
+                  </NavLink>
+                </>
+              )}
+            </>
+          )}
           
-          <div className="sidebar-category">ADMINISTRATION</div>
-          <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : ''}>
-            <Briefcase size={20} />
-            {t('staff')}
-          </NavLink>
-          <NavLink to="/buses" className={({ isActive }) => isActive ? 'active' : ''}>
-            <BusIcon size={20} />
-            {t('buses')}
-          </NavLink>
-          <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''}>
-            <Package size={20} />
-            {t('inventory')}
-          </NavLink>
+          {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'driver'].includes(currentUser.role) && (
+            <>
+              <div className="sidebar-category">ADMINISTRATION</div>
+              {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
+                <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-staff">
+                  <Briefcase size={20} />
+                  {t('staff')}
+                </NavLink>
+              )}
+              {['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role) && (
+                <NavLink to="/buses" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-bus">
+                  <BusIcon size={20} />
+                  {t('buses')}
+                </NavLink>
+              )}
+              {['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+                <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-inventory">
+                  <Package size={20} />
+                  {t('inventory')}
+                </NavLink>
+              )}
+            </>
+          )}
           
-          <div className="sidebar-category">FINANCES</div>
-          <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''}>
-            <CreditCard size={20} />
-            {t('payments', 'Paiements')}
-          </NavLink>
+          {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+            <>
+              <div className="sidebar-category">FINANCES</div>
+              <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-payments">
+                <CreditCard size={20} />
+                {t('payments', 'Paiements')}
+              </NavLink>
+            </>
+          )}
           
-          <div className="sidebar-category">COMMUNICATION & IA</div>
-          <NavLink to="/communication" className={({ isActive }) => isActive ? 'active' : ''}>
-            <MessageSquare size={20} />
-            Messages & WhatsApp
-          </NavLink>
-          <NavLink to="/ai-director" className={({ isActive }) => isActive ? 'active' : ''}>
-            <Bot size={20} />
-            Assistant IA Directeur
-          </NavLink>
-          <NavLink to="/ai-teacher" className={({ isActive }) => isActive ? 'active' : ''}>
-            <Bot size={20} />
-            Assistant IA Enseignant
-          </NavLink>
+          {currentUser && ['superAdmin', 'owner', 'director', 'teacher'].includes(currentUser.role) && (
+            <>
+              <div className="sidebar-category">COMMUNICATION & IA</div>
+              <NavLink to="/communication" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-communication">
+                <MessageSquare size={20} />
+                Messages & WhatsApp
+              </NavLink>
+              {['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+                <NavLink to="/ai-director" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-ai-director">
+                  <Bot size={20} />
+                  Assistant IA Directeur
+                </NavLink>
+              )}
+              {['teacher'].includes(currentUser.role) && (
+                <NavLink to="/ai-teacher" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-ai-teacher">
+                  <Bot size={20} />
+                  Assistant IA Enseignant
+                </NavLink>
+              )}
+            </>
+          )}
 
-          <div className="sidebar-category">PARAMÈTRES</div>
-          <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}>
-            <Settings size={20} />
-            Paramètres
-          </NavLink>
+          {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+            <>
+              <div className="sidebar-category">PARAMÈTRES</div>
+              <NavLink to="/audit" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-audit">
+                <ShieldAlert size={20} />
+                Audit Logs
+              </NavLink>
+              <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-settings">
+                <Settings size={20} />
+                Paramètres
+              </NavLink>
+            </>
+          )}
           
           {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
             <>
-              <NavLink to="/validations" className={({ isActive }) => isActive ? 'active' : ''}>
+              <NavLink to="/validations" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-validations">
                 <ShieldAlert size={20} />
                 Validations
               </NavLink>
-              <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''}>
+              <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-users">
                 <Shield size={20} />
                 Accès & Rôles
               </NavLink>
@@ -111,6 +153,18 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <button className="secondary" onClick={toggleLang} style={{ width: '100%' }}>
              {lang === 'fr' ? 'Switch to English' : 'Passer en Français'}
+          </button>
+          <button 
+            className="secondary" 
+            onClick={() => {
+              if (window.confirm('Voulez-vous vraiment vous déconnecter ?')) {
+                logout();
+              }
+            }} 
+            data-testid="logout-button" 
+            style={{ width: '100%', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+          >
+             Déconnexion
           </button>
         </div>
       </aside>

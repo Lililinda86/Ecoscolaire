@@ -7,7 +7,7 @@ import { Plus, Minus, Wallet, ClipboardList, Trash2 } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const Payments: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
@@ -72,14 +72,23 @@ const Payments: React.FC = () => {
        }
     }
 
-    newDb.payments.push({ 
+    const newPayment = { 
       ...currentPayment, 
       id: crypto.randomUUID(),
       method: paymentMethod,
       transactionId: paymentMethod === 'mobile_money' ? `MOMO-${Date.now()}` : undefined
-    } as Payment);
+    } as Payment;
+
+    newDb.payments.push(newPayment);
     saveDB(newDb);
     setModalOpen(false);
+
+    logAuditAction({
+      action: 'CREATE_PAYMENT',
+      targetType: 'PAYMENT',
+      targetId: newPayment.id,
+      targetName: `Paiement ${newPayment.amount} FCFA - ${newPayment.type}`
+    });
   };
 
   const handleSaveExpense = (e: React.FormEvent) => {
@@ -128,6 +137,12 @@ const Payments: React.FC = () => {
     if (window.confirm('Voulez-vous vraiment supprimer cet encaissement ? Cela annulera le paiement.')) {
       const newDb = { ...db, payments: db.payments.filter(p => p.id !== id) };
       saveDB(newDb);
+      logAuditAction({
+        action: 'DELETE_PAYMENT',
+        targetType: 'PAYMENT',
+        targetId: id,
+        targetName: 'Paiement supprimé'
+      });
     }
   };
 

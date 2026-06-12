@@ -19,7 +19,7 @@ export const getAppreciation = (score: number, max: number = 20) => {
 };
 
 const Grades: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
@@ -72,6 +72,12 @@ const Grades: React.FC = () => {
 
         if (canSaveDirectly) {
           newDb.grades.push(gradeObj);
+          logAuditAction({
+            action: 'CREATE_GRADE',
+            targetType: 'GRADE',
+            targetId: gradeObj.id,
+            targetName: `Note de ${g.score} en ${subjectId}`
+          });
         } else {
           hasValidations = true;
           if (!newDb.validation_requests) newDb.validation_requests = [];
@@ -112,6 +118,12 @@ const Grades: React.FC = () => {
           const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
           pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
           pdf.save(`${filename}.pdf`);
+          logAuditAction({
+            action: 'EXPORT_PDF',
+            targetType: 'DOCUMENT',
+            targetId: filename,
+            targetName: `Export PDF: ${filename}`
+          });
         });
       });
     });

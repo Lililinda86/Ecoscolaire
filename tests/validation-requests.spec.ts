@@ -1,10 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 test('Validation Requests - Check existence', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('login-email').fill('director.alpha@ecoscolaire.com');
-  await page.getByTestId('login-password').fill('Test@2026Alpha!');
-  await page.getByTestId('login-submit').click();
+  await loginAs(page, 'director.alpha@ecoscolaire.com', 'Test@2026Alpha!');
   
   await page.waitForTimeout(2000);
   const pageText = await page.content();
