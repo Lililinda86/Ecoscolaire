@@ -1,0 +1,25 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Dossier dédié à l'identité visuelle de l'école (Logos)
+    match /schools/{schoolId}/brand/{fileName} {
+      
+      // Lecture : Utilisateur authentifié appartenant à la même école (ou superAdmin global)
+      allow read: if request.auth != null && 
+                  (request.auth.token.role == 'superAdmin' || request.auth.token.schoolId == schoolId);
+      
+      // Écriture : Strictement réservé au superAdmin, ou au directeur/owner de cette école
+      allow write: if request.auth != null && 
+                   (
+                     request.auth.token.role == 'superAdmin' || 
+                     (request.auth.token.schoolId == schoolId && (request.auth.token.role == 'owner' || request.auth.token.role == 'director'))
+                   );
+    }
+
+    // Protection par défaut sur l'ensemble du bucket (verrouillage total)
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-
+import { getStorage } from 'firebase/storage';
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCWm59UvkOsyHWx9gJXHf0m9qH7d3Droh0",
@@ -32,6 +32,7 @@ enableIndexedDbPersistence(db).catch((err) => {
 */
 
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // Application secondaire pour créer des comptes sans déconnecter l'admin
 export const createSecondaryUser = async (email: string, pass: string) => {

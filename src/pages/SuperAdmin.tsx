@@ -57,13 +57,6 @@ const SuperAdmin: React.FC = () => {
             logoFileName: file.name,
             logoUpdatedAt: new Date().toISOString()
           });
-          
-          logAuditAction({
-            action: 'UPLOAD_LOGO',
-            targetType: 'SCHOOL',
-            targetId: currentSchool.id || 'NEW_SCHOOL',
-            targetName: `Upload de logo: ${file.name}`
-          });
         }
       };
       img.src = event.target?.result as string;
@@ -79,8 +72,31 @@ const SuperAdmin: React.FC = () => {
       const { db: firestoreDb } = await import('../db/firebase');
       const { doc, setDoc, getDoc, collection, getDocs } = await import('firebase/firestore');
 
-      if (currentSchool.id) {
-        const updatedSchool = { ...currentSchool } as School;
+      let schoolId = currentSchool.id;
+      let isNewSchool = false;
+      if (!schoolId) {
+        schoolId = crypto.randomUUID();
+        isNewSchool = true;
+      }
+
+      let finalLogoUrl = currentSchool.logoUrl;
+      let logoUploaded = false;
+
+      // Si le logo est en base64 (nouvel upload local), on le pousse vers Firebase Storage
+      if (finalLogoUrl && finalLogoUrl.startsWith('data:image/')) {
+        const { storage } = await import('../db/firebase');
+        const { ref, uploadString, getDownloadURL } = await import('firebase/storage');
+        const timestamp = new Date().getTime();
+        const extension = currentSchool.logoFileName?.split('.').pop() || 'jpg';
+        const storageRef = ref(storage, `schools/${schoolId}/brand/logo_${timestamp}.${extension}`);
+        
+        await uploadString(storageRef, finalLogoUrl, 'data_url');
+        finalLogoUrl = await getDownloadURL(storageRef);
+        logoUploaded = true;
+      }
+
+      if (!isNewSchool) {
+        const updatedSchool = { ...currentSchool, logoUrl: finalLogoUrl } as School;
         await setDoc(doc(firestoreDb, 'schools', updatedSchool.id), updatedSchool);
         console.log("🟢 [SuperAdmin] setDoc exécuté avec succès pour mise à jour :", updatedSchool.id);
         
@@ -94,7 +110,7 @@ const SuperAdmin: React.FC = () => {
         
         newDb.schools = (newDb.schools || []).map(s => s.id === updatedSchool.id ? updatedSchool : s);
       } else {
-        const newSchool = { ...currentSchool, id: crypto.randomUUID(), createdAt: new Date().toISOString() } as School;
+        const newSchool = { ...currentSchool, id: schoolId, logoUrl: finalLogoUrl, createdAt: new Date().toISOString() } as School;
         console.log("🟢 [SuperAdmin] Création d'une nouvelle école dans l'état local :", newSchool);
         
         await setDoc(doc(firestoreDb, 'schools', newSchool.id), newSchool);
@@ -114,7 +130,16 @@ const SuperAdmin: React.FC = () => {
           action: 'CREATE_SCHOOL',
           targetType: 'SCHOOL',
           targetId: newSchool.id,
-          targetName: newSchool.name
+          targetName: newSchool.name || 'École inconnue'
+        });
+      }
+
+      if (logoUploaded) {
+        logAuditAction({
+          action: 'UPLOAD_LOGO',
+          targetType: 'SCHOOL',
+          targetId: schoolId,
+          targetName: `Upload de logo: ${currentSchool.logoFileName || 'logo'}`
         });
       }
       
