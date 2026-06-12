@@ -46,6 +46,7 @@ export interface Database {
   expenses: any[];
   inventory: InventoryItem[];
   inventoryTransactions: InventoryTransaction[];
+  audit_logs: any[];
 }
 
 const initialDB: Database = {
@@ -109,7 +110,8 @@ const initialDB: Database = {
   payments: [],
   expenses: [],
   inventory: [],
-  inventoryTransactions: []
+  inventoryTransactions: [],
+  audit_logs: [],
 };
 
 export const defaultDB = initialDB;

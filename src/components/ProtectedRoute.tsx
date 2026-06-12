@@ -1,14 +1,16 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
+import SchoolContextRequired from './SchoolContextRequired';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string[];
+  requireSchool?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { currentUser, authLoading } = useAppContext();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, requireSchool = false }) => {
+  const { currentUser, currentSchool, authLoading } = useAppContext();
 
   if (authLoading) {
     return (
@@ -30,6 +32,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
         <button onClick={() => window.history.back()} style={{ marginTop: '1rem', padding: '0.75rem', background: '#dc2626', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
           Retour
         </button>
+      </div>
+    );
+  }
+
+  if (requireSchool && !currentSchool && currentUser.role === 'superAdmin') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+        <SchoolContextRequired />
       </div>
     );
   }

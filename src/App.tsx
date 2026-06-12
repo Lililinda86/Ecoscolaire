@@ -160,21 +160,21 @@ function App() {
           </ProtectedRoute>
         } />
         
-        <Route path="/students" element={<ProtectedRoute><Layout><Students /></Layout></ProtectedRoute>} />
-        <Route path="/classes" element={<ProtectedRoute><Layout><Classes /></Layout></ProtectedRoute>} />
-        <Route path="/staff" element={<ProtectedRoute><Layout><Staff /></Layout></ProtectedRoute>} />
-        <Route path="/attendance" element={<ProtectedRoute><Layout><Attendance /></Layout></ProtectedRoute>} />
-        <Route path="/buses" element={<ProtectedRoute><Layout><Buses /></Layout></ProtectedRoute>} />
-        <Route path="/inventory" element={<ProtectedRoute><Layout><Inventory /></Layout></ProtectedRoute>} />
-        <Route path="/grades" element={<ProtectedRoute><Layout><Grades /></Layout></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute><Layout><Payments /></Layout></ProtectedRoute>} />
+        <Route path="/students" element={<ProtectedRoute requireSchool><Layout><Students /></Layout></ProtectedRoute>} />
+        <Route path="/classes" element={<ProtectedRoute requireSchool><Layout><Classes /></Layout></ProtectedRoute>} />
+        <Route path="/staff" element={<ProtectedRoute requireSchool><Layout><Staff /></Layout></ProtectedRoute>} />
+        <Route path="/attendance" element={<ProtectedRoute requireSchool><Layout><Attendance /></Layout></ProtectedRoute>} />
+        <Route path="/buses" element={<ProtectedRoute requireSchool><Layout><Buses /></Layout></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute requireSchool><Layout><Inventory /></Layout></ProtectedRoute>} />
+        <Route path="/grades" element={<ProtectedRoute requireSchool><Layout><Grades /></Layout></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute requireSchool><Layout><Settings /></Layout></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute requireSchool><Layout><Payments /></Layout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute><Layout><UsersManagement /></Layout></ProtectedRoute>} />
-        <Route path="/validations" element={<ProtectedRoute><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
-        <Route path="/ai-director" element={<ProtectedRoute><Layout><AIDirector /></Layout></ProtectedRoute>} />
-        <Route path="/ai-teacher" element={<ProtectedRoute><Layout><AITeacher /></Layout></ProtectedRoute>} />
-        <Route path="/communication" element={<ProtectedRoute><Layout><Communication /></Layout></ProtectedRoute>} />
-        <Route path="/audit" element={<ProtectedRoute><Layout><AuditLogs /></Layout></ProtectedRoute>} />
+        <Route path="/validations" element={<ProtectedRoute requireSchool><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/ai-director" element={<ProtectedRoute requireSchool><Layout><AIDirector /></Layout></ProtectedRoute>} />
+        <Route path="/ai-teacher" element={<ProtectedRoute requireSchool><Layout><AITeacher /></Layout></ProtectedRoute>} />
+        <Route path="/communication" element={<ProtectedRoute requireSchool><Layout><Communication /></Layout></ProtectedRoute>} />
+        <Route path="/audit" element={<ProtectedRoute requireSchool><Layout><AuditLogs /></Layout></ProtectedRoute>} />
         
         {/* Redirection fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

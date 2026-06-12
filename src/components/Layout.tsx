@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
 import { useAppContext } from '../context/AppContext';
-import { LayoutDashboard, Bus as BusIcon, Package, Settings, BookOpen, AlertTriangle, Shield, ShieldAlert, Users, Calendar, ClipboardList, Briefcase, CreditCard, MessageSquare, Bot } from 'lucide-react';
+import { Bot, Shield, Package, Bus as BusIcon, ClipboardList, BookOpen, Users, LayoutDashboard, Settings, CreditCard, Calendar, MessageSquare, ShieldAlert, Briefcase, AlertTriangle } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
@@ -31,121 +31,141 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       <aside className="sidebar" data-testid="sidebar" style={{ paddingTop: isSupervising ? '3rem' : undefined }}>
         <h2>EcoScolaire</h2>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}>
-          <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-dashboard">
-            <LayoutDashboard size={20} />
-            {t('dashboard')}
-          </NavLink>
-          
-          {currentUser && ['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'accountant'].includes(currentUser.role) && (
+          {currentUser?.role === 'superAdmin' && !currentSchool ? (
             <>
-              <div className="sidebar-category">ACADÉMIQUE</div>
-              {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
-                <>
-                  <NavLink to="/students" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-students">
-                    <Users size={20} />
-                    {t('students', 'Élèves')}
-                  </NavLink>
-                  <NavLink to="/classes" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-classes">
-                    <BookOpen size={20} />
-                    {t('classes', 'Classes')}
-                  </NavLink>
-                </>
-              )}
-              {['superAdmin', 'owner', 'director', 'teacher', 'secretary'].includes(currentUser.role) && (
-                <>
-                  <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-grades">
-                    <ClipboardList size={20} />
-                    Notes & Bulletins
-                  </NavLink>
-                  <NavLink to="/attendance" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-attendance">
-                    <Calendar size={20} />
-                    Présences
-                  </NavLink>
-                </>
-              )}
-            </>
-          )}
-          
-          {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'driver'].includes(currentUser.role) && (
-            <>
-              <div className="sidebar-category">ADMINISTRATION</div>
-              {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
-                <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-staff">
-                  <Briefcase size={20} />
-                  {t('staff')}
-                </NavLink>
-              )}
-              {['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role) && (
-                <NavLink to="/buses" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-bus">
-                  <BusIcon size={20} />
-                  {t('buses')}
-                </NavLink>
-              )}
-              {['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
-                <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-inventory">
-                  <Package size={20} />
-                  {t('inventory')}
-                </NavLink>
-              )}
-            </>
-          )}
-          
-          {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
-            <>
-              <div className="sidebar-category">FINANCES</div>
-              <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-payments">
-                <CreditCard size={20} />
-                {t('payments', 'Paiements')}
+              <div className="sidebar-category">GLOBAL SUPER ADMIN</div>
+              <NavLink to="/superadmin" className={({ isActive }) => isActive ? 'active' : ''}>
+                <LayoutDashboard size={20} />
+                Tableau de bord
               </NavLink>
-            </>
-          )}
-          
-          {currentUser && ['superAdmin', 'owner', 'director', 'teacher'].includes(currentUser.role) && (
-            <>
-              <div className="sidebar-category">COMMUNICATION & IA</div>
-              <NavLink to="/communication" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-communication">
-                <MessageSquare size={20} />
-                Messages & WhatsApp
+              <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-users">
+                <Shield size={20} />
+                Utilisateurs
               </NavLink>
-              {['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
-                <NavLink to="/ai-director" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-ai-director">
-                  <Bot size={20} />
-                  Assistant IA Directeur
-                </NavLink>
-              )}
-              {['teacher'].includes(currentUser.role) && (
-                <NavLink to="/ai-teacher" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-ai-teacher">
-                  <Bot size={20} />
-                  Assistant IA Enseignant
-                </NavLink>
-              )}
-            </>
-          )}
-
-          {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
-            <>
-              <div className="sidebar-category">PARAMÈTRES</div>
               <NavLink to="/audit" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-audit">
                 <ShieldAlert size={20} />
                 Audit Logs
               </NavLink>
-              <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-settings">
-                <Settings size={20} />
-                Paramètres
-              </NavLink>
             </>
-          )}
-          
-          {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+          ) : (
             <>
-              <NavLink to="/validations" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-validations">
-                <ShieldAlert size={20} />
-                Validations
+              <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-dashboard">
+                <LayoutDashboard size={20} />
+                {t('dashboard')}
               </NavLink>
-              <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-users">
-                <Shield size={20} />
-                Accès & Rôles
-              </NavLink>
+              
+              {currentUser && ['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'accountant'].includes(currentUser.role) && (
+                <>
+                  <div className="sidebar-category">ACADÉMIQUE</div>
+                  {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
+                    <>
+                      <NavLink to="/students" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-students">
+                        <Users size={20} />
+                        {t('students', 'Élèves')}
+                      </NavLink>
+                      <NavLink to="/classes" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-classes">
+                        <BookOpen size={20} />
+                        {t('classes', 'Classes')}
+                      </NavLink>
+                    </>
+                  )}
+                  {['superAdmin', 'owner', 'director', 'teacher', 'secretary'].includes(currentUser.role) && (
+                    <>
+                      <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-grades">
+                        <ClipboardList size={20} />
+                        Notes & Bulletins
+                      </NavLink>
+                      <NavLink to="/attendance" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-attendance">
+                        <Calendar size={20} />
+                        Présences
+                      </NavLink>
+                    </>
+                  )}
+                </>
+              )}
+              
+              {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'driver'].includes(currentUser.role) && (
+                <>
+                  <div className="sidebar-category">ADMINISTRATION</div>
+                  {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
+                    <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-staff">
+                      <Briefcase size={20} />
+                      {t('staff')}
+                    </NavLink>
+                  )}
+                  {['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role) && (
+                    <NavLink to="/buses" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-bus">
+                      <BusIcon size={20} />
+                      {t('buses')}
+                    </NavLink>
+                  )}
+                  {['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+                    <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-inventory">
+                      <Package size={20} />
+                      {t('inventory')}
+                    </NavLink>
+                  )}
+                </>
+              )}
+              
+              {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+                <>
+                  <div className="sidebar-category">FINANCES</div>
+                  <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-payments">
+                    <CreditCard size={20} />
+                    {t('payments', 'Paiements')}
+                  </NavLink>
+                </>
+              )}
+              
+              {currentUser && ['superAdmin', 'owner', 'director', 'teacher'].includes(currentUser.role) && (
+                <>
+                  <div className="sidebar-category">COMMUNICATION & IA</div>
+                  <NavLink to="/communication" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-communication">
+                    <MessageSquare size={20} />
+                    Messages & WhatsApp
+                  </NavLink>
+                  {['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+                    <NavLink to="/ai-director" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-ai-director">
+                      <Bot size={20} />
+                      Assistant IA Directeur
+                    </NavLink>
+                  )}
+                  {['teacher'].includes(currentUser.role) && (
+                    <NavLink to="/ai-teacher" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-ai-teacher">
+                      <Bot size={20} />
+                      Assistant IA Enseignant
+                    </NavLink>
+                  )}
+                </>
+              )}
+
+              {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+                <>
+                  <div className="sidebar-category">PARAMÈTRES</div>
+                  <NavLink to="/audit" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-audit">
+                    <ShieldAlert size={20} />
+                    Audit Logs
+                  </NavLink>
+                  <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-settings">
+                    <Settings size={20} />
+                    Paramètres
+                  </NavLink>
+                </>
+              )}
+              
+              {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+                <>
+                  <NavLink to="/validations" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-validations">
+                    <ShieldAlert size={20} />
+                    Validations
+                  </NavLink>
+                  <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-users">
+                    <Shield size={20} />
+                    Accès & Rôles
+                  </NavLink>
+                </>
+              )}
             </>
           )}
         </nav>

@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
     <title>EcoScolaire</title>
-    <script type="module" crossorigin="" src="/assets/index-Q8nbWYjh.js"></script>
+    <script type="module" crossorigin="" src="/assets/index-C4yrwpNR.js"></script>
     <link rel="modulepreload" crossorigin="" href="/assets/preload-helper-LAx7wYi6.js">
     <link rel="modulepreload" crossorigin="" href="/assets/index.esm-se1TPRUE.js">
     <link rel="modulepreload" crossorigin="" href="/assets/index.esm-v_Gc4XRI.js">

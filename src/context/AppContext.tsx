@@ -125,7 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'classes', 'students', 'staff', 'buses', 'inventory', 
           'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
-          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance'
+          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'audit_logs'
         ];
 
         console.log("================ DIAGNOSTIC AppContext ===============");
@@ -295,6 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.log("🔵 [AppContext] exitSupervision appelé. Retour au mode Global.");
     setSupervisionSchoolId(null);
     setIsSupervising(false);
+    setCurrentSchool(null);
     
     try {
       const { db: firestoreDb } = await import('../db/firebase');
