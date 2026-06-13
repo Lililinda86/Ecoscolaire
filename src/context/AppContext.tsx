@@ -165,17 +165,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return;
         }
 
-        const schoolDoc = await getDoc(doc(firestoreDb, 'schools', targetSchoolId));
-        if (schoolDoc.exists()) {
-          loadedDb.schools = [{ id: schoolDoc.id, ...schoolDoc.data() }];
-          setCurrentSchool(loadedDb.schools[0] as School);
-        } else {
-          setCurrentSchool(null);
+        let schoolDocData: any = null;
+        try {
+          const schoolDoc = await getDoc(doc(firestoreDb, 'schools', targetSchoolId));
+          if (schoolDoc.exists()) {
+            schoolDocData = { id: schoolDoc.id, ...schoolDoc.data() };
+            loadedDb.schools = [schoolDocData];
+            setCurrentSchool(loadedDb.schools[0] as School);
+          } else {
+            setCurrentSchool(null);
+          }
+        } catch (e) {
+          console.warn("❌ [AppContext] Erreur lecture schools (schoolDoc) :", e);
         }
 
-        const usersQ = query(collection(firestoreDb, 'users'), where('schoolId', '==', targetSchoolId));
-        const usersSnap = await getDocs(usersQ);
-        loadedDb.users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
+        let usersData: any[] = [];
+        try {
+          const usersQ = query(collection(firestoreDb, 'users'), where('schoolId', '==', targetSchoolId));
+          const usersSnap = await getDocs(usersQ);
+          usersData = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
+        } catch (e) {
+          console.warn("❌ [AppContext] Erreur lecture users (permission refusée pour ce rôle) :", e);
+          usersData = [userData]; // Fallback : on s'inclut soi-même a minima
+        }
+        loadedDb.users = usersData;
 
         // Fetch collections ciblées
         const fetchPromises = collectionsToFetch.map(async (colName) => {
