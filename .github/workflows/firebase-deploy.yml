@@ -36,5 +36,5 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Deploy Hosting
-        run: firebase deploy --only hosting --project ecoscolaire-c5861
+      - name: Deploy Firestore and Storage Rules
+        run: firebase deploy --only firestore,storage --project ecoscolaire-c5861 --non-interactive
