@@ -17,6 +17,11 @@ dist-ssr
 .env.production
 !*.example
 
+# Service Accounts
+*service-account*.json
+staging-service-account.json
+firebase-service-account*.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

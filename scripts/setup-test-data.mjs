@@ -1,31 +1,9 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, getDocs, collection, query, where, deleteDoc } from 'firebase/firestore';
-
+import admin from 'firebase-admin';
 import dotenv from 'dotenv';
+import fs from 'fs';
+
 dotenv.config({ path: '.env.staging' }); // Priority to staging
 dotenv.config(); // Fallback to .env
-
-const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
-  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID
-};
-
-console.log("=== FIREBASE SEED TARGET ===");
-console.log("Project ID:", firebaseConfig.projectId);
-
-if (firebaseConfig.projectId === 'ecoscolaire-c5861') {
-  console.error("ABORT: Tentative d'exécution du Seed sur la Production (ecoscolaire-c5861) !");
-  process.exit(1);
-}
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 const isDryRun = process.argv.includes('--dry-run');
 const isCleanup = process.argv.includes('--cleanup');
@@ -38,6 +16,53 @@ const logAction = (action, details) => {
   }
 };
 
+let serviceAccount;
+
+if (process.env.STAGING_FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(process.env.STAGING_FIREBASE_SERVICE_ACCOUNT);
+  } catch(e) {
+    console.error("Erreur de parsing de STAGING_FIREBASE_SERVICE_ACCOUNT", e);
+    process.exit(1);
+  }
+} else if (fs.existsSync('./staging-service-account.json')) {
+  try {
+    const file = fs.readFileSync('./staging-service-account.json', 'utf8');
+    serviceAccount = JSON.parse(file);
+  } catch(e) {
+    console.error("Erreur de lecture du fichier staging-service-account.json", e);
+    process.exit(1);
+  }
+} else {
+  console.error("ABORT: Aucun Service Account trouvé. Fournissez STAGING_FIREBASE_SERVICE_ACCOUNT ou le fichier staging-service-account.json.");
+  process.exit(1);
+}
+
+if (!serviceAccount.project_id) {
+  console.error("ABORT: project_id absent dans le Service Account.");
+  process.exit(1);
+}
+
+if (serviceAccount.project_id === 'ecoscolaire-c5861') {
+  console.error("ABORT: Tentative d'exécution du Seed sur la Production (ecoscolaire-c5861) !");
+  process.exit(1);
+}
+
+if (serviceAccount.project_id !== 'ecoscolaire-staging') {
+  console.error(`ABORT: Ce script est restreint au staging. project_id actuel: ${serviceAccount.project_id}`);
+  process.exit(1);
+}
+
+console.log("=== FIREBASE SEED TARGET ===");
+console.log("Project ID:", serviceAccount.project_id);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
+const auth = admin.auth();
+
 const isoDate = () => new Date().toISOString();
 
 const createOrUpdateUser = async (email, pass) => {
@@ -46,20 +71,19 @@ const createOrUpdateUser = async (email, pass) => {
     return `dry-run-uid-${email}`;
   }
   let uid;
-  const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp' + Date.now() + Math.random());
-  const secondaryAuth = getAuth(secondaryApp);
-  const { deleteApp } = await import('firebase/app');
   try {
-    await signInWithEmailAndPassword(secondaryAuth, email, pass);
-    uid = secondaryAuth.currentUser.uid;
-    await signOut(secondaryAuth);
-  } catch(e) {
-    // Attempt creation
-    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
-    uid = userCredential.user.uid;
-    await signOut(secondaryAuth);
+    const userRecord = await auth.getUserByEmail(email);
+    uid = userRecord.uid;
+    // Update password to ensure the script's password is the one set
+    await auth.updateUser(uid, { password: pass });
+  } catch (e) {
+    if (e.code === 'auth/user-not-found') {
+      const newUser = await auth.createUser({ email, password: pass });
+      uid = newUser.uid;
+    } else {
+      throw e;
+    }
   }
-  await deleteApp(secondaryApp);
   return uid;
 };
 
@@ -76,13 +100,17 @@ const cleanupTestData = async () => {
       }
       let q;
       if (c === 'schools') {
-        q = query(collection(db, c), where('id', '==', sid));
+        q = db.collection(c).where('id', '==', sid);
       } else {
-        q = query(collection(db, c), where('schoolId', '==', sid));
+        q = db.collection(c).where('schoolId', '==', sid);
       }
-      const snapshot = await getDocs(q);
-      for (const d of snapshot.docs) {
-        await deleteDoc(d.ref);
+      const snapshot = await q.get();
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      if (!snapshot.empty) {
+        await batch.commit();
       }
     }
   }
@@ -105,20 +133,11 @@ const setupTestData = async () => {
     const saPass = 'Test@2026Super!';
     const saUid = await createOrUpdateUser(saEmail, saPass);
     if (!isDryRun) {
-      console.log('Logging in as superAdmin...');
-      await signInWithEmailAndPassword(auth, saEmail, saPass);
-      console.log('Checking if superAdmin doc exists...');
-      const saDocSnap = await getDoc(doc(db, 'users', saUid));
-      if (!saDocSnap.exists()) {
-        console.log('Writing superAdmin user doc...');
-        await setDoc(doc(db, 'users', saUid), {
-          id: saUid, email: saEmail, role: 'superAdmin', active: true, isActive: true, createdAt: isoDate()
-        });
-        console.log('SuperAdmin doc written.');
-      } else {
-        console.log('SuperAdmin doc already exists. Updating active: true...');
-        await setDoc(doc(db, 'users', saUid), { active: true, isActive: true }, { merge: true });
-      }
+      console.log('Writing superAdmin user doc...');
+      await db.collection('users').doc(saUid).set({
+        id: saUid, email: saEmail, role: 'superAdmin', active: true, isActive: true, createdAt: isoDate()
+      }, { merge: true });
+      console.log('SuperAdmin doc written.');
     }
     logAction('SuperAdmin', `Ready: ${saEmail}`);
 
@@ -128,17 +147,17 @@ const setupTestData = async () => {
     
     if (!isDryRun) {
       console.log('Writing alpha school...');
-      await setDoc(doc(db, 'schools', alphaId), {
+      await db.collection('schools').doc(alphaId).set({
         id: alphaId, name: "École Test EcoScolaire Alpha", schoolCode: "ALPHA001", academicYear: "2026-2027", address: "Yaoundé",
         settings: { currency: "XAF", defaultLanguage: "fr" },
         createdAt: isoDate(), updatedAt: isoDate()
-      });
+      }, { merge: true });
       console.log('Writing beta school...');
-      await setDoc(doc(db, 'schools', betaId), {
+      await db.collection('schools').doc(betaId).set({
         id: betaId, name: "École Test EcoScolaire Beta", schoolCode: "BETA002", academicYear: "2026-2027", address: "Douala",
         settings: { currency: "XAF", defaultLanguage: "fr" },
         createdAt: isoDate(), updatedAt: isoDate()
-      });
+      }, { merge: true });
       console.log('Schools written.');
     }
     logAction('Schools', 'Alpha and Beta schools prepared (Idempotent).');
@@ -177,8 +196,7 @@ const setupTestData = async () => {
             userData.studentIds = [studentIds[pIdx], studentIds[pIdx+1]];
             pIdx += 2;
           }
-          // Using uid to set doc makes it idempotent
-          await setDoc(doc(db, 'users', uid), userData);
+          await db.collection('users').doc(uid).set(userData, { merge: true });
         }
         logAction('User', `Prepared ${r.role} - ${r.email}`);
       }
@@ -194,7 +212,7 @@ const setupTestData = async () => {
       { id: 'beta-class-cp', schoolId: betaId, name: 'CP Beta', level: 'Primaire', type: 'francophone' }
     ];
     for (const c of classes) {
-      if (!isDryRun) await setDoc(doc(db, 'classes', c.id), c);
+      if (!isDryRun) await db.collection('classes').doc(c.id).set(c, { merge: true });
       logAction('Class', `Prepared ${c.name} for ${c.schoolId}`);
     }
 
@@ -202,7 +220,7 @@ const setupTestData = async () => {
     for(let i=1; i<=20; i++) {
       const classRef = i <= 7 ? classes[0].id : (i <= 14 ? classes[1].id : classes[2].id);
       if (!isDryRun) {
-        await setDoc(doc(db, 'students', studentIds[i-1]), {
+        await db.collection('students').doc(studentIds[i-1]).set({
           id: studentIds[i-1], schoolId: alphaId, classId: classRef,
           name: `Élève${i} TestAlpha`, matricule: `MAT2026${i.toString().padStart(3,'0')}`,
           gender: i%2===0?'F':'M', createdAt: isoDate(),
@@ -210,11 +228,11 @@ const setupTestData = async () => {
           parentName: `Parent ${i}`,
           parentPhone: `+2376000000${i.toString().padStart(2,'0')}`,
           feeT1: 50000, feeT2: 0, feeT3: 0
-        });
+        }, { merge: true });
       }
     }
     if (!isDryRun) {
-      await setDoc(doc(db, 'students', 'beta-student-1'), {
+      await db.collection('students').doc('beta-student-1').set({
         id: 'beta-student-1', schoolId: betaId, classId: 'beta-class-cp',
         name: 'Élève1 TestBeta', matricule: 'BETAMAT001',
         gender: 'M', createdAt: isoDate(),
@@ -222,18 +240,18 @@ const setupTestData = async () => {
         parentName: 'Parent Beta',
         parentPhone: '+237600000099',
         feeT1: 50000, feeT2: 0, feeT3: 0
-      });
+      }, { merge: true });
     }
     logAction('Students', '20 Alpha + 1 Beta idempotent students generated.');
 
     // 6. Payments
     for(let i=1; i<=15; i++) {
       if (!isDryRun) {
-        await setDoc(doc(db, 'payments', `alpha-pay-${i}`), {
+        await db.collection('payments').doc(`alpha-pay-${i}`).set({
           id: `alpha-pay-${i}`, schoolId: alphaId, studentId: studentIds[i-1],
           amount: 50000, method: i<=10 ? 'cash' : 'momo', status: i<=10 ? 'completed' : 'pending',
           type: 'tuition', reference: i<=10 ? `RECU-${i}` : `MOMO-PENDING-${i}`, date: isoDate()
-        });
+        }, { merge: true });
       }
     }
     logAction('Payments', '10 paid, 5 pending payments generated.');
@@ -241,10 +259,10 @@ const setupTestData = async () => {
     // 7. Grades
     for(let i=1; i<=50; i++) {
       if (!isDryRun) {
-        await setDoc(doc(db, 'grades', `alpha-grade-${i}`), {
+        await db.collection('grades').doc(`alpha-grade-${i}`).set({
           id: `alpha-grade-${i}`, schoolId: alphaId, studentId: studentIds[(i-1)%20],
           subjectId: 'maths', term: 'T1', type: 'exam', value: 15, maxScore: 20, date: isoDate()
-        });
+        }, { merge: true });
       }
     }
     logAction('Grades', '50 deterministic grades generated.');
@@ -252,10 +270,10 @@ const setupTestData = async () => {
     // 8. Attendance
     for(let i=1; i<=50; i++) {
       if (!isDryRun) {
-        await setDoc(doc(db, 'attendance', `alpha-att-${i}`), {
+        await db.collection('attendance').doc(`alpha-att-${i}`).set({
           id: `alpha-att-${i}`, schoolId: alphaId, studentId: studentIds[(i-1)%20],
           date: isoDate().split('T')[0], status: i%5===0 ? 'absent' : 'present', createdAt: isoDate()
-        });
+        }, { merge: true });
       }
     }
     logAction('Attendance', '50 deterministic attendances generated.');
