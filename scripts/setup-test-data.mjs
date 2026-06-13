@@ -1,15 +1,27 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDocs, collection, query, where, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, getDocs, collection, query, where, deleteDoc } from 'firebase/firestore';
+
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.staging' }); // Priority to staging
+dotenv.config(); // Fallback to .env
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCWm59UvkOsyHWx9gJXHf0m9qH7d3Droh0",
-  authDomain: "ecoscolaire-c5861.firebaseapp.com",
-  projectId: "ecoscolaire-c5861",
-  storageBucket: "ecoscolaire-c5861.firebasestorage.app",
-  messagingSenderId: "329523025972",
-  appId: "1:329523025972:web:052855ab83a9da2ea49261"
+  apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID
 };
+
+console.log("=== FIREBASE SEED TARGET ===");
+console.log("Project ID:", firebaseConfig.projectId);
+
+if (firebaseConfig.projectId === 'ecoscolaire-c5861') {
+  console.error("ABORT: Tentative d'exécution du Seed sur la Production (ecoscolaire-c5861) !");
+  process.exit(1);
+}
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -93,11 +105,20 @@ const setupTestData = async () => {
     const saPass = 'Test@2026Super!';
     const saUid = await createOrUpdateUser(saEmail, saPass);
     if (!isDryRun) {
-      // Authenticate as Super Admin for remaining operations
+      console.log('Logging in as superAdmin...');
       await signInWithEmailAndPassword(auth, saEmail, saPass);
-      await setDoc(doc(db, 'users', saUid), {
-        id: saUid, email: saEmail, role: 'superAdmin', isActive: true, createdAt: isoDate()
-      });
+      console.log('Checking if superAdmin doc exists...');
+      const saDocSnap = await getDoc(doc(db, 'users', saUid));
+      if (!saDocSnap.exists()) {
+        console.log('Writing superAdmin user doc...');
+        await setDoc(doc(db, 'users', saUid), {
+          id: saUid, email: saEmail, role: 'superAdmin', active: true, isActive: true, createdAt: isoDate()
+        });
+        console.log('SuperAdmin doc written.');
+      } else {
+        console.log('SuperAdmin doc already exists. Updating active: true...');
+        await setDoc(doc(db, 'users', saUid), { active: true, isActive: true }, { merge: true });
+      }
     }
     logAction('SuperAdmin', `Ready: ${saEmail}`);
 
@@ -106,14 +127,19 @@ const setupTestData = async () => {
     const betaId = 'school-beta-002';
     
     if (!isDryRun) {
+      console.log('Writing alpha school...');
       await setDoc(doc(db, 'schools', alphaId), {
         id: alphaId, name: "École Test EcoScolaire Alpha", schoolCode: "ALPHA001", academicYear: "2026-2027", address: "Yaoundé",
-        logoUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-        createdAt: isoDate()
+        settings: { currency: "XAF", defaultLanguage: "fr" },
+        createdAt: isoDate(), updatedAt: isoDate()
       });
+      console.log('Writing beta school...');
       await setDoc(doc(db, 'schools', betaId), {
-        id: betaId, name: "École Test EcoScolaire Beta", schoolCode: "BETA002", academicYear: "2026-2027", createdAt: isoDate()
+        id: betaId, name: "École Test EcoScolaire Beta", schoolCode: "BETA002", academicYear: "2026-2027", address: "Douala",
+        settings: { currency: "XAF", defaultLanguage: "fr" },
+        createdAt: isoDate(), updatedAt: isoDate()
       });
+      console.log('Schools written.');
     }
     logAction('Schools', 'Alpha and Beta schools prepared (Idempotent).');
 
@@ -146,7 +172,7 @@ const setupTestData = async () => {
       for (const r of rolesList) {
         const uid = await createOrUpdateUser(r.email, r.pass);
         if (!isDryRun) {
-          const userData = { id: uid, schoolId, email: r.email, role: r.role, isActive: true, createdAt: isoDate() };
+          const userData = { id: uid, schoolId, email: r.email, role: r.role, active: true, isActive: true, createdAt: isoDate() };
           if (r.role === 'parent' && schoolId === alphaId) {
             userData.studentIds = [studentIds[pIdx], studentIds[pIdx+1]];
             pIdx += 2;

@@ -4,11 +4,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
     <title>EcoScolaire</title>
-    <script type="module" crossorigin="" src="/assets/index-C4yrwpNR.js"></script>
+    <script type="module" crossorigin="" src="/assets/index-C_IQAkFV.js"></script>
     <link rel="modulepreload" crossorigin="" href="/assets/preload-helper-LAx7wYi6.js">
     <link rel="modulepreload" crossorigin="" href="/assets/index.esm-se1TPRUE.js">
     <link rel="modulepreload" crossorigin="" href="/assets/index.esm-v_Gc4XRI.js">
     <link rel="modulepreload" crossorigin="" href="/assets/index.esm-Dthi65yG.js">
+    <link rel="modulepreload" crossorigin="" href="/assets/index.esm-DFoaFKR4.js">
     <link rel="modulepreload" crossorigin="" href="/assets/index.esm-CLHhn1EC.js">
     <link rel="stylesheet" crossorigin="" href="/assets/index-Cf9bg23B.css">
   <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script><link rel="modulepreload" as="script" crossorigin="" href="/assets/index.esm-CkBvtJj0.js"></head>

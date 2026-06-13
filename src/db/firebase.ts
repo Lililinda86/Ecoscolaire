@@ -4,14 +4,22 @@ import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCWm59UvkOsyHWx9gJXHf0m9qH7d3Droh0",
-  authDomain: "ecoscolaire-c5861.firebaseapp.com",
-  projectId: "ecoscolaire-c5861",
-  storageBucket: "ecoscolaire-c5861.firebasestorage.app",
-  messagingSenderId: "329523025972",
-  appId: "1:329523025972:web:052855ab83a9da2ea49261",
-  measurementId: "G-L9QJQYQGHH"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-L9QJQYQGHH"
 };
+
+// Check for missing mandatory vars
+const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+for (const key of requiredKeys) {
+  if (!firebaseConfig[key as keyof typeof firebaseConfig]) {
+    throw new Error(`Firebase configuration error: Missing environment variable for ${key}. Check your .env file.`);
+  }
+}
 
 // Initialiser Firebase
 const app = initializeApp(firebaseConfig);
