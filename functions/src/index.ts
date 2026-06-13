@@ -39,7 +39,6 @@ export const verifySaaSPayment = functions.https.onCall(async (data, context) =>
 // Scheduled function (Cron) running daily at midnight to suspend expired schools.
 // ----------------------------------------------------------------------
 export const dailySubscriptionCheck = functions.pubsub.schedule('every day 00:00').onRun(async (context) => {
-  const db = admin.firestore();
   const now = new Date();
   console.log(`Cron execution at ${now.toISOString()}`);
   return null;
