@@ -24,7 +24,8 @@ service cloud.firestore {
     }
 
     function isActive() {
-      return getUserData().active == true;
+      let data = getUserData();
+      return data.active == true || data.isActive == true;
     }
 
     // --- Rôles ---
