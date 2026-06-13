@@ -12,8 +12,7 @@ service cloud.firestore {
 
     function getUserData() {
       // Les données de l'utilisateur qui fait la requête
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc == null ? {} : userDoc.data;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     function getRole() {
@@ -96,7 +95,7 @@ service cloud.firestore {
       // Autorise superAdmin/owner à créer, OU le premier superAdmin via email
       allow create: if isAuthenticated() && (
         isSuperAdmin() || isOwner() || 
-        (request.auth.token.email == 'kyrialove@gmail.com' && request.auth.uid == userId)
+        (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId)
       );
       allow update: if isAuthenticated() && isActive() && (isSuperAdmin() || (isOwner() && hasSchoolAccess(resource.data.schoolId)));
       allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);

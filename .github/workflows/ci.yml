@@ -28,5 +28,8 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Seed Test Database
+        run: node scripts/setup-test-data.mjs
+
       - name: Run E2E Tests
         run: npx playwright test
