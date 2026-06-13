@@ -93,11 +93,11 @@ const setupTestData = async () => {
     const saPass = 'Test@2026Super!';
     const saUid = await createOrUpdateUser(saEmail, saPass);
     if (!isDryRun) {
+      // Authenticate as Super Admin for remaining operations
+      await signInWithEmailAndPassword(auth, saEmail, saPass);
       await setDoc(doc(db, 'users', saUid), {
         id: saUid, email: saEmail, role: 'superAdmin', isActive: true, createdAt: isoDate()
       });
-      // Authenticate as Super Admin for remaining operations
-      await signInWithEmailAndPassword(auth, saEmail, saPass);
     }
     logAction('SuperAdmin', `Ready: ${saEmail}`);
 
