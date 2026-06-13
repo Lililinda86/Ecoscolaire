@@ -85,12 +85,10 @@ service cloud.firestore {
       // Un utilisateur peut lire son propre document.
       // Le superAdmin peut lire tous les utilisateurs.
       // L'owner, le directeur et la secrétaire peuvent lire les utilisateurs de leur école.
-      allow get: if isAuthenticated() && (
-        request.auth.uid == userId ||
-        (isActive() && (
-          isSuperAdmin() ||
-          ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
-        ))
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      allow get: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
       );
       allow list: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
