@@ -98,14 +98,13 @@ service cloud.firestore {
         isSuperAdmin() || isOwner() || 
         (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId)
       );
-      allow update: if isAuthenticated() && isActive() && (isSuperAdmin() || (isOwner() && hasSchoolAccess(resource.data.schoolId)));
+      allow update: if isAuthenticated() && isActive() && (request.auth.uid == userId || isSuperAdmin() || (isOwner() && hasSchoolAccess(resource.data.schoolId)));
       allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
     }
 
     // --- SCHOOLS ---
     match /schools/{schoolId} {
-      allow get: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
-      allow list: if isAuthenticated() && isActive() && isSuperAdmin();
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
       
       // Seul le superAdmin peut créer ou supprimer des écoles
       allow create, delete: if isAuthenticated() && isSuperAdmin();
@@ -230,7 +229,8 @@ service cloud.firestore {
     // --- NOTIFICATIONS ---
     match /notifications/{notifId} {
       // Tout utilisateur connecté peut recevoir/créer des notifications dans son école
-      allow read, write: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow read, update, delete: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId);
     }
   }
 }
