@@ -104,8 +104,8 @@ service cloud.firestore {
 
     // --- SCHOOLS ---
     match /schools/{schoolId} {
-      // Tout utilisateur authentifié et actif peut lire les infos de son école, ou le superAdmin peut tout lire.
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
+      allow get: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
+      allow list: if isAuthenticated() && isActive() && isSuperAdmin();
       
       // Seul le superAdmin peut créer ou supprimer des écoles
       allow create, delete: if isAuthenticated() && isSuperAdmin();

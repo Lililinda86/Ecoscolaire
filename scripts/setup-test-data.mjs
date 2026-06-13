@@ -34,20 +34,20 @@ const createOrUpdateUser = async (email, pass) => {
     return `dry-run-uid-${email}`;
   }
   let uid;
+  const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp' + Date.now() + Math.random());
+  const secondaryAuth = getAuth(secondaryApp);
+  const { deleteApp } = await import('firebase/app');
   try {
-    await signInWithEmailAndPassword(auth, email, pass);
-    uid = auth.currentUser.uid;
-    await signOut(auth); // Sign out so we don't break subsequent logins
+    await signInWithEmailAndPassword(secondaryAuth, email, pass);
+    uid = secondaryAuth.currentUser.uid;
+    await signOut(secondaryAuth);
   } catch(e) {
     // Attempt creation
-    const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp' + Date.now() + Math.random());
-    const secondaryAuth = getAuth(secondaryApp);
     const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
     uid = userCredential.user.uid;
     await signOut(secondaryAuth);
-    const { deleteApp } = await import('firebase/app');
-    await deleteApp(secondaryApp);
   }
+  await deleteApp(secondaryApp);
   return uid;
 };
 
@@ -160,18 +160,19 @@ const setupTestData = async () => {
     await processRoles(alphaRoles, alphaId);
     await processRoles(betaRoles, betaId);
 
-    // 4. Classes (Alpha)
+    // 4. Classes (Alpha & Beta)
     const classes = [
       { id: 'alpha-class-cp', schoolId: alphaId, name: 'CP', level: 'Primaire', type: 'francophone' },
       { id: 'alpha-class-ce1', schoolId: alphaId, name: 'CE1', level: 'Primaire', type: 'francophone' },
-      { id: 'alpha-class-ce2', schoolId: alphaId, name: 'CE2', level: 'Primaire', type: 'francophone' }
+      { id: 'alpha-class-ce2', schoolId: alphaId, name: 'CE2', level: 'Primaire', type: 'francophone' },
+      { id: 'beta-class-cp', schoolId: betaId, name: 'CP Beta', level: 'Primaire', type: 'francophone' }
     ];
     for (const c of classes) {
       if (!isDryRun) await setDoc(doc(db, 'classes', c.id), c);
-      logAction('Class', `Prepared ${c.name}`);
+      logAction('Class', `Prepared ${c.name} for ${c.schoolId}`);
     }
 
-    // 5. Students (Alpha)
+    // 5. Students (Alpha & Beta)
     for(let i=1; i<=20; i++) {
       const classRef = i <= 7 ? classes[0].id : (i <= 14 ? classes[1].id : classes[2].id);
       if (!isDryRun) {
@@ -186,7 +187,18 @@ const setupTestData = async () => {
         });
       }
     }
-    logAction('Students', '20 idempotent students generated.');
+    if (!isDryRun) {
+      await setDoc(doc(db, 'students', 'beta-student-1'), {
+        id: 'beta-student-1', schoolId: betaId, classId: 'beta-class-cp',
+        name: 'Élève1 TestBeta', matricule: 'BETAMAT001',
+        gender: 'M', createdAt: isoDate(),
+        section: 'francophone',
+        parentName: 'Parent Beta',
+        parentPhone: '+237600000099',
+        feeT1: 50000, feeT2: 0, feeT3: 0
+      });
+    }
+    logAction('Students', '20 Alpha + 1 Beta idempotent students generated.');
 
     // 6. Payments
     for(let i=1; i<=15; i++) {
