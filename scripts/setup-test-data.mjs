@@ -1,4 +1,6 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import dotenv from 'dotenv';
 import fs from 'fs';
 
@@ -56,12 +58,12 @@ if (serviceAccount.project_id !== 'ecoscolaire-staging') {
 console.log("=== FIREBASE SEED TARGET ===");
 console.log("Project ID:", serviceAccount.project_id);
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+initializeApp({
+  credential: cert(serviceAccount)
 });
 
-const db = admin.firestore();
-const auth = admin.auth();
+const db = getFirestore();
+const auth = getAuth();
 
 const isoDate = () => new Date().toISOString();
 
