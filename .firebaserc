@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "staging": "ecoscolaire-staging",
+    "prod": "ecoscolaire-c5861"
+  }
+}
