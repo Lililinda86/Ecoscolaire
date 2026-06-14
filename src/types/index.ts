@@ -225,6 +225,7 @@ export interface SchoolPaymentSettingsPublic {
   campayPublic?: string;
   flutterwavePublic?: string;
   activeProvider?: 'campay' | 'flutterwave' | 'none';
+  hasCampaySecret?: boolean;
 }
 
 export interface SchoolPaymentSecrets {

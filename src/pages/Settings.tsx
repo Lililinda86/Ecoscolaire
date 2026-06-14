@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Edit2, Trash2, BookOpen } from 'lucide-react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 
@@ -10,6 +12,28 @@ const Settings: React.FC = () => {
   const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as const });
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
   const [currentClassId, setCurrentClassId] = useState('');
+  const [campaySecretInput, setCampaySecretInput] = useState('');
+
+  const handleSaveCampaySecret = async () => {
+    if (!db.school || !campaySecretInput.trim()) return;
+    if (!checkPin()) { alert("Code PIN incorrect."); return; }
+    
+    try {
+      const secretRef = doc(firestoreDb, `schools/${db.school.id}/secrets/payment`);
+      await setDoc(secretRef, {
+        campaySecret: campaySecretInput.trim(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      
+      saveDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), hasCampaySecret: true } } });
+      
+      setCampaySecretInput('');
+      alert("Secret Campay configuré et sauvegardé avec succès de façon sécurisée.");
+    } catch (error) {
+      console.error(error);
+      alert("Erreur : Seul le propriétaire ou superAdmin peut modifier les secrets de paiement.");
+    }
+  };
 
   const handleAddClass = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,14 +197,40 @@ const Settings: React.FC = () => {
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: '#f97316' }}>💳 Clé Publique Mobile Money (API)</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: '#f97316' }}>💳 Clé Publique Campay</label>
             <input 
-              type="password"
-              value={db.school?.apiKeys?.flutterwavePublic || ''}
+              type="text"
+              value={db.school?.paymentSettings?.campayPublic || ''}
               placeholder="Mode Simulation actif par défaut si vide..."
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), apiKeys: { ...(db.school?.apiKeys||{}), flutterwavePublic: e.target.value } } })}
-              style={{ width: '100%', borderColor: '#f97316' }}
+              onChange={e => saveDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), campayPublic: e.target.value } } })}
+              style={{ width: '100%', borderColor: '#f97316', marginBottom: '1rem' }}
             />
+
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: '#ef4444' }}>
+              🔒 Campay Secret
+              <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', padding: '0.2rem 0.5rem', borderRadius: '12px', background: db.school?.paymentSettings?.hasCampaySecret ? '#dcfce7' : '#fee2e2', color: db.school?.paymentSettings?.hasCampaySecret ? '#166534' : '#991b1b' }}>
+                {db.school?.paymentSettings?.hasCampaySecret ? '🟢 Secret Campay configuré' : '🔴 Secret non configuré'}
+              </span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input 
+                type="password"
+                value={campaySecretInput}
+                placeholder="Entrez pour configurer..."
+                onChange={e => setCampaySecretInput(e.target.value)}
+                style={{ flex: 1, borderColor: '#ef4444' }}
+              />
+              <button 
+                onClick={handleSaveCampaySecret}
+                disabled={!campaySecretInput.trim()}
+                style={{ background: '#ef4444' }}
+              >
+                Sauvegarder
+              </button>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+              Le secret n'est jamais affiché ni lisible pour des raisons de sécurité. Écrivez une nouvelle valeur pour l'écraser.
+            </p>
           </div>
         </div>
 
