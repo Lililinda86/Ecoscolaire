@@ -35,6 +35,15 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Deploy Firestore Rules to Staging
+        run: |
+          echo "$STAGING_FIREBASE_SERVICE_ACCOUNT" > staging-service-account.json
+          export GOOGLE_APPLICATION_CREDENTIALS="${PWD}/staging-service-account.json"
+          npx firebase-tools deploy --only firestore:rules --project ecoscolaire-staging --non-interactive
+          rm staging-service-account.json
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+
       - name: Seed Test Database
         run: npm run seed:staging
         env:
