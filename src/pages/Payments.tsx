@@ -5,6 +5,8 @@ import type { Payment, Expense } from '../types';
 import Modal from '../components/Modal';
 import { Plus, Minus, Wallet, ClipboardList, Trash2 } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
+import { functions } from '../db/firebase';
+import { httpsCallable } from 'firebase/functions';
 
 const Payments: React.FC = () => {
   const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
@@ -47,13 +49,42 @@ const Payments: React.FC = () => {
         return;
       }
       setIsProcessingMoMo(true);
-      // Simulate API call to Flutterwave / Campay
-      await new Promise(resolve => setTimeout(resolve, 3000));
       
-      setIsProcessingMoMo(false);
-      setMomoSuccess(true);
-      // Wait 2 seconds for visual confirmation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      try {
+        const initiatePayment = httpsCallable(functions, 'initiatePayment');
+        let provider = db.school?.paymentSettings?.activeProvider;
+        if (provider !== 'campay' && provider !== 'flutterwave') {
+          provider = 'campay';
+        }
+        
+        const payload = {
+          schoolId: currentSchool!.id,
+          studentId: currentPayment.studentId,
+          amount: currentPayment.amount || 0,
+          type: currentPayment.type,
+          installment: currentPayment.installment,
+          provider
+        };
+        
+        const result = await initiatePayment(payload);
+        const data = result.data as any;
+        
+        setIsProcessingMoMo(false);
+        setMomoSuccess(true);
+        
+        if (data.mockPaymentUrl) {
+          window.open(data.mockPaymentUrl, '_blank');
+        }
+        
+        alert(data.message || "Paiement Mobile Money initié avec succès.");
+        setModalOpen(false);
+        return; // CRITIQUE : on arrête ici, on n'écrit pas dans db.payments !
+      } catch (error: any) {
+        console.error(error);
+        setIsProcessingMoMo(false);
+        alert(`Erreur lors de l'initiation du paiement: ${error.message || "Erreur inconnue"}`);
+        return;
+      }
     }
 
     const newDb = { ...db };
@@ -76,7 +107,7 @@ const Payments: React.FC = () => {
       ...currentPayment, 
       id: crypto.randomUUID(),
       method: paymentMethod,
-      transactionId: paymentMethod === 'mobile_money' ? `MOMO-${Date.now()}` : undefined
+      transactionId: undefined
     } as Payment;
 
     newDb.payments.push(newPayment);
