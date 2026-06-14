@@ -112,6 +112,12 @@ service cloud.firestore {
       allow create, delete: if isAuthenticated() && isSuperAdmin();
       // Le propriétaire peut modifier son école (mais pas l'abonnement)
       allow update: if isAuthenticated() && isActive() && (isSuperAdmin() || canManageSchool(schoolId));
+
+      match /secrets/{secretId} {
+        allow read: if false;
+        allow create, update: if isAuthenticated() && isActive() && (isSuperAdmin() || isOwner()) && hasSchoolAccess(schoolId);
+        allow delete: if isAuthenticated() && isActive() && isSuperAdmin();
+      }
     }
 
     // --- STUDENTS & PARENTS ---
@@ -169,6 +175,15 @@ service cloud.firestore {
     }
 
     // --- FINANCE (PAYMENTS & EXPENSES) ---
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && isActive() && (
+        resource.data.userId == request.auth.uid ||
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isAccountant()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow create, update, delete: if false;
+    }
+
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() || 

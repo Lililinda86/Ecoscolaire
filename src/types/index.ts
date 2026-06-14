@@ -31,10 +31,11 @@ export interface School {
     feeTransport: number;
     feeUniforms: number;
   };
-  apiKeys?: {
+  apiKeys?: { // DEPRECATED
     flutterwavePublic?: string;
-    flutterwaveSecret?: string;
+    flutterwaveSecret?: string; // DEPRECATED
   };
+  paymentSettings?: SchoolPaymentSettingsPublic;
 }
 
 export type GlobalRole = 'superAdmin' | 'owner' | 'director' | 'secretary' | 'accountant' | 'teacher' | 'driver' | 'parent' | 'student';
@@ -219,6 +220,34 @@ export interface Breakdown {
 }
 
 export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'other';
+
+export interface SchoolPaymentSettingsPublic {
+  campayPublic?: string;
+  flutterwavePublic?: string;
+  activeProvider?: 'campay' | 'flutterwave' | 'none';
+}
+
+export interface SchoolPaymentSecrets {
+  campaySecret?: string;
+  flutterwaveSecret?: string;
+}
+
+export type TransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+
+export interface PaymentTransaction {
+  id: string;
+  schoolId: string;
+  userId: string;
+  studentId?: string;
+  amount: number;
+  type: PaymentType;
+  installment?: 'T1' | 'T2' | 'T3';
+  provider: 'campay' | 'flutterwave';
+  reference: string;
+  status: TransactionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Payment {
   id: string;
