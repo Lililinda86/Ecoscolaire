@@ -44,8 +44,8 @@ const Payments: React.FC = () => {
     if (!currentPayment.studentId) return;
 
     if (paymentMethod === 'mobile_money') {
-      if (!parentPhone || parentPhone.length < 9) {
-        alert("Veuillez entrer un numéro de téléphone valide (ex: 677000000).");
+      if (!parentPhone || parentPhone.length < 9 || !parentPhone.startsWith('237') || !/^\d+$/.test(parentPhone)) {
+        alert("Veuillez entrer un numéro de téléphone valide (ex: 237677000000, commence par 237, uniquement des chiffres).");
         return;
       }
       setIsProcessingMoMo(true);
@@ -63,7 +63,8 @@ const Payments: React.FC = () => {
           amount: currentPayment.amount || 0,
           type: currentPayment.type,
           installment: currentPayment.installment,
-          provider
+          provider,
+          phoneNumber: parentPhone
         };
         
         const result = await initiatePayment(payload);
@@ -641,7 +642,7 @@ const Payments: React.FC = () => {
                 <label style={{ color: '#ea580c', fontWeight: 500 }}>Numéro Mobile Money du Parent</label>
                 <input 
                   type="tel" 
-                  placeholder="ex: 677000000" 
+                  placeholder="ex: 237677000000" 
                   value={parentPhone} 
                   required={paymentMethod === 'mobile_money'}
                   onChange={e => setParentPhone(e.target.value)}

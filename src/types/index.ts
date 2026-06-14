@@ -246,6 +246,10 @@ export interface PaymentTransaction {
   provider: 'campay' | 'flutterwave';
   reference: string;
   status: TransactionStatus;
+  phoneNumber?: string;
+  providerTransactionId?: string;
+  failureReason?: string;
+  mode?: 'mock' | 'campay_sandbox';
   createdAt: string;
   updatedAt: string;
 }
