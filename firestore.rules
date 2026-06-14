@@ -169,6 +169,10 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary() || isTeacher()) && hasSchoolAccess(request.resource.data.schoolId);
     }
+    match /staff/{staffId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+    }
     match /staffAttendance/{attendanceId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
       allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);

@@ -10,6 +10,8 @@ const Dashboard: React.FC = () => {
   const { db, isFirestoreConnected } = useAppContext();
   const navigate = useNavigate();
 
+  if (!db) return null;
+
   // Mock data for KPIs - In a real scenario these would be calculated from db
   const todayStats = {
     presentStudents: Math.floor(db.students.length * 0.9),
