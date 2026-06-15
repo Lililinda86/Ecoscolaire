@@ -33,6 +33,8 @@ async function testMobileMoney() {
     }
   });
 
+  let lastTransactionId = null;
+
   page.on('response', async res => {
       if (res.url().includes('initiatePayment')) {
           console.log(`[NETWORK RESPONSE] ${res.request().method()} ${res.url()} -> Status: ${res.status()}`);
@@ -40,6 +42,10 @@ async function testMobileMoney() {
           try {
              const json = await res.json();
              console.log('[NETWORK RESPONSE BODY]', JSON.stringify(json, null, 2));
+             if (json.result && json.result.transactionId) {
+                 lastTransactionId = json.result.transactionId;
+                 console.log(`Captured transactionId: ${lastTransactionId}`);
+             }
           } catch (e) {
              console.log('[NETWORK RESPONSE BODY]', await res.text());
           }
@@ -112,32 +118,54 @@ async function testMobileMoney() {
         console.log('Success message NOT visible in UI.');
     }
 
-    console.log('Function invoked:', functionInvoked);
-    console.log('Mock URL opened (popup):', mockUrlOpened);
+    console.log('Reloading page to fetch new transactions from Firestore...');
+    await page.reload();
+    await page.waitForTimeout(5000);
 
-    // Wait a bit for React to re-render the pending transactions table
-    await page.waitForTimeout(3000);
-    
-    console.log('Checking for pending transaction button...');
-    const confirmBtn = await page.$('button:has-text("Simuler paiement réussi")');
+    console.log(`Checking for pending transaction button for ${lastTransactionId}...`);
+    const confirmBtn = await page.$(`button[data-testid="btn-mock-confirm-${lastTransactionId}"]`);
     if (confirmBtn) {
-        console.log('Button "Simuler paiement réussi" found! Clicking it...');
+        console.log(`Button "Simuler paiement réussi" found for ${lastTransactionId}! Clicking it...`);
         await confirmBtn.click();
         
         console.log('Waiting for confirmation processing...');
         await page.waitForTimeout(5000);
         
-        console.log('Testing idempotency: trying to click again if button still there or via direct call...');
-        // To truly test idempotency, let's just make a direct call in the browser context
-        const idempotencyResult = await page.evaluate(async () => {
-             const { getFunctions, httpsCallable } = await import('firebase/functions');
-             const functions = getFunctions();
-             const mockConfirmPayment = httpsCallable(functions, 'mockConfirmPayment');
-             
-             // Find transactionId from the dom or assume there's only one.
-             // But actually, we can't easily import firebase inside page.evaluate unless it's exposed.
-             return "Idempotency will be tested if we click twice quickly or verify manually.";
-        });
+        console.log('Testing idempotency & verifying Firestore via Admin SDK...');
+        try {
+            const { getApps, initializeApp } = require('firebase-admin/app');
+            const { getFirestore } = require('firebase-admin/firestore');
+            
+            if (getApps().length === 0) {
+                initializeApp({ projectId: 'ecoscolaire-staging' });
+            }
+            const db = getFirestore();
+
+            if (lastTransactionId) {
+                console.log(`\n--- VERIFICATION FIRESTORE POUR ${lastTransactionId} ---`);
+                const txDoc = await db.collection('transactions').doc(lastTransactionId).get();
+                if (txDoc.exists) {
+                    console.log(`Transaction Status: ${txDoc.data().status} (expected: SUCCESS)`);
+                } else {
+                    console.log(`Transaction NOT FOUND!`);
+                }
+                
+                const paymentDoc = await db.collection('payments').doc(lastTransactionId).get();
+                if (paymentDoc.exists) {
+                    console.log(`Payment document FOUND. Amount: ${paymentDoc.data().amount}`);
+                } else {
+                    console.log(`Payment document NOT FOUND!`);
+                }
+                
+                const allPayments = await db.collection('payments').where('transactionId', '==', lastTransactionId).get();
+                console.log(`Number of payment documents with this transactionId: ${allPayments.size} (expected: 1)`);
+                console.log(`----------------------------------------------------\n`);
+            } else {
+                console.log("Could not find lastTransactionId to verify.");
+            }
+        } catch (adminErr) {
+            console.error("Admin SDK verification failed:", adminErr.message);
+        }
         
         // Let's check if the pending table is gone or the button is gone
         const confirmBtnAfter = await page.$('button:has-text("Simuler paiement réussi")');

@@ -3,7 +3,8 @@ import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import type { Payment, Expense } from '../types';
 import Modal from '../components/Modal';
-import { Plus, Minus, Wallet, ClipboardList, Trash2 } from 'lucide-react';
+import TransactionHistory from '../components/TransactionHistory';
+import { Plus, Minus, Wallet, ClipboardList, Trash2, History } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -11,7 +12,7 @@ import { httpsCallable } from 'firebase/functions';
 const Payments: React.FC = () => {
   const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'>('encaissements');
+  const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
   
   const [isModalOpen, setModalOpen] = useState(false);
@@ -180,11 +181,13 @@ const Payments: React.FC = () => {
   };
 
   const handleConfirmMockTx = async (transactionId: string) => {
+    console.log(`[FRONTEND] Bouton cliqué pour confirmer la transaction: ${transactionId}`);
     setIsConfirmingTx(transactionId);
     try {
       const mockConfirmPayment = httpsCallable(functions, 'mockConfirmPayment');
       const result = await mockConfirmPayment({ transactionId });
       const data = result.data as any;
+      console.log(`[FRONTEND] Réponse de mockConfirmPayment:`, data);
       if (data.success) {
         alert(data.message || "Paiement simulé avec succès.");
         const newDb = { ...db };
@@ -211,10 +214,11 @@ const Payments: React.FC = () => {
           }
         }
       } else {
+         console.error(`[FRONTEND] Erreur retournée par mockConfirmPayment:`, data);
          alert("Erreur lors de la simulation.");
       }
     } catch (err: any) {
-      console.error(err);
+      console.error(`[FRONTEND] Erreur catch lors de mockConfirmPayment:`, err);
       alert("Erreur: " + err.message);
     }
     setIsConfirmingTx(null);
@@ -315,8 +319,21 @@ const Payments: React.FC = () => {
         <button className={activeTab === 'encaissements' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'encaissements' ? '' : 'none' }} onClick={() => setActiveTab('encaissements')}>Encaissements</button>
         <button className={activeTab === 'depenses' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'depenses' ? '' : 'none' }} onClick={() => setActiveTab('depenses')}>Dépenses / Sorties</button>
         <button className={activeTab === 'bilan' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'bilan' ? '' : 'none' }} onClick={() => setActiveTab('bilan')}><ClipboardList size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Bilan Scolarité</button>
+        {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+          <button className={activeTab === 'historique-momo' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-momo' ? '' : 'none' }} onClick={() => setActiveTab('historique-momo')}><History size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Historique MoMo</button>
+        )}
         <button className={activeTab === 'brouillard' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'brouillard' ? '' : 'none', background: activeTab === 'brouillard' ? 'var(--warning)' : undefined, color: activeTab === 'brouillard' ? '#000' : undefined }} onClick={() => setActiveTab('brouillard')}>🔒 Brouillard de Caisse</button>
       </div>
+
+      {activeTab === 'historique-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+        <TransactionHistory 
+          transactions={db.transactions || []}
+          students={db.students || []}
+          currentUser={currentUser}
+          onMockConfirm={handleConfirmMockTx}
+          isConfirmingTx={isConfirmingTx}
+        />
+      )}
 
       {activeTab === 'encaissements' && (
         <>
@@ -349,6 +366,8 @@ const Payments: React.FC = () => {
                              style={{ background: '#f59e0b', padding: '0.5rem 1rem' }} 
                              onClick={() => handleConfirmMockTx(tx.id)}
                              disabled={isConfirmingTx === tx.id}
+                             data-testid={`btn-mock-confirm-${tx.id}`}
+                             className={`btn-mock-confirm`}
                            >
                              {isConfirmingTx === tx.id ? 'Simulation...' : 'Simuler paiement réussi'}
                            </button>
