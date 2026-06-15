@@ -48,6 +48,7 @@ export interface Database {
   inventoryTransactions: InventoryTransaction[];
   transactions: any[];
   audit_logs: any[];
+  receipts?: any[];
 }
 
 const initialDB: Database = {
@@ -114,6 +115,7 @@ const initialDB: Database = {
   inventoryTransactions: [],
   transactions: [],
   audit_logs: [],
+  receipts: []
 };
 
 export const defaultDB = initialDB;

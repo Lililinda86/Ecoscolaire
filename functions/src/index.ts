@@ -276,3 +276,69 @@ export const mockConfirmPayment = functions.https.onCall(async (data, context) =
     };
   });
 });
+
+// ----------------------------------------------------------------------
+// 7. onPaymentCreated (Trigger)
+// Generates an automatic PDF receipt for any successful payment.
+// ----------------------------------------------------------------------
+export const onPaymentCreated = functions.firestore
+  .document('payments/{paymentId}')
+  .onCreate(async (snap, context) => {
+    const paymentData = snap.data();
+    const paymentId = context.params.paymentId;
+    
+    if (!paymentData || !paymentData.schoolId) {
+      console.log('Skipping receipt generation: Missing payment data or schoolId');
+      return null;
+    }
+
+    const schoolId = paymentData.schoolId;
+    const db = admin.firestore();
+    
+    return await db.runTransaction(async (transaction) => {
+      // 1. Idempotency Check
+      const receiptRef = db.collection('receipts').doc(paymentId);
+      const receiptSnap = await transaction.get(receiptRef);
+      if (receiptSnap.exists) {
+        console.log(`Receipt already exists for payment ${paymentId}`);
+        return null;
+      }
+
+      // 2. Stable Counter logic
+      const counterRef = db.collection('counters').doc(`receipts_${schoolId}`);
+      const counterSnap = await transaction.get(counterRef);
+      
+      let nextNum = 1;
+      if (counterSnap.exists) {
+        const data = counterSnap.data();
+        if (data && typeof data.lastReceiptNumber === 'number') {
+           nextNum = data.lastReceiptNumber + 1;
+        }
+      }
+      
+      // Update counter
+      transaction.set(counterRef, { lastReceiptNumber: nextNum }, { merge: true });
+
+      // 3. Formatting
+      const year = new Date().getFullYear();
+      const formattedNum = String(nextNum).padStart(4, '0');
+      const receiptNumber = `REC-${year}-${formattedNum}`;
+
+      // 4. Create Receipt Document
+      transaction.set(receiptRef, {
+        id: paymentId,
+        paymentId: paymentId,
+        schoolId: schoolId,
+        receiptNumber: receiptNumber,
+        studentId: paymentData.studentId || null,
+        amount: paymentData.amount,
+        type: paymentData.type,
+        method: paymentData.method,
+        date: paymentData.date || admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log(`Successfully created receipt ${receiptNumber} for payment ${paymentId}`);
+      return receiptNumber;
+    });
+  });

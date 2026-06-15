@@ -4,7 +4,8 @@ import { useI18n } from '../context/I18nContext';
 import type { Payment, Expense } from '../types';
 import Modal from '../components/Modal';
 import TransactionHistory from '../components/TransactionHistory';
-import { Plus, Minus, Wallet, ClipboardList, Trash2, History } from 'lucide-react';
+import ReceiptHistory from '../components/ReceiptHistory';
+import { Plus, Minus, Wallet, ClipboardList, Trash2, History, FileText } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -12,7 +13,7 @@ import { httpsCallable } from 'firebase/functions';
 const Payments: React.FC = () => {
   const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'>('encaissements');
+  const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'|'historique-recus'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
   
   const [isModalOpen, setModalOpen] = useState(false);
@@ -320,7 +321,10 @@ const Payments: React.FC = () => {
         <button className={activeTab === 'depenses' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'depenses' ? '' : 'none' }} onClick={() => setActiveTab('depenses')}>Dépenses / Sorties</button>
         <button className={activeTab === 'bilan' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'bilan' ? '' : 'none' }} onClick={() => setActiveTab('bilan')}><ClipboardList size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Bilan Scolarité</button>
         {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
-          <button className={activeTab === 'historique-momo' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-momo' ? '' : 'none' }} onClick={() => setActiveTab('historique-momo')}><History size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Historique MoMo</button>
+          <>
+            <button className={activeTab === 'historique-momo' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-momo' ? '' : 'none' }} onClick={() => setActiveTab('historique-momo')}><History size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Historique MoMo</button>
+            <button className={activeTab === 'historique-recus' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-recus' ? '' : 'none' }} onClick={() => setActiveTab('historique-recus')}><FileText size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Reçus</button>
+          </>
         )}
         <button className={activeTab === 'brouillard' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'brouillard' ? '' : 'none', background: activeTab === 'brouillard' ? 'var(--warning)' : undefined, color: activeTab === 'brouillard' ? '#000' : undefined }} onClick={() => setActiveTab('brouillard')}>🔒 Brouillard de Caisse</button>
       </div>
@@ -332,6 +336,14 @@ const Payments: React.FC = () => {
           currentUser={currentUser}
           onMockConfirm={handleConfirmMockTx}
           isConfirmingTx={isConfirmingTx}
+        />
+      )}
+
+      {activeTab === 'historique-recus' && currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+        <ReceiptHistory 
+          receipts={db.receipts || []}
+          students={db.students || []}
+          school={currentSchool}
         />
       )}
 

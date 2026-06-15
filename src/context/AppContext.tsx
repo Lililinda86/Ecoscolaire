@@ -125,7 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'classes', 'students', 'staff', 'buses', 'inventory', 
           'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
-          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions'
+          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts'
         ];
 
         console.log("================ DIAGNOSTIC AppContext ===============");
