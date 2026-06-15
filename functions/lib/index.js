@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
+exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 // Initialize the Firebase Admin SDK
@@ -49,9 +49,14 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
     if (!context.auth || !context.auth.uid) {
         throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
     }
-    const { schoolId, studentId, amount, type, installment, provider } = data;
+    const { schoolId, studentId, amount, type, installment, provider, phoneNumber, campayRealEnabled } = data;
     if (!schoolId) {
         throw new functions.https.HttpsError('invalid-argument', 'schoolId is required');
+    }
+    if (provider === 'campay') {
+        if (!phoneNumber || typeof phoneNumber !== 'string' || !phoneNumber.startsWith('237') || !/^\d+$/.test(phoneNumber)) {
+            throw new functions.https.HttpsError('invalid-argument', 'A valid Cameroonian phone number starting with 237 is required for Campay');
+        }
     }
     if (typeof amount !== 'number' || amount <= 0) {
         throw new functions.https.HttpsError('invalid-argument', 'Amount must be greater than 0');
@@ -91,6 +96,39 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
     const transactionRef = db.collection('transactions').doc();
     const generatedId = transactionRef.id;
     const idempotencyKey = `idemp_${generatedId}`;
+    let mode = 'mock';
+    let mockPaymentUrl = `https://mock.campay.net/pay/${generatedId}`;
+    let message = 'Payment initiated securely (Mock Mode)';
+    let secretsValidated = false;
+    if (provider === 'campay') {
+        // Attempt to read secrets
+        const secretSnap = await db.collection('schools').doc(schoolId).collection('secrets').doc('payment').get();
+        const secrets = secretSnap.data();
+        console.log(`[CAMPAY_AUDIT] secret document found = ${secretSnap.exists}`);
+        if (secrets) {
+            console.log(`[CAMPAY_AUDIT] username present = ${!!secrets.campayAppUsername}`);
+            console.log(`[CAMPAY_AUDIT] password present = ${!!secrets.campayAppPassword}`);
+            console.log(`[CAMPAY_AUDIT] environment = ${secrets.campayEnvironment || 'not-set'}`);
+        }
+        if (secrets && secrets.campayAppUsername && secrets.campayAppPassword) {
+            secretsValidated = true;
+            if (campayRealEnabled === true) {
+                mode = 'campay_sandbox';
+                // TODO: Prepare the real API call here.
+                // For now, since we only do preparatory work without actually breaking or calling real API,
+                // we log securely and set the mode.
+                console.log(`[CAMPAY] Real integration triggered for ${generatedId}. Calling API... (Placeholder)`);
+                message = 'Real Campay integration not fully activated yet.';
+                mockPaymentUrl = '';
+            }
+            else {
+                console.log(`[CAMPAY] Secrets found, but campayRealEnabled is false. Falling back to MOCK.`);
+            }
+        }
+        else {
+            console.log(`[CAMPAY] No valid secrets found for school ${schoolId}. Falling back to MOCK.`);
+        }
+    }
     const transactionData = {
         id: generatedId,
         schoolId,
@@ -100,12 +138,14 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
         type,
         installment: installment || null,
         provider,
+        phoneNumber: phoneNumber || null,
         reference: `mock_tx_${Date.now()}`,
         status: 'PENDING',
         providerTransactionId: null,
         providerResponse: null,
         failureReason: null,
         idempotencyKey,
+        mode,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
@@ -114,8 +154,89 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
         success: true,
         transactionId: generatedId,
         status: 'PENDING',
-        mockPaymentUrl: `https://mock.campay.net/pay/${generatedId}`,
-        message: 'Payment initiated securely (Mock Mode)'
+        mockPaymentUrl,
+        mode,
+        secretsValidated,
+        message
     };
+});
+// ----------------------------------------------------------------------
+// 6. mockConfirmPayment
+// Callable function to manually confirm a pending payment in MOCK mode.
+// ----------------------------------------------------------------------
+exports.mockConfirmPayment = functions.https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.uid) {
+        throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    const { transactionId } = data;
+    if (!transactionId) {
+        throw new functions.https.HttpsError('invalid-argument', 'transactionId is required');
+    }
+    const db = admin.firestore();
+    // Verify User Role
+    const userSnap = await db.collection('users').doc(context.auth.uid).get();
+    if (!userSnap.exists) {
+        throw new functions.https.HttpsError('permission-denied', 'User not found');
+    }
+    const user = userSnap.data();
+    if (!user || user.isActive !== true) {
+        throw new functions.https.HttpsError('permission-denied', 'User is inactive or missing');
+    }
+    const allowedRoles = ['parent', 'owner', 'director', 'accountant', 'superAdmin'];
+    if (!allowedRoles.includes(user.role)) {
+        throw new functions.https.HttpsError('permission-denied', 'Role not authorized');
+    }
+    return await db.runTransaction(async (transaction) => {
+        const txRef = db.collection('transactions').doc(transactionId);
+        const txSnap = await transaction.get(txRef);
+        if (!txSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Transaction not found');
+        }
+        const txData = txSnap.data();
+        // Check school access
+        if (user.role !== 'superAdmin' && user.schoolId !== txData?.schoolId) {
+            throw new functions.https.HttpsError('permission-denied', 'School access denied');
+        }
+        if (txData?.status === 'SUCCESS') {
+            return {
+                success: true,
+                status: 'SUCCESS',
+                alreadyConfirmed: true,
+                paymentCreated: false,
+                message: 'Transaction already confirmed'
+            };
+        }
+        if (txData?.status !== 'PENDING') {
+            throw new functions.https.HttpsError('failed-precondition', `Transaction cannot be confirmed. Current status: ${txData?.status}`);
+        }
+        // Update transaction
+        transaction.update(txRef, {
+            status: 'SUCCESS',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        // Create payment document
+        const paymentRef = db.collection('payments').doc(transactionId);
+        const paymentData = {
+            id: transactionId,
+            schoolId: txData.schoolId,
+            studentId: txData.studentId,
+            amount: txData.amount,
+            type: txData.type,
+            method: 'mobile_money',
+            installment: txData.installment || null,
+            status: 'completed',
+            transactionId: transactionId,
+            date: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+        transaction.set(paymentRef, paymentData);
+        return {
+            success: true,
+            status: 'SUCCESS',
+            alreadyConfirmed: false,
+            paymentCreated: true,
+            message: 'Payment confirmed successfully'
+        };
+    });
 });
 //# sourceMappingURL=index.js.map

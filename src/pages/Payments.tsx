@@ -21,6 +21,7 @@ const Payments: React.FC = () => {
   const [momoSuccess, setMomoSuccess] = useState(false);
   const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({ date: new Date().toISOString().split('T')[0], type: 'tuition' });
   const [modalExpectedAmount, setModalExpectedAmount] = useState(0);
+  const [isConfirmingTx, setIsConfirmingTx] = useState<string | null>(null);
 
   const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0] });
@@ -178,6 +179,47 @@ const Payments: React.FC = () => {
     }
   };
 
+  const handleConfirmMockTx = async (transactionId: string) => {
+    setIsConfirmingTx(transactionId);
+    try {
+      const mockConfirmPayment = httpsCallable(functions, 'mockConfirmPayment');
+      const result = await mockConfirmPayment({ transactionId });
+      const data = result.data as any;
+      if (data.success) {
+        alert(data.message || "Paiement simulé avec succès.");
+        const newDb = { ...db };
+        if (newDb.transactions) {
+          const txIndex = newDb.transactions.findIndex((t: any) => t.id === transactionId);
+          if (txIndex > -1) {
+            const tx = newDb.transactions[txIndex];
+            newDb.transactions[txIndex] = { ...tx, status: 'SUCCESS' };
+            
+            if (!data.alreadyConfirmed) {
+              newDb.payments.push({
+                id: transactionId,
+                schoolId: tx.schoolId,
+                studentId: tx.studentId,
+                amount: tx.amount,
+                type: tx.type,
+                method: 'mobile_money',
+                installment: tx.installment || null,
+                date: new Date().toISOString().split('T')[0],
+                transactionId: transactionId
+              } as any);
+            }
+            saveDB(newDb);
+          }
+        }
+      } else {
+         alert("Erreur lors de la simulation.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur: " + err.message);
+    }
+    setIsConfirmingTx(null);
+  };
+
   const handleDeleteExpense = (id: string) => {
     if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
     if (window.confirm("Voulez-vous vraiment annuler cette sortie d'argent ?")) {
@@ -277,6 +319,48 @@ const Payments: React.FC = () => {
       </div>
 
       {activeTab === 'encaissements' && (
+        <>
+        {db.transactions && db.transactions.filter((t: any) => t.status === 'PENDING').length > 0 && (
+          <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '2rem', border: '1px solid var(--warning)' }}>
+            <div style={{ padding: '1rem', background: '#fffbeb', borderBottom: '1px solid var(--warning)' }}>
+              <h3 style={{ margin: 0, color: '#b45309' }}>⏳ Transactions Mobile Money en attente</h3>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ background: 'rgba(251, 191, 36, 0.1)', borderBottom: '1px solid var(--border-color)' }}>
+                <tr>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Date</th>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Élève</th>
+                  <th style={{ padding: '1rem', textAlign: 'right' }}>Montant</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Action (Mock)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {db.transactions.filter((t: any) => t.status === 'PENDING').map((tx: any) => {
+                  const student = db.students.find(s => s.id === tx.studentId);
+                  const isDevOrStaging = import.meta.env.MODE === 'development' || import.meta.env.VITE_FIREBASE_PROJECT_ID === 'ecoscolaire-staging';
+                  return (
+                    <tr key={tx.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '1rem' }}>{new Date(tx.createdAt?.seconds ? tx.createdAt.seconds * 1000 : Date.now()).toLocaleDateString('fr-FR')}</td>
+                      <td style={{ padding: '1rem', fontWeight: 500 }}>{student?.name || 'Inconnu'}</td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{tx.amount.toLocaleString('fr-FR')} FCFA</td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        {isDevOrStaging && (
+                           <button 
+                             style={{ background: '#f59e0b', padding: '0.5rem 1rem' }} 
+                             onClick={() => handleConfirmMockTx(tx.id)}
+                             disabled={isConfirmingTx === tx.id}
+                           >
+                             {isConfirmingTx === tx.id ? 'Simulation...' : 'Simuler paiement réussi'}
+                           </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
@@ -344,6 +428,7 @@ const Payments: React.FC = () => {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {activeTab === 'depenses' && (

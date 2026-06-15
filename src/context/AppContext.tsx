@@ -125,7 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'classes', 'students', 'staff', 'buses', 'inventory', 
           'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
-          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'audit_logs'
+          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions'
         ];
 
         console.log("================ DIAGNOSTIC AppContext ===============");
@@ -258,7 +258,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'schools', 'users', 'classes', 'students', 'staff', 'buses', 
         'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
         'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
-        'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance'
+        'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'transactions'
       ] as const;
       
       for (const col of collections) {

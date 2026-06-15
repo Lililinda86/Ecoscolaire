@@ -181,3 +181,98 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     message
   };
 });
+
+// ----------------------------------------------------------------------
+// 6. mockConfirmPayment
+// Callable function to manually confirm a pending payment in MOCK mode.
+// ----------------------------------------------------------------------
+export const mockConfirmPayment = functions.https.onCall(async (data, context) => {
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const { transactionId } = data;
+  if (!transactionId) {
+    throw new functions.https.HttpsError('invalid-argument', 'transactionId is required');
+  }
+
+  const db = admin.firestore();
+  
+  // Verify User Role
+  const userSnap = await db.collection('users').doc(context.auth.uid).get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('permission-denied', 'User not found');
+  }
+
+  const user = userSnap.data();
+  if (!user || user.isActive !== true) {
+    throw new functions.https.HttpsError('permission-denied', 'User is inactive or missing');
+  }
+
+  const allowedRoles = ['parent', 'owner', 'director', 'accountant', 'superAdmin'];
+  if (!allowedRoles.includes(user.role)) {
+    throw new functions.https.HttpsError('permission-denied', 'Role not authorized');
+  }
+
+  return await db.runTransaction(async (transaction) => {
+    const txRef = db.collection('transactions').doc(transactionId);
+    const txSnap = await transaction.get(txRef);
+    
+    if (!txSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Transaction not found');
+    }
+
+    const txData = txSnap.data();
+    
+    // Check school access
+    if (user.role !== 'superAdmin' && user.schoolId !== txData?.schoolId) {
+      throw new functions.https.HttpsError('permission-denied', 'School access denied');
+    }
+
+    if (txData?.status === 'SUCCESS') {
+      return {
+        success: true,
+        status: 'SUCCESS',
+        alreadyConfirmed: true,
+        paymentCreated: false,
+        message: 'Transaction already confirmed'
+      };
+    }
+
+    if (txData?.status !== 'PENDING') {
+      throw new functions.https.HttpsError('failed-precondition', `Transaction cannot be confirmed. Current status: ${txData?.status}`);
+    }
+
+    // Update transaction
+    transaction.update(txRef, {
+      status: 'SUCCESS',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Create payment document
+    const paymentRef = db.collection('payments').doc(transactionId);
+    const paymentData = {
+      id: transactionId,
+      schoolId: txData.schoolId,
+      studentId: txData.studentId,
+      amount: txData.amount,
+      type: txData.type,
+      method: 'mobile_money',
+      installment: txData.installment || null,
+      status: 'completed',
+      transactionId: transactionId,
+      date: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    transaction.set(paymentRef, paymentData);
+
+    return {
+      success: true,
+      status: 'SUCCESS',
+      alreadyConfirmed: false,
+      paymentCreated: true,
+      message: 'Payment confirmed successfully'
+    };
+  });
+});
