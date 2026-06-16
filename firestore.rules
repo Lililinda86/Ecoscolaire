@@ -197,6 +197,15 @@ service cloud.firestore {
       // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
       allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
     }
+    match /receipts/{receiptId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() || 
+        ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (isParent() && hasSchoolAccess(resource.data.schoolId))
+      );
+      // Création gérée uniquement par le backend (Cloud Functions onPaymentCreated)
+      allow write: if false;
+    }
     match /expenses/{expenseId} {
       allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId);
       allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);

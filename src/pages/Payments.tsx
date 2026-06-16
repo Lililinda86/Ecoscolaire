@@ -340,6 +340,18 @@ const Payments: React.FC = () => {
       )}
 
       {activeTab === 'historique-recus' && currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+        <div style={{ marginBottom: '1rem', padding: '1rem', background: '#e0f2fe', borderRadius: '4px' }}>
+          <strong>Logs de Diagnostic (Temporaire):</strong>
+          <ul style={{ margin: '0.5rem 0 0 1.5rem', fontSize: '0.9rem' }}>
+            <li><code>db.receipts</code> présent ? {db.receipts ? 'Oui' : 'Non'}</li>
+            <li><code>db.receipts.length</code> = {db.receipts?.length || 0}</li>
+            <li><code>currentUser.schoolId</code> = {currentUser.schoolId}</li>
+            <li><code>currentSchool.id</code> = {currentSchool?.id}</li>
+          </ul>
+        </div>
+      )}
+
+      {activeTab === 'historique-recus' && currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
         <ReceiptHistory 
           receipts={db.receipts || []}
           students={db.students || []}
