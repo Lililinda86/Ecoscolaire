@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { CampayService } from './services/campayService';
 
 // Initialize the Firebase Admin SDK
 admin.initializeApp();
@@ -53,7 +54,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
   }
 
-  const { schoolId, studentId, amount, type, installment, provider, phoneNumber, campayRealEnabled } = data;
+  const { schoolId, studentId, amount, type, installment, provider, phoneNumber } = data;
 
   if (!schoolId) {
     throw new functions.https.HttpsError('invalid-argument', 'schoolId is required');
@@ -115,8 +116,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
   let mode: 'mock' | 'campay_sandbox' = 'mock';
   let mockPaymentUrl = `https://mock.campay.net/pay/${generatedId}`;
   let message = 'Payment initiated securely (Mock Mode)';
-  
-  let secretsValidated = false;
+    let secretsValidated = false;
   if (provider === 'campay') {
     // Attempt to read secrets
     const secretSnap = await db.collection('schools').doc(schoolId).collection('secrets').doc('payment').get();
@@ -124,24 +124,67 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     
     console.log(`[CAMPAY_AUDIT] secret document found = ${secretSnap.exists}`);
     
-    if (secrets) {
-      console.log(`[CAMPAY_AUDIT] username present = ${!!secrets.campayAppUsername}`);
-      console.log(`[CAMPAY_AUDIT] password present = ${!!secrets.campayAppPassword}`);
-      console.log(`[CAMPAY_AUDIT] environment = ${secrets.campayEnvironment || 'not-set'}`);
-    }
-    
     if (secrets && secrets.campayAppUsername && secrets.campayAppPassword) {
       secretsValidated = true;
-      if (campayRealEnabled === true) {
+      if (secrets.campayEnvironment === 'sandbox') {
         mode = 'campay_sandbox';
-        // TODO: Prepare the real API call here.
-        // For now, since we only do preparatory work without actually breaking or calling real API,
-        // we log securely and set the mode.
-        console.log(`[CAMPAY] Real integration triggered for ${generatedId}. Calling API... (Placeholder)`);
-        message = 'Real Campay integration not fully activated yet.';
-        mockPaymentUrl = ''; 
+        const campayService = new CampayService(true); // force sandbox for now
+        let token = '';
+        
+        try {
+          // 1. Login
+          token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
+          
+          // 2. Request To Pay
+          const description = `Paiement pour ${studentId || 'élève inconnu'}`;
+          const response = await campayService.requestToPay(
+            token,
+            amount,
+            phoneNumber,
+            description,
+            generatedId // transactionId as externalReference
+          );
+          
+          message = 'Payment initiated via Campay Sandbox.';
+          mockPaymentUrl = ''; // No mock URL in real mode
+          
+          // Log securely
+          await db.collection('campay_logs').add({
+            schoolId,
+            transactionId: generatedId,
+            requestType: 'request_to_pay',
+            status: 'SUCCESS',
+            sanitizedRequest: {
+              amount: amount.toString(),
+              from: phoneNumber,
+              description,
+              external_reference: generatedId
+            },
+            sanitizedResponse: response,
+            errorMessage: null,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          
+        } catch (error: any) {
+          // Log error securely
+          await db.collection('campay_logs').add({
+            schoolId,
+            transactionId: generatedId,
+            requestType: 'request_to_pay',
+            status: 'FAILED',
+            sanitizedRequest: {
+              amount: amount.toString(),
+              from: phoneNumber,
+              external_reference: generatedId
+            },
+            sanitizedResponse: null,
+            errorMessage: error.message,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          throw new functions.https.HttpsError('internal', `Campay initiation failed: ${error.message}`);
+        }
       } else {
-        console.log(`[CAMPAY] Secrets found, but campayRealEnabled is false. Falling back to MOCK.`);
+        console.log(`[CAMPAY] Secrets found, but campayEnvironment is not sandbox. Falling back to MOCK.`);
       }
     } else {
       console.log(`[CAMPAY] No valid secrets found for school ${schoolId}. Falling back to MOCK.`);
