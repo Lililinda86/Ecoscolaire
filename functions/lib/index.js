@@ -278,19 +278,24 @@ exports.onPaymentCreated = functions.firestore
         const year = new Date().getFullYear();
         const formattedNum = String(nextNum).padStart(4, '0');
         const receiptNumber = `REC-${year}-${formattedNum}`;
+        // Helper to remove undefined values
+        const cleanUndefined = (obj) => {
+            return Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
+        };
         // 4. Create Receipt Document
-        transaction.set(receiptRef, {
+        const receiptData = cleanUndefined({
             id: paymentId,
             paymentId: paymentId,
             schoolId: schoolId,
             receiptNumber: receiptNumber,
             studentId: paymentData.studentId || null,
-            amount: paymentData.amount,
-            type: paymentData.type,
-            method: paymentData.method,
+            amount: paymentData.amount || 0,
+            type: paymentData.type || paymentData.method || 'PAYMENT',
+            method: paymentData.method || 'unknown',
             date: paymentData.date || admin.firestore.FieldValue.serverTimestamp(),
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
+        transaction.set(receiptRef, receiptData);
         console.log(`Successfully created receipt ${receiptNumber} for payment ${paymentId}`);
         return receiptNumber;
     });
