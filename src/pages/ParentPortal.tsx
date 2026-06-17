@@ -64,6 +64,11 @@ const ParentPortal: React.FC = () => {
     );
   };
 
+  const isSevereDebt = (student: Student) => {
+    // Si la tranche 1 est impayée (sans bypass), c'est un grand impayé.
+    return !isTranchePaid(student, 'T1');
+  };
+
   return (
     <div className="page-container" style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -97,17 +102,28 @@ const ParentPortal: React.FC = () => {
                   <UserIcon size={24} color="var(--primary)" /> {student.name} <small style={{ color: 'var(--text-muted)', fontWeight: 'normal', fontSize: '1rem' }}>(Matricule: {student.matricule || 'N/A'})</small>
                 </h2>
 
-                {activeTab === 'overview' && (
-                  <div>
-                    <p><strong>Classe :</strong> {db.classes.find(c => c.id === student.classId)?.name || 'Non assigné'}</p>
-                    <p><strong>Date de naissance :</strong> {student.dob}</p>
-                    <p><strong>Section :</strong> {student.section}</p>
-                    {/* Alerte globale sur la vue d'ensemble */}
-                    {!isTranchePaid(student, 'T1') && renderBlockadeAlert(student, 1)}
-                    {!isTranchePaid(student, 'T2') && renderBlockadeAlert(student, 2)}
-                    {!isTranchePaid(student, 'T3') && renderBlockadeAlert(student, 3)}
+                {isSevereDebt(student) && activeTab !== 'finance' ? (
+                  <div style={{ background: '#fef2f2', border: '1px solid #f87171', borderRadius: '8px', padding: '1.5rem', textAlign: 'center', color: '#991b1b', margin: '1rem 0' }}>
+                    <AlertTriangle size={32} style={{ margin: '0 auto 1rem' }} />
+                    <h3 style={{ margin: '0 0 0.5rem' }}>Dossier Bloqué</h3>
+                    <p style={{ margin: 0 }}>
+                      L'accès au dossier de <strong>{student.name}</strong> est temporairement restreint en raison d'un impayé majeur sur la scolarité.
+                      Veuillez consulter l'onglet <strong>Finances</strong> pour régulariser la situation ou contacter l'administration.
+                    </p>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {activeTab === 'overview' && (
+                      <div>
+                        <p><strong>Classe :</strong> {db.classes.find(c => c.id === student.classId)?.name || 'Non assigné'}</p>
+                        <p><strong>Date de naissance :</strong> {student.dob}</p>
+                        <p><strong>Section :</strong> {student.section}</p>
+                        {/* Alerte globale sur la vue d'ensemble */}
+                        {!isTranchePaid(student, 'T1') && renderBlockadeAlert(student, 1)}
+                        {!isTranchePaid(student, 'T2') && renderBlockadeAlert(student, 2)}
+                        {!isTranchePaid(student, 'T3') && renderBlockadeAlert(student, 3)}
+                      </div>
+                    )}
 
                 {activeTab === 'grades' && (
                   <div>
@@ -233,14 +249,16 @@ const ParentPortal: React.FC = () => {
                   </div>
                 )}
 
-                {activeTab === 'transport' && (
-                  <div>
-                    {student.busId ? (
-                      <p><strong>Ligne / Bus :</strong> {db.buses.find(b => b.id === student.busId)?.name || 'Inconnu'}</p>
-                    ) : (
-                      <p>Votre enfant n'est pas inscrit au service de transport scolaire.</p>
+                    {activeTab === 'transport' && (
+                      <div>
+                        {student.busId ? (
+                          <p><strong>Ligne / Bus :</strong> {db.buses.find(b => b.id === student.busId)?.name || 'Inconnu'}</p>
+                        ) : (
+                          <p>Votre enfant n'est pas inscrit au service de transport scolaire.</p>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
 
               </div>
