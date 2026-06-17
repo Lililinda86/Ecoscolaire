@@ -6,6 +6,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google" content="notranslate" />
     <title>EcoScolaire</title>
+    <script>
+      window.__appStartTime = Date.now();
+      window.__ecoscolaireFatalHandler = function() {
+        if (Date.now() - window.__appStartTime > 10000) {
+          window.removeEventListener('error', window.__ecoscolaireFatalHandler);
+          window.removeEventListener('unhandledrejection', window.__ecoscolaireFatalHandler);
+          return;
+        }
+        var root = document.getElementById('root');
+        if (!root || root.innerHTML.trim() === '') {
+          var repairAttempted = sessionStorage.getItem('ecoscolaire_cache_repair_attempted');
+          if (!repairAttempted) {
+            sessionStorage.setItem('ecoscolaire_cache_repair_attempted', 'true');
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                var promises = [];
+                for(var i = 0; i < registrations.length; i++) promises.push(registrations[i].unregister());
+                return Promise.all(promises);
+              }).then(function() {
+                if ('caches' in window) {
+                  return caches.keys().then(function(names) {
+                    var cachePromises = [];
+                    for (var i = 0; i < names.length; i++) cachePromises.push(caches.delete(names[i]));
+                    return Promise.all(cachePromises);
+                  });
+                }
+              }).then(function() {
+                window.location.reload();
+              }).catch(function() {
+                window.location.reload();
+              });
+            } else {
+              window.location.reload();
+            }
+          } else {
+            document.body.innerHTML = '<div style="padding: 2rem; font-family: sans-serif; text-align: center; color: #ef4444;"><h2>Erreur Système</h2><p>EcoScolaire a détecté un problème de cache. Veuillez vider les données du site ou contacter l\'administration.</p></div>';
+          }
+        }
+      };
+      window.addEventListener('error', window.__ecoscolaireFatalHandler);
+      window.addEventListener('unhandledrejection', window.__ecoscolaireFatalHandler);
+    </script>
   </head>
   <body>
     <div id="root"></div>

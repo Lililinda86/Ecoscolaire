@@ -17,6 +17,12 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         icons: [] // Browser can fallback to default if missing, or we can add one later
+      },
+      workbox: {
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
+        sourcemap: true
       }
     })
   ],
