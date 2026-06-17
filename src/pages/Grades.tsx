@@ -19,7 +19,7 @@ export const getAppreciation = (score: number, max: number = 20) => {
 };
 
 const Grades: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
@@ -176,7 +176,7 @@ const Grades: React.FC = () => {
       <div className="page-header no-print">
         <h1>{t('grades', 'Notes & Bulletins')}</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={handleOpenModal}>
+          <button onClick={handleOpenModal} disabled={isSchoolSuspended}>
             <Plus size={18} /> Saisir des Notes
           </button>
         </div>

@@ -12,7 +12,7 @@ import { functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
 
 const Payments: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'|'historique-recus'|'finance-momo'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
@@ -305,10 +305,10 @@ const Payments: React.FC = () => {
       <div className="page-header no-print">
         <h1>{t('payments', 'Comptabilité Générale')}</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={handleOpenModal} style={{ background: 'var(--success)' }}>
+          <button onClick={handleOpenModal} style={{ background: 'var(--success)' }} disabled={isSchoolSuspended}>
             <Plus size={18} /> Encaissement (+)
           </button>
-          <button onClick={handleOpenExpenseModal} style={{ background: 'var(--danger)' }}>
+          <button onClick={handleOpenExpenseModal} style={{ background: 'var(--danger)' }} disabled={isSchoolSuspended}>
             <Minus size={18} /> Dépense (-)
           </button>
         </div>
@@ -622,7 +622,7 @@ const Payments: React.FC = () => {
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                           {totalBalance > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
-                            <button onClick={() => handleWhatsAppClick(s, totalBalance, 'scolarité')} style={{ background: '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp">📱 WhatsApp</button>
+                            <button onClick={() => handleWhatsAppClick(s, totalBalance, 'scolarité')} style={{ background: isSchoolSuspended ? '#a1a1aa' : '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: isSchoolSuspended ? 'not-allowed' : 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp" disabled={isSchoolSuspended}>📱 WhatsApp</button>
                           ) : null}
                         </td>
                       </tr>
@@ -648,7 +648,7 @@ const Payments: React.FC = () => {
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                           {reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
-                            <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (transport)')} style={{ background: '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp">📱 WhatsApp</button>
+                            <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (transport)')} style={{ background: isSchoolSuspended ? '#a1a1aa' : '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: isSchoolSuspended ? 'not-allowed' : 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp" disabled={isSchoolSuspended}>📱 WhatsApp</button>
                           ) : null}
                         </td>
                       </tr>

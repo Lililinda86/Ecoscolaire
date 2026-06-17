@@ -252,7 +252,7 @@ const setupTestData = async () => {
         await db.collection('payments').doc(`alpha-pay-${i}`).set({
           id: `alpha-pay-${i}`, schoolId: alphaId, studentId: studentIds[i-1],
           amount: 50000, method: i<=10 ? 'cash' : 'momo', status: i<=10 ? 'completed' : 'pending',
-          type: 'tuition', reference: i<=10 ? `RECU-${i}` : `MOMO-PENDING-${i}`, date: isoDate()
+          type: 'tuition', installment: 'T1', reference: i<=10 ? `RECU-${i}` : `MOMO-PENDING-${i}`, date: isoDate()
         }, { merge: true });
       }
     }

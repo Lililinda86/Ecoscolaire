@@ -8,7 +8,7 @@ import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const StaffPage: React.FC = () => {
-  const { db, saveDB, currentSchool } = useAppContext();
+  const { db, saveDB, currentSchool, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<Partial<Staff>>({});
@@ -57,7 +57,7 @@ const StaffPage: React.FC = () => {
           <button className="secondary" onClick={() => window.print()}>
             <Printer size={18} /> Imprimer la liste
           </button>
-          <button onClick={() => handleOpenModal()}>
+          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
             <Plus size={18} />
             {t('add', 'Ajouter')}
           </button>
@@ -93,10 +93,10 @@ const StaffPage: React.FC = () => {
                     {s.role} {s.role === 'teacher' && s.assignedClassId ? ` - ${db.classes.find(c => c.id === s.assignedClassId)?.name || ''}` : ''}
                   </td>
                   <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button className="secondary" onClick={() => handleOpenModal(s)} style={{ marginRight: '0.5rem' }}>
+                    <button className="secondary" onClick={() => handleOpenModal(s)} style={{ marginRight: '0.5rem' }} disabled={isSchoolSuspended}>
                       <Edit2 size={16} />
                     </button>
-                    <button className="secondary" onClick={() => handleDelete(s.id)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                    <button className="secondary" onClick={() => handleDelete(s.id)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={isSchoolSuspended}>
                       <Trash2 size={16} />
                     </button>
                   </td>

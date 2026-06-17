@@ -4,7 +4,7 @@ import { LogOut, User as UserIcon, BookOpen, AlertTriangle, CheckCircle, CreditC
 import type { Student } from '../types';
 
 const ParentPortal: React.FC = () => {
-  const { db, currentUser, currentSchool, logout } = useAppContext();
+  const { db, currentUser, currentSchool, logout, isSchoolSuspended } = useAppContext();
   const [activeTab, setActiveTab] = useState<'overview' | 'grades' | 'attendance' | 'finance' | 'transport'>('overview');
 
   if (!currentUser || currentUser.role !== 'parent' || !currentSchool) {
@@ -27,7 +27,7 @@ const ParentPortal: React.FC = () => {
     if (expectedFee === 0) return true; // Free or not set
 
     const paidForTranche = db.payments
-      .filter(p => p.studentId === student.id && p.type === 'tuition' && p.installment === tranche)
+      .filter(p => p.studentId === student.id && p.type === 'tuition' && (p.installment === tranche || (!p.installment && tranche === 'T1')))
       .reduce((sum, p) => sum + p.amount, 0);
 
     return paidForTranche >= expectedFee;
@@ -36,9 +36,9 @@ const ParentPortal: React.FC = () => {
   const getTrancheBalance = (student: Student, tranche: 'T1' | 'T2' | 'T3') => {
     const expectedFee = student[`fee${tranche}`] || 0;
     const paidForTranche = db.payments
-      .filter(p => p.studentId === student.id && p.type === 'tuition' && p.installment === tranche)
+      .filter(p => p.studentId === student.id && p.type === 'tuition' && (p.installment === tranche || (!p.installment && tranche === 'T1')))
       .reduce((sum, p) => sum + p.amount, 0);
-    return expectedFee - paidForTranche;
+    return Math.max(0, expectedFee - paidForTranche);
   };
 
   const renderBlockadeAlert = (student: Student, trimester: 1 | 2 | 3) => {
@@ -70,8 +70,15 @@ const ParentPortal: React.FC = () => {
   };
 
   return (
-    <div className="page-container" style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+    <div style={{ position: 'relative' }}>
+      {isSchoolSuspended && (
+        <div style={{ position: 'sticky', top: 0, zIndex: 999, background: '#ea580c', color: 'white', padding: '0.5rem 1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}>
+          <AlertTriangle size={20} style={{ marginRight: '0.5rem' }} />
+          Abonnement suspendu. L'accès est restreint en lecture seule. Veuillez contacter EcoScolaire.
+        </div>
+      )}
+      <div className="page-container" style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ margin: 0 }}>Portail Parent - {currentSchool.name}</h1>
           <p style={{ color: 'var(--text-muted)', margin: 0 }}>Bienvenue, {parent.email}</p>
@@ -189,7 +196,7 @@ const ParentPortal: React.FC = () => {
                       <tbody>
                         {['T1', 'T2', 'T3'].map(tranche => {
                           const expected = student[`fee${tranche}` as keyof Student] as number || 0;
-                          const paid = db.payments.filter(p => p.studentId === student.id && p.type === 'tuition' && p.installment === tranche).reduce((sum, p) => sum + p.amount, 0);
+                          const paid = db.payments.filter(p => p.studentId === student.id && p.type === 'tuition' && (p.installment === tranche || (!p.installment && tranche === 'T1'))).reduce((sum, p) => sum + p.amount, 0);
                           const isPaid = isTranchePaid(student, tranche as any);
                           return (
                             <tr key={tranche} style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -266,6 +273,7 @@ const ParentPortal: React.FC = () => {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 };

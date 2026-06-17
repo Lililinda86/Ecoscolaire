@@ -6,7 +6,7 @@ import { Bot, Shield, Package, Bus as BusIcon, ClipboardList, BookOpen, Users, L
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
-  const { currentUser, isSupervising, currentSchool, exitSupervision, logout } = useAppContext();
+  const { currentUser, isSupervising, currentSchool, exitSupervision, logout, isSchoolSuspended } = useAppContext();
 
   const toggleLang = () => {
     setLang(lang === 'fr' ? 'en' : 'fr');
@@ -28,7 +28,13 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           </button>
         </div>
       )}
-      <aside className="sidebar" data-testid="sidebar" style={{ paddingTop: isSupervising ? '3rem' : undefined }}>
+      {isSchoolSuspended && currentUser?.role !== 'superAdmin' && (
+        <div style={{ position: 'absolute', top: isSupervising ? '2.5rem' : 0, left: 0, right: 0, zIndex: 999, background: '#ea580c', color: 'white', padding: '0.5rem 1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}>
+          <AlertTriangle size={20} style={{ marginRight: '0.5rem' }} />
+          Abonnement suspendu. L'accès est restreint en lecture seule. Veuillez contacter EcoScolaire.
+        </div>
+      )}
+      <aside className="sidebar" data-testid="sidebar" style={{ paddingTop: isSupervising ? '3rem' : isSchoolSuspended && currentUser?.role !== 'superAdmin' ? '3rem' : undefined }}>
         <h2>EcoScolaire</h2>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}>
           {currentUser?.role === 'superAdmin' && !currentSchool ? (

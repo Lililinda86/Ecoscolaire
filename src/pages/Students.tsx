@@ -12,7 +12,7 @@ const Students: React.FC = () => {
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
+  const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
@@ -300,13 +300,13 @@ const Students: React.FC = () => {
           <button className="secondary" onClick={() => window.print()}>
             <Printer size={18} /> Imprimer la liste
           </button>
-          <button className="secondary" onClick={handleDeleteAll} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+          <button className="secondary" onClick={handleDeleteAll} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={isSchoolSuspended}>
             <Trash2 size={18} /> Vider la liste
           </button>
-          <button className="secondary" onClick={() => setImportModalOpen(true)}>
+          <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended}>
             <FileSpreadsheet size={18} /> Importer Excel
           </button>
-          <button onClick={() => handleOpenModal()}>
+          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
             <Plus size={18} /> {t('add', 'Ajouter')}
           </button>
         </div>
@@ -379,10 +379,10 @@ const Students: React.FC = () => {
                     <td style={{ padding: '1rem' }}>{student.parentPhone || '-'}</td>
                     <td style={{ padding: '1rem' }}>{student.address || '-'}</td>
                     <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
-                      <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }} title="Modifier">
+                      <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }} title="Modifier" disabled={isSchoolSuspended}>
                         <Edit2 size={16} />
                       </button>
-                      <button className="secondary" onClick={() => handleDelete(student)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} title="Supprimer (Soumis à validation)">
+                      <button className="secondary" onClick={() => handleDelete(student)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} title="Supprimer (Soumis à validation)" disabled={isSchoolSuspended}>
                         <Trash2 size={16} />
                       </button>
                     </td>

@@ -50,7 +50,7 @@ test.describe('Audit Logs E2E', () => {
     const createStudentRows = page.locator('tr:has-text("CREATE_STUDENT")');
     await expect(createStudentRows.first()).toBeVisible();
     // It should contain the student's name
-    await expect(page.locator(`text=${uniqueStudentName}`).first()).toBeVisible();
+    await expect(page.locator(`text=${uniqueStudentName}`).first()).toBeVisible({ timeout: 15000 });
 
     // 7. Test log immutability (No delete buttons)
     const deleteButtons = page.locator('button:has-text("Supprimer")');

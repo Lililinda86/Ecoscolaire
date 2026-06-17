@@ -19,6 +19,7 @@ interface AppContextProps {
   supervisionSchoolId: string | null;
   authLoading: boolean;
   logAuditAction: (params: { action: string, targetType: string, targetId: string, targetName: string, details?: any }) => Promise<void>;
+  isSchoolSuspended: boolean;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -69,7 +70,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoading(true);
       try {
         const { db: firestoreDb } = await import('../db/firebase');
-        const { doc, getDoc, setDoc, collection, getDocs, query, where, serverTimestamp } = await import('firebase/firestore');
+        const { doc, getDoc, setDoc, collection, getDocs, query, where, serverTimestamp, documentId } = await import('firebase/firestore');
 
         // Fetch user profile
         console.log("Utilisateur Firebase connecté:", firebaseUser.email, firebaseUser.uid);
@@ -196,7 +197,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             let q;
             if (userData.role === 'parent' && colName === 'students') {
               if (userData.studentIds && userData.studentIds.length > 0) {
-                q = query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId), where('id', 'in', userData.studentIds));
+                q = query(collection(firestoreDb, colName), where(documentId(), 'in', userData.studentIds));
               } else {
                 return { colName, data: [] };
               }
@@ -412,12 +413,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   }
 
+  const isSchoolSuspended = currentSchool?.subscriptionStatus === 'suspended' || currentSchool?.subscriptionStatus === 'expired';
+
   return (
     <AppContext.Provider value={{ 
       db, saveDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
-      authLoading: loading, logAuditAction
+      authLoading: loading, logAuditAction, isSchoolSuspended
     }}>
       {children}
     </AppContext.Provider>
