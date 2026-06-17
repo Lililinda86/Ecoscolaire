@@ -14,12 +14,23 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-L9QJQYQGHH"
 };
 
-// Check for missing mandatory vars
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+let isConfigValid = true;
 for (const key of requiredKeys) {
   if (!firebaseConfig[key as keyof typeof firebaseConfig]) {
-    throw new Error(`Firebase configuration error: Missing environment variable for ${key}. Check your .env file.`);
+    console.error(`Firebase configuration error: Missing environment variable for ${key}. Check your .env file.`);
+    isConfigValid = false;
   }
+}
+
+if (!isConfigValid) {
+  console.warn("Using fallback dummy Firebase configuration to prevent app crash. Auth and Firestore will not work.");
+  firebaseConfig.apiKey = firebaseConfig.apiKey || "dummy-api-key";
+  firebaseConfig.authDomain = firebaseConfig.authDomain || "dummy.firebaseapp.com";
+  firebaseConfig.projectId = firebaseConfig.projectId || "dummy-project";
+  firebaseConfig.storageBucket = firebaseConfig.storageBucket || "dummy.appspot.com";
+  firebaseConfig.messagingSenderId = firebaseConfig.messagingSenderId || "000000000000";
+  firebaseConfig.appId = firebaseConfig.appId || "1:000000000000:web:0000000000000000000000";
 }
 
 // Initialiser Firebase
