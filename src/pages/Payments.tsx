@@ -272,6 +272,23 @@ const Payments: React.FC = () => {
   
   const soldeTiroirCaisse = totalCashReceived - totalExpenses;
 
+  const formatPhoneForWhatsApp = (phone?: string) => {
+    if (!phone) return '';
+    let cleaned = phone.replace(/[^0-9]/g, '');
+    if (cleaned.length === 9 && cleaned.startsWith('6')) {
+      cleaned = '237' + cleaned;
+    }
+    return cleaned;
+  };
+
+  const handleWhatsAppClick = (student: any, amount: number, motif: string) => {
+    const phone = formatPhoneForWhatsApp(student.parentPhone);
+    if (!phone) return;
+    const message = `Bonjour M./Mme ${student.parentName || ''},\n\nNous vous rappelons qu'un solde de ${amount.toLocaleString('fr-FR')} FCFA reste dû pour la ${motif} de l'élève ${student.name}.\n\nMerci de prendre contact avec l'administration pour régulariser la situation.\n\nCordialement,\nGroupe Scolaire Bilingue ITALO`;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="page-container" id="payments-page">
       <style>
@@ -565,6 +582,7 @@ const Payments: React.FC = () => {
                      </>
                   )}
                   <th style={{ padding: '1rem', textAlign: 'right' }}>Reste à Payer</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -602,6 +620,11 @@ const Payments: React.FC = () => {
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {totalExpected === 0 ? '-' : (totalBalance <= 0 ? 'Soldé ✓' : totalBalance.toLocaleString('fr-FR') + ' FCFA')}
                         </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          {totalBalance > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
+                            <button onClick={() => handleWhatsAppClick(s, totalBalance, 'scolarité')} style={{ background: '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp">📱 WhatsApp</button>
+                          ) : null}
+                        </td>
                       </tr>
                     );
                   }
@@ -623,6 +646,11 @@ const Payments: React.FC = () => {
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {expected === 0 ? '-' : (reste <= 0 ? 'Soldé ✓' : `${reste.toLocaleString('fr-FR')} FCFA`)}
                         </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          {reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
+                            <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (transport)')} style={{ background: '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp">📱 WhatsApp</button>
+                          ) : null}
+                        </td>
                       </tr>
                     );
                   }
@@ -643,6 +671,11 @@ const Payments: React.FC = () => {
                         <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--primary-color)' }}>{paidOther > 0 ? `+ ${paidOther.toLocaleString('fr-FR')}` : '-'}</td>
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {expected === 0 ? '-' : (reste <= 0 ? 'Soldé ✓' : `${reste.toLocaleString('fr-FR')} FCFA`)}
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          {reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
+                            <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (tenues)')} style={{ background: '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp">📱 WhatsApp</button>
+                          ) : null}
                         </td>
                       </tr>
                     );
