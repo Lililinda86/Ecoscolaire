@@ -95,7 +95,7 @@ async function testMobileMoney() {
     // Set amount
     const amountInputs = await page.$$('input[type="number"]');
     // The second number input is the amount (first is expected amount)
-    await amountInputs[1].fill('1000');
+    await amountInputs[1].fill('25'); // Campay sandbox max is 25 XAF
 
     // Select Mobile Money
     await page.check('input[type="radio"] >> nth=1'); // First is cash, second is mobile_money
@@ -163,6 +163,17 @@ async function testMobileMoney() {
             } else {
                 console.log("Could not find lastTransactionId to verify.");
             }
+            
+            console.log(`\n--- VERIFICATION CAMPAY LOGS ---`);
+            const logsQuery = await db.collection('campay_logs').orderBy('createdAt', 'desc').limit(1).get();
+            if (!logsQuery.empty) {
+                const log = logsQuery.docs[0].data();
+                console.log('Latest Campay Log:');
+                console.log(JSON.stringify(log, null, 2));
+            } else {
+                console.log('No campay_logs found.');
+            }
+            console.log(`----------------------------------------------------\n`);
         } catch (adminErr) {
             console.error("Admin SDK verification failed:", adminErr.message);
         }

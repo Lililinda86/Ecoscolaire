@@ -141,7 +141,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
     });
   }
 
-  // 9. Réponse Campay
+  // 9. Réponse Campay finale
   res.status(200).send('OK');
 });
 
