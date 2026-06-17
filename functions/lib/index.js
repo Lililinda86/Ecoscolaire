@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const campayService_1 = require("./services/campayService");
 // Initialize the Firebase Admin SDK
 admin.initializeApp();
 // ----------------------------------------------------------------------
@@ -20,6 +21,118 @@ exports.createSaaSCheckout = functions.https.onCall(async (data, context) => {
 // HTTP function to receive status updates from Campay.
 // ----------------------------------------------------------------------
 exports.campayWebhook = functions.https.onRequest(async (req, res) => {
+    const payload = req.body || {};
+    const { status, reference, external_reference, amount } = payload;
+    const db = admin.firestore();
+    // 2. Journalisation initiale
+    await db.collection('campay_logs').add({
+        requestType: 'webhook_received',
+        payload: payload,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    // 3. Validation minimale
+    if (!external_reference || !status) {
+        await db.collection('campay_logs').add({
+            requestType: 'webhook_failed',
+            reason: 'Missing external_reference or status',
+            payload: payload,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        res.status(200).send('OK');
+        return;
+    }
+    const txRef = db.collection('transactions').doc(external_reference);
+    try {
+        await db.runTransaction(async (transaction) => {
+            // 4. Recherche transaction
+            const txSnap = await transaction.get(txRef);
+            if (!txSnap.exists) {
+                transaction.set(db.collection('campay_logs').doc(), {
+                    requestType: 'webhook_failed_not_found',
+                    external_reference: external_reference,
+                    payload: payload,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                return;
+            }
+            const txData = txSnap.data();
+            // 5. Règle idempotence
+            if (txData.status !== 'PENDING') {
+                transaction.set(db.collection('campay_logs').doc(), {
+                    requestType: 'webhook_duplicate',
+                    external_reference: external_reference,
+                    currentStatus: txData.status,
+                    payload: payload,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                return;
+            }
+            const upperStatus = String(status).toUpperCase();
+            // 6 & 7. Succès ou Echec
+            if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus)) {
+                transaction.update(txRef, {
+                    status: 'SUCCESS',
+                    providerReference: reference || null,
+                    providerResponse: payload,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                const paymentRef = db.collection('payments').doc(external_reference);
+                transaction.set(paymentRef, {
+                    id: external_reference,
+                    schoolId: txData.schoolId,
+                    studentId: txData.studentId || null,
+                    amount: txData.amount || amount,
+                    type: txData.type || 'PAYMENT',
+                    installment: txData.installment || null,
+                    paymentMethod: 'Mobile Money',
+                    provider: 'Campay',
+                    providerReference: reference || null,
+                    transactionId: external_reference,
+                    status: 'completed',
+                    date: admin.firestore.FieldValue.serverTimestamp(),
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                transaction.set(db.collection('campay_logs').doc(), {
+                    requestType: 'webhook_processed',
+                    status: 'SUCCESS',
+                    external_reference: external_reference,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            else if (['FAILED', 'FAILURE', 'ERROR'].includes(upperStatus)) {
+                transaction.update(txRef, {
+                    status: 'FAILED',
+                    failureReason: payload,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                transaction.set(db.collection('campay_logs').doc(), {
+                    requestType: 'webhook_processed',
+                    status: 'FAILED',
+                    external_reference: external_reference,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            else {
+                transaction.set(db.collection('campay_logs').doc(), {
+                    requestType: 'webhook_failed',
+                    reason: `Unhandled status: ${status}`,
+                    external_reference: external_reference,
+                    payload: payload,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        });
+    }
+    catch (error) {
+        await db.collection('campay_logs').add({
+            requestType: 'webhook_failed',
+            reason: 'Transaction error',
+            error: error.message,
+            external_reference: external_reference,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    // 9. Réponse Campay
     res.status(200).send('OK');
 });
 // ----------------------------------------------------------------------
@@ -49,7 +162,7 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
     if (!context.auth || !context.auth.uid) {
         throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
     }
-    const { schoolId, studentId, amount, type, installment, provider, phoneNumber, campayRealEnabled } = data;
+    const { schoolId, studentId, amount, type, installment, provider, phoneNumber } = data;
     if (!schoolId) {
         throw new functions.https.HttpsError('invalid-argument', 'schoolId is required');
     }
@@ -105,24 +218,59 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
         const secretSnap = await db.collection('schools').doc(schoolId).collection('secrets').doc('payment').get();
         const secrets = secretSnap.data();
         console.log(`[CAMPAY_AUDIT] secret document found = ${secretSnap.exists}`);
-        if (secrets) {
-            console.log(`[CAMPAY_AUDIT] username present = ${!!secrets.campayAppUsername}`);
-            console.log(`[CAMPAY_AUDIT] password present = ${!!secrets.campayAppPassword}`);
-            console.log(`[CAMPAY_AUDIT] environment = ${secrets.campayEnvironment || 'not-set'}`);
-        }
         if (secrets && secrets.campayAppUsername && secrets.campayAppPassword) {
             secretsValidated = true;
-            if (campayRealEnabled === true) {
+            if (secrets.campayEnvironment === 'sandbox') {
                 mode = 'campay_sandbox';
-                // TODO: Prepare the real API call here.
-                // For now, since we only do preparatory work without actually breaking or calling real API,
-                // we log securely and set the mode.
-                console.log(`[CAMPAY] Real integration triggered for ${generatedId}. Calling API... (Placeholder)`);
-                message = 'Real Campay integration not fully activated yet.';
-                mockPaymentUrl = '';
+                const campayService = new campayService_1.CampayService(true); // force sandbox for now
+                let token = '';
+                try {
+                    // 1. Login
+                    token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
+                    // 2. Request To Pay
+                    const description = `Paiement pour ${studentId || 'élève inconnu'}`;
+                    const response = await campayService.requestToPay(token, amount, phoneNumber, description, generatedId // transactionId as externalReference
+                    );
+                    message = 'Payment initiated via Campay Sandbox.';
+                    mockPaymentUrl = ''; // No mock URL in real mode
+                    // Log securely
+                    await db.collection('campay_logs').add({
+                        schoolId,
+                        transactionId: generatedId,
+                        requestType: 'request_to_pay',
+                        status: 'SUCCESS',
+                        sanitizedRequest: {
+                            amount: amount.toString(),
+                            from: phoneNumber,
+                            description,
+                            external_reference: generatedId
+                        },
+                        sanitizedResponse: response,
+                        errorMessage: null,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                catch (error) {
+                    // Log error securely
+                    await db.collection('campay_logs').add({
+                        schoolId,
+                        transactionId: generatedId,
+                        requestType: 'request_to_pay',
+                        status: 'FAILED',
+                        sanitizedRequest: {
+                            amount: amount.toString(),
+                            from: phoneNumber,
+                            external_reference: generatedId
+                        },
+                        sanitizedResponse: null,
+                        errorMessage: error.message,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    throw new functions.https.HttpsError('internal', `Campay initiation failed: ${error.message}`);
+                }
             }
             else {
-                console.log(`[CAMPAY] Secrets found, but campayRealEnabled is false. Falling back to MOCK.`);
+                console.log(`[CAMPAY] Secrets found, but campayEnvironment is not sandbox. Falling back to MOCK.`);
             }
         }
         else {
