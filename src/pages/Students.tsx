@@ -7,12 +7,15 @@ import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
+import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 
 const Students: React.FC = () => {
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const limitReached = isStudentLimitReached(currentSchool, db.students.length);
+  const limitLabel = getStudentLimitLabel(currentSchool, db.students.length);
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
@@ -51,6 +54,13 @@ const Students: React.FC = () => {
       alert("Veuillez choisir une classe !");
       return;
     }
+    
+    // SaaS Limit Check for creation
+    if (!isEditing && limitReached) {
+      alert("La limite du nombre d'élèves pour votre abonnement SaaS a été atteinte. Veuillez passer au plan supérieur.");
+      return;
+    }
+
     const newDb = { ...db };
     if (isEditing && currentStudent.id) {
       newDb.students = newDb.students.map(s => s.id === currentStudent.id ? currentStudent as Student : s);
@@ -268,6 +278,13 @@ const Students: React.FC = () => {
 
   const handleConfirmImport = () => {
     if (previewStudents) {
+      // SaaS Limit Check for import
+      const remainingSlots = getStudentLimit(currentSchool) - db.students.length;
+      if (previewStudents.length > remainingSlots) {
+        alert(`L'import dépasse votre limite SaaS. Places restantes : ${remainingSlots}. Éditez votre fichier pour ne pas dépasser la limite.`);
+        return;
+      }
+
       const hasUnrecognizedClasses = previewStudents.some(s => !s.classId);
       if (hasUnrecognizedClasses) {
         const confirm = window.confirm("Attention : Certaines classes n'ont pas été reconnues et seront enregistrées comme 'À définir'. Voulez-vous quand même continuer l'importation ?");
@@ -295,7 +312,12 @@ const Students: React.FC = () => {
         `}
       </style>
       <div className="page-header no-print">
-        <h1>{t('students', 'Élèves')}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h1 style={{ margin: 0 }}>{t('students', 'Élèves')}</h1>
+          <div style={{ padding: '0.4rem 0.8rem', background: limitReached ? '#fee2e2' : '#eef2ff', color: limitReached ? '#dc2626' : '#4338ca', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 500 }}>
+            Capacité SaaS : {limitLabel}
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <button className="secondary" onClick={() => window.print()}>
             <Printer size={18} /> Imprimer la liste
@@ -306,7 +328,7 @@ const Students: React.FC = () => {
           <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended}>
             <FileSpreadsheet size={18} /> Importer Excel
           </button>
-          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
+          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended || limitReached} title={limitReached ? "Limite SaaS atteinte" : ""}>
             <Plus size={18} /> {t('add', 'Ajouter')}
           </button>
         </div>

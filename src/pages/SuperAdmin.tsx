@@ -298,7 +298,13 @@ const SuperAdmin: React.FC = () => {
             <div className="form-group"><label>Nom de l'école</label><input required value={currentSchool.name || ''} onChange={e => setCurrentSchool({...currentSchool, name: e.target.value})} /></div>
             <div className="form-group"><label>Code École (Unique)</label><input required value={currentSchool.schoolCode || ''} onChange={e => setCurrentSchool({...currentSchool, schoolCode: e.target.value})} /></div>
           </div>
-          <div className="form-group"><label>Année Académique</label><input required value={currentSchool.academicYear || ''} onChange={e => setCurrentSchool({...currentSchool, academicYear: e.target.value})} placeholder="Ex: 2023-2024" /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group"><label>Année Académique</label><input required value={currentSchool.academicYear || ''} onChange={e => setCurrentSchool({...currentSchool, academicYear: e.target.value})} placeholder="Ex: 2023-2024" /></div>
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem' }}>
+              <input type="checkbox" id="isInternalSchool" checked={currentSchool.isInternalSchool || false} onChange={e => setCurrentSchool({...currentSchool, isInternalSchool: e.target.checked})} style={{ width: 'auto' }} />
+              <label htmlFor="isInternalSchool" style={{ marginBottom: 0, fontWeight: 500, color: '#4338ca' }}>École Interne (ITALO) - Illimité</label>
+            </div>
+          </div>
           
           <div className="form-group" style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
             <label>Logo de l'école (PNG, JPG, WEBP - Max 2Mo)</label>
@@ -324,8 +330,9 @@ const SuperAdmin: React.FC = () => {
             <div className="form-group">
               <label>Formule d'abonnement</label>
               <select required value={currentSchool.subscriptionPlan || 'starter'} onChange={e => setCurrentSchool({...currentSchool, subscriptionPlan: e.target.value as SubscriptionPlan})}>
+                <option value="pilot">Pilote (Gratuit 6 mois, Max 1000 élèves)</option>
                 <option value="starter">Starter (Max 200 élèves)</option>
-                <option value="standard">Standard (Max 1000 élèves + Parents)</option>
+                <option value="standard">Standard (Max 1000 élèves)</option>
                 <option value="premium">Premium (Illimité + Automatisations)</option>
               </select>
             </div>
@@ -340,8 +347,9 @@ const SuperAdmin: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
             <div className="form-group"><label>Date de Début</label><input type="date" value={currentSchool.subscriptionStartDate || ''} onChange={e => setCurrentSchool({...currentSchool, subscriptionStartDate: e.target.value})} /></div>
+            <div className="form-group"><label>Fin Période d'Essai</label><input type="date" value={currentSchool.trialEndsAt || ''} onChange={e => setCurrentSchool({...currentSchool, trialEndsAt: e.target.value})} /></div>
             <div className="form-group"><label>Date d'Expiration</label><input type="date" value={currentSchool.subscriptionEndDate || ''} onChange={e => setCurrentSchool({...currentSchool, subscriptionEndDate: e.target.value})} /></div>
           </div>
 

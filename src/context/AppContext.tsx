@@ -413,7 +413,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   }
 
-  const isSchoolSuspended = currentSchool?.subscriptionStatus === 'suspended' || currentSchool?.subscriptionStatus === 'expired';
+  const isSchoolSuspended = !currentSchool?.isInternalSchool && (currentSchool?.subscriptionStatus === 'suspended' || currentSchool?.subscriptionStatus === 'expired');
 
   return (
     <AppContext.Provider value={{ 

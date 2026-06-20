@@ -1,4 +1,4 @@
-export type SubscriptionPlan = 'starter' | 'standard' | 'premium';
+export type SubscriptionPlan = 'starter' | 'standard' | 'premium' | 'pilot';
 export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired';
 
 export interface School {
@@ -21,6 +21,8 @@ export interface School {
   subscriptionStatus?: SubscriptionStatus;
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
+  trialEndsAt?: string;
+  isInternalSchool?: boolean;
   amountPaid?: number;
   nextPaymentDate?: string;
   // --- Fin champs SaaS ---
