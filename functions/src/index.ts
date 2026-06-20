@@ -512,3 +512,65 @@ export const onPaymentCreated = functions.firestore
       return receiptNumber;
     });
   });
+
+// ----------------------------------------------------------------------
+// 8. enforceStudentSaasLimits (Trigger)
+// Maintains the studentsCount on schools and deletes excess students
+// ----------------------------------------------------------------------
+export const enforceStudentSaasLimits = functions.firestore
+  .document('students/{studentId}')
+  .onWrite(async (change, context) => {
+    const db = admin.firestore();
+    const studentId = context.params.studentId;
+
+    const isCreate = !change.before.exists && change.after.exists;
+    const isDelete = change.before.exists && !change.after.exists;
+    
+    if (!isCreate && !isDelete) {
+      return null;
+    }
+
+    const schoolId = isCreate ? change.after.data()?.schoolId : change.before.data()?.schoolId;
+    if (!schoolId) return null;
+
+    const schoolRef = db.collection('schools').doc(schoolId);
+    
+    return await db.runTransaction(async (transaction) => {
+      const schoolSnap = await transaction.get(schoolRef);
+      if (!schoolSnap.exists) {
+        console.error(`School ${schoolId} not found for student ${studentId}`);
+        return null;
+      }
+
+      const school = schoolSnap.data();
+      let currentCount = school?.studentsCount || 0;
+      
+      if (isDelete) {
+        currentCount = Math.max(0, currentCount - 1);
+        transaction.update(schoolRef, { studentsCount: currentCount });
+        return null;
+      }
+
+      if (isCreate) {
+        currentCount += 1;
+        
+        const isInternalSchool = school?.isInternalSchool === true;
+        const plan = school?.subscriptionPlan || 'starter';
+        
+        let limit = 200;
+        if (plan === 'premium' || isInternalSchool) limit = Infinity;
+        else if (plan === 'pilot' || plan === 'standard') limit = 1000;
+        else limit = 200;
+
+        if (currentCount > limit) {
+          console.warn(`[SaaS Limits] School ${schoolId} exceeded limit of ${limit}. Deleting student ${studentId}.`);
+          transaction.delete(change.after.ref);
+          return null;
+        } else {
+          transaction.update(schoolRef, { studentsCount: currentCount });
+          return null;
+        }
+      }
+      return null;
+    });
+  });

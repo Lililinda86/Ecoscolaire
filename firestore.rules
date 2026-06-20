@@ -38,6 +38,7 @@ service cloud.firestore {
         'nextPaymentDate', 
         'isInternalSchool', 
         'studentLimit', 
+        'studentsCount',
         'billingStatus', 
         'billingCycle', 
         'trialEndsAt'
@@ -108,6 +109,19 @@ service cloud.firestore {
       return hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
     }
 
+    function canCreateStudentWithinLimits(schoolId) {
+      let school = get(/databases/$(database)/documents/schools/$(schoolId)).data;
+      let isInternal = school.get('isInternalSchool', false) == true;
+      let plan = school.get('subscriptionPlan', 'starter');
+      let count = school.get('studentsCount', 0);
+      
+      return isInternal 
+          || plan == 'premium'
+          || (plan == 'pilot' && count < 1000)
+          || (plan == 'standard' && count < 1000)
+          || (plan == 'starter' && count < 200);
+    }
+
     // ==========================================
     // RULES PER COLLECTION
     // ==========================================
@@ -173,8 +187,10 @@ service cloud.firestore {
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().studentIds)
       );
-      // Création/Update par Owner, Director, Secretary
-      allow create, update: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      // Création par Owner, Director, Secretary AVEC limite
+      allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId) && canCreateStudentWithinLimits(request.resource.data.schoolId);
+      // Update
+      allow update: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
       // Delete (Demande validation dans le client, mais ici la vraie suppression requiert owner)
       allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
     }
