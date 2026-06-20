@@ -28,6 +28,43 @@ service cloud.firestore {
       return data.active == true || data.isActive == true;
     }
 
+    function isUpdatingSaasFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'subscriptionPlan', 
+        'subscriptionStatus', 
+        'subscriptionStartDate', 
+        'subscriptionEndDate', 
+        'subscriptionRenewalDate', 
+        'nextPaymentDate', 
+        'isInternalSchool', 
+        'studentLimit', 
+        'billingStatus', 
+        'billingCycle', 
+        'trialEndsAt'
+      ]);
+    }
+
+    function isUpdatingSensitiveUserFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'role',
+        'schoolId',
+        'schoolIds',
+        'active',
+        'status',
+        'permissions',
+        'studentIds'
+      ]);
+    }
+
+    function isPromotingToSuperAdmin() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) 
+             && request.resource.data.role == 'superAdmin';
+    }
+
+    function isChangingSchoolId() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId', 'schoolIds']);
+    }
+
     // --- Rôles ---
     function isSuperAdmin() {
       return getRole() == 'superAdmin';
@@ -100,7 +137,13 @@ service cloud.firestore {
         isSuperAdmin() || isOwner() || 
         (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId)
       );
-      allow update: if isAuthenticated() && isActive() && (request.auth.uid == userId || isSuperAdmin() || (isOwner() && hasSchoolAccess(resource.data.schoolId)));
+      allow update: if isAuthenticated() && isActive() && (
+        isSuperAdmin() || 
+        (
+          (request.auth.uid == userId || (isOwner() && hasSchoolAccess(resource.data.schoolId))) &&
+          !isUpdatingSensitiveUserFields()
+        )
+      );
       allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
     }
 
@@ -110,8 +153,11 @@ service cloud.firestore {
       
       // Seul le superAdmin peut créer ou supprimer des écoles
       allow create, delete: if isAuthenticated() && isSuperAdmin();
-      // Le propriétaire peut modifier son école (mais pas l'abonnement)
-      allow update: if isAuthenticated() && isActive() && (isSuperAdmin() || canManageSchool(schoolId));
+      // Le propriétaire peut modifier son école (mais pas l'abonnement SaaS)
+      allow update: if isAuthenticated() && isActive() && (
+        isSuperAdmin() || 
+        (canManageSchool(schoolId) && !isUpdatingSaasFields())
+      );
 
       match /secrets/{secretId} {
         allow read: if false;
