@@ -4,7 +4,8 @@ export class CampayService {
   private baseUrl: string;
 
   constructor(isSandbox: boolean = true) {
-    this.baseUrl = isSandbox ? CAMPAY_BASE_URL_SANDBOX : CAMPAY_BASE_URL_SANDBOX; // Force sandbox for now
+    const defaultUrl = isSandbox ? CAMPAY_BASE_URL_SANDBOX : CAMPAY_BASE_URL_SANDBOX;
+    this.baseUrl = process.env.CAMPAY_API_URL || defaultUrl;
   }
 
   async login(username: string, password: string): Promise<string> {
@@ -75,6 +76,30 @@ export class CampayService {
         errorData = { message: response.statusText };
       }
       throw new Error(`Campay requestToPay failed [${response.status}]: ${JSON.stringify(errorData)}`);
+    }
+
+    return await response.json();
+  }
+
+  async getTransactionStatus(token: string, reference: string): Promise<any> {
+    const url = `${this.baseUrl}/api/transaction/${reference}/`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Token ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { message: response.statusText };
+      }
+      throw new Error(`Campay getTransactionStatus failed [${response.status}]: ${JSON.stringify(errorData)}`);
     }
 
     return await response.json();

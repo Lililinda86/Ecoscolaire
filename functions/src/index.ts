@@ -22,21 +22,22 @@ export const createSaaSCheckout = functions.https.onCall(async (data, context) =
 // ----------------------------------------------------------------------
 export const campayWebhook = functions.https.onRequest(async (req, res) => {
   const payload = req.body || {};
-  const { status, reference, external_reference, amount } = payload;
+  const external_reference = payload.external_reference || payload.externalReference || payload.merchant_reference;
+  const reference = payload.reference || payload.transaction_reference;
   const db = admin.firestore();
 
-  // 2. Journalisation initiale
+  // 1. Journalisation brute de la réception (avant toute validation)
   await db.collection('campay_logs').add({
-    requestType: 'webhook_received',
+    requestType: 'webhook_received_raw',
     payload: payload,
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  // 3. Validation minimale
-  if (!external_reference || !status) {
+  // 2. Validation minimale du payload
+  if (!external_reference || !reference) {
     await db.collection('campay_logs').add({
-      requestType: 'webhook_failed',
-      reason: 'Missing external_reference or status',
+      requestType: 'webhook_aborted',
+      reason: 'Missing external_reference or reference in payload',
       payload: payload,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -47,41 +48,85 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
   const txRef = db.collection('transactions').doc(external_reference);
 
   try {
-    await db.runTransaction(async (transaction) => {
-      // 4. Recherche transaction
-      const txSnap = await transaction.get(txRef);
-      if (!txSnap.exists) {
-        transaction.set(db.collection('campay_logs').doc(), {
-          requestType: 'webhook_failed_not_found',
-          external_reference: external_reference,
-          payload: payload,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        return;
-      }
+    // 3. Lecture initiale (hors transaction Firestore) pour récupérer le schoolId
+    const txInitialSnap = await txRef.get();
+    if (!txInitialSnap.exists) {
+      await db.collection('campay_logs').add({
+        requestType: 'webhook_aborted',
+        reason: 'Transaction not found locally',
+        external_reference: external_reference,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      res.status(200).send('OK');
+      return;
+    }
 
+    const txInitialData = txInitialSnap.data()!;
+    if (txInitialData.status !== 'PENDING') {
+      await db.collection('campay_logs').add({
+        requestType: 'webhook_duplicate',
+        reason: 'Transaction is not PENDING',
+        external_reference: external_reference,
+        currentStatus: txInitialData.status,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      res.status(200).send('OK');
+      return;
+    }
+
+    const schoolId = txInitialData.schoolId;
+    
+    // 4. Récupération des secrets
+    const secretSnap = await db.collection('schools').doc(schoolId).collection('secrets').doc('payment').get();
+    const secrets = secretSnap.data();
+    if (!secrets || !secrets.campayAppUsername || !secrets.campayAppPassword) {
+      throw new Error(`Missing Campay secrets for school ${schoolId}`);
+    }
+
+    // 5. Appel de l'API Campay (Server-to-Server)
+    const isSandbox = secrets.campayEnvironment === 'sandbox';
+    const campayService = new CampayService(isSandbox);
+    const token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
+    
+    const apiTx = await campayService.getTransactionStatus(token, reference);
+
+    // Journalisation de la réponse API brute
+    await db.collection('campay_logs').add({
+      requestType: 'api_verification_response',
+      external_reference: external_reference,
+      apiResponse: apiTx,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Extraction robuste des champs (defensive validation)
+    const apiAmount = apiTx.amount ?? apiTx.amount_paid ?? apiTx.amount_collected;
+    const apiStatus = apiTx.status ?? apiTx.transaction_status;
+    const apiExtRef = apiTx.external_reference ?? apiTx.externalReference ?? apiTx.merchant_reference;
+
+    if (apiAmount === undefined || apiStatus === undefined || apiExtRef === undefined) {
+      throw new Error(`Critical field missing in Campay API response. Payload: ${JSON.stringify(apiTx)}`);
+    }
+
+    // 6. Transaction Firestore finale (Mise à jour sécurisée)
+    await db.runTransaction(async (transaction) => {
+      const txSnap = await transaction.get(txRef);
       const txData = txSnap.data()!;
 
-      // 5. Règle idempotence
+      // Re-vérification idempotence stricte
       if (txData.status !== 'PENDING') {
-        transaction.set(db.collection('campay_logs').doc(), {
-          requestType: 'webhook_duplicate',
-          external_reference: external_reference,
-          currentStatus: txData.status,
-          payload: payload,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
         return;
       }
 
-      const upperStatus = String(status).toUpperCase();
+      // Validation croisée stricte
+      const isAmountMatch = Number(apiAmount) === Number(txData.amount);
+      const isExtRefMatch = String(apiExtRef) === String(external_reference);
+      const upperStatus = String(apiStatus).toUpperCase();
 
-      // 6 & 7. Succès ou Echec
-      if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus)) {
+      if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus) && isAmountMatch && isExtRefMatch) {
         transaction.update(txRef, {
           status: 'SUCCESS',
           providerReference: reference || null,
-          providerResponse: payload,
+          providerResponse: apiTx,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
@@ -90,7 +135,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
           id: external_reference,
           schoolId: txData.schoolId,
           studentId: txData.studentId || null,
-          amount: txData.amount || amount,
+          amount: txData.amount,
           type: txData.type || 'PAYMENT',
           installment: txData.installment || null,
           paymentMethod: 'Mobile Money',
@@ -103,45 +148,46 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
         });
 
         transaction.set(db.collection('campay_logs').doc(), {
-          requestType: 'webhook_processed',
-          status: 'SUCCESS',
+          requestType: 'webhook_success_verified',
           external_reference: external_reference,
+          status: 'SUCCESS',
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else if (['FAILED', 'FAILURE', 'ERROR'].includes(upperStatus)) {
         transaction.update(txRef, {
           status: 'FAILED',
-          failureReason: payload,
+          failureReason: apiTx,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
         transaction.set(db.collection('campay_logs').doc(), {
-          requestType: 'webhook_processed',
-          status: 'FAILED',
+          requestType: 'webhook_failed_verified',
           external_reference: external_reference,
+          status: 'FAILED',
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
         transaction.set(db.collection('campay_logs').doc(), {
-          requestType: 'webhook_failed',
-          reason: `Unhandled status: ${status}`,
+          requestType: 'webhook_verification_mismatch',
           external_reference: external_reference,
-          payload: payload,
+          reason: 'Mismatch in amount, reference, or unknown status',
+          apiTx: apiTx,
+          localTxAmount: txData.amount,
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
     });
+
   } catch (error: any) {
     await db.collection('campay_logs').add({
-      requestType: 'webhook_failed',
-      reason: 'Transaction error',
-      error: error.message,
+      requestType: 'webhook_processing_error',
       external_reference: external_reference,
+      error: error.message,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
   }
 
-  // 9. Réponse Campay finale
+  // 7. Toujours renvoyer 200 OK à Campay
   res.status(200).send('OK');
 });
 
