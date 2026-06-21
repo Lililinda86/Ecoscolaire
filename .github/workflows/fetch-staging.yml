@@ -1,0 +1,26 @@
+name: Run Staging Script
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/fetch-staging-tx.cjs'
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install dependencies
+        run: npm install firebase-admin
+        
+      - name: Run Fetch Script
+        run: node scripts/fetch-staging-tx.cjs
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
