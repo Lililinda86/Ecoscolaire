@@ -1,11 +1,12 @@
-const CAMPAY_BASE_URL_SANDBOX = "https://demo.campay.net";
+const CAMPAY_BASE_URL_SANDBOX = process.env.CAMPAY_SANDBOX_URL || "https://demo.campay.net";
+const CAMPAY_BASE_URL_PRODUCTION = process.env.CAMPAY_PRODUCTION_URL || "https://campay.net";
 
 export class CampayService {
   private baseUrl: string;
 
   constructor(isSandbox: boolean = true) {
-    const defaultUrl = isSandbox ? CAMPAY_BASE_URL_SANDBOX : CAMPAY_BASE_URL_SANDBOX;
-    this.baseUrl = process.env.CAMPAY_API_URL || defaultUrl;
+    this.baseUrl = isSandbox ? CAMPAY_BASE_URL_SANDBOX : CAMPAY_BASE_URL_PRODUCTION;
+    console.log(`[CampayService] Initialized for environment: ${isSandbox ? 'sandbox' : 'production'}`);
   }
 
   async login(username: string, password: string): Promise<string> {

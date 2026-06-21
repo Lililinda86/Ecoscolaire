@@ -84,7 +84,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
     }
 
     // 5. Appel de l'API Campay (Server-to-Server)
-    const isSandbox = secrets.campayEnvironment === 'sandbox';
+    const isSandbox = secrets.campayEnvironment !== 'production';
     const campayService = new CampayService(isSandbox);
     const token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
     
@@ -280,7 +280,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
   const generatedId = transactionRef.id;
   const idempotencyKey = `idemp_${generatedId}`;
   
-  let mode: 'mock' | 'campay_sandbox' = 'mock';
+  let mode: 'mock' | 'campay_sandbox' | 'campay_production' = 'mock';
   let mockPaymentUrl = `https://mock.campay.net/pay/${generatedId}`;
   let message = 'Payment initiated securely (Mock Mode)';
     let secretsValidated = false;
@@ -293,10 +293,14 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     
     if (secrets && secrets.campayAppUsername && secrets.campayAppPassword) {
       secretsValidated = true;
-      if (secrets.campayEnvironment === 'sandbox') {
+      const isSandbox = secrets.campayEnvironment !== 'production';
+      if (isSandbox) {
         mode = 'campay_sandbox';
-        const campayService = new CampayService(true); // force sandbox for now
-        let token = '';
+      } else {
+        mode = 'campay_production';
+      }
+      const campayService = new CampayService(isSandbox);
+      let token = '';
         
         try {
           // 1. Login
@@ -350,9 +354,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
           });
           throw new functions.https.HttpsError('internal', `Campay initiation failed: ${error.message}`);
         }
-      } else {
-        console.log(`[CAMPAY] Secrets found, but campayEnvironment is not sandbox. Falling back to MOCK.`);
-      }
+      // Removed the else block that was falling back to mock when not sandbox
     } else {
       console.log(`[CAMPAY] No valid secrets found for school ${schoolId}. Falling back to MOCK.`);
     }
