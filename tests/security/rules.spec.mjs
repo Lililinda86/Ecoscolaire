@@ -1,6 +1,9 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import fs from 'fs';
 import { setDoc, updateDoc, doc } from 'firebase/firestore';
+import { test } from '@playwright/test';
+const { describe, beforeAll: before, beforeEach, afterAll: after } = test;
+const it = test;
 
 let testEnv;
 
