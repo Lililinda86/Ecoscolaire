@@ -10,6 +10,7 @@ jobs:
   validate:
     permissions:
       contents: write
+      issues: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,14 +24,13 @@ jobs:
         run: npm install firebase-admin
         
       - name: Run Script
+        continue-on-error: true
         run: node scripts/validate-staging.cjs > VALIDATION-RESULTS.txt
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
           
-      - name: Commit Results
+      - name: Create Issue with Results
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add VALIDATION-RESULTS.txt
-          git commit -m "chore: upload staging validation results"
-          git push
+          gh issue create --title "Staging Validation Results - $(date +'%s')" --body-file VALIDATION-RESULTS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
