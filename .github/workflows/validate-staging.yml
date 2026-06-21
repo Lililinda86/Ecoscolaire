@@ -1,0 +1,34 @@
+name: Validate Webhook Staging
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/validate-staging.cjs'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install dependencies
+        run: npm install firebase-admin
+        
+      - name: Run Script
+        run: node scripts/validate-staging.cjs > VALIDATION-RESULTS.txt
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          
+      - name: Commit Results
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add VALIDATION-RESULTS.txt
+          git commit -m "chore: upload staging validation results"
+          git push
