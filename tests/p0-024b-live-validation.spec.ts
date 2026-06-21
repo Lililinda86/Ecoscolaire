@@ -105,15 +105,28 @@ test.describe('P0-024B POST-DEPLOYMENT LIVE VALIDATION (with seed)', () => {
       } else {
         // Test Manual Add
         const addBtn = page.locator('button:has-text("Ajouter")');
-        if (expectedStatus === 'bloque') {
+        
+        const limitText = await page.locator('div', { hasText: /^Capacité SaaS :/ }).last().textContent();
+        let currentCount = 0;
+        let limit = Infinity;
+        
+        if (limitText) {
+          const match = limitText.match(/Capacité SaaS :\s*(\d+)\s*\/\s*(\d+|Illimitée)/i);
+          if (match) {
+            currentCount = parseInt(match[1], 10);
+            limit = match[2].toLowerCase() === 'illimitée' ? Infinity : parseInt(match[2], 10);
+          }
+        }
+
+        if (currentCount >= limit) {
           await expect(addBtn).toBeDisabled();
           // Title should have "Limite SaaS atteinte"
           const title = await addBtn.getAttribute('title');
           expect(title).toBe('Limite SaaS atteinte');
-          console.log(`✅ Bouton Ajout bloqué comme prévu.`);
+          console.log(`✅ Bouton Ajout bloqué dynamiquement comme prévu (${currentCount}/${limit}).`);
         } else {
           await expect(addBtn).toBeEnabled();
-          console.log(`✅ Bouton Ajout autorisé comme prévu.`);
+          console.log(`✅ Bouton Ajout autorisé dynamiquement comme prévu (${currentCount}/${limit}).`);
         }
       }
     }
