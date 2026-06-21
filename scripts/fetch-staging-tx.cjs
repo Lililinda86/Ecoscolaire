@@ -13,40 +13,18 @@ async function run() {
   
   const db = admin.firestore();
   
-  // Find a successful transaction with a campay reference
-  const txs = await db.collection('transactions')
-    .where('status', '==', 'SUCCESS')
-    .where('provider', '==', 'campay')
+  const logs = await db.collection('campay_logs')
     .orderBy('createdAt', 'desc')
-    .limit(5)
+    .limit(10)
     .get();
     
-  console.log(`Found ${txs.size} successful campay transactions.`);
-  txs.forEach(doc => {
+  console.log(`Found ${logs.size} recent campay logs.`);
+  logs.forEach(doc => {
     const data = doc.data();
-    console.log(`ID: ${doc.id}`);
-    console.log(`Amount: ${data.amount}`);
-    console.log(`Provider Ref: ${data.providerReference}`);
-    console.log(`Mode: ${data.mode}`);
-    console.log(`SchoolId: ${data.schoolId}`);
-    console.log('---');
-  });
-
-  // Find a failed one
-  const ftxs = await db.collection('transactions')
-    .where('status', '==', 'FAILED')
-    .where('provider', '==', 'campay')
-    .orderBy('createdAt', 'desc')
-    .limit(2)
-    .get();
-  
-  console.log(`Found ${ftxs.size} failed campay transactions.`);
-  ftxs.forEach(doc => {
-    const data = doc.data();
-    console.log(`ID: ${doc.id}`);
-    console.log(`Amount: ${data.amount}`);
-    console.log(`Provider Ref: ${data.providerReference}`);
-    console.log(`Mode: ${data.mode}`);
+    console.log(`Log ID: ${doc.id}`);
+    console.log(`Request Type: ${data.requestType}`);
+    console.log(`External Ref: ${data.external_reference || (data.payload ? data.payload.external_reference : 'N/A')}`);
+    console.log(`Reason: ${data.reason || 'N/A'}`);
     console.log('---');
   });
 
