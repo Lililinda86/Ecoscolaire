@@ -59,5 +59,8 @@ jobs:
           FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Run Firestore Rules Tests
+        run: npm run test:rules
+
       - name: Run E2E Tests
         run: npm run test:e2e
