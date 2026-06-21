@@ -25,12 +25,14 @@ jobs:
         
       - name: Run Script
         continue-on-error: true
-        run: node scripts/validate-staging.cjs > VALIDATION-RESULTS.txt
+        run: node scripts/validate-staging.cjs
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
           
-      - name: Create Issue with Results
+      - name: Commit Report
         run: |
-          gh issue create --title "Staging Validation Results - $(date +'%s')" --body-file VALIDATION-RESULTS.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add P0-025B-FIRESTORE-PROOF-REPORT.md
+          git commit -m "docs: add firestore proof report"
+          git push
