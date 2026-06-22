@@ -198,10 +198,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (userData.role === 'parent' && colName === 'students') {
               const fetchQueries = [];
               if (userData.studentIds && userData.studentIds.length > 0) {
-                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where(documentId(), 'in', userData.studentIds))));
+                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId), where(documentId(), 'in', userData.studentIds))));
               }
               if (firebaseUser.email) {
-                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where('parentEmails', 'array-contains', firebaseUser.email.toLowerCase().trim()))));
+                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId), where('parentEmails', 'array-contains', firebaseUser.email.toLowerCase().trim()))));
               }
               if (fetchQueries.length === 0) {
                 return { colName, data: [] };
