@@ -117,6 +117,7 @@ export interface Student {
   feeTransport?: number;
   feeUniforms?: number;
   financialBypass?: { t1: boolean, t2: boolean, t3: boolean }; // Pour débloquer les notes
+  parentEmails?: string[]; // Ajout SaaS pour lier avec l'email du Parent
   rawClassName?: string; // Used for Excel import preview
   detectedClassName?: string; // Used for Excel import preview
   allergies?: string;

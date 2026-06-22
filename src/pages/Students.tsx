@@ -8,6 +8,7 @@ import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
+import { normalizeParentEmails } from '../utils/emailHelpers';
 
 const Students: React.FC = () => {
   const { t } = useI18n();
@@ -17,6 +18,7 @@ const Students: React.FC = () => {
   const limitReached = isStudentLimitReached(currentSchool, db.students.length);
   const limitLabel = getStudentLimitLabel(currentSchool, db.students.length);
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
+  const [parentEmailsInput, setParentEmailsInput] = useState('');
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [importSection, setImportSection] = useState<SectionType>('francophone');
@@ -41,9 +43,11 @@ const Students: React.FC = () => {
     if (student) {
       setIsEditing(true);
       setCurrentStudent(student);
+      setParentEmailsInput((student.parentEmails || []).join(', '));
     } else {
       setCurrentStudent({ id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '' });
       setIsEditing(false);
+      setParentEmailsInput('');
     }
     setModalOpen(true);
   };
@@ -61,11 +65,14 @@ const Students: React.FC = () => {
       return;
     }
 
+    const normalizedEmails = normalizeParentEmails(parentEmailsInput);
+    const finalStudent = { ...currentStudent, parentEmails: normalizedEmails };
+
     const newDb = { ...db };
     if (isEditing && currentStudent.id) {
-      newDb.students = newDb.students.map(s => s.id === currentStudent.id ? currentStudent as Student : s);
+      newDb.students = newDb.students.map(s => s.id === currentStudent.id ? finalStudent as Student : s);
     } else {
-      newDb.students.push({ ...currentStudent, id: crypto.randomUUID() } as Student);
+      newDb.students.push({ ...finalStudent, id: crypto.randomUUID() } as Student);
     }
     saveDB(newDb);
     setModalOpen(false);
@@ -193,6 +200,9 @@ const Students: React.FC = () => {
           const classeNameRaw = getVal(['CLASSE']);
           const matricule = getVal(['MATRICULE']);
           
+          const parentEmailsStr = getVal(['EMAIL PARENT', 'EMAILS PARENTS', 'EMAIL PARENT 1', 'EMAILPARENT', 'PARENT EMAIL', 'EMAIL']);
+          const normalizedEmails = normalizeParentEmails(parentEmailsStr);
+          
           let classId = '';
           let finalSection: 'francophone' | 'anglophone' | '' = '';
           let detectedClassName = '';
@@ -258,7 +268,8 @@ const Students: React.FC = () => {
             address: getVal(['ADRESSE', 'QUARTIER']) || '',
             feeT1: 0, feeT2: 0, feeT3: 0, feeTransport: 0, feeUniforms: 0,
             rawClassName: classeNameRaw,
-            detectedClassName: detectedClassName
+            detectedClassName: detectedClassName,
+            parentEmails: normalizedEmails
           });
         }
 
@@ -471,6 +482,17 @@ const Students: React.FC = () => {
               <label>{t('parent_name', 'Nom du Tuteur / Parent')}</label>
               <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} />
             </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Emails des parents/tuteurs</label>
+              <input 
+                value={parentEmailsInput} 
+                onChange={e => setParentEmailsInput(e.target.value)} 
+                placeholder="email1@test.com, email2@test.com" 
+              />
+              <small style={{ color: 'var(--text-muted)' }}>Séparés par des virgules. Lie automatiquement l'élève au portail Parent.</small>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem' }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label>Contact (Téléphone)</label>
               <input value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} />
