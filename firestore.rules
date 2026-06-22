@@ -185,7 +185,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() || 
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().studentIds)
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
       );
       // Création par Owner, Director, Secretary AVEC limite
       allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId) && canCreateStudentWithinLimits(request.resource.data.schoolId);

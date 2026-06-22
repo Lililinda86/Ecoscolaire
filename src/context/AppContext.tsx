@@ -196,11 +196,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           try {
             let q;
             if (userData.role === 'parent' && colName === 'students') {
+              const fetchQueries = [];
               if (userData.studentIds && userData.studentIds.length > 0) {
-                q = query(collection(firestoreDb, colName), where(documentId(), 'in', userData.studentIds));
-              } else {
+                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where(documentId(), 'in', userData.studentIds))));
+              }
+              if (firebaseUser.email) {
+                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where('parentEmails', 'array-contains', firebaseUser.email.toLowerCase().trim()))));
+              }
+              if (fetchQueries.length === 0) {
                 return { colName, data: [] };
               }
+              const snaps = await Promise.all(fetchQueries);
+              const allDocs = new Map();
+              snaps.forEach((snap: any) => snap.docs.forEach((d: any) => allDocs.set(d.id, { id: d.id, ...d.data() })));
+              console.log(`🔵 [AppContext] Lecture Firestore [${colName}] pour parent : ${allDocs.size} document(s) chargé(s).`);
+              return { colName, data: Array.from(allDocs.values()) };
             } else {
               q = query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId));
             }
