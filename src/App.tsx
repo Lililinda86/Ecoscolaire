@@ -17,6 +17,7 @@ import Classes from './pages/Classes';
 import Login from './pages/Login';
 import SuperAdmin from './pages/SuperAdmin';
 import ParentPortal from './pages/ParentPortal';
+import ParentSignup from './pages/ParentSignup';
 import UsersManagement from './pages/UsersManagement';
 import ValidationDashboard from './pages/ValidationDashboard';
 import AIDirector from './pages/AIDirector';
@@ -120,6 +121,7 @@ function App() {
           </ProtectedRouteForLogin>
         } />
         <Route path="/diagnostic" element={<Diagnostic />} />
+        <Route path="/parent-signup" element={<ParentSignup />} />
         
         {/* Route Parent Portal protégée */}
         <Route path="/parent" element={

@@ -55,6 +55,22 @@ export interface User {
   mustChangePin?: boolean;
 }
 
+export interface ParentInvitation {
+  id: string; // inviteId
+  schoolId: string;
+  studentId: string;
+  parentEmail: string;
+  parentEmailLower: string;
+  parentName: string;
+  studentName: string;
+  status: 'pending' | 'used' | 'expired';
+  createdAt: string;
+  expiresAt: string;
+  createdBy: string;
+  usedAt?: string;
+  usedBy?: string;
+}
+
 export interface ValidationRequest {
   id: string;
   schoolId: string;

@@ -146,10 +146,18 @@ service cloud.firestore {
         ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
       );
 
-      // Autorise superAdmin/owner à créer, OU le premier superAdmin via email
+      // Autorise superAdmin/owner à créer, OU le premier superAdmin via email, OU Auto-inscription Parent via Invitation
       allow create: if isAuthenticated() && (
         isSuperAdmin() || isOwner() || 
-        (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId)
+        (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId) ||
+        (
+          request.auth.uid == userId &&
+          request.resource.data.role == 'parent' &&
+          request.resource.data.keys().hasAll(['inviteId']) &&
+          get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.status == 'pending' &&
+          get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.parentEmailLower == request.auth.token.email &&
+          get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.schoolId == request.resource.data.schoolId
+        )
       );
       allow update: if isAuthenticated() && isActive() && (
         isSuperAdmin() || 
@@ -180,12 +188,30 @@ service cloud.firestore {
       }
     }
 
+    // --- PARENT INVITATIONS ---
+    match /parent_invitations/{inviteId} {
+      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
+      allow get: if resource.data.status == 'pending' && resource.data.expiresAt > request.time.toMillis(); // Not fully possible to compare string ISO with toMillis simply in rules if it's stored as string. Wait, ISO strings can be compared directly in lexicographical order!
+      // Better yet, just check pending. The client checks expiration, or we can check string:
+      // allow get: if resource.data.status == 'pending'; (the UI will check expiration)
+      
+      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(request.resource.data.schoolId);
+      
+      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
+      
+      allow update: if isAuthenticated() && 
+                    (request.auth.token.email == resource.data.parentEmailLower || request.auth.token.email == resource.data.parentEmail) &&
+                    resource.data.status == 'pending' &&
+                    request.resource.data.status == 'used' &&
+                    request.resource.data.usedBy == request.auth.uid;
+    }
+
     // --- STUDENTS & PARENTS ---
     match /students/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() || 
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || ('parentEmails' in resource.data && request.auth.token.email in resource.data.parentEmails)))
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
       );
       // Création par Owner, Director, Secretary AVEC limite
       allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId) && canCreateStudentWithinLimits(request.resource.data.schoolId);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
-import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer } from 'lucide-react';
+import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy } from 'lucide-react';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
@@ -9,6 +9,8 @@ import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
+import { db as firestoreDb } from '../db/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 const Students: React.FC = () => {
   const { t } = useI18n();
@@ -20,6 +22,9 @@ const Students: React.FC = () => {
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
   const [parentEmailsInput, setParentEmailsInput] = useState('');
   
+  const [inviteModalStudent, setInviteModalStudent] = useState<Student | null>(null);
+  const [inviteEmailTarget, setInviteEmailTarget] = useState<string>('');
+  const [generatedInviteLink, setGeneratedInviteLink] = useState<string>('');
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [importSection, setImportSection] = useState<SectionType>('francophone');
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -50,6 +55,53 @@ const Students: React.FC = () => {
       setParentEmailsInput('');
     }
     setModalOpen(true);
+  };
+
+  const handleOpenInviteModal = (student: Student) => {
+    setInviteModalStudent(student);
+    if (student.parentEmails && student.parentEmails.length > 0) {
+      setInviteEmailTarget(student.parentEmails[0]);
+    } else {
+      setInviteEmailTarget('');
+    }
+    setGeneratedInviteLink('');
+  };
+
+  const generateInviteLink = async () => {
+    if (!inviteModalStudent || !inviteEmailTarget) return;
+    if (!currentSchool) return;
+
+    try {
+      const inviteId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const invitation = {
+        id: inviteId,
+        schoolId: currentSchool.id,
+        studentId: inviteModalStudent.id,
+        parentEmail: inviteEmailTarget,
+        parentEmailLower: inviteEmailTarget.toLowerCase().trim(),
+        parentName: inviteModalStudent.parentName || 'Parent',
+        studentName: inviteModalStudent.name,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // +30 jours
+        createdBy: currentUser?.id || 'system'
+      };
+
+      await setDoc(doc(firestoreDb, 'parent_invitations', inviteId), invitation);
+      
+      const link = `${window.location.origin}/#/parent-signup?inviteId=${inviteId}`;
+      setGeneratedInviteLink(link);
+      logAuditAction({
+        action: 'STUDENT_INVITE_GENERATED',
+        targetType: 'STUDENT',
+        targetId: inviteModalStudent.id,
+        targetName: inviteModalStudent.name,
+        details: { inviteId }
+      });
+    } catch (error: any) {
+      alert("Erreur lors de la génération de l'invitation : " + error.message);
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -412,6 +464,9 @@ const Students: React.FC = () => {
                     <td style={{ padding: '1rem' }}>{student.parentPhone || '-'}</td>
                     <td style={{ padding: '1rem' }}>{student.address || '-'}</td>
                     <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
+                      <button className="secondary" onClick={() => handleOpenInviteModal(student)} style={{ marginRight: '0.5rem', color: 'var(--primary)' }} title="Inviter le parent" disabled={isSchoolSuspended}>
+                        <Send size={16} />
+                      </button>
                       <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }} title="Modifier" disabled={isSchoolSuspended}>
                         <Edit2 size={16} />
                       </button>
@@ -669,6 +724,75 @@ const Students: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      <Modal isOpen={!!inviteModalStudent} onClose={() => { setInviteModalStudent(null); setGeneratedInviteLink(''); }} title="Inviter un parent">
+        {inviteModalStudent && (
+          <div style={{ padding: '1rem' }}>
+            <p style={{ marginBottom: '1rem' }}>
+              Générer une invitation sécurisée pour que le parent de <strong>{inviteModalStudent.name}</strong> puisse accéder au portail.
+            </p>
+            
+            {(!inviteModalStudent.parentEmails || inviteModalStudent.parentEmails.length === 0) ? (
+              <div style={{ padding: '1rem', background: '#fee2e2', color: '#b91c1c', borderRadius: '4px', marginBottom: '1rem' }}>
+                Cet élève n'a aucun email parent renseigné. Veuillez d'abord modifier sa fiche.
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1rem' }}>
+                <label>Sélectionnez l'email à inviter :</label>
+                <select 
+                  value={inviteEmailTarget} 
+                  onChange={(e) => setInviteEmailTarget(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', marginTop: '0.5rem' }}
+                >
+                  {inviteModalStudent.parentEmails.map(email => (
+                    <option key={email} value={email}>{email}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {!generatedInviteLink ? (
+              <button 
+                onClick={generateInviteLink}
+                disabled={!inviteEmailTarget}
+                style={{ width: '100%', padding: '0.75rem', background: 'var(--primary)', color: 'white', borderRadius: '4px', border: 'none', cursor: inviteEmailTarget ? 'pointer' : 'not-allowed' }}
+              >
+                Générer le lien d'invitation
+              </button>
+            ) : (
+              <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+                <p style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>Lien généré avec succès !</p>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={generatedInviteLink} 
+                  style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }} 
+                />
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedInviteLink);
+                      alert('Lien copié dans le presse-papier !');
+                    }}
+                    style={{ flex: 1, padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: 'var(--secondary-color)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    <Copy size={16} /> Copier
+                  </button>
+                  <a 
+                    href={`https://wa.me/?text=${encodeURIComponent(`Bonjour, voici votre lien pour suivre la scolarité de ${inviteModalStudent.name}. Cliquez ici : ${generatedInviteLink}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ flex: 1, padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: '#25D366', color: 'white', textDecoration: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    <Send size={16} /> WhatsApp
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
     </div>
   );
 };

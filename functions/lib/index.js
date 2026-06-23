@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
+exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const campayService_1 = require("./services/campayService");
@@ -22,19 +22,20 @@ exports.createSaaSCheckout = functions.https.onCall(async (data, context) => {
 // ----------------------------------------------------------------------
 exports.campayWebhook = functions.https.onRequest(async (req, res) => {
     const payload = req.body || {};
-    const { status, reference, external_reference, amount } = payload;
+    const external_reference = payload.external_reference || payload.externalReference || payload.merchant_reference;
+    const reference = payload.reference || payload.transaction_reference;
     const db = admin.firestore();
-    // 2. Journalisation initiale
+    // 1. Journalisation brute de la réception (avant toute validation)
     await db.collection('campay_logs').add({
-        requestType: 'webhook_received',
+        requestType: 'webhook_received_raw',
         payload: payload,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    // 3. Validation minimale
-    if (!external_reference || !status) {
+    // 2. Validation minimale du payload
+    if (!external_reference || !reference) {
         await db.collection('campay_logs').add({
-            requestType: 'webhook_failed',
-            reason: 'Missing external_reference or status',
+            requestType: 'webhook_aborted',
+            reason: 'Missing external_reference or reference in payload',
             payload: payload,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -43,37 +44,73 @@ exports.campayWebhook = functions.https.onRequest(async (req, res) => {
     }
     const txRef = db.collection('transactions').doc(external_reference);
     try {
+        // 3. Lecture initiale (hors transaction Firestore) pour récupérer le schoolId
+        const txInitialSnap = await txRef.get();
+        if (!txInitialSnap.exists) {
+            await db.collection('campay_logs').add({
+                requestType: 'webhook_aborted',
+                reason: 'Transaction not found locally',
+                external_reference: external_reference,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            res.status(200).send('OK');
+            return;
+        }
+        const txInitialData = txInitialSnap.data();
+        if (txInitialData.status !== 'PENDING') {
+            await db.collection('campay_logs').add({
+                requestType: 'webhook_duplicate',
+                reason: 'Transaction is not PENDING',
+                external_reference: external_reference,
+                currentStatus: txInitialData.status,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            res.status(200).send('OK');
+            return;
+        }
+        const schoolId = txInitialData.schoolId;
+        // 4. Récupération des secrets
+        const secretSnap = await db.collection('schools').doc(schoolId).collection('secrets').doc('payment').get();
+        const secrets = secretSnap.data();
+        if (!secrets || !secrets.campayAppUsername || !secrets.campayAppPassword) {
+            throw new Error(`Missing Campay secrets for school ${schoolId}`);
+        }
+        // 5. Appel de l'API Campay (Server-to-Server)
+        const isSandbox = secrets.campayEnvironment !== 'production';
+        const campayService = new campayService_1.CampayService(isSandbox);
+        const token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
+        const apiTx = await campayService.getTransactionStatus(token, reference);
+        // Journalisation de la réponse API brute
+        await db.collection('campay_logs').add({
+            requestType: 'api_verification_response',
+            external_reference: external_reference,
+            apiResponse: apiTx,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        // Extraction robuste des champs (defensive validation)
+        const apiAmount = apiTx.amount ?? apiTx.amount_paid ?? apiTx.amount_collected;
+        const apiStatus = apiTx.status ?? apiTx.transaction_status;
+        const apiExtRef = apiTx.external_reference ?? apiTx.externalReference ?? apiTx.merchant_reference;
+        if (apiAmount === undefined || apiStatus === undefined || apiExtRef === undefined) {
+            throw new Error(`Critical field missing in Campay API response. Payload: ${JSON.stringify(apiTx)}`);
+        }
+        // 6. Transaction Firestore finale (Mise à jour sécurisée)
         await db.runTransaction(async (transaction) => {
-            // 4. Recherche transaction
             const txSnap = await transaction.get(txRef);
-            if (!txSnap.exists) {
-                transaction.set(db.collection('campay_logs').doc(), {
-                    requestType: 'webhook_failed_not_found',
-                    external_reference: external_reference,
-                    payload: payload,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-                return;
-            }
             const txData = txSnap.data();
-            // 5. Règle idempotence
+            // Re-vérification idempotence stricte
             if (txData.status !== 'PENDING') {
-                transaction.set(db.collection('campay_logs').doc(), {
-                    requestType: 'webhook_duplicate',
-                    external_reference: external_reference,
-                    currentStatus: txData.status,
-                    payload: payload,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
                 return;
             }
-            const upperStatus = String(status).toUpperCase();
-            // 6 & 7. Succès ou Echec
-            if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus)) {
+            // Validation croisée stricte
+            const isAmountMatch = Number(apiAmount) === Number(txData.amount);
+            const isExtRefMatch = String(apiExtRef) === String(external_reference);
+            const upperStatus = String(apiStatus).toUpperCase();
+            if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus) && isAmountMatch && isExtRefMatch) {
                 transaction.update(txRef, {
                     status: 'SUCCESS',
                     providerReference: reference || null,
-                    providerResponse: payload,
+                    providerResponse: apiTx,
                     updatedAt: admin.firestore.FieldValue.serverTimestamp()
                 });
                 const paymentRef = db.collection('payments').doc(external_reference);
@@ -81,7 +118,7 @@ exports.campayWebhook = functions.https.onRequest(async (req, res) => {
                     id: external_reference,
                     schoolId: txData.schoolId,
                     studentId: txData.studentId || null,
-                    amount: txData.amount || amount,
+                    amount: txData.amount,
                     type: txData.type || 'PAYMENT',
                     installment: txData.installment || null,
                     paymentMethod: 'Mobile Money',
@@ -93,31 +130,32 @@ exports.campayWebhook = functions.https.onRequest(async (req, res) => {
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
                 transaction.set(db.collection('campay_logs').doc(), {
-                    requestType: 'webhook_processed',
-                    status: 'SUCCESS',
+                    requestType: 'webhook_success_verified',
                     external_reference: external_reference,
+                    status: 'SUCCESS',
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
             else if (['FAILED', 'FAILURE', 'ERROR'].includes(upperStatus)) {
                 transaction.update(txRef, {
                     status: 'FAILED',
-                    failureReason: payload,
+                    failureReason: apiTx,
                     updatedAt: admin.firestore.FieldValue.serverTimestamp()
                 });
                 transaction.set(db.collection('campay_logs').doc(), {
-                    requestType: 'webhook_processed',
-                    status: 'FAILED',
+                    requestType: 'webhook_failed_verified',
                     external_reference: external_reference,
+                    status: 'FAILED',
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
             else {
                 transaction.set(db.collection('campay_logs').doc(), {
-                    requestType: 'webhook_failed',
-                    reason: `Unhandled status: ${status}`,
+                    requestType: 'webhook_verification_mismatch',
                     external_reference: external_reference,
-                    payload: payload,
+                    reason: 'Mismatch in amount, reference, or unknown status',
+                    apiTx: apiTx,
+                    localTxAmount: txData.amount,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
@@ -125,14 +163,13 @@ exports.campayWebhook = functions.https.onRequest(async (req, res) => {
     }
     catch (error) {
         await db.collection('campay_logs').add({
-            requestType: 'webhook_failed',
-            reason: 'Transaction error',
-            error: error.message,
+            requestType: 'webhook_processing_error',
             external_reference: external_reference,
+            error: error.message,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
     }
-    // 9. Réponse Campay
+    // 7. Toujours renvoyer 200 OK à Campay
     res.status(200).send('OK');
 });
 // ----------------------------------------------------------------------
@@ -220,58 +257,60 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
         console.log(`[CAMPAY_AUDIT] secret document found = ${secretSnap.exists}`);
         if (secrets && secrets.campayAppUsername && secrets.campayAppPassword) {
             secretsValidated = true;
-            if (secrets.campayEnvironment === 'sandbox') {
+            const isSandbox = secrets.campayEnvironment !== 'production';
+            if (isSandbox) {
                 mode = 'campay_sandbox';
-                const campayService = new campayService_1.CampayService(true); // force sandbox for now
-                let token = '';
-                try {
-                    // 1. Login
-                    token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
-                    // 2. Request To Pay
-                    const description = `Paiement pour ${studentId || 'élève inconnu'}`;
-                    const response = await campayService.requestToPay(token, amount, phoneNumber, description, generatedId // transactionId as externalReference
-                    );
-                    message = 'Payment initiated via Campay Sandbox.';
-                    mockPaymentUrl = ''; // No mock URL in real mode
-                    // Log securely
-                    await db.collection('campay_logs').add({
-                        schoolId,
-                        transactionId: generatedId,
-                        requestType: 'request_to_pay',
-                        status: 'SUCCESS',
-                        sanitizedRequest: {
-                            amount: amount.toString(),
-                            from: phoneNumber,
-                            description,
-                            external_reference: generatedId
-                        },
-                        sanitizedResponse: response,
-                        errorMessage: null,
-                        createdAt: admin.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-                catch (error) {
-                    // Log error securely
-                    await db.collection('campay_logs').add({
-                        schoolId,
-                        transactionId: generatedId,
-                        requestType: 'request_to_pay',
-                        status: 'FAILED',
-                        sanitizedRequest: {
-                            amount: amount.toString(),
-                            from: phoneNumber,
-                            external_reference: generatedId
-                        },
-                        sanitizedResponse: null,
-                        errorMessage: error.message,
-                        createdAt: admin.firestore.FieldValue.serverTimestamp()
-                    });
-                    throw new functions.https.HttpsError('internal', `Campay initiation failed: ${error.message}`);
-                }
             }
             else {
-                console.log(`[CAMPAY] Secrets found, but campayEnvironment is not sandbox. Falling back to MOCK.`);
+                mode = 'campay_production';
             }
+            const campayService = new campayService_1.CampayService(isSandbox);
+            let token = '';
+            try {
+                // 1. Login
+                token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
+                // 2. Request To Pay
+                const description = `Paiement pour ${studentId || 'élève inconnu'}`;
+                const response = await campayService.requestToPay(token, amount, phoneNumber, description, generatedId // transactionId as externalReference
+                );
+                message = 'Payment initiated via Campay Sandbox.';
+                mockPaymentUrl = ''; // No mock URL in real mode
+                // Log securely
+                await db.collection('campay_logs').add({
+                    schoolId,
+                    transactionId: generatedId,
+                    requestType: 'request_to_pay',
+                    status: 'SUCCESS',
+                    sanitizedRequest: {
+                        amount: amount.toString(),
+                        from: phoneNumber,
+                        description,
+                        external_reference: generatedId
+                    },
+                    sanitizedResponse: response,
+                    errorMessage: null,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            catch (error) {
+                // Log error securely
+                await db.collection('campay_logs').add({
+                    schoolId,
+                    transactionId: generatedId,
+                    requestType: 'request_to_pay',
+                    status: 'FAILED',
+                    sanitizedRequest: {
+                        amount: amount.toString(),
+                        from: phoneNumber,
+                        external_reference: generatedId
+                    },
+                    sanitizedResponse: null,
+                    errorMessage: error.message,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                throw new functions.https.HttpsError('internal', `Campay initiation failed: ${error.message}`);
+            }
+            // Removed the else block that was falling back to mock when not sandbox
         }
         else {
             console.log(`[CAMPAY] No valid secrets found for school ${schoolId}. Falling back to MOCK.`);
@@ -446,6 +485,61 @@ exports.onPaymentCreated = functions.firestore
         transaction.set(receiptRef, receiptData);
         console.log(`Successfully created receipt ${receiptNumber} for payment ${paymentId}`);
         return receiptNumber;
+    });
+});
+// ----------------------------------------------------------------------
+// 8. enforceStudentSaasLimits (Trigger)
+// Maintains the studentsCount on schools and deletes excess students
+// ----------------------------------------------------------------------
+exports.enforceStudentSaasLimits = functions.firestore
+    .document('students/{studentId}')
+    .onWrite(async (change, context) => {
+    const db = admin.firestore();
+    const studentId = context.params.studentId;
+    const isCreate = !change.before.exists && change.after.exists;
+    const isDelete = change.before.exists && !change.after.exists;
+    if (!isCreate && !isDelete) {
+        return null;
+    }
+    const schoolId = isCreate ? change.after.data()?.schoolId : change.before.data()?.schoolId;
+    if (!schoolId)
+        return null;
+    const schoolRef = db.collection('schools').doc(schoolId);
+    return await db.runTransaction(async (transaction) => {
+        const schoolSnap = await transaction.get(schoolRef);
+        if (!schoolSnap.exists) {
+            console.error(`School ${schoolId} not found for student ${studentId}`);
+            return null;
+        }
+        const school = schoolSnap.data();
+        let currentCount = school?.studentsCount || 0;
+        if (isDelete) {
+            currentCount = Math.max(0, currentCount - 1);
+            transaction.update(schoolRef, { studentsCount: currentCount });
+            return null;
+        }
+        if (isCreate) {
+            currentCount += 1;
+            const isInternalSchool = school?.isInternalSchool === true;
+            const plan = school?.subscriptionPlan || 'starter';
+            let limit = 200;
+            if (plan === 'premium' || isInternalSchool)
+                limit = Infinity;
+            else if (plan === 'pilot' || plan === 'standard')
+                limit = 1000;
+            else
+                limit = 200;
+            if (currentCount > limit) {
+                console.warn(`[SaaS Limits] School ${schoolId} exceeded limit of ${limit}. Deleting student ${studentId}.`);
+                transaction.delete(change.after.ref);
+                return null;
+            }
+            else {
+                transaction.update(schoolRef, { studentsCount: currentCount });
+                return null;
+            }
+        }
+        return null;
     });
 });
 //# sourceMappingURL=index.js.map
