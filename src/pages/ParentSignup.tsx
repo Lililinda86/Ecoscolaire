@@ -44,7 +44,11 @@ const ParentSignup: React.FC = () => {
           return;
         }
 
-        if (new Date(data.expiresAt).getTime() < Date.now()) {
+        const expiresAtTime = typeof (data.expiresAt as any)?.toDate === 'function' 
+          ? (data.expiresAt as any).toDate().getTime() 
+          : new Date(data.expiresAt).getTime();
+          
+        if (expiresAtTime < Date.now()) {
           setError('Cette invitation a expiré.');
           setLoading(false);
           return;

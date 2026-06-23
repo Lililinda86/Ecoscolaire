@@ -191,7 +191,7 @@ service cloud.firestore {
     // --- PARENT INVITATIONS ---
     match /parent_invitations/{inviteId} {
       allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
-      allow get: if resource.data.status == 'pending' && resource.data.expiresAt > request.time.toMillis(); // Not fully possible to compare string ISO with toMillis simply in rules if it's stored as string. Wait, ISO strings can be compared directly in lexicographical order!
+      allow get: if resource.data.status == 'pending' && resource.data.expiresAt > request.time; // Not fully possible to compare string ISO with toMillis simply in rules if it's stored as string. Wait, ISO strings can be compared directly in lexicographical order!
       // Better yet, just check pending. The client checks expiration, or we can check string:
       // allow get: if resource.data.status == 'pending'; (the UI will check expiration)
       
