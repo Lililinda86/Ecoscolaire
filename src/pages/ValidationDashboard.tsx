@@ -7,7 +7,7 @@ const ValidationDashboard: React.FC = () => {
   const { db, saveDB, currentUser, logAuditAction } = useAppContext();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  if (!db || !currentUser) return null;
+  if (!db || !currentUser) return <div style={{padding: '2rem'}}>Chargement (db manquant: {!db}, user manquant: {!currentUser})...</div>;
 
   // Seuls les approbateurs peuvent voir ce dashboard
   const canApprove = ['superAdmin', 'owner', 'director'].includes(currentUser.role);

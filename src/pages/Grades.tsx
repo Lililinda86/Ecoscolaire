@@ -80,8 +80,7 @@ const Grades: React.FC = () => {
           });
         } else {
           hasValidations = true;
-          if (!newDb.validation_requests) newDb.validation_requests = [];
-          newDb.validation_requests.push({
+          newDb.validation_requests = [...(newDb.validation_requests || []), {
             id: crypto.randomUUID(),
             schoolId: currentSchool.id,
             requesterId: currentUser.id,
@@ -92,7 +91,7 @@ const Grades: React.FC = () => {
             proposedData: gradeObj,
             status: 'pending',
             createdAt: new Date().toISOString()
-          });
+          }];
         }
       }
     });
