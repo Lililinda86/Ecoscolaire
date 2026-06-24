@@ -1,0 +1,21 @@
+name: Seed Staging Database
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install Dependencies
+        run: npm ci || npm install firebase-admin dotenv
+        
+      - name: Run Seed Script
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+        run: npm run seed:staging
