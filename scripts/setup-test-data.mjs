@@ -92,7 +92,7 @@ const createOrUpdateUser = async (email, pass) => {
 const cleanupTestData = async () => {
   console.log("Starting cleanup for Alpha and Beta...");
   const schoolIds = ['school-alpha-001', 'school-beta-002'];
-  const collectionsList = ['schools', 'users', 'classes', 'students', 'payments', 'grades', 'attendance'];
+  const collectionsList = ['schools', 'users', 'classes', 'students', 'payments', 'grades', 'attendance', 'subjects'];
   
   for (const c of collectionsList) {
     for (const sid of schoolIds) {
@@ -206,12 +206,32 @@ const setupTestData = async () => {
     await processRoles(alphaRoles, alphaId);
     await processRoles(betaRoles, betaId);
 
+    // 3.5 Subjects
+    const subjects = [
+      { id: 'subj-fr-fra', schoolId: alphaId, name: 'Français', type: 'francophone' },
+      { id: 'subj-fr-mat', schoolId: alphaId, name: 'Mathématiques', type: 'francophone' },
+      { id: 'subj-fr-ang', schoolId: alphaId, name: 'Anglais', type: 'francophone' },
+      { id: 'subj-fr-sci', schoolId: alphaId, name: 'Sciences', type: 'francophone' },
+      { id: 'subj-fr-his', schoolId: alphaId, name: 'Histoire-Géographie', type: 'francophone' },
+      { id: 'subj-en-eng', schoolId: betaId, name: 'English', type: 'anglophone' },
+      { id: 'subj-en-mat', schoolId: betaId, name: 'Mathematics', type: 'anglophone' },
+      { id: 'subj-en-sci', schoolId: betaId, name: 'Science', type: 'anglophone' },
+      { id: 'subj-en-soc', schoolId: betaId, name: 'Social Studies', type: 'anglophone' }
+    ];
+    for (const s of subjects) {
+      if (!isDryRun) await db.collection('subjects').doc(s.id).set(s, { merge: true });
+      logAction('Subject', `Prepared ${s.name} for ${s.schoolId}`);
+    }
+
+    const alphaSubjIds = subjects.filter(s => s.schoolId === alphaId).map(s => s.id);
+    const betaSubjIds = subjects.filter(s => s.schoolId === betaId).map(s => s.id);
+
     // 4. Classes (Alpha & Beta)
     const classes = [
-      { id: 'alpha-class-cp', schoolId: alphaId, name: 'CP', level: 'Primaire', type: 'francophone' },
-      { id: 'alpha-class-ce1', schoolId: alphaId, name: 'CE1', level: 'Primaire', type: 'francophone' },
-      { id: 'alpha-class-ce2', schoolId: alphaId, name: 'CE2', level: 'Primaire', type: 'francophone' },
-      { id: 'beta-class-cp', schoolId: betaId, name: 'CP Beta', level: 'Primaire', type: 'francophone' }
+      { id: 'alpha-class-cp', schoolId: alphaId, name: 'CP', level: 'Primaire', type: 'francophone', subjects: alphaSubjIds },
+      { id: 'alpha-class-ce1', schoolId: alphaId, name: 'CE1', level: 'Primaire', type: 'francophone', subjects: alphaSubjIds },
+      { id: 'alpha-class-ce2', schoolId: alphaId, name: 'CE2', level: 'Primaire', type: 'francophone', subjects: alphaSubjIds },
+      { id: 'beta-class-cp', schoolId: betaId, name: 'CP Beta', level: 'Primaire', type: 'francophone', subjects: betaSubjIds }
     ];
     for (const c of classes) {
       if (!isDryRun) await db.collection('classes').doc(c.id).set(c, { merge: true });

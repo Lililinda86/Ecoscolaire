@@ -1,6 +1,10 @@
 name: Seed Staging Database
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/setup-test-data.mjs'
+      - '.github/workflows/run-seed.yml'
 
 jobs:
   seed:
