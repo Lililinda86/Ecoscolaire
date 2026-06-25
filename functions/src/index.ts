@@ -399,6 +399,10 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
 // Callable function to manually confirm a pending payment in MOCK mode.
 // ----------------------------------------------------------------------
 export const mockConfirmPayment = functions.https.onCall(async (data, context) => {
+  if (process.env.FUNCTIONS_EMULATOR !== 'true' && process.env.NODE_ENV !== 'test') {
+    throw new functions.https.HttpsError('failed-precondition', 'mockConfirmPayment is disabled outside test environment');
+  }
+
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
   }
