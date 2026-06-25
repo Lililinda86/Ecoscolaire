@@ -153,10 +153,12 @@ service cloud.firestore {
         (
           request.auth.uid == userId &&
           request.resource.data.role == 'parent' &&
-          request.resource.data.keys().hasAll(['inviteId']) &&
+          request.resource.data.keys().hasAll(['inviteId', 'studentIds']) &&
           get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.status == 'pending' &&
           get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.parentEmailLower == request.auth.token.email &&
-          get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.schoolId == request.resource.data.schoolId
+          get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.schoolId == request.resource.data.schoolId &&
+          request.resource.data.studentIds == get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.studentIds &&
+          !request.resource.data.keys().hasAny(['isInternalSchool', 'subscriptionPlan', 'studentLimit', 'pilot', 'permissions', 'claims', 'customClaims'])
         )
       );
       allow update: if isAuthenticated() && isActive() && (
