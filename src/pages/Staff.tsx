@@ -8,10 +8,23 @@ import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const StaffPage: React.FC = () => {
-  const { db, saveDB, currentSchool, isSchoolSuspended } = useAppContext();
+  const { db, saveDB, currentSchool, isSchoolSuspended, currentUser } = useAppContext();
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<Partial<Staff>>({});
+
+  const isAllowed = currentUser && ['owner', 'director', 'secretary', 'superAdmin'].includes(currentUser.role);
+  if (!isAllowed) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#991b1b' }}>
+        <h2>Accès refusé</h2>
+        <p>Vous n'avez pas les autorisations nécessaires pour voir cette page.</p>
+        <button onClick={() => window.history.back()} style={{ marginTop: '1rem', padding: '0.75rem', background: '#dc2626', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
+          Retour
+        </button>
+      </div>
+    );
+  }
 
   const handleOpenModal = (staff?: Staff) => {
     if (staff) setCurrentStaff(staff);

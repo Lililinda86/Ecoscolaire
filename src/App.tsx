@@ -164,7 +164,7 @@ function App() {
         
         <Route path="/students" element={<ProtectedRoute requireSchool><Layout><Students /></Layout></ProtectedRoute>} />
         <Route path="/classes" element={<ProtectedRoute requireSchool><Layout><Classes /></Layout></ProtectedRoute>} />
-        <Route path="/staff" element={<ProtectedRoute requireSchool><Layout><Staff /></Layout></ProtectedRoute>} />
+        <Route path="/staff" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'superAdmin']}><Layout><Staff /></Layout></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute requireSchool><Layout><Attendance /></Layout></ProtectedRoute>} />
         <Route path="/buses" element={<ProtectedRoute requireSchool><Layout><Buses /></Layout></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute requireSchool><Layout><Inventory /></Layout></ProtectedRoute>} />
