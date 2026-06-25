@@ -6,8 +6,22 @@ import Modal from '../components/Modal';
 import { Plus, Edit2, AlertTriangle, ArrowRightLeft, Package, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 
 const Inventory: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentUser } = useAppContext();
   const { t } = useI18n();
+
+  const allowedRoles = ['owner', 'director', 'secretary', 'accountant', 'superAdmin'];
+  if (!currentUser || !allowedRoles.includes(currentUser.role)) {
+    return (
+      <div className="page-container" style={{ padding: '2rem' }}>
+        <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--danger)' }}>
+          <AlertTriangle size={48} style={{ marginBottom: '1rem' }} />
+          <h2>Accès refusé</h2>
+          <p>Vous n'avez pas les autorisations nécessaires pour accéder à l'inventaire.</p>
+          <button onClick={() => window.history.back()} style={{ marginTop: '1rem' }}>Retour</button>
+        </div>
+      </div>
+    );
+  }
   const [isItemModalOpen, setItemModalOpen] = useState(false);
   const [isTxModalOpen, setTxModalOpen] = useState(false);
   
