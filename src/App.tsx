@@ -170,7 +170,7 @@ function App() {
         <Route path="/inventory" element={<ProtectedRoute requireSchool><Layout><Inventory /></Layout></ProtectedRoute>} />
         <Route path="/grades" element={<ProtectedRoute requireSchool><Layout><Grades /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requireSchool><Layout><Settings /></Layout></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute requireSchool><Layout><Payments /></Layout></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute><Layout><UsersManagement /></Layout></ProtectedRoute>} />
         <Route path="/validations" element={<ProtectedRoute requireSchool><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
         <Route path="/ai-director" element={<ProtectedRoute requireSchool><Layout><AIDirector /></Layout></ProtectedRoute>} />

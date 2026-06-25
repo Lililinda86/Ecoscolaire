@@ -14,6 +14,16 @@ import { httpsCallable } from 'firebase/functions';
 const Payments: React.FC = () => {
   const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
+
+  const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
+  if (!currentUser || !allowedRoles.includes(currentUser.role)) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626', background: '#fee2e2', borderRadius: '8px', margin: '2rem' }}>
+        <h2>Accès refusé</h2>
+        <p>Vous n'avez pas les autorisations nécessaires pour accéder à la comptabilité générale.</p>
+      </div>
+    );
+  }
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'|'historique-recus'|'finance-momo'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
   
