@@ -339,7 +339,7 @@ const Payments: React.FC = () => {
           <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--success)' }}><Wallet size={24} /></div>
           <div>
             <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>Masse Totale (Global)</h3>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.2rem', fontWeight: 'bold' }}>{(totalCashReceived + totalMoMoReceived).toLocaleString('fr-FR')} FCFA</p>
+            <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.2rem', fontWeight: 'bold' }}>{(totalCashReceived + totalMoMoReceived - totalExpenses).toLocaleString('fr-FR')} FCFA</p>
           </div>
         </div>
       </div>
