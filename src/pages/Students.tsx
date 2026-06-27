@@ -134,8 +134,27 @@ const Students: React.FC = () => {
 
       if (isEditing && finalStudent.id) {
         const studentRef = doc(firestoreDb, 'students', finalStudent.id);
-        const patchData = { ...finalStudent };
-        delete patchData.id;
+        const rawPatchData = {
+          matricule: finalStudent.matricule,
+          name: finalStudent.name,
+          gender: finalStudent.gender,
+          dob: finalStudent.dob,
+          section: finalStudent.section,
+          classId: finalStudent.classId,
+          parentName: finalStudent.parentName,
+          parentEmails: finalStudent.parentEmails,
+          parentPhone: finalStudent.parentPhone,
+          feeT1: finalStudent.feeT1,
+          feeT2: finalStudent.feeT2,
+          feeT3: finalStudent.feeT3,
+          feeTransport: finalStudent.feeTransport,
+          feeUniforms: finalStudent.feeUniforms,
+          address: finalStudent.address,
+          emergencyContact: finalStudent.emergencyContact,
+          allergies: finalStudent.allergies,
+          medicalConditions: finalStudent.medicalConditions,
+        };
+        const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([_, v]) => v !== undefined));
         await updateDoc(studentRef, patchData);
         
         // Mutate local state for UI update

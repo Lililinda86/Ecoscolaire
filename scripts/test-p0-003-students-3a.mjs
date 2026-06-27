@@ -39,6 +39,21 @@ const tests = [
       const funcBody = fileContent.split('const handleDelete =')[1].split('const handleDeleteAll =')[0];
       return funcBody.includes('setDoc') && funcBody.includes('validation_requests') && !funcBody.includes('saveDB');
     }
+  },
+  {
+    name: 'Patch strict : pas de ...finalStudent',
+    check: () => {
+      const editBlock = fileContent.match(/if \(isEditing.*\) {[\s\S]*?updateDoc/);
+      return editBlock && !editBlock[0].includes('...finalStudent');
+    }
+  },
+  {
+    name: 'Patch strict : pas de schoolId, createdAt, createdBy',
+    check: () => {
+      const editBlock = fileContent.match(/if \(isEditing.*\) {[\s\S]*?updateDoc/);
+      if (!editBlock) return false;
+      return !editBlock[0].match(/schoolId:|createdAt:|createdBy:/);
+    }
   }
 ];
 
