@@ -10,13 +10,18 @@ import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 
 const Students: React.FC = () => {
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [, setRefresh] = useState(0);
   const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
+
   const limitReached = isStudentLimitReached(currentSchool, db.students.length);
   const limitLabel = getStudentLimitLabel(currentSchool, db.students.length);
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
@@ -50,7 +55,7 @@ const Students: React.FC = () => {
       setCurrentStudent(student);
       setParentEmailsInput((student.parentEmails || []).join(', '));
     } else {
-      setCurrentStudent({ id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '' });
+      setCurrentStudent({ id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '' });
       setIsEditing(false);
       setParentEmailsInput('');
     }
@@ -104,8 +109,10 @@ const Students: React.FC = () => {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    
     if (!currentStudent.classId) {
       alert("Veuillez choisir une classe !");
       return;
@@ -117,61 +124,98 @@ const Students: React.FC = () => {
       return;
     }
 
-    const normalizedEmails = normalizeParentEmails(parentEmailsInput);
-    const finalStudent = { ...currentStudent, parentEmails: normalizedEmails };
+    setIsSaving(true);
+    try {
+      const normalizedEmails = normalizeParentEmails(parentEmailsInput);
+      const finalStudent = { ...currentStudent, parentEmails: normalizedEmails } as Student;
+      if (!finalStudent.schoolId && currentSchool) {
+        finalStudent.schoolId = currentSchool.id;
+      }
 
-    const newDb = { ...db };
-    if (isEditing && currentStudent.id) {
-      newDb.students = newDb.students.map(s => s.id === currentStudent.id ? finalStudent as Student : s);
-    } else {
-      newDb.students.push({ ...finalStudent, id: crypto.randomUUID() } as Student);
+      if (isEditing && finalStudent.id) {
+        const studentRef = doc(firestoreDb, 'students', finalStudent.id);
+        const patchData = { ...finalStudent };
+        delete patchData.id;
+        await updateDoc(studentRef, patchData);
+        
+        // Mutate local state for UI update
+        const idx = db.students.findIndex(s => s.id === finalStudent.id);
+        if (idx !== -1) db.students[idx] = finalStudent;
+        
+      } else {
+        const studentId = finalStudent.id || crypto.randomUUID();
+        finalStudent.id = studentId;
+        const studentRef = doc(firestoreDb, 'students', studentId);
+        await setDoc(studentRef, finalStudent);
+        
+        // Mutate local state
+        db.students.push(finalStudent);
+      }
+
+      setRefresh(r => r + 1);
+      setModalOpen(false);
+
+      logAuditAction({
+        action: isEditing ? 'UPDATE_STUDENT' : 'CREATE_STUDENT',
+        targetType: 'STUDENT',
+        targetId: finalStudent.id as string,
+        targetName: finalStudent.name as string
+      });
+    } catch (err: any) {
+      alert("Erreur lors de l'enregistrement : " + err.message);
+    } finally {
+      setIsSaving(false);
     }
-    saveDB(newDb);
-    setModalOpen(false);
-
-    logAuditAction({
-      action: isEditing ? 'UPDATE_STUDENT' : 'CREATE_STUDENT',
-      targetType: 'STUDENT',
-      targetId: currentStudent.id as string,
-      targetName: currentStudent.name as string
-    });
   };
 
-  const handleDelete = (student: Student) => {
+  const handleDelete = async (student: Student) => {
     if (!currentUser || !currentSchool) return;
     
     if (confirm(t('delete') + ' cet élève ?')) {
       const canDeleteDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
       
-      const newDb = { ...db };
-      
-      if (canDeleteDirectly) {
-        newDb.students = db.students.filter(s => s.id !== student.id);
-        saveDB(newDb);
-        alert("Élève supprimé avec succès.");
-        logAuditAction({
-          action: 'DELETE_STUDENT',
-          targetType: 'STUDENT',
-          targetId: student.id,
-          targetName: student.name
-        });
-      } else {
-        // Créer une requête de validation
-        if (!newDb.validation_requests) newDb.validation_requests = [];
-        newDb.validation_requests.push({
-          id: crypto.randomUUID(),
-          schoolId: currentSchool.id,
-          requesterId: currentUser.id,
-          requesterRole: currentUser.role,
-          actionType: 'DELETE_STUDENT',
-          targetCollection: 'students',
-          targetDocumentId: student.id,
-          proposedData: student,
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        });
-        saveDB(newDb);
-        alert("Demande de suppression envoyée pour validation (Directeur / Super Admin).");
+      try {
+        if (canDeleteDirectly) {
+          await deleteDoc(doc(firestoreDb, 'students', student.id));
+          
+          // Mutate local state
+          const idx = db.students.findIndex(s => s.id === student.id);
+          if (idx !== -1) db.students.splice(idx, 1);
+          setRefresh(r => r + 1);
+          
+          alert("Élève supprimé avec succès.");
+          logAuditAction({
+            action: 'DELETE_STUDENT',
+            targetType: 'STUDENT',
+            targetId: student.id,
+            targetName: student.name
+          });
+        } else {
+          // Créer une requête de validation
+          const requestId = crypto.randomUUID();
+          const reqData = {
+            id: requestId,
+            schoolId: currentSchool.id,
+            requesterId: currentUser.id,
+            requesterRole: currentUser.role,
+            actionType: 'DELETE_STUDENT' as const,
+            targetCollection: 'students',
+            targetDocumentId: student.id,
+            proposedData: student,
+            status: 'pending' as const,
+            createdAt: new Date().toISOString()
+          };
+          
+          await setDoc(doc(firestoreDb, 'validation_requests', requestId), reqData);
+          
+          if (!db.validation_requests) db.validation_requests = [];
+          db.validation_requests.push(reqData);
+          setRefresh(r => r + 1);
+          
+          alert("Demande de suppression envoyée pour validation (Directeur / Super Admin).");
+        }
+      } catch (err: any) {
+        alert("Erreur lors de la suppression : " + err.message);
       }
     }
   };
@@ -611,8 +655,8 @@ const Students: React.FC = () => {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="secondary" onClick={() => setModalOpen(false)}>{t('cancel', 'Annuler')}</button>
-            <button type="submit">{t('save', 'Enregistrer')}</button>
+            <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isSaving}>{t('cancel', 'Annuler')}</button>
+            <button type="submit" disabled={isSaving}>{isSaving ? 'Enregistrement...' : t('save', 'Enregistrer')}</button>
           </div>
         </form>
       </Modal>
