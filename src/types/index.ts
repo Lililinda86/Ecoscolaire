@@ -142,6 +142,36 @@ export interface Student {
   emergencyContact?: string;
 }
 
+export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
+
+export interface StudentImportJobSummary {
+  processedCount: number;
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  failedCount: number;
+}
+
+export interface StudentImportJob {
+  id: string; // jobId
+  schoolId: string;
+  status: StudentImportJobStatus;
+  storagePath: string;
+  totalRows: number;
+  processedCount: number;
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  errorLogPath?: string;
+  createdBy: string;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
 export interface Staff {
   id: string;
   schoolId?: string;

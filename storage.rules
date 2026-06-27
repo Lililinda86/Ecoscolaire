@@ -16,6 +16,26 @@ service firebase.storage {
                      (request.auth.token.schoolId == schoolId && (request.auth.token.role == 'owner' || request.auth.token.role == 'director'))
                    );
     }
+    // Dossier pour les données d'import Excel massif (JSON)
+    match /import_jobs_data/{schoolId}/{jobId}.json {
+      // Lecture : Backend et utilisateurs autorisés de l'école (superAdmin inclus)
+      allow read: if request.auth != null && 
+                  (request.auth.token.role == 'superAdmin' || request.auth.token.schoolId == schoolId);
+      
+      // Écriture : Création autorisée pour ceux qui gèrent la pédagogie.
+      // Overwrite (mise à jour) interdit pour empêcher un client de changer les données après que la CF ait commencé.
+      // Seul le Backend (Cloud Function) bypass cette règle et a tous les droits.
+      allow create: if request.auth != null && 
+                    (request.auth.token.role == 'superAdmin' || 
+                     (request.auth.token.schoolId == schoolId && 
+                      (request.auth.token.role == 'owner' || request.auth.token.role == 'director' || request.auth.token.role == 'secretary')
+                     )
+                    ) &&
+                    request.resource.size < 10 * 1024 * 1024 && // Max 10MB
+                    request.resource.contentType == 'application/json';
+      allow update: if false; // Interdit pour le client d'écraser un fichier existant (Sécurité)
+      allow delete: if false; // Interdit pour le client
+    }
 
     // Protection par défaut sur l'ensemble du bucket (verrouillage total)
     match /{allPaths=**} {

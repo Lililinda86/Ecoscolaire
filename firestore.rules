@@ -240,6 +240,20 @@ service cloud.firestore {
       allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
     }
 
+    // --- STUDENT IMPORT JOBS ---
+    match /student_import_jobs/{jobId} {
+      allow read: if isAuthenticated() && isActive() && (isSuperAdmin() || hasSchoolAccess(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.status == 'PENDING'
+                    && request.resource.data.processedCount == 0
+                    && request.resource.data.createdCount == 0
+                    && request.resource.data.updatedCount == 0
+                    && request.resource.data.skippedCount == 0
+                    && request.resource.data.failedCount == 0
+                    && request.resource.data.storagePath.matches('^import_jobs_data/' + request.resource.data.schoolId + '/.*');
+      allow update, delete: if false; // Only Cloud Functions (Admin SDK) can update/delete
+    }
+
     // --- GRADES & ATTENDANCE ---
     match /audit_logs/{logId} {
       allow create: if isAuthenticated();
