@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 
 const Students: React.FC = () => {
   const { t } = useI18n();
@@ -117,12 +117,6 @@ const Students: React.FC = () => {
       alert("Veuillez choisir une classe !");
       return;
     }
-    
-    // SaaS Limit Check for creation
-    if (!isEditing && limitReached) {
-      alert("La limite du nombre d'élèves pour votre abonnement SaaS a été atteinte. Veuillez passer au plan supérieur.");
-      return;
-    }
 
     setIsSaving(true);
     try {
@@ -162,13 +156,38 @@ const Students: React.FC = () => {
         if (idx !== -1) db.students[idx] = finalStudent;
         
       } else {
+        if (!currentSchool) throw new Error("École non définie.");
         const studentId = finalStudent.id || crypto.randomUUID();
         finalStudent.id = studentId;
         const studentRef = doc(firestoreDb, 'students', studentId);
-        await setDoc(studentRef, finalStudent);
+        const schoolRef = doc(firestoreDb, 'schools', currentSchool.id);
+        
+        await runTransaction(firestoreDb, async (transaction) => {
+          const schoolDoc = await transaction.get(schoolRef);
+          if (!schoolDoc.exists()) {
+            throw new Error("NOT_FOUND_SCHOOL");
+          }
+          
+          const schoolData = schoolDoc.data();
+          const currentCount = schoolData.studentCount || 0;
+          const limit = getStudentLimit(schoolData as any);
+          
+          if (currentCount >= limit) {
+            throw new Error("QUOTA_EXCEEDED");
+          }
+          
+          const studentDoc = await transaction.get(studentRef);
+          if (studentDoc.exists()) {
+            throw new Error("ALREADY_EXISTS");
+          }
+          
+          transaction.set(studentRef, finalStudent);
+          transaction.update(schoolRef, { studentCount: currentCount + 1 });
+        });
         
         // Mutate local state
         db.students.push(finalStudent);
+        currentSchool.studentCount = (currentSchool.studentCount || 0) + 1;
       }
 
       setRefresh(r => r + 1);
@@ -181,7 +200,19 @@ const Students: React.FC = () => {
         targetName: finalStudent.name as string
       });
     } catch (err: any) {
-      alert("Erreur lors de l'enregistrement : " + err.message);
+      if (err.message === 'QUOTA_EXCEEDED') {
+        alert("Action refusée : La limite de votre abonnement SaaS est atteinte. Veuillez passer au plan supérieur.");
+      } else if (err.message === 'ALREADY_EXISTS') {
+        alert("Erreur métier : Cet élève existe déjà ou une requête concurrente a réussi.");
+      } else if (err.code === 'permission-denied') {
+        alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
+      } else if (err.code === 'unavailable' || !navigator.onLine) {
+        alert("Erreur réseau : Impossible de vérifier le quota hors ligne. Veuillez vous reconnecter.");
+      } else if (err.code === 'aborted') {
+        alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
+      } else {
+        alert("Erreur lors de l'enregistrement : " + err.message);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -195,11 +226,30 @@ const Students: React.FC = () => {
       
       try {
         if (canDeleteDirectly) {
-          await deleteDoc(doc(firestoreDb, 'students', student.id));
+          const studentRef = doc(firestoreDb, 'students', student.id);
+          const schoolRef = doc(firestoreDb, 'schools', currentSchool.id);
+          
+          await runTransaction(firestoreDb, async (transaction) => {
+            const studentDoc = await transaction.get(studentRef);
+            if (!studentDoc.exists()) {
+               throw new Error("NOT_FOUND");
+            }
+            
+            const schoolDoc = await transaction.get(schoolRef);
+            if (!schoolDoc.exists()) throw new Error("NOT_FOUND_SCHOOL");
+            
+            const schoolData = schoolDoc.data();
+            const currentCount = schoolData.studentCount || 0;
+            const newCount = Math.max(0, currentCount - 1);
+            
+            transaction.delete(studentRef);
+            transaction.update(schoolRef, { studentCount: newCount });
+          });
           
           // Mutate local state
           const idx = db.students.findIndex(s => s.id === student.id);
           if (idx !== -1) db.students.splice(idx, 1);
+          currentSchool.studentCount = Math.max(0, (currentSchool.studentCount || 0) - 1);
           setRefresh(r => r + 1);
           
           alert("Élève supprimé avec succès.");
@@ -234,7 +284,17 @@ const Students: React.FC = () => {
           alert("Demande de suppression envoyée pour validation (Directeur / Super Admin).");
         }
       } catch (err: any) {
-        alert("Erreur lors de la suppression : " + err.message);
+        if (err.message === 'NOT_FOUND') {
+          alert("Erreur métier : Cet élève n'existe pas ou a déjà été supprimé.");
+        } else if (err.code === 'permission-denied') {
+          alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
+        } else if (err.code === 'unavailable' || !navigator.onLine) {
+          alert("Erreur réseau : Impossible d'effectuer l'action hors ligne. Veuillez vous reconnecter.");
+        } else if (err.code === 'aborted') {
+          alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
+        } else {
+          alert("Erreur lors de la suppression : " + err.message);
+        }
       }
     }
   };
