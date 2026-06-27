@@ -38,6 +38,12 @@ try {
     
   check('Test 4 : db.students.length retiré des décisions', 
     !saveBlock.includes('db.students.length') && !deleteBlock.includes('db.students.length'));
+
+  check('Test 4b: isStudentLimitReached n_utilise plus db.students.length prioritairement',
+    !studentsContent.includes('isStudentLimitReached(currentSchool, db.students.length)'));
+    
+  check('Test 4c: Le bouton Ajouter n_est plus bloque par limitReached',
+    !studentsContent.includes('disabled={isSchoolSuspended || limitReached}'));
     
   console.log("--- SIMULATION CONCURRENTE ---");
   

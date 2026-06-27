@@ -22,8 +22,9 @@ const Students: React.FC = () => {
   
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
-  const limitReached = isStudentLimitReached(currentSchool, db.students.length);
-  const limitLabel = getStudentLimitLabel(currentSchool, db.students.length);
+  const currentCountDisplay = currentSchool?.studentCount ?? db.students.length;
+  const limitReached = isStudentLimitReached(currentSchool, currentCountDisplay);
+  const limitLabel = getStudentLimitLabel(currentSchool, currentCountDisplay);
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
   const [parentEmailsInput, setParentEmailsInput] = useState('');
   
@@ -501,7 +502,7 @@ const Students: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <h1 style={{ margin: 0 }}>{t('students', 'Élèves')}</h1>
           <div style={{ padding: '0.4rem 0.8rem', background: limitReached ? '#fee2e2' : '#eef2ff', color: limitReached ? '#dc2626' : '#4338ca', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 500 }}>
-            Capacité SaaS : {limitLabel}
+            Capacité SaaS : {limitLabel} (Synchronisé avec le serveur)
           </div>
         </div>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -514,7 +515,7 @@ const Students: React.FC = () => {
           <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended}>
             <FileSpreadsheet size={18} /> Importer Excel
           </button>
-          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended || limitReached} title={limitReached ? "Limite SaaS atteinte" : ""}>
+          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
             <Plus size={18} /> {t('add', 'Ajouter')}
           </button>
         </div>
