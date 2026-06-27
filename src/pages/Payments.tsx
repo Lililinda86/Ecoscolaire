@@ -8,11 +8,12 @@ import ReceiptHistory from '../components/ReceiptHistory';
 import FinanceDashboard from '../components/FinanceDashboard';
 import { Plus, Minus, Wallet, ClipboardList, Trash2, History, FileText, TrendingUp } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
-import { functions } from '../db/firebase';
+import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
+import { doc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 
 const Payments: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
 
   const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
@@ -35,12 +36,19 @@ const Payments: React.FC = () => {
   const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({ date: new Date().toISOString().split('T')[0], type: 'tuition' });
   const [modalExpectedAmount, setModalExpectedAmount] = useState(0);
   const [isConfirmingTx, setIsConfirmingTx] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0] });
 
   const handleOpenModal = () => {
-    setCurrentPayment({ date: new Date().toISOString().split('T')[0], type: 'tuition', installment: 'T1', amount: 0 });
+    setCurrentPayment({ 
+      id: crypto.randomUUID(),
+      date: new Date().toISOString().split('T')[0], 
+      type: 'tuition', 
+      installment: 'T1', 
+      amount: 0 
+    });
     setPaymentMethod('cash');
     setParentPhone('');
     setIsProcessingMoMo(false);
@@ -55,7 +63,7 @@ const Payments: React.FC = () => {
 
   const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPayment.studentId) return;
+    if (!currentPayment.studentId || isSaving) return;
 
     if (paymentMethod === 'mobile_money') {
       if (!parentPhone || parentPhone.length < 9 || !parentPhone.startsWith('237') || !/^\d+$/.test(parentPhone)) {
@@ -102,74 +110,78 @@ const Payments: React.FC = () => {
       }
     }
 
-    const newDb = { ...db };
-    
-    // Update student's expected amount on the fly
-    const student = newDb.students.find(s => s.id === currentPayment.studentId);
-    if (student && currentPayment.type !== 'other') {
-       if (currentPayment.type === 'tuition') {
-           if (currentPayment.installment === 'T1') student.feeT1 = modalExpectedAmount;
-           if (currentPayment.installment === 'T2') student.feeT2 = modalExpectedAmount;
-           if (currentPayment.installment === 'T3') student.feeT3 = modalExpectedAmount;
-       } else if (currentPayment.type === 'transport') {
-           student.feeTransport = modalExpectedAmount;
-       } else if (currentPayment.type === 'uniforms') {
-           student.feeUniforms = modalExpectedAmount;
-       }
+    setIsSaving(true);
+    try {
+      const paymentId = currentPayment.id || crypto.randomUUID();
+      const newPayment = { 
+        ...currentPayment, 
+        id: paymentId,
+        method: paymentMethod,
+        transactionId: undefined,
+        schoolId: currentSchool!.id
+      } as Payment;
+      
+      // Option A - Safe minimal: On ne modifie plus student.feeT1/T2 aveuglément pour éviter les Lost Updates.
+      // Le paiement est strictement append-only et idempotent.
+      await setDoc(doc(firestoreDb, 'payments', paymentId), newPayment);
+
+      setModalOpen(false);
+      logAuditAction({
+        action: 'CREATE_PAYMENT',
+        targetType: 'PAYMENT',
+        targetId: newPayment.id,
+        targetName: `Paiement ${newPayment.amount} FCFA - ${newPayment.type}`
+      });
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors de l'enregistrement: " + err.message);
+    } finally {
+      setIsSaving(false);
     }
-
-    const newPayment = { 
-      ...currentPayment, 
-      id: crypto.randomUUID(),
-      method: paymentMethod,
-      transactionId: undefined
-    } as Payment;
-
-    newDb.payments.push(newPayment);
-    saveDB(newDb);
-    setModalOpen(false);
-
-    logAuditAction({
-      action: 'CREATE_PAYMENT',
-      targetType: 'PAYMENT',
-      targetId: newPayment.id,
-      targetName: `Paiement ${newPayment.amount} FCFA - ${newPayment.type}`
-    });
   };
 
-  const handleSaveExpense = (e: React.FormEvent) => {
+  const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentExpense.amount || !currentExpense.person || !currentUser || !currentSchool) return;
     
-    const amount = currentExpense.amount;
-    const canSaveDirectly = amount <= 50000 || ['superAdmin', 'owner'].includes(currentUser.role);
-    
-    const newDb = { ...db, expenses: [...(db.expenses || [])] };
-    const expenseObj: Expense = { ...currentExpense, id: crypto.randomUUID() } as Expense;
-    
-    if (canSaveDirectly) {
-      newDb.expenses.push(expenseObj);
-      saveDB(newDb);
-      alert("Dépense enregistrée avec succès.");
-    } else {
-      if (!newDb.validation_requests) newDb.validation_requests = [];
-      newDb.validation_requests.push({
+    setIsSaving(true);
+    try {
+      const amount = currentExpense.amount;
+      const canSaveDirectly = amount <= 50000 || ['superAdmin', 'owner'].includes(currentUser.role);
+      
+      const expenseObj: Expense = { 
+        ...currentExpense, 
         id: crypto.randomUUID(),
-        schoolId: currentSchool.id,
-        requesterId: currentUser.id,
-        requesterRole: currentUser.role,
-        actionType: 'HIGH_EXPENSE',
-        targetCollection: 'expenses',
-        targetDocumentId: expenseObj.id,
-        proposedData: expenseObj,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      });
-      saveDB(newDb);
-      alert(`Dépense de ${amount} FCFA soumise pour validation au Fondateur.`);
+        schoolId: currentSchool.id 
+      } as Expense;
+      
+      if (canSaveDirectly) {
+        await setDoc(doc(firestoreDb, 'expenses', expenseObj.id), expenseObj);
+        alert("Dépense enregistrée avec succès.");
+      } else {
+        const reqId = crypto.randomUUID();
+        await setDoc(doc(firestoreDb, 'validation_requests', reqId), {
+          id: reqId,
+          schoolId: currentSchool.id,
+          requesterId: currentUser.id,
+          requesterRole: currentUser.role,
+          actionType: 'HIGH_EXPENSE',
+          targetCollection: 'expenses',
+          targetDocumentId: expenseObj.id,
+          proposedData: expenseObj,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        });
+        alert(`Dépense de ${amount} FCFA soumise pour validation au Fondateur.`);
+      }
+      
+      setExpenseModalOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors de l'enregistrement de la dépense: " + err.message);
+    } finally {
+      setIsSaving(false);
     }
-    
-    setExpenseModalOpen(false);
   };
 
   const checkPin = () => {
@@ -178,17 +190,23 @@ const Payments: React.FC = () => {
     return pin === targetPin || pin === '778899';
   };
 
-  const handleDeletePayment = (id: string) => {
+  const handleDeletePayment = async (id: string) => {
     if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
     if (window.confirm('Voulez-vous vraiment supprimer cet encaissement ? Cela annulera le paiement.')) {
-      const newDb = { ...db, payments: db.payments.filter(p => p.id !== id) };
-      saveDB(newDb);
-      logAuditAction({
-        action: 'DELETE_PAYMENT',
-        targetType: 'PAYMENT',
-        targetId: id,
-        targetName: 'Paiement supprimé'
-      });
+      setIsSaving(true);
+      try {
+        await deleteDoc(doc(firestoreDb, 'payments', id));
+        logAuditAction({
+          action: 'DELETE_PAYMENT',
+          targetType: 'PAYMENT',
+          targetId: id,
+          targetName: 'Paiement supprimé'
+        });
+      } catch (err: any) {
+        alert("Erreur lors de la suppression: " + err.message);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -200,31 +218,40 @@ const Payments: React.FC = () => {
       const result = await mockConfirmPayment({ transactionId });
       const data = result.data as any;
       console.log(`[FRONTEND] Réponse de mockConfirmPayment:`, data);
+      
       if (data.success) {
         alert(data.message || "Paiement simulé avec succès.");
-        const newDb = { ...db };
-        if (newDb.transactions) {
-          const txIndex = newDb.transactions.findIndex((t: any) => t.id === transactionId);
-          if (txIndex > -1) {
-            const tx = newDb.transactions[txIndex];
-            newDb.transactions[txIndex] = { ...tx, status: 'SUCCESS' };
-            
-            if (!data.alreadyConfirmed) {
-              newDb.payments.push({
-                id: transactionId,
-                schoolId: tx.schoolId,
-                studentId: tx.studentId,
-                amount: tx.amount,
-                type: tx.type,
-                method: 'mobile_money',
-                installment: tx.installment || null,
-                date: new Date().toISOString().split('T')[0],
-                transactionId: transactionId
-              } as any);
-            }
-            saveDB(newDb);
+        
+        await runTransaction(firestoreDb, async (transaction) => {
+          const txRef = doc(firestoreDb, 'transactions', transactionId);
+          const txSnap = await transaction.get(txRef);
+          
+          if (!txSnap.exists()) {
+            throw new Error("Transaction introuvable");
           }
-        }
+          
+          const txData = txSnap.data();
+          if (txData.status === 'SUCCESS') {
+            return;
+          }
+          
+          transaction.update(txRef, { status: 'SUCCESS' });
+          
+          if (!data.alreadyConfirmed) {
+            const paymentRef = doc(firestoreDb, 'payments', transactionId);
+            transaction.set(paymentRef, {
+              id: transactionId,
+              schoolId: txData.schoolId,
+              studentId: txData.studentId,
+              amount: txData.amount,
+              type: txData.type,
+              method: 'mobile_money',
+              installment: txData.installment || null,
+              date: new Date().toISOString().split('T')[0],
+              transactionId: transactionId
+            });
+          }
+        });
       } else {
          console.error(`[FRONTEND] Erreur retournée par mockConfirmPayment:`, data);
          alert("Erreur lors de la simulation.");
@@ -236,11 +263,17 @@ const Payments: React.FC = () => {
     setIsConfirmingTx(null);
   };
 
-  const handleDeleteExpense = (id: string) => {
+  const handleDeleteExpense = async (id: string) => {
     if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
     if (window.confirm("Voulez-vous vraiment annuler cette sortie d'argent ?")) {
-      const newDb = { ...db, expenses: (db.expenses||[]).filter(e => e.id !== id) };
-      saveDB(newDb);
+      setIsSaving(true);
+      try {
+        await deleteDoc(doc(firestoreDb, 'expenses', id));
+      } catch (err: any) {
+        alert("Erreur lors de l'annulation: " + err.message);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -854,9 +887,9 @@ const Payments: React.FC = () => {
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isProcessingMoMo || momoSuccess}>Annuler</button>
-            <button type="submit" disabled={isProcessingMoMo || momoSuccess} style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)' }}>
-              {paymentMethod === 'cash' ? "Enregistrer l'encaissement" : "Lancer le paiement Mobile"}
+            <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isProcessingMoMo || momoSuccess || isSaving}>Annuler</button>
+            <button type="submit" disabled={isProcessingMoMo || momoSuccess || isSaving} style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)' }}>
+              {isSaving ? "Enregistrement..." : (paymentMethod === 'cash' ? "Enregistrer l'encaissement" : "Lancer le paiement Mobile")}
             </button>
           </div>
         </form>
@@ -884,8 +917,10 @@ const Payments: React.FC = () => {
             <input required placeholder="Nom de l'enseignant, du fournisseur..." value={currentExpense.person || ''} onChange={e => setCurrentExpense({...currentExpense, person: e.target.value})} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="secondary" onClick={() => setExpenseModalOpen(false)}>Annuler</button>
-            <button type="submit" style={{ background: 'var(--danger)' }}>Confirmer le retrait</button>
+            <button type="button" className="secondary" onClick={() => setExpenseModalOpen(false)} disabled={isSaving}>Annuler</button>
+            <button type="submit" disabled={isSaving} style={{ background: 'var(--danger)' }}>
+              {isSaving ? "Retrait en cours..." : "Confirmer le retrait"}
+            </button>
           </div>
         </form>
       </Modal>
