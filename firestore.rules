@@ -39,6 +39,8 @@ service cloud.firestore {
         'isInternalSchool', 
         'studentLimit', 
         'studentsCount',
+        'studentCount',
+        'pilot',
         'billingStatus', 
         'billingCycle', 
         'trialEndsAt'

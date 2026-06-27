@@ -33,6 +33,12 @@ try {
   const diagnosticContent = fs.readFileSync(diagnosticPath, 'utf8');
   check('Diagnostic.tsx inclut la réconciliation de studentCount', diagnosticContent.includes('reconcileStudentCount'));
   check('Diagnostic.tsx modifie schools via updateDoc', diagnosticContent.includes('updateDoc(doc(firestoreDb, \'schools\''));
+  check('Diagnostic.tsx vérifie le rôle superAdmin', diagnosticContent.includes('currentUser?.role !== \'superAdmin\'') && diagnosticContent.includes('currentUser?.role === \'superAdmin\''));
+  
+  // Verify firestore.rules
+  const rulesPath = path.join(process.cwd(), 'firestore.rules');
+  const rulesContent = fs.readFileSync(rulesPath, 'utf8');
+  check('firestore.rules protège studentCount', rulesContent.includes('\'studentCount\'') && rulesContent.includes('isUpdatingSaasFields'));
   
   // Verify forbidden files were not modified
   const diffOutput = execSync('git diff --name-only HEAD').toString();
@@ -41,8 +47,7 @@ try {
   const forbiddenFiles = [
     'src/pages/Students.tsx',
     'src/pages/Payments.tsx',
-    'src/context/AppContext.tsx',
-    'firestore.rules'
+    'src/context/AppContext.tsx'
   ];
   
   let scopeViolated = false;

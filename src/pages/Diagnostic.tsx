@@ -140,6 +140,11 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
   };
 
   const reconcileStudentCount = async () => {
+    if (currentUser?.role !== 'superAdmin') {
+      setTestResult("❌ Accès refusé : Seul le superAdmin peut exécuter cette action.");
+      return;
+    }
+    
     if (!currentSchool) {
       setTestResult("❌ Veuillez sélectionner une école pour la réconciliation.");
       return;
@@ -242,13 +247,15 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
                 <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
               </label>
               
-              <button 
-                onClick={reconcileStudentCount}
-                style={{ background: '#0284c7', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
-                title="Recalculer et corriger le nombre d'élèves pour l'école en cours"
-              >
-                Recalculer les quotas élèves (Self-Healing)
-              </button>
+              {currentUser?.role === 'superAdmin' && (
+                <button 
+                  onClick={reconcileStudentCount}
+                  style={{ background: '#0284c7', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                  title="Recalculer et corriger le nombre d'élèves pour l'école en cours"
+                >
+                  Recalculer les quotas élèves (Self-Healing)
+                </button>
+              )}
             </div>
 
             {testResult && (
