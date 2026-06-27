@@ -4,7 +4,7 @@ import { Activity, Database, Server, Users, Building, ChevronLeft, ShieldCheck, 
 import { useNavigate } from 'react-router-dom';
 
 const Diagnostic: React.FC = () => {
-  const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, supervisionSchoolId } = useAppContext();
+  const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, supervisionSchoolId, currentSchool } = useAppContext();
   const navigate = useNavigate();
   const [testResult, setTestResult] = useState<string | null>(null);
   const [directFetchData, setDirectFetchData] = useState<any>(null);
@@ -139,6 +139,47 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
     event.target.value = ''; // Reset input
   };
 
+  const reconcileStudentCount = async () => {
+    if (!currentSchool) {
+      setTestResult("❌ Veuillez sélectionner une école pour la réconciliation.");
+      return;
+    }
+    
+    try {
+      setTestResult("Recalcul en cours...");
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { doc, updateDoc, collection, getDocs, query, where } = await import('firebase/firestore');
+      
+      const q = query(collection(firestoreDb, 'students'), where('schoolId', '==', currentSchool.id));
+      const snap = await getDocs(q);
+      const realCount = snap.size;
+      
+      const currentCount = currentSchool.studentCount !== undefined ? currentSchool.studentCount : 'NON DÉFINI';
+      
+      if (realCount === currentSchool.studentCount) {
+        setTestResult(`✅ Le compteur est déjà correct : ${realCount} élèves trouvés.`);
+        return;
+      }
+      
+      const conf = window.confirm(`Écart détecté !
+Compteur actuel : ${currentCount}
+Élèves réels : ${realCount}
+
+Voulez-vous corriger le compteur sur la base de données Firestore ?`);
+      
+      if (conf) {
+        await updateDoc(doc(firestoreDb, 'schools', currentSchool.id), {
+          studentCount: realCount
+        });
+        setTestResult(`✅ Correction effectuée. Nouveau studentCount : ${realCount}. Rafraîchissez la page.`);
+      } else {
+        setTestResult(`⚠️ Réconciliation annulée. L'écart persiste (Actuel: ${currentCount}, Réel: ${realCount}).`);
+      }
+    } catch (err: any) {
+      setTestResult(`❌ Erreur lors de la réconciliation : ${err.message}`);
+    }
+  };
+
   const firebaseConfigValues = {
     projectId: "ecoscolaire-c5861",
     authDomain: "ecoscolaire-c5861.firebaseapp.com",
@@ -200,6 +241,14 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
                 Restaurer Firestore (Import JSON)
                 <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
               </label>
+              
+              <button 
+                onClick={reconcileStudentCount}
+                style={{ background: '#0284c7', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                title="Recalculer et corriger le nombre d'élèves pour l'école en cours"
+              >
+                Recalculer les quotas élèves (Self-Healing)
+              </button>
             </div>
 
             {testResult && (

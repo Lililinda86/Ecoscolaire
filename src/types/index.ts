@@ -23,6 +23,7 @@ export interface School {
   subscriptionEndDate?: string;
   trialEndsAt?: string;
   isInternalSchool?: boolean;
+  studentCount?: number;
   amountPaid?: number;
   nextPaymentDate?: string;
   // --- Fin champs SaaS ---
