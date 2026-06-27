@@ -19,5 +19,18 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: "CallExpression[callee.name='saveDB']",
+          message: "P0-003: L'utilisation de saveDB() est un anti-pattern causant des Lost Updates. Utilisez updateDoc() ou runTransaction()."
+        },
+        {
+          selector: "CallExpression[callee.name='setDoc'][arguments.length<3]",
+          message: "P0-003: setDoc sans option {merge: true} écrase le document entier. Ajoutez {merge: true} ou utilisez updateDoc()."
+        }
+      ]
+    }
   },
 ])
