@@ -2,6 +2,7 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 import { normalizeRows } from './studentImportNormalizer';
 import { runDiscovery } from './studentImportDiscovery';
+import { reserveStudentImportQuota } from './studentImportQuota';
 
 // Trigger on document creation in student_import_jobs
 export const processStudentImportJob = onDocumentCreated(
@@ -113,15 +114,26 @@ export const processStudentImportJob = onDocumentCreated(
       const discoveryResult = await runDiscovery(db, normalizedData, currentStudentCount, studentLimit);
 
       if (!discoveryResult.quotaCheck.passed) {
-        throw new Error(`QUOTA_EXCEEDED: Cannot import ${discoveryResult.summary.newStudents} new students. Limit is ${discoveryResult.quotaCheck.limit}, future count would be ${discoveryResult.quotaCheck.futureCount}`);
+        throw new Error(`QUOTA_EXCEEDED`); // Will be caught by global handler
       }
 
-      // 5. Set final status for Phase 2B
+      // 5. Transition to VALIDATING_COMPLETE (End of Phase 2B)
       await jobRef.update({
         status: 'VALIDATING_COMPLETE',
         discoverySummary: discoveryResult.summary,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
+
+      // 6. Phase 2C: Quota Reservation
+      const quotaRes = await reserveStudentImportQuota(db, jobId, schoolId, discoveryResult.summary.newStudents, discoveryResult.summary);
+      
+      if (!quotaRes.success) {
+        console.log(`Quota reservation failed: ${quotaRes.errorCode}`);
+        return; // Job is already marked as FAILED inside reserveStudentImportQuota
+      }
+
+      // Job is now RUNNING and quota is reserved.
+      // Phase 2D (BulkWriter) will follow here.
 
     } catch (error: any) {
       console.error(`Error processing job ${jobId}:`, error);
