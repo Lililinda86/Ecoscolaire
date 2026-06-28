@@ -105,13 +105,7 @@ export async function reserveStudentImportQuota(
       // It's a business logic failure we explicitly threw
       // We must mark the job as failed, except for JOB_NOT_FOUND (can't update it)
       if (errorCode !== 'JOB_NOT_FOUND' && errorCode !== 'INVALID_JOB_STATUS') {
-        // We do this outside the main transaction to ensure it saves even if transaction aborted
-        await jobRef.update({
-          status: 'FAILED',
-          errorCode: errorCode,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          finishedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+        await markImportJobFailedIfCurrent(db, jobId, errorCode, error.message);
       }
       return { success: false, errorCode, reservedCount: 0 };
     }
@@ -119,4 +113,39 @@ export async function reserveStudentImportQuota(
     // Unhandled / Transaction aborted / Permission denied
     return { success: false, errorCode: 'TRANSACTION_ERROR', errorMessage: error.message, reservedCount: 0 };
   }
+}
+
+/**
+ * Safely marks a job as FAILED without risking overwriting a more advanced state.
+ * Prevents FAILED UPDATE RACE conditions.
+ */
+export async function markImportJobFailedIfCurrent(
+  db: FirebaseFirestore.Firestore,
+  jobId: string,
+  errorCode: string,
+  errorMessage: string
+): Promise<void> {
+  const jobRef = db.collection('student_import_jobs').doc(jobId);
+
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(jobRef);
+    if (!snap.exists) return;
+
+    const data = snap.data() || {};
+    const status = data.status;
+
+    // Terminal or running states must NEVER be overwritten by an old failure
+    if (['RUNNING', 'SUCCESS', 'PARTIAL_SUCCESS', 'FAILED'].includes(status)) {
+      return; // no-op
+    }
+
+    // Eligible states (PENDING, VALIDATING, VALIDATING_COMPLETE)
+    transaction.update(jobRef, {
+      status: 'FAILED',
+      errorCode,
+      errorMessage,
+      finishedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  });
 }

@@ -191,6 +191,65 @@ async function runTests() {
     assert.strictEqual(db.getSchoolData().studentCount, 10); // Remains untouched by THIS transaction
   });
 
+  // 11. markImportJobFailedIfCurrent: VALIDATING_COMPLETE -> FAILED
+  await testCase('11. markImportJobFailedIfCurrent: VALIDATING_COMPLETE -> FAILED', async () => {
+    const db = createDbMock({ status: 'VALIDATING_COMPLETE' }, null);
+    const { markImportJobFailedIfCurrent } = require('../../functions/lib/studentImportQuota.js');
+    await markImportJobFailedIfCurrent(db, 'job1', 'ERR_CODE', 'Msg');
+    assert.strictEqual(db.getJobData().status, 'FAILED');
+    assert.strictEqual(db.getJobData().errorCode, 'ERR_CODE');
+  });
+
+  // 12. markImportJobFailedIfCurrent: RUNNING -> reste RUNNING
+  await testCase('12. markImportJobFailedIfCurrent: RUNNING -> reste RUNNING', async () => {
+    const db = createDbMock({ status: 'RUNNING' }, null);
+    const { markImportJobFailedIfCurrent } = require('../../functions/lib/studentImportQuota.js');
+    await markImportJobFailedIfCurrent(db, 'job1', 'ERR_CODE', 'Msg');
+    assert.strictEqual(db.getJobData().status, 'RUNNING');
+    assert.strictEqual(db.getJobData().errorCode, undefined);
+  });
+
+  // 13. markImportJobFailedIfCurrent: SUCCESS -> reste SUCCESS
+  await testCase('13. markImportJobFailedIfCurrent: SUCCESS -> reste SUCCESS', async () => {
+    const db = createDbMock({ status: 'SUCCESS' }, null);
+    const { markImportJobFailedIfCurrent } = require('../../functions/lib/studentImportQuota.js');
+    await markImportJobFailedIfCurrent(db, 'job1', 'ERR_CODE', 'Msg');
+    assert.strictEqual(db.getJobData().status, 'SUCCESS');
+  });
+
+  // 14. markImportJobFailedIfCurrent: PARTIAL_SUCCESS -> reste PARTIAL_SUCCESS
+  await testCase('14. markImportJobFailedIfCurrent: PARTIAL_SUCCESS -> reste PARTIAL_SUCCESS', async () => {
+    const db = createDbMock({ status: 'PARTIAL_SUCCESS' }, null);
+    const { markImportJobFailedIfCurrent } = require('../../functions/lib/studentImportQuota.js');
+    await markImportJobFailedIfCurrent(db, 'job1', 'ERR_CODE', 'Msg');
+    assert.strictEqual(db.getJobData().status, 'PARTIAL_SUCCESS');
+  });
+
+  // 15. markImportJobFailedIfCurrent: FAILED -> no-op
+  await testCase('15. markImportJobFailedIfCurrent: FAILED -> no-op', async () => {
+    const db = createDbMock({ status: 'FAILED', errorCode: 'INITIAL_ERROR' }, null);
+    const { markImportJobFailedIfCurrent } = require('../../functions/lib/studentImportQuota.js');
+    await markImportJobFailedIfCurrent(db, 'job1', 'NEW_ERR', 'Msg');
+    assert.strictEqual(db.getJobData().status, 'FAILED');
+    assert.strictEqual(db.getJobData().errorCode, 'INITIAL_ERROR'); // Not overwritten
+  });
+
+  // 16. markImportJobFailedIfCurrent: Concurrent race
+  await testCase('16. markImportJobFailedIfCurrent: Concurrent race -> RUNNING wins', async () => {
+    const db = createDbMock({ status: 'VALIDATING_COMPLETE' }, null);
+    db.runTransaction = async (cb) => {
+      // Simulate that just before this transaction commits, another instance set status to RUNNING
+      db.getJobData().status = 'RUNNING';
+      return await cb({
+        get: async (ref) => ref.mockGet(),
+        update: (ref, data) => ref.mockUpdate(data)
+      });
+    };
+    const { markImportJobFailedIfCurrent } = require('../../functions/lib/studentImportQuota.js');
+    await markImportJobFailedIfCurrent(db, 'job1', 'ERR_CODE', 'Msg');
+    assert.strictEqual(db.getJobData().status, 'RUNNING'); // It did not get overwritten to FAILED
+  });
+
   console.log(`\n=== RÉSULTATS: ${passed} PASS, ${failed} FAIL ===`);
   if (failed > 0) process.exit(1);
 }
