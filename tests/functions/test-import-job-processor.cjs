@@ -181,6 +181,52 @@ async function runTests() {
     'PROCESSOR_PHASE_1_ERROR'
   );
 
+  // 8. Global FAILED RACE ELIMINATION (catch race)
+  console.log(`\nTEST: 8. Global FAILED RACE ELIMINATION (catch race)`);
+  const docRef8 = dbMock.collection('student_import_jobs').doc('job1');
+  docRef8.updates = [];
+  let state8 = { status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 };
+  docRef8.setState({ exists: true, data: () => state8 });
+  docRef8.mockUpdate = (data) => { Object.assign(state8, data); docRef8.updates.push(data); };
+  
+  // Force a JSON error to trigger the catch block
+  const fileMock8 = storageMock.bucket().file('import_jobs_data/school1/job1.json');
+  fileMock8.setState({ exists: true, content: 'INVALID_JSON_RACE' });
+
+  // Hook runTransaction to simulate instance B updating to RUNNING right before the catch block's transaction commits
+  const originalRunTx = dbMock.runTransaction;
+  dbMock.runTransaction = async (cb) => {
+    if (docRef8.mockGet().data().status !== 'PENDING') {
+      // When markImportJobFailedIfCurrent opens a transaction, we simulate another instance already advanced it
+      docRef8.setState({ exists: true, data: () => ({ status: 'RUNNING', schoolId: 'school1' }) });
+    }
+    return await cb({
+      get: async (ref) => ref.mockGet(),
+      update: (ref, data) => ref.mockUpdate(data)
+    });
+  };
+
+  try {
+    const handler = processStudentImportJob.__endpoint?.parsedTrigger?.run || processStudentImportJob.run;
+    await handler({
+      data: { data: docRef8.mockGet().data },
+      params: { jobId: 'job1' }
+    });
+    // The final state should still be RUNNING because markImportJobFailedIfCurrent saw RUNNING and did a no-op
+    const lastState = docRef8.mockGet().data().status;
+    if (lastState === 'RUNNING') {
+      console.log(`✅ 8. Global FAILED RACE ELIMINATION (catch race) -> PASS (Status: RUNNING)`);
+      passed++;
+    } else {
+      console.log(`❌ 8. Global FAILED RACE ELIMINATION (catch race) -> FAIL: Expected RUNNING, got ${lastState}`);
+      failed++;
+    }
+  } catch(e) {
+    console.log(`❌ 8. Global FAILED RACE ELIMINATION (catch race) -> ERROR: ${e.message}`);
+    failed++;
+  }
+  dbMock.runTransaction = originalRunTx;
+
   console.log(`\n=== RÉSULTATS: ${passed} PASS, ${failed} FAIL ===`);
   if (failed > 0) process.exit(1);
 }

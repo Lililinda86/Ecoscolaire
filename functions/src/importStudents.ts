@@ -2,7 +2,7 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 import { normalizeRows } from './studentImportNormalizer';
 import { runDiscovery } from './studentImportDiscovery';
-import { reserveStudentImportQuota } from './studentImportQuota';
+import { reserveStudentImportQuota, markImportJobFailedIfCurrent } from './studentImportQuota';
 
 // Trigger on document creation in student_import_jobs
 export const processStudentImportJob = onDocumentCreated(
@@ -137,13 +137,12 @@ export const processStudentImportJob = onDocumentCreated(
 
     } catch (error: any) {
       console.error(`Error processing job ${jobId}:`, error);
-      await jobRef.update({
-        status: 'FAILED',
-        errorCode: 'PROCESSOR_PHASE_1_ERROR',
-        errorMessage: error.message || 'Unknown error',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        finishedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      await markImportJobFailedIfCurrent(
+        db,
+        jobId,
+        'PROCESSOR_PHASE_1_ERROR',
+        error.message || 'Unknown error'
+      );
     }
   }
 );
