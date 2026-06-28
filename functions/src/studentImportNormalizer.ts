@@ -53,7 +53,12 @@ function normalizeString(str: any, toUpper = false): string {
  */
 function normalizePhone(str: any): string {
   if (typeof str !== 'string' && typeof str !== 'number') return '';
-  return String(str).replace(/[^\d+]/g, '');
+  let phone = String(str).replace(/\s+/g, '');
+  const hasPlus = phone.startsWith('+');
+  phone = phone.replace(/[^\d]/g, '');
+  if (!phone) return '';
+  if (hasPlus) return '+' + phone;
+  return phone;
 }
 
 /**
@@ -61,7 +66,19 @@ function normalizePhone(str: any): string {
  */
 function normalizeEmail(str: any): string {
   if (typeof str !== 'string') return '';
-  return str.trim().toLowerCase();
+  const email = str.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '';
+  return email;
+}
+
+/**
+ * Normalizes financial amounts
+ */
+function normalizeAmount(val: any): number {
+  if (val === null || val === undefined || val === '') return 0;
+  const num = Number(val);
+  if (!Number.isFinite(num)) return 0;
+  return num;
 }
 
 /**
@@ -156,11 +173,11 @@ export function normalizeRows(payload: any[], schoolId: string, jobId: string, t
     if (rawRow.parentPhone) safeRow.parentPhone = normalizePhone(rawRow.parentPhone);
     
     // Financials
-    if (rawRow.feeT1 != null) safeRow.feeT1 = Number(rawRow.feeT1) || 0;
-    if (rawRow.feeT2 != null) safeRow.feeT2 = Number(rawRow.feeT2) || 0;
-    if (rawRow.feeT3 != null) safeRow.feeT3 = Number(rawRow.feeT3) || 0;
-    if (rawRow.feeTransport != null) safeRow.feeTransport = Number(rawRow.feeTransport) || 0;
-    if (rawRow.feeUniforms != null) safeRow.feeUniforms = Number(rawRow.feeUniforms) || 0;
+    safeRow.feeT1 = normalizeAmount(rawRow.feeT1);
+    safeRow.feeT2 = normalizeAmount(rawRow.feeT2);
+    safeRow.feeT3 = normalizeAmount(rawRow.feeT3);
+    safeRow.feeTransport = normalizeAmount(rawRow.feeTransport);
+    safeRow.feeUniforms = normalizeAmount(rawRow.feeUniforms);
     
     if (rawRow.address) safeRow.address = normalizeString(rawRow.address);
     if (rawRow.emergencyContact) safeRow.emergencyContact = normalizeString(rawRow.emergencyContact);
