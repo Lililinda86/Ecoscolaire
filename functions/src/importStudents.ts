@@ -1,5 +1,7 @@
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
+import { normalizeRows } from './studentImportNormalizer';
+import { runDiscovery } from './studentImportDiscovery';
 
 // Trigger on document creation in student_import_jobs
 export const processStudentImportJob = onDocumentCreated(
@@ -94,26 +96,30 @@ export const processStudentImportJob = onDocumentCreated(
         throw new Error(`Row count mismatch. Expected: ${jobData.totalRows}, Got: ${payload.length}`);
       }
 
-      // 3. Basic Validation (Phase 1)
-      let validRows = 0;
-      let invalidRows = 0;
+      // 3. Normalization (Phase 2A)
+      const normalizedData = normalizeRows(payload, schoolId, jobId);
 
-      for (const row of payload) {
-        // Minimal basic validation
-        if (row && typeof row === 'object' && row.name && typeof row.name === 'string' && row.name.trim() !== '') {
-          validRows++;
-        } else {
-          invalidRows++;
-        }
+      if (normalizedData.summary.invalid > 0 && normalizedData.summary.valid === 0) {
+        throw new Error(`Basic validation failed: ${normalizedData.summary.invalid} invalid rows found`);
       }
 
-      if (invalidRows > 0) {
-        throw new Error(`Basic validation failed: ${invalidRows} invalid rows found`);
+      // 4. Discovery (Phase 2B)
+      const schoolRef = db.collection('schools').doc(schoolId);
+      const schoolSnap = await schoolRef.get();
+      const schoolData = schoolSnap.data() || {};
+      const currentStudentCount = schoolData.studentCount || 0;
+      const studentLimit = schoolData.studentLimit || Infinity;
+
+      const discoveryResult = await runDiscovery(db, normalizedData, currentStudentCount, studentLimit);
+
+      if (!discoveryResult.quotaCheck.passed) {
+        throw new Error(`QUOTA_EXCEEDED: Cannot import ${discoveryResult.summary.newStudents} new students. Limit is ${discoveryResult.quotaCheck.limit}, future count would be ${discoveryResult.quotaCheck.futureCount}`);
       }
 
-      // 4. Set final status for Phase 1
+      // 5. Set final status for Phase 2B
       await jobRef.update({
         status: 'VALIDATING_COMPLETE',
+        discoverySummary: discoveryResult.summary,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 

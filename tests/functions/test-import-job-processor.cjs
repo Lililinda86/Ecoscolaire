@@ -10,8 +10,14 @@ const dbMock = {
       update: (ref, data) => ref.mockUpdate(data)
     });
   },
+  getAll: async (...docRefs) => {
+    return docRefs.map(ref => ({ exists: false }));
+  },
   collection: (path) => ({
     doc: (id) => {
+      if (path === 'schools') {
+        return { get: async () => ({ data: () => ({ studentCount: 0, studentLimit: 100 }) }) };
+      }
       const key = `${path}/${id}`;
       if (!docs[key]) {
         let state = { exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 }) };
@@ -39,7 +45,7 @@ const storageMock = {
   bucket: () => ({
     file: (path) => {
       if (!files[path]) {
-        let state = { exists: true, content: '[{"name": "Alice"}, {"name": "Bob"}]' };
+        let state = { exists: true, content: JSON.stringify([{ matricule: 'M001', name: 'John Doe', classId: 'C1' }, { matricule: 'M002', name: 'Jane Doe', classId: 'C1' }]) };
         files[path] = {
           exists: async () => [state.exists],
           download: async () => [Buffer.from(state.content)],
@@ -124,7 +130,7 @@ async function runTests() {
   await testCase(
     '1. Job PENDING valide -> VALIDATING_COMPLETE',
     () => ({ exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 }) }),
-    () => ({ exists: true, content: '[{"name":"Alice"},{"name":"Bob"}]' }),
+    () => ({ exists: true, content: '[{"matricule":"M1","name":"Alice","classId":"C1"},{"matricule":"M2","name":"Bob","classId":"C1"}]' }),
     'VALIDATING_COMPLETE'
   );
 
