@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import { normalizeRows } from './studentImportNormalizer';
 import { runDiscovery } from './studentImportDiscovery';
 import { reserveStudentImportQuota, markImportJobFailedIfCurrent } from './studentImportQuota';
-
+import { executeBulkWriterImport, markImportJobCompletedIfRunning } from './studentImportBulkWriter';
 // Trigger on document creation in student_import_jobs
 export const processStudentImportJob = onDocumentCreated(
   {
@@ -133,8 +133,17 @@ export const processStudentImportJob = onDocumentCreated(
       }
 
       // Job is now RUNNING and quota is reserved.
-      // Phase 2D (BulkWriter) will follow here.
+      // Phase 2D (BulkWriter)
+      const bulkWriterResult = await executeBulkWriterImport(
+        db,
+        jobId,
+        schoolId,
+        discoveryResult.creates,
+        discoveryResult.updates
+      );
 
+      // Phase 2D Job Finalization
+      await markImportJobCompletedIfRunning(db, jobId, bulkWriterResult);
     } catch (error: any) {
       console.error(`Error processing job ${jobId}:`, error);
       await markImportJobFailedIfCurrent(
