@@ -142,7 +142,7 @@ export interface Student {
   emergencyContact?: string;
 }
 
-export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
+export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
 
 export interface StudentImportJobSummary {
   processedCount: number;

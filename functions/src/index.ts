@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+export * from './importStudents';
 import * as admin from 'firebase-admin';
 import { CampayService } from './services/campayService';
 
