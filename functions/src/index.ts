@@ -627,3 +627,5 @@ export const enforceStudentSaasLimits = functions.firestore
       return null;
     });
   });
+
+export { sweepZombieImportJobs } from './studentImportSweeper';
