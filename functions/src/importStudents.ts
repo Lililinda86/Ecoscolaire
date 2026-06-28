@@ -4,6 +4,7 @@ import { normalizeRows } from './studentImportNormalizer';
 import { runDiscovery } from './studentImportDiscovery';
 import { reserveStudentImportQuota, markImportJobFailedIfCurrent } from './studentImportQuota';
 import { executeBulkWriterImport, markImportJobCompletedIfRunning } from './studentImportBulkWriter';
+import { reconcileImportJobQuota } from './studentImportReconciler';
 // Trigger on document creation in student_import_jobs
 export const processStudentImportJob = onDocumentCreated(
   {
@@ -144,14 +145,24 @@ export const processStudentImportJob = onDocumentCreated(
 
       // Phase 2D Job Finalization
       await markImportJobCompletedIfRunning(db, jobId, bulkWriterResult);
+
+      // Phase 2E Quota Reconciliation
+      await reconcileImportJobQuota(db, jobId, schoolId);
     } catch (error: any) {
       console.error(`Error processing job ${jobId}:`, error);
       await markImportJobFailedIfCurrent(
         db,
         jobId,
-        'PROCESSOR_PHASE_1_ERROR',
-        error.message || 'Unknown error'
+        'SYSTEM_ERROR',
+        `System Error: ${error.message || 'Unknown error'}`
       );
+      
+      // Phase 2E Quota Reconciliation (in case it failed after quota reservation)
+      try {
+        await reconcileImportJobQuota(db, jobId, jobData.schoolId);
+      } catch (recError) {
+        console.error(`Failed to reconcile quota after job failure ${jobId}:`, recError);
+      }
     }
   }
 );
