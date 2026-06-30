@@ -4,8 +4,11 @@ import { useI18n } from '../context/I18nContext';
 import { sortClasses } from '../utils/sortClasses';
 
 const Classes: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentUser } = useAppContext();
   const { t } = useI18n();
+  
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
+
   const [selectedClass, setSelectedClass] = useState<string>('');
 
   const currentClass = db.classes.find(c => c.id === selectedClass);

@@ -3,7 +3,10 @@ import { useAppContext } from '../context/AppContext';
 import { MessageSquare, Phone, Send, FileText, Settings, ShieldAlert } from 'lucide-react';
 
 const Communication: React.FC = () => {
-  const { db } = useAppContext();
+  const { db, currentUser } = useAppContext();
+  
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'teacher'].includes(currentUser.role)) return null;
+
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp');
   const [messageType, setMessageType] = useState<'rappel' | 'absence' | 'bulletin' | 'custom'>('rappel');
   const [recipient, setRecipient] = useState('');

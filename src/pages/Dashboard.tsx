@@ -7,8 +7,10 @@ import {
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
-  const { db, isFirestoreConnected } = useAppContext();
+  const { db, isFirestoreConnected, currentUser } = useAppContext();
   const navigate = useNavigate();
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher'].includes(currentUser.role)) return null;
 
   if (!db) return null;
 

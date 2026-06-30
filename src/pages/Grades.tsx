@@ -21,6 +21,9 @@ export const getAppreciation = (score: number, max: number = 20) => {
 const Grades: React.FC = () => {
   const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
+  
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
+
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
   // Logic for Individual Tab

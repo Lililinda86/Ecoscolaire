@@ -5,8 +5,10 @@ import Modal from '../components/Modal';
 import { Plus, Edit2, Trash2, Bus as BusIcon, Map as RouteIcon, Fuel, PenTool as Tool, AlertTriangle, Users, LayoutDashboard } from 'lucide-react';
 
 const Buses: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentUser } = useAppContext();
   
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role)) return null;
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'fleet' | 'drivers' | 'routes' | 'fuel' | 'maintenance' | 'breakdowns'>('dashboard');
 
   // Modal states

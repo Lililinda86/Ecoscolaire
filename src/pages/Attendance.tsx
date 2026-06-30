@@ -8,8 +8,11 @@ import Modal from '../components/Modal';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const Attendance: React.FC = () => {
-  const { db, saveDB, currentSchool } = useAppContext();
+  const { db, saveDB, currentSchool, currentUser } = useAppContext();
   const { t } = useI18n();
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [month, setMonth] = useState(new Date().toISOString().substring(0, 7));
   const [target, setTarget] = useState<'students' | 'staff'>('students');

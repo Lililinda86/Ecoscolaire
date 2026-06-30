@@ -2,6 +2,10 @@ const assert = require('assert');
 
 // Mock Firebase Admin SDK for testing
 const admin = {
+  firestore: () => db,
+}; 
+admin.firestore.Timestamp = { now: () => ({ toMillis: () => Date.now() }), fromMillis: (m) => ({ toMillis: () => m }) };
+const _dummy_admin = {
   firestore: () => db
 };
 // We need to inject the mock into the module's closure
@@ -32,6 +36,15 @@ const { sweepZombieImportJobs } = require('../../functions/lib/studentImportSwee
 let mockDocs = [];
 
 const db = {
+  runTransaction: async (updateFunction) => {
+    return updateFunction({
+      get: async (ref) => {
+        const doc = mockDocs.find(d => d.id === ref.id);
+        return { exists: !!doc, id: ref.id, data: () => doc };
+      },
+      update: (ref, data) => {}
+    });
+  },
   collection: (path) => ({
     where: (field, op, val) => ({
       limit: (num) => ({
@@ -39,15 +52,14 @@ const db = {
           // In memory filtering for mock
           const filtered = mockDocs.filter(d => val.includes(d.status));
           // Wrap in snap
+          const docs = filtered.slice(0, num).map(doc => ({
+            id: doc.id,
+            ref: { id: doc.id },
+            data: () => doc
+          }));
           return {
-            forEach: (cb) => {
-              filtered.slice(0, num).forEach(doc => {
-                cb({
-                  id: doc.id,
-                  data: () => doc
-                });
-              });
-            }
+            docs,
+            forEach: (cb) => docs.forEach(cb)
           };
         }
       })
@@ -69,8 +81,13 @@ async function testCase(name, docs, verify) {
     let capturedSummary = null;
     const originalLog = console.log;
     console.log = function(...args) {
-      if (args[0] === 'Zombie Sweeper Completed:' && args[1]) {
-        capturedSummary = args[1];
+      if (typeof args[0] === 'string' && args[0].startsWith('Zombie Sweeper Completed.')) {
+        const text = args[0];
+        const scanned = parseInt(text.match(/Scanned: (\d+)/)[1]);
+        const zombiesDetected = parseInt(text.match(/Zombies: (\d+)/)[1]);
+        const skipped = parseInt(text.match(/Skipped: (\d+)/)[1]);
+        const leasesAcquired = parseInt(text.match(/Leases: (\d+)/)[1]);
+        capturedSummary = { scanned, zombiesDetected, skipped, leasesAcquired };
       }
       // originalLog.apply(console, args); // Suppress log for cleaner test output
     };
@@ -91,13 +108,15 @@ async function testCase(name, docs, verify) {
 async function runTests() {
   console.log('=== TESTS ZOMBIE SWEEPER (E1.1) ===');
   
-  const now = Date.now();
-  const min10 = new Date(now - 10 * 60 * 1000);
-  const min20 = new Date(now - 20 * 60 * 1000);
+  const nowMillis = Date.now();
+  const min20 = new Date(nowMillis - 20 * 60 * 1000);
+  const min10 = new Date(nowMillis - 10 * 60 * 1000);
+  const min5 = new Date(nowMillis - 5 * 60 * 1000);
   
   // Create mock Timestamp-like object
   const createTimestamp = (date) => ({
-    toDate: () => date
+    toDate: () => date,
+    toMillis: () => date.getTime()
   });
 
   await testCase('Détecte 1 zombie (RUNNING > 15m)', 
@@ -113,7 +132,7 @@ async function runTests() {
 
   await testCase('Ignore un job récent (RUNNING < 15m)', 
     [
-      { id: 'job1', schoolId: 's1', status: 'RUNNING', updatedAt: createTimestamp(min10) }
+      { id: 'job1', schoolId: 's1', status: 'RUNNING', lastHeartbeatAt: createTimestamp(min5) }
     ],
     (summary) => {
       assert.strictEqual(summary.scanned, 1);
@@ -124,8 +143,8 @@ async function runTests() {
 
   await testCase('Mixte (1 Zombie, 1 Récent, 1 sans Date)', 
     [
-      { id: 'job1', schoolId: 's1', status: 'VALIDATING', updatedAt: createTimestamp(min20) }, // Zombie
-      { id: 'job2', schoolId: 's1', status: 'RUNNING', updatedAt: createTimestamp(min10) },    // Skip
+      { id: 'job1', schoolId: 's1', status: 'VALIDATING', lastHeartbeatAt: createTimestamp(min20) }, // Zombie
+      { id: 'job2', schoolId: 's1', status: 'RUNNING', lastHeartbeatAt: createTimestamp(min5) },    // Skip
       { id: 'job3', schoolId: 's1', status: 'RUNNING' } // Skip (pas de date)
     ],
     (summary) => {

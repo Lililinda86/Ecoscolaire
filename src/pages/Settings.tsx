@@ -7,12 +7,14 @@ import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 
 const Settings: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, saveDB, currentUser } = useAppContext();
   const [newSubject, setNewSubject] = useState('');
   const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as const });
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
   const [currentClassId, setCurrentClassId] = useState('');
   const [campaySecretInput, setCampaySecretInput] = useState('');
+
+  if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return null;
 
   const handleSaveCampaySecret = async () => {
     if (!db.school || !campaySecretInput.trim()) return;

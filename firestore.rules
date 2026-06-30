@@ -244,13 +244,25 @@ service cloud.firestore {
     match /student_import_jobs/{jobId} {
       allow read: if isAuthenticated() && isActive() && (isSuperAdmin() || hasSchoolAccess(resource.data.schoolId));
       allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasOnly(['id', 'schoolId', 'status', 'storagePath', 'totalRows', 'processedCount', 'createdCount', 'updatedCount', 'skippedCount', 'failedCount', 'createdBy', 'createdAt', 'startedAt', 'finishedAt', 'errorCode', 'errorMessage'])
+                    && request.resource.data.id is string
+                    && request.resource.data.schoolId is string
+                    && request.resource.data.status is string
                     && request.resource.data.status == 'PENDING'
-                    && request.resource.data.processedCount == 0
-                    && request.resource.data.createdCount == 0
-                    && request.resource.data.updatedCount == 0
-                    && request.resource.data.skippedCount == 0
-                    && request.resource.data.failedCount == 0
-                    && request.resource.data.storagePath.matches('^import_jobs_data/' + request.resource.data.schoolId + '/.*');
+                    && request.resource.data.storagePath is string
+                    && request.resource.data.storagePath.matches('^import_jobs_data/' + request.resource.data.schoolId + '/[^/]+\\.json$')
+                    && request.resource.data.totalRows is int
+                    && request.resource.data.processedCount is int && request.resource.data.processedCount == 0
+                    && request.resource.data.createdCount is int && request.resource.data.createdCount == 0
+                    && request.resource.data.updatedCount is int && request.resource.data.updatedCount == 0
+                    && request.resource.data.skippedCount is int && request.resource.data.skippedCount == 0
+                    && request.resource.data.failedCount is int && request.resource.data.failedCount == 0
+                    && request.resource.data.createdBy is string
+                    && request.resource.data.createdAt is timestamp
+                    && (!('startedAt' in request.resource.data) || request.resource.data.startedAt == null)
+                    && (!('finishedAt' in request.resource.data) || request.resource.data.finishedAt == null)
+                    && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null)
+                    && (!('errorMessage' in request.resource.data) || request.resource.data.errorMessage == null);
       allow update, delete: if false; // Only Cloud Functions (Admin SDK) can update/delete
     }
 

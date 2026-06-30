@@ -1,7 +1,22 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
+exports.sweepZombieImportJobs = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
+__exportStar(require("./importStudents"), exports);
 const admin = require("firebase-admin");
 const campayService_1 = require("./services/campayService");
 // Initialize the Firebase Admin SDK
@@ -352,6 +367,9 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
 // Callable function to manually confirm a pending payment in MOCK mode.
 // ----------------------------------------------------------------------
 exports.mockConfirmPayment = functions.https.onCall(async (data, context) => {
+    if (process.env.FUNCTIONS_EMULATOR !== 'true' && process.env.NODE_ENV !== 'test') {
+        throw new functions.https.HttpsError('failed-precondition', 'mockConfirmPayment is disabled outside test environment');
+    }
     if (!context.auth || !context.auth.uid) {
         throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
     }
@@ -542,4 +560,6 @@ exports.enforceStudentSaasLimits = functions.firestore
         return null;
     });
 });
+var studentImportSweeper_1 = require("./studentImportSweeper");
+Object.defineProperty(exports, "sweepZombieImportJobs", { enumerable: true, get: function () { return studentImportSweeper_1.sweepZombieImportJobs; } });
 //# sourceMappingURL=index.js.map

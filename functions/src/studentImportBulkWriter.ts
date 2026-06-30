@@ -21,7 +21,8 @@ export async function executeBulkWriterImport(
   jobId: string,
   schoolId: string,
   creates: NormalizedStudentRow[],
-  updates: NormalizedStudentRow[]
+  updates: NormalizedStudentRow[],
+  onProgress?: (progress: number) => Promise<void>
 ): Promise<BulkWriterImportResult> {
   const startTime = Date.now();
   
@@ -58,12 +59,20 @@ export async function executeBulkWriterImport(
     return false; // Do not retry
   });
 
+  let processedCount = 0;
+  const progressPromises: Promise<void>[] = [];
+
   bulkWriter.onWriteResult((docRef, resultSnap) => {
     // Success callback
     const op = operationTypeMap.get(docRef.id);
     if (op) {
       if (op.type === 'create') result.successfulCreates++;
       if (op.type === 'update') result.successfulUpdates++;
+    }
+    
+    processedCount++;
+    if (onProgress && processedCount % 100 === 0) {
+      progressPromises.push(onProgress(processedCount));
     }
   });
 
@@ -119,6 +128,14 @@ export async function executeBulkWriterImport(
   
   // Also await all individual promises (they are catching internally so they won't reject here, but safe to wait)
   await Promise.allSettled(allPromises);
+
+  // Wait for all onProgress promises to settle
+  const progressResults = await Promise.allSettled(progressPromises);
+  const rejected = progressResults.find(r => r.status === 'rejected');
+  
+  if (rejected) {
+    throw (rejected as PromiseRejectedResult).reason;
+  }
 
   result.durationMs = Date.now() - startTime;
   return result;

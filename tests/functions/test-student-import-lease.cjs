@@ -68,6 +68,7 @@ async function runTests() {
   const nowMillis = Date.now();
   const min20Ago = Timestamp.fromMillis(nowMillis - 20 * 60000);
   const min10Ago = Timestamp.fromMillis(nowMillis - 10 * 60000);
+  const min5Ago = Timestamp.fromMillis(nowMillis - 5 * 60000);
   const min5Future = Timestamp.fromMillis(nowMillis + 5 * 60000);
 
   const testCases = [
@@ -103,8 +104,8 @@ async function runTests() {
     },
     {
       id: 'T6',
-      name: 'Job récent (<15 min) -> false PASS',
-      initialState: { schoolId: 's1', status: 'RUNNING', updatedAt: min10Ago },
+      name: 'Job récent (<10 min) -> false PASS',
+      initialState: { schoolId: 's1', status: 'RUNNING', updatedAt: min5Ago },
       expected: false
     }
   ];

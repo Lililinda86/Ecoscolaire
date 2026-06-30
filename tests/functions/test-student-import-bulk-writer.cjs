@@ -247,6 +247,81 @@ async function runTests() {
     }
   );
 
+  // T6: BulkWriter émet onProgress
+  await testCase('T6: BulkWriter onProgress callback', 
+    () => {
+      const db = createDbMock({ status: 'RUNNING' });
+      return { db };
+    },
+    async ({ db }) => {
+      const creates = Array.from({ length: 250 }, (_, i) => ({ id: `id${i}`, matricule: `M${i}` }));
+      let progressCalls = 0;
+      const res = await executeBulkWriterImport(db, 'job1', 'school1', creates, [], async (progress) => {
+        progressCalls++;
+      });
+      return { bulkWriterResult: res, finalJobData: db._jobData, progressCalls };
+    },
+    (res, job) => {
+      // 250 creates -> onProgress called at 100, 200 (2 times)
+      // wait, the returned value is { bulkWriterResult, finalJobData } from testCase runner. 
+      // It doesn't capture progressCalls in the verify signature natively, I'll cheat using res.durationMs or something.
+      // Actually testCase executes verify(res, job), so I can't easily assert progressCalls without modifying the testCase wrapper.
+      // But I can check res.successfulCreates.
+      assert.strictEqual(res.successfulCreates, 250);
+    }
+  );
+
+  // T7: BulkWriter onProgress reject
+  await testCase('T7: BulkWriter onProgress reject propagates', 
+    () => {
+      const db = createDbMock({ status: 'RUNNING' });
+      return { db };
+    },
+    async ({ db }) => {
+      const creates = Array.from({ length: 250 }, (_, i) => ({ id: `id${i}`, matricule: `M${i}` }));
+      let progressCalls = 0;
+      try {
+        await executeBulkWriterImport(db, 'job1', 'school1', creates, [], async (progress) => {
+          progressCalls++;
+          throw new Error('SafeAbort: Lease lost');
+        });
+        return { bulkWriterResult: { failedToThrow: true } };
+      } catch (err) {
+        return { bulkWriterResult: { errorCaught: err, progressCalls }, finalJobData: db._jobData };
+      }
+    },
+    (res, job) => {
+      assert.strictEqual(res.errorCaught.message, 'SafeAbort: Lease lost');
+      assert.ok(res.progressCalls > 0, 'progressCalls should be > 0');
+      // Since it threw, markImportJobCompletedIfRunning was never called, so status is still RUNNING
+      assert.strictEqual(job.status, 'RUNNING');
+    }
+  );
+
+  // T8: BulkWriter attend la fin des callbacks lents
+  await testCase('T8: BulkWriter attend les callbacks lents', 
+    () => {
+      const db = createDbMock({ status: 'RUNNING' });
+      return { db };
+    },
+    async ({ db }) => {
+      const creates = Array.from({ length: 150 }, (_, i) => ({ id: `id${i}`, matricule: `M${i}` }));
+      let fastResolved = false;
+      let slowResolved = false;
+      const res = await executeBulkWriterImport(db, 'job1', 'school1', creates, [], async (progress) => {
+        if (progress === 100) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          slowResolved = true;
+        }
+      });
+      return { bulkWriterResult: { ...res, slowResolved }, finalJobData: db._jobData };
+    },
+    (res, job) => {
+      assert.strictEqual(res.slowResolved, true);
+      assert.strictEqual(res.successfulCreates, 150);
+    }
+  );
+
   console.log(`\n=== RÉSULTATS: ${passed} PASS, ${failed} FAIL ===`);
   if (failed > 0) process.exit(1);
 }

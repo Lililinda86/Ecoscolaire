@@ -1,28 +1,30 @@
 # P0-030B-PRODUCTION-VALIDATION-REPORT
 
 ## Commit
-Pending
+✅ Terminé (P0-030 committed)
 
 ## Push
-Pending
+✅ Terminé (Pushed to main)
 
 ## Deploy
-Pending
+⚠️ Vercel deploy: À vérifier sur le dashboard Vercel.
+❌ GitHub Actions: L'action "Deploy Firebase" a échoué. (À vérifier dans les logs GitHub Actions).
+Le build local frontend et functions passe avec succès.
 
 ## Firestore Rules
-Pending
+⏳ En attente
 
 ## Invitation
-Pending
+⏳ En attente
 
 ## Signup
-Pending
+⏳ En attente
 
 ## Parent Portal
-Pending
+⏳ En attente
 
 ## Security Tests
-Pending
+⏳ En attente
 
 ## Verdict
-Pending
+P0-030 NON VALIDÉ (Bloqué par le déploiement)
