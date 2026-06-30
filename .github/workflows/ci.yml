@@ -1,72 +1,122 @@
-name: CI Build & Tests
+name: CI/CD Pipeline
 
 on:
-  pull_request:
-    branches: [ main ]
   push:
-    branches: [ main ]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-test:
+  frontend-ci:
+    name: Frontend CI
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-      - name: Build Frontend
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
         run: npm run build
-        env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+      - name: Upload Artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 7
 
-      - name: Deploy Firestore Rules and Functions to Staging
+  functions-ci:
+    name: Functions CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'functions/package-lock.json'
+
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: ./functions
+
+      - name: Lint
+        run: npm run lint
+        working-directory: ./functions
+
+      - name: Build
+        run: npm run build
+        working-directory: ./functions
+
+      - name: Unit Tests
         run: |
-          echo "$STAGING_FIREBASE_SERVICE_ACCOUNT" > staging-service-account.json
-          export GOOGLE_APPLICATION_CREDENTIALS="${PWD}/staging-service-account.json"
-          cd functions
-          npm ci
-          npm run build
-          cd ..
-          npx firebase-tools deploy --only firestore:rules,functions --project ecoscolaire-staging --non-interactive
-          rm staging-service-account.json
-        env:
-          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          node tests/functions/test-student-import-sweeper.cjs
+          node tests/functions/test-student-import-lease.cjs
+          node tests/functions/test-student-import-recovery.cjs
+          node tests/functions/test-student-import-bulk-writer.cjs
 
-      - name: Seed Test Database
-        run: npm run seed:staging
-        env:
-          FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
-          FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
-          FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
-          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+      - name: Upload Artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: functions-lib
+          path: functions/lib/
+          retention-days: 7
 
-      - name: Setup Java 21 for Firebase Emulator
+  firestore-rules-ci:
+    name: Firestore Rules CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '21'
 
-      - name: Run Firestore Rules Tests
-        run: npm run test:rules
+      - name: Cache Firebase Emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: ${{ runner.os }}-firebase-emulators-${{ hashFiles('firebase.json') }}
+          restore-keys: |
+            ${{ runner.os }}-firebase-emulators-
 
-      - name: Run E2E Tests
-        run: npm run test:e2e
+      - name: Install Root Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Test Firestore Rules
+        run: npm run test:rules
+        env:
+          FIREBASE_PROJECT: demo-ecoscolaire
