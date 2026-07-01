@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs\"",
+    "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs --config=playwright.rules.config.ts\"",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "seed:staging": "node scripts/setup-test-data.mjs"
