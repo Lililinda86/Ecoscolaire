@@ -1,12 +1,8 @@
-name: CI/CD Pipeline
+name: Deploy Staging
 
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
       - staging
 
 permissions:
@@ -29,20 +25,8 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      # TODO(E3.1b): frontend lint debt (305 errors)
-      # - name: Lint
-      #   run: npm run lint
-
       - name: Build
         run: npm run build
-
-      - name: Upload Artifact
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist/
-          retention-days: 7
 
   functions-ci:
     name: Functions CI
@@ -62,11 +46,6 @@ jobs:
         run: npm ci
         working-directory: ./functions
 
-      # TODO(E3.1b): functions ESLint flat config debt
-      # - name: Lint
-      #   run: npm run lint
-      #   working-directory: ./functions
-
       - name: Build
         run: npm run build
         working-directory: ./functions
@@ -77,14 +56,6 @@ jobs:
           node tests/functions/test-student-import-lease.cjs
           node tests/functions/test-student-import-recovery.cjs
           node tests/functions/test-student-import-bulk-writer.cjs
-
-      - name: Upload Artifact
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: functions-lib
-          path: functions/lib/
-          retention-days: 7
 
   firestore-rules-ci:
     name: Firestore Rules CI
@@ -123,3 +94,37 @@ jobs:
         run: npm run test:rules
         env:
           FIREBASE_PROJECT: demo-ecoscolaire
+
+  deploy-firebase:
+    name: Deploy to Staging
+    needs: [frontend-ci, functions-ci, firestore-rules-ci]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Functions Dependencies
+        run: npm ci
+        working-directory: ./functions
+
+      - name: Build Functions
+        run: npm run build
+        working-directory: ./functions
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ECOSCOLAIRE_STAGING }}
+
+      - name: Deploy Firebase Backend
+        run: npx firebase-tools deploy --project ecoscolaire-staging --only functions,firestore:rules,storage
