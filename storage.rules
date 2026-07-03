@@ -17,7 +17,7 @@ service firebase.storage {
                    );
     }
     // Dossier pour les données d'import Excel massif (JSON)
-    match /import_jobs_data/{schoolId}/{jobId}.json {
+    match /import_jobs_data/{schoolId}/{fileName} {
       // Lecture : Backend et utilisateurs autorisés de l'école (superAdmin inclus)
       allow read: if request.auth != null && 
                   (request.auth.token.role == 'superAdmin' || request.auth.token.schoolId == schoolId);
@@ -32,7 +32,8 @@ service firebase.storage {
                      )
                     ) &&
                     request.resource.size < 10 * 1024 * 1024 && // Max 10MB
-                    request.resource.contentType == 'application/json';
+                    request.resource.contentType == 'application/json' &&
+                    fileName.matches('.*\\.json');
       allow update: if false; // Interdit pour le client d'écraser un fichier existant (Sécurité)
       allow delete: if false; // Interdit pour le client
     }
