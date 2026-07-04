@@ -12,6 +12,33 @@ import { normalizeParentEmails } from '../utils/emailHelpers';
 import { db as firestoreDb } from '../db/firebase';
 import { doc, setDoc, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 
+const getErrorCode = (error: unknown): string | undefined => {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string'
+  ) {
+    return (error as { code: string }).code;
+  }
+  return undefined;
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+  return String(error);
+};
+
 const Students: React.FC = () => {
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
@@ -201,19 +228,21 @@ const Students: React.FC = () => {
         targetId: finalStudent.id as string,
         targetName: finalStudent.name as string
       });
-    } catch (err: any) {
-      if (err.message === 'QUOTA_EXCEEDED') {
+    } catch (err: unknown) {
+      const code = getErrorCode(err);
+      const message = getErrorMessage(err);
+      if (message === 'QUOTA_EXCEEDED') {
         alert("Action refusée : La limite de votre abonnement SaaS est atteinte. Veuillez passer au plan supérieur.");
-      } else if (err.message === 'ALREADY_EXISTS') {
+      } else if (message === 'ALREADY_EXISTS') {
         alert("Erreur métier : Cet élève existe déjà ou une requête concurrente a réussi.");
-      } else if (err.code === 'permission-denied') {
+      } else if (code === 'permission-denied') {
         alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
-      } else if (err.code === 'unavailable' || !navigator.onLine) {
+      } else if (code === 'unavailable' || !navigator.onLine) {
         alert("Erreur réseau : Impossible de vérifier le quota hors ligne. Veuillez vous reconnecter.");
-      } else if (err.code === 'aborted') {
+      } else if (code === 'aborted') {
         alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
       } else {
-        alert("Erreur lors de l'enregistrement : " + err.message);
+        alert("Erreur lors de l'enregistrement : " + message);
       }
     } finally {
       setIsSaving(false);
@@ -285,17 +314,19 @@ const Students: React.FC = () => {
           
           alert("Demande de suppression envoyée pour validation (Directeur / Super Admin).");
         }
-      } catch (err: any) {
-        if (err.message === 'NOT_FOUND') {
+      } catch (err: unknown) {
+        const code = getErrorCode(err);
+        const message = getErrorMessage(err);
+        if (message === 'NOT_FOUND') {
           alert("Erreur métier : Cet élève n'existe pas ou a déjà été supprimé.");
-        } else if (err.code === 'permission-denied') {
+        } else if (code === 'permission-denied') {
           alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
-        } else if (err.code === 'unavailable' || !navigator.onLine) {
+        } else if (code === 'unavailable' || !navigator.onLine) {
           alert("Erreur réseau : Impossible d'effectuer l'action hors ligne. Veuillez vous reconnecter.");
-        } else if (err.code === 'aborted') {
+        } else if (code === 'aborted') {
           alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
         } else {
-          alert("Erreur lors de la suppression : " + err.message);
+          alert("Erreur lors de la suppression : " + message);
         }
       }
     }
