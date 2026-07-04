@@ -7,9 +7,9 @@ const Classes: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
   const { t } = useI18n();
   
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
-
   const [selectedClass, setSelectedClass] = useState<string>('');
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
   const currentClass = db.classes.find(c => c.id === selectedClass);
   const teachers = db.staff.filter(s => s.role === 'teacher' && s.assignedClassId === selectedClass);

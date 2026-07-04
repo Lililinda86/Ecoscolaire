@@ -7,8 +7,6 @@ import { Plus, Edit2, Trash2, Bus as BusIcon, Map as RouteIcon, Fuel, PenTool as
 const Buses: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
   
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role)) return null;
-
   const [activeTab, setActiveTab] = useState<'dashboard' | 'fleet' | 'drivers' | 'routes' | 'fuel' | 'maintenance' | 'breakdowns'>('dashboard');
 
   // Modal states
@@ -29,6 +27,8 @@ const Buses: React.FC = () => {
 
   const [isBreakdownModalOpen, setBreakdownModalOpen] = useState(false);
   const [currentBreakdown, setCurrentBreakdown] = useState<Partial<Breakdown>>({});
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role)) return null;
 
   // Ensure arrays exist
   const buses = db.buses || [];

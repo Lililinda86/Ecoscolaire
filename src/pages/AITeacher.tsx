@@ -7,8 +7,6 @@ import { useAppContext } from '../context/AppContext';
 const AITeacher: React.FC = () => {
   const { currentUser } = useAppContext();
   
-  if (!currentUser || !['teacher'].includes(currentUser.role)) return null;
-
   const [messages, setMessages] = useState<{role: 'user'|'assistant', content: string}[]>([
     { role: 'assistant', content: "Bonjour cher Enseignant ! Je suis votre assistant pédagogique IA. Je peux vous aider à préparer une leçon, créer une évaluation, générer des remarques de bulletins, ou trouver des activités éducatives. Que souhaitez-vous préparer aujourd'hui ?" }
   ]);
@@ -24,6 +22,8 @@ const AITeacher: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  if (!currentUser || !['teacher'].includes(currentUser.role)) return null;
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();

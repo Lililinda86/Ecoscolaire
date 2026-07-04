@@ -22,8 +22,6 @@ const Grades: React.FC = () => {
   const { db, safeMergeDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
   
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
-
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
   // Logic for Individual Tab
@@ -35,6 +33,8 @@ const Grades: React.FC = () => {
 
   // Logic for Ranking Tab
   const [selectedClassRank, setSelectedClassRank] = useState<string>('');
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
 
   const handleOpenModal = () => {
     setBulkStudentId(selectedStudent || '');

@@ -16,15 +16,6 @@ const Payments: React.FC = () => {
   const { db, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
 
-  const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
-  if (!currentUser || !allowedRoles.includes(currentUser.role)) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626', background: '#fee2e2', borderRadius: '8px', margin: '2rem' }}>
-        <h2>Accès refusé</h2>
-        <p>Vous n'avez pas les autorisations nécessaires pour accéder à la comptabilité générale.</p>
-      </div>
-    );
-  }
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'|'historique-recus'|'finance-momo'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
   
@@ -40,6 +31,40 @@ const Payments: React.FC = () => {
 
   const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0] });
+
+  React.useEffect(() => {
+    if (isModalOpen && currentPayment.studentId && currentPayment.type !== 'other') {
+      const student = db.students.find(s => s.id === currentPayment.studentId);
+      if (student) {
+        let expected = 0;
+        const g = db.school?.globalFees || {feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0};
+        if (currentPayment.type === 'tuition') {
+          expected = currentPayment.installment === 'T1' ? (student.feeT1 ?? g.feeT1) : currentPayment.installment === 'T2' ? (student.feeT2 ?? g.feeT2) : (student.feeT3 ?? g.feeT3);
+        } else if (currentPayment.type === 'transport') {
+          expected = student.feeTransport ?? g.feeTransport;
+        } else if (currentPayment.type === 'uniforms') {
+          expected = student.feeUniforms ?? g.feeUniforms;
+        }
+        setModalExpectedAmount(expected);
+        const alreadyPaid = db.payments.filter(p => p.studentId === student.id && p.type === currentPayment.type && (currentPayment.type !== 'tuition' || p.installment === currentPayment.installment)).reduce((s, p) => s + p.amount, 0);
+        const remaining = Math.max(0, expected - alreadyPaid);
+        setCurrentPayment(prev => ({ ...prev, amount: remaining }));
+      }
+    } else {
+      setModalExpectedAmount(0);
+    }
+  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, isModalOpen]);
+
+  const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
+  if (!currentUser || !allowedRoles.includes(currentUser.role)) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626', background: '#fee2e2', borderRadius: '8px', margin: '2rem' }}>
+        <h2>Accès refusé</h2>
+        <p>Vous n'avez pas les autorisations nécessaires pour accéder à la comptabilité générale.</p>
+      </div>
+    );
+  }
+
 
   const handleOpenModal = () => {
     setCurrentPayment({ 
@@ -277,28 +302,6 @@ const Payments: React.FC = () => {
     }
   };
 
-  React.useEffect(() => {
-    if (isModalOpen && currentPayment.studentId && currentPayment.type !== 'other') {
-      const student = db.students.find(s => s.id === currentPayment.studentId);
-      if (student) {
-        let expected = 0;
-        const g = db.school?.globalFees || {feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0};
-        if (currentPayment.type === 'tuition') {
-          expected = currentPayment.installment === 'T1' ? (student.feeT1 ?? g.feeT1) : currentPayment.installment === 'T2' ? (student.feeT2 ?? g.feeT2) : (student.feeT3 ?? g.feeT3);
-        } else if (currentPayment.type === 'transport') {
-          expected = student.feeTransport ?? g.feeTransport;
-        } else if (currentPayment.type === 'uniforms') {
-          expected = student.feeUniforms ?? g.feeUniforms;
-        }
-        setModalExpectedAmount(expected);
-        const alreadyPaid = db.payments.filter(p => p.studentId === student.id && p.type === currentPayment.type && (currentPayment.type !== 'tuition' || p.installment === currentPayment.installment)).reduce((s, p) => s + p.amount, 0);
-        const remaining = Math.max(0, expected - alreadyPaid);
-        setCurrentPayment(prev => ({ ...prev, amount: remaining }));
-      }
-    } else {
-      setModalExpectedAmount(0);
-    }
-  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, isModalOpen]);
 
   const getFeeDetails = () => {
     if (!currentPayment.studentId || currentPayment.type === 'other') return null;

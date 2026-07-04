@@ -5,12 +5,12 @@ import { MessageSquare, Phone, Send, FileText, Settings, ShieldAlert } from 'luc
 const Communication: React.FC = () => {
   const { db, currentUser } = useAppContext();
   
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'teacher'].includes(currentUser.role)) return null;
-
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp');
   const [messageType, setMessageType] = useState<'rappel' | 'absence' | 'bulletin' | 'custom'>('rappel');
   const [recipient, setRecipient] = useState('');
   const [customMessage, setCustomMessage] = useState('');
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'teacher'].includes(currentUser.role)) return null;
 
   const generateWhatsAppLink = () => {
     let text = "";

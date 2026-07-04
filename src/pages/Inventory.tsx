@@ -10,6 +10,12 @@ const Inventory: React.FC = () => {
   const { t } = useI18n();
 
   const allowedRoles = ['owner', 'director', 'secretary', 'accountant', 'superAdmin'];
+  const [isItemModalOpen, setItemModalOpen] = useState(false);
+  const [isTxModalOpen, setTxModalOpen] = useState(false);
+  
+  const [currentItem, setCurrentItem] = useState<Partial<InventoryItem>>({ quantity: 0, alertThreshold: 10 });
+  const [currentTx, setCurrentTx] = useState<Partial<InventoryTransaction>>({ type: 'IN', quantity: 1, date: new Date().toISOString().split('T')[0] });
+
   if (!currentUser || !allowedRoles.includes(currentUser.role)) {
     return (
       <div className="page-container" style={{ padding: '2rem' }}>
@@ -22,11 +28,6 @@ const Inventory: React.FC = () => {
       </div>
     );
   }
-  const [isItemModalOpen, setItemModalOpen] = useState(false);
-  const [isTxModalOpen, setTxModalOpen] = useState(false);
-  
-  const [currentItem, setCurrentItem] = useState<Partial<InventoryItem>>({ quantity: 0, alertThreshold: 10 });
-  const [currentTx, setCurrentTx] = useState<Partial<InventoryTransaction>>({ type: 'IN', quantity: 1, date: new Date().toISOString().split('T')[0] });
 
   const handleOpenItemModal = (item?: InventoryItem) => {
     if (item) setCurrentItem(item);

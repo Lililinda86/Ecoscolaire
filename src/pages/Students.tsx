@@ -20,8 +20,6 @@ const Students: React.FC = () => {
   const [, setRefresh] = useState(0);
   const { db, safeMergeDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
-
   const currentCountDisplay = currentSchool?.studentCount ?? db.students.length;
   const limitReached = isStudentLimitReached(currentSchool, currentCountDisplay);
   const limitLabel = getStudentLimitLabel(currentSchool, currentCountDisplay);
@@ -39,6 +37,8 @@ const Students: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sectionFilter, setSectionFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
   // Derive a sorted list once for mapping
   const sortedClasses = sortClasses(db.classes);
