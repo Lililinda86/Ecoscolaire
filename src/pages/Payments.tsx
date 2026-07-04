@@ -29,6 +29,23 @@ const getErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
+type InitiatePaymentResult = {
+  message?: string;
+  mockPaymentUrl?: string;
+};
+
+type MockConfirmPaymentResult = {
+  success?: boolean;
+  message?: string;
+  alreadyConfirmed?: boolean;
+};
+
+type WhatsAppPaymentStudent = {
+  name: string;
+  parentName?: string;
+  parentPhone?: string;
+};
+
 const Payments: React.FC = () => {
   const { db, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
@@ -132,7 +149,7 @@ const Payments: React.FC = () => {
         };
         
         const result = await initiatePayment(payload);
-        const data = result.data as any;
+        const data = result.data as InitiatePaymentResult;
         
         setIsProcessingMoMo(false);
         setMomoSuccess(true);
@@ -262,7 +279,7 @@ const Payments: React.FC = () => {
     try {
       const mockConfirmPayment = httpsCallable(functions, 'mockConfirmPayment');
       const result = await mockConfirmPayment({ transactionId });
-      const data = result.data as any;
+      const data = result.data as MockConfirmPaymentResult;
       console.log(`[FRONTEND] Réponse de mockConfirmPayment:`, data);
       
       if (data.success) {
@@ -350,7 +367,7 @@ const Payments: React.FC = () => {
     return cleaned;
   };
 
-  const handleWhatsAppClick = (student: any, amount: number, motif: string) => {
+  const handleWhatsAppClick = (student: WhatsAppPaymentStudent, amount: number, motif: string) => {
     const phone = formatPhoneForWhatsApp(student.parentPhone);
     if (!phone) return;
     const message = `Bonjour M./Mme ${student.parentName || ''},\n\nNous vous rappelons qu'un solde de ${amount.toLocaleString('fr-FR')} FCFA reste dû pour la ${motif} de l'élève ${student.name}.\n\nMerci de prendre contact avec l'administration pour régulariser la situation.\n\nCordialement,\nGroupe Scolaire Bilingue ITALO`;
