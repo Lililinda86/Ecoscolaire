@@ -82,7 +82,7 @@ export const processStudentImportJob = onDocumentCreated(
       try {
         const fileContent = fileBuffer.toString('utf-8');
         payload = JSON.parse(fileContent);
-      } catch (err) {
+      } catch {
         throw new Error('Invalid JSON format');
       }
 

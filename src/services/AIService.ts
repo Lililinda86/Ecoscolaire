@@ -30,38 +30,38 @@ class AIService {
 
     switch (provider) {
       case 'openai':
-        return this.callOpenAI(prompt, options);
+        return this.callOpenAI(prompt);
       case 'gemini':
-        return this.callGemini(prompt, options);
+        return this.callGemini(prompt);
       case 'claude':
-        return this.callClaude(prompt, options);
+        return this.callClaude(prompt);
       case 'ollama':
-        return this.callOllama(prompt, options);
+        return this.callOllama(prompt);
       case 'mock':
       default:
         return this.callMock(prompt);
     }
   }
 
-  private async callOpenAI(prompt: string, _options?: AIRequestOptions): Promise<AIResponse> {
+  private async callOpenAI(prompt: string): Promise<AIResponse> {
     // Implementation for OpenAI API (requires backend proxy or direct fetch with key)
     console.log("Calling OpenAI API...", prompt);
     throw new Error("OpenAI API non configurée. Utilisez le mode 'mock' pour tester.");
   }
 
-  private async callGemini(prompt: string, _options?: AIRequestOptions): Promise<AIResponse> {
+  private async callGemini(prompt: string): Promise<AIResponse> {
     // Implementation for Google Gemini API
     console.log("Calling Gemini API...", prompt);
     throw new Error("Gemini API non configurée.");
   }
 
-  private async callClaude(prompt: string, _options?: AIRequestOptions): Promise<AIResponse> {
+  private async callClaude(prompt: string): Promise<AIResponse> {
     // Implementation for Anthropic Claude API
     console.log("Calling Claude API...", prompt);
     throw new Error("Claude API non configurée.");
   }
 
-  private async callOllama(prompt: string, _options?: AIRequestOptions): Promise<AIResponse> {
+  private async callOllama(prompt: string): Promise<AIResponse> {
     // Implementation for local Ollama (e.g. http://localhost:11434/api/generate)
     console.log("Calling local Ollama API...", prompt);
     try {
@@ -78,7 +78,7 @@ class AIService {
         const data = await response.json();
         return { content: data.response, provider: 'ollama' };
       }
-    } catch (err) {
+    } catch {
       console.warn("Ollama non détecté localement, fallback vers mock.");
     }
     return this.callMock(prompt);

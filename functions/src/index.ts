@@ -207,7 +207,7 @@ export const verifySaaSPayment = functions.https.onCall(async (data, context) =>
 // 4. dailySubscriptionCheck
 // Scheduled function (Cron) running daily at midnight to suspend expired schools.
 // ----------------------------------------------------------------------
-export const dailySubscriptionCheck = functions.pubsub.schedule('every day 00:00').onRun(async (context) => {
+export const dailySubscriptionCheck = functions.pubsub.schedule('every day 00:00').onRun(async () => {
   const now = new Date();
   console.log(`Cron execution at ${now.toISOString()}`);
   return null;
@@ -543,7 +543,7 @@ export const onPaymentCreated = functions.firestore
 
       // Helper to remove undefined values
       const cleanUndefined = (obj: any) => {
-        return Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
+        return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
       };
 
       // 4. Create Receipt Document

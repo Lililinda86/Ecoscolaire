@@ -37,7 +37,6 @@ test.describe('SuperAdmin Supervision Mode', () => {
     // Le bouton de retour super admin est dans le Layout quand on est en supervision
     // On cherche le bouton avec le texte "Retour Super Admin"
     // D'abord, vérifions si ce bouton existe dans Layout.tsx pour exitSupervision.
-    const exitButton = page.locator('text=Retour Super Admin');
     // S'il n'existe pas explicitement sous ce nom, il faut utiliser l'UI existante (Red banner)
     // "MODE SUPERVISION — École"
     // "Quitter la supervision"

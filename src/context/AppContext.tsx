@@ -76,7 +76,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Fetch user profile
         console.log("Utilisateur Firebase connecté:", firebaseUser.email, firebaseUser.uid);
-        let userDoc = await getDoc(doc(firestoreDb, 'users', firebaseUser.uid));
+        const userDoc = await getDoc(doc(firestoreDb, 'users', firebaseUser.uid));
         let userData: any;
 
         if (!userDoc.exists()) {

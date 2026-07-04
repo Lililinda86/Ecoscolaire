@@ -175,7 +175,7 @@ export async function resumeImportJob(
       schoolId, 
       discoveryResult.creates, 
       discoveryResult.updates,
-      async (progress) => {
+      async () => {
         await updateHeartbeat(db, jobRef);
         const renewed = await renewLeaseIfOwner(db, jobRef, sweeperId);
         if (!renewed) throw new Error("SafeAbort: Lease lost during BulkWriter");

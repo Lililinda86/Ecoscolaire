@@ -53,7 +53,7 @@ export async function acquireZombieLease(
   });
 }
 
-export const sweepZombieImportJobs = onSchedule('every 15 minutes', async (event) => {
+export const sweepZombieImportJobs = onSchedule('every 15 minutes', async () => {
   const db = admin.firestore();
   console.log('Starting Zombie Sweeper Execution...');
 

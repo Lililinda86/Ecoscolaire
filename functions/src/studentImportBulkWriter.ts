@@ -62,7 +62,7 @@ export async function executeBulkWriterImport(
   let processedCount = 0;
   const progressPromises: Promise<void>[] = [];
 
-  bulkWriter.onWriteResult((docRef, resultSnap) => {
+  bulkWriter.onWriteResult((docRef) => {
     // Success callback
     const op = operationTypeMap.get(docRef.id);
     if (op) {

@@ -149,7 +149,7 @@ const Students: React.FC = () => {
           allergies: finalStudent.allergies,
           medicalConditions: finalStudent.medicalConditions,
         };
-        const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([_, v]) => v !== undefined));
+        const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
         await updateDoc(studentRef, patchData);
         
         // Mutate local state for UI update

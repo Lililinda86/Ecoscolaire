@@ -28,7 +28,7 @@ export class CampayService {
       let errorData;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { message: response.statusText };
       }
       throw new Error(`Campay login failed [${response.status}]: ${JSON.stringify(errorData)}`);
@@ -73,7 +73,7 @@ export class CampayService {
       let errorData;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { message: response.statusText };
       }
       throw new Error(`Campay requestToPay failed [${response.status}]: ${JSON.stringify(errorData)}`);
@@ -97,7 +97,7 @@ export class CampayService {
       let errorData;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { message: response.statusText };
       }
       throw new Error(`Campay getTransactionStatus failed [${response.status}]: ${JSON.stringify(errorData)}`);
