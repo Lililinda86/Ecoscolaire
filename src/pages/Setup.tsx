@@ -5,7 +5,7 @@ import { useI18n } from '../context/I18nContext';
 import setupBg from '../assets/setup-bg.png';
 
 const Setup: React.FC = () => {
-  const { saveDB, db } = useAppContext();
+  const { safeMergeDB, db } = useAppContext();
   const { t } = useI18n();
   const navigate = useNavigate();
   
@@ -60,7 +60,7 @@ const Setup: React.FC = () => {
       { id: crypto.randomUUID(), name: 'Arts Dramatiques ou Plastiques / Arts' },
     ];
     
-    saveDB(newDb);
+    safeMergeDB(newDb);
     navigate('/');
   };
 

@@ -8,7 +8,7 @@ import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const StaffPage: React.FC = () => {
-  const { db, saveDB, currentSchool, isSchoolSuspended, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentSchool, isSchoolSuspended, currentUser } = useAppContext();
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<Partial<Staff>>({});
@@ -40,13 +40,13 @@ const StaffPage: React.FC = () => {
     } else {
       newDb.staff.push({ ...currentStaff, id: crypto.randomUUID() } as Staff);
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setModalOpen(false);
   };
 
   const handleDelete = (id: string) => {
     if (confirm("Voulez-vous vraiment supprimer ce membre du personnel ?")) {
-      saveDB({ ...db, staff: db.staff.filter(s => s.id !== id) });
+      safeMergeDB({ ...db, staff: db.staff.filter(s => s.id !== id) });
     }
   };
 

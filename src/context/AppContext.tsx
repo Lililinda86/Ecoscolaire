@@ -6,6 +6,7 @@ import type { User, School } from '../types';
 interface AppContextProps {
   db: Database | null;
   saveDB: (newDb: Database) => Promise<void>;
+  safeMergeDB: (newDb: Database) => Promise<void>;
   currentUser: User | null;
   currentSchool: School | null;
   isSupervising: boolean;
@@ -308,6 +309,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const safeMergeDB = async (newDb: Database) => {
+    if (!db || !currentUser) return;
+    
+    if (isSupervising) {
+      const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les données de cette école. Êtes-vous sûr ?");
+      if (!confirm) return;
+    }
+    
+    setDb({ ...newDb });
+
+    try {
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
+
+      const collections = [
+        'schools', 'users', 'classes', 'students', 'staff', 'buses', 
+        'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
+        'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
+        'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'transactions'
+      ] as const;
+      
+      for (const col of collections) {
+        const oldArray = (db as any)[col] || [];
+        const newArray = (newDb as any)[col] || [];
+
+        const oldMap = new Map(oldArray.map((item: any) => [item.id, item]));
+        const newMap = new Map(newArray.map((item: any) => [item.id, item]));
+
+        for (const newItem of newArray) {
+          const oldItem = oldMap.get(newItem.id);
+          if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(newItem)) {
+            // Force schoolId pour la sécurité
+            if (!newItem.schoolId && col !== 'schools' && col !== 'users' && currentSchool) {
+              newItem.schoolId = currentSchool.id;
+            }
+            console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour ou ajout dans [${col}] :`, newItem);
+            await setDoc(doc(firestoreDb, col, newItem.id), newItem, { merge: true });
+          }
+        }
+
+        for (const oldItem of oldArray) {
+          if (!newMap.has(oldItem.id)) {
+            if (col === 'schools') {
+              console.log(`🛡️ [AppContext] Protection activée : Suppression de l'école ${oldItem.id} bloquée.`);
+              continue;
+            }
+            await deleteDoc(doc(firestoreDb, col, oldItem.id));
+          }
+        }
+      }
+      setLastSyncDate(new Date());
+    } catch (e) {
+      console.error("Sync Error:", e);
+      alert("Une erreur de permissions est survenue lors de la synchronisation.");
+    }
+  };
+
   const enterSupervision = (schoolId: string) => {
     if (currentUser?.role !== 'superAdmin') return;
     setSupervisionSchoolId(schoolId);
@@ -427,7 +485,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      db, saveDB, currentUser, currentSchool, 
+      db, saveDB, safeMergeDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended

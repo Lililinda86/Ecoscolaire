@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, Clock, ShieldAlert } from 'lucide-react';
 import type { ValidationRequest } from '../types';
 
 const ValidationDashboard: React.FC = () => {
-  const { db, saveDB, currentUser, logAuditAction } = useAppContext();
+  const { db, safeMergeDB, currentUser, logAuditAction } = useAppContext();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   if (!db || !currentUser) return <div style={{padding: '2rem'}}>Chargement (db manquant: {!db}, user manquant: {!currentUser})...</div>;
@@ -54,7 +54,7 @@ const ValidationDashboard: React.FC = () => {
         newDb.validation_requests[reqIndex] = { ...newDb.validation_requests[reqIndex], status: 'approved' };
       }
 
-      await saveDB(newDb);
+      await safeMergeDB(newDb);
       logAuditAction({
         action: 'APPROVE_VALIDATION_REQUEST',
         targetType: 'VALIDATION_REQUEST',
@@ -78,7 +78,7 @@ const ValidationDashboard: React.FC = () => {
       if (reqIndex >= 0) {
         newDb.validation_requests[reqIndex] = { ...newDb.validation_requests[reqIndex], status: 'rejected' };
       }
-      await saveDB(newDb);
+      await safeMergeDB(newDb);
       logAuditAction({
         action: 'REJECT_VALIDATION_REQUEST',
         targetType: 'VALIDATION_REQUEST',

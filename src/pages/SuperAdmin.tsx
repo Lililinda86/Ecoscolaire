@@ -5,7 +5,7 @@ import { Building2, Plus, Edit2, Play, AlertCircle, CreditCard, LogOut, Building
 import type { School, SubscriptionPlan, SubscriptionStatus } from '../types';
 
 const SuperAdmin: React.FC = () => {
-  const { db, saveDB, currentUser, logout, enterSupervision, logAuditAction } = useAppContext();
+  const { db, safeMergeDB, currentUser, logout, enterSupervision, logAuditAction } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentSchool, setCurrentSchool] = useState<Partial<School>>({});
 
@@ -97,7 +97,7 @@ const SuperAdmin: React.FC = () => {
 
       if (!isNewSchool) {
         const updatedSchool = { ...currentSchool, logoUrl: finalLogoUrl } as School;
-        await setDoc(doc(firestoreDb, 'schools', updatedSchool.id), updatedSchool);
+        await setDoc(doc(firestoreDb, 'schools', updatedSchool.id), updatedSchool, { merge: true });
         console.log("🟢 [SuperAdmin] setDoc exécuté avec succès pour mise à jour :", updatedSchool.id);
         
         // --- Vérification obligatoire ---
@@ -113,7 +113,7 @@ const SuperAdmin: React.FC = () => {
         const newSchool = { ...currentSchool, id: schoolId, logoUrl: finalLogoUrl, createdAt: new Date().toISOString() } as School;
         console.log("🟢 [SuperAdmin] Création d'une nouvelle école dans l'état local :", newSchool);
         
-        await setDoc(doc(firestoreDb, 'schools', newSchool.id), newSchool);
+        await setDoc(doc(firestoreDb, 'schools', newSchool.id), newSchool, { merge: true });
         console.log("🟢 [SuperAdmin] setDoc exécuté avec succès pour création :", newSchool.id);
         
         // --- Vérification obligatoire ---
@@ -143,7 +143,7 @@ const SuperAdmin: React.FC = () => {
         });
       }
       
-      saveDB(newDb);
+      safeMergeDB(newDb);
       setModalOpen(false);
 
       const snap = await getDocs(collection(firestoreDb, 'schools'));
@@ -275,7 +275,7 @@ const SuperAdmin: React.FC = () => {
                         const newStatus: SubscriptionStatus = s.subscriptionStatus === 'active' ? 'suspended' : 'active';
                         if (window.confirm(`Voulez-vous ${newStatus === 'suspended' ? 'suspendre' : 'réactiver'} cette école ?`)) {
                           const newDb = { ...db, schools: db.schools.map(school => school.id === s.id ? { ...school, subscriptionStatus: newStatus } : school) };
-                          saveDB(newDb);
+                          safeMergeDB(newDb);
                         }
                       }}
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: s.subscriptionStatus === 'active' ? '#fee2e2' : '#dcfce7', color: s.subscriptionStatus === 'active' ? '#ef4444' : '#10b981', border: 'none' }}

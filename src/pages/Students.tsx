@@ -18,7 +18,7 @@ const Students: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [, setRefresh] = useState(0);
-  const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, safeMergeDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
@@ -94,7 +94,7 @@ const Students: React.FC = () => {
         createdBy: currentUser?.id || 'system'
       };
 
-      await setDoc(doc(firestoreDb, 'parent_invitations', inviteId), invitation);
+      await setDoc(doc(firestoreDb, 'parent_invitations', inviteId), invitation, { merge: true });
       
       const link = `${window.location.origin}/#/parent-signup?inviteId=${inviteId}`;
       setGeneratedInviteLink(link);
@@ -276,7 +276,7 @@ const Students: React.FC = () => {
             createdAt: new Date().toISOString()
           };
           
-          await setDoc(doc(firestoreDb, 'validation_requests', requestId), reqData);
+          await setDoc(doc(firestoreDb, 'validation_requests', requestId), reqData, { merge: true });
           
           if (!db.validation_requests) db.validation_requests = [];
           db.validation_requests.push(reqData);
@@ -303,7 +303,7 @@ const Students: React.FC = () => {
   const handleDeleteAll = () => {
     if (confirm('Êtes-vous sûr de vouloir supprimer TOUS les élèves de la base de données ? Cette action est irréversible.')) {
       const newDb = { ...db, students: [] };
-      saveDB(newDb);
+      safeMergeDB(newDb);
     }
   };
 
@@ -477,7 +477,7 @@ const Students: React.FC = () => {
         const confirm = window.confirm("Attention : Certaines classes n'ont pas été reconnues et seront enregistrées comme 'À définir'. Voulez-vous quand même continuer l'importation ?");
         if (!confirm) return;
       }
-      saveDB({ ...db, students: [...db.students, ...previewStudents] });
+      safeMergeDB({ ...db, students: [...db.students, ...previewStudents] });
       setPreviewStudents(null);
       setImportModalOpen(false);
       setExcelFile(null);
@@ -766,7 +766,7 @@ const Students: React.FC = () => {
                  import('../db/storage').then(({ defaultDB }) => {
                    const missing = defaultDB.classes.filter(defCls => !db.classes.some(c => c.id === defCls.id));
                    if (missing.length > 0) {
-                     saveDB({ ...db, classes: [...db.classes, ...missing] });
+                     safeMergeDB({ ...db, classes: [...db.classes, ...missing] });
                      alert(`${missing.length} classes manquantes ont été injectées avec succès !`);
                    } else {
                      alert("Toutes les classes sont déjà présentes.");

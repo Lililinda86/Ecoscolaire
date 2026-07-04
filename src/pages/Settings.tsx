@@ -7,7 +7,7 @@ import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 
 const Settings: React.FC = () => {
-  const { db, saveDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentUser } = useAppContext();
   const [newSubject, setNewSubject] = useState('');
   const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as const });
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
@@ -27,7 +27,7 @@ const Settings: React.FC = () => {
         updatedAt: new Date().toISOString()
       }, { merge: true });
       
-      saveDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), hasCampaySecret: true } } });
+      safeMergeDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), hasCampaySecret: true } } });
       
       setCampaySecretInput('');
       alert("Secret Campay configuré et sauvegardé avec succès de façon sécurisée.");
@@ -41,21 +41,21 @@ const Settings: React.FC = () => {
     e.preventDefault();
     if (!newClass.name.trim()) return;
     const newDb = { ...db, classes: [...db.classes, { id: crypto.randomUUID(), name: newClass.name, type: newClass.type }] };
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setNewClass({ name: '', type: 'francophone' });
   };
 
   const handleDeleteClass = (id: string) => {
     if (!checkPin()) { alert("Code PIN incorrect."); return; }
     if (confirm("Voulez-vous vraiment supprimer cette classe ?")) {
-      saveDB({ ...db, classes: db.classes.filter(c => c.id !== id) });
+      safeMergeDB({ ...db, classes: db.classes.filter(c => c.id !== id) });
     }
   };
 
   const handleEditClass = (id: string, oldName: string) => {
     const name = prompt("Modifier le nom de la classe :", oldName);
     if (name && name.trim()) {
-      saveDB({ ...db, classes: db.classes.map(c => c.id === id ? { ...c, name: name.trim() } : c) });
+      safeMergeDB({ ...db, classes: db.classes.map(c => c.id === id ? { ...c, name: name.trim() } : c) });
     }
   };
 
@@ -63,21 +63,21 @@ const Settings: React.FC = () => {
     e.preventDefault();
     if (!newSubject.trim()) return;
     const newDb = { ...db, subjects: [...db.subjects, { id: crypto.randomUUID(), name: newSubject }] };
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setNewSubject('');
   };
 
   const handleDeleteSubject = (id: string) => {
     if (!checkPin()) { alert("Code PIN incorrect."); return; }
     if (confirm("Voulez-vous vraiment supprimer cette matière ?")) {
-      saveDB({ ...db, subjects: db.subjects.filter(s => s.id !== id) });
+      safeMergeDB({ ...db, subjects: db.subjects.filter(s => s.id !== id) });
     }
   };
 
   const handleEditSubject = (id: string, oldName: string) => {
     const name = prompt("Modifier le nom de la matière :", oldName);
     if (name && name.trim()) {
-      saveDB({ ...db, subjects: db.subjects.map(s => s.id === id ? { ...s, name: name.trim() } : s) });
+      safeMergeDB({ ...db, subjects: db.subjects.map(s => s.id === id ? { ...s, name: name.trim() } : s) });
     }
   };
 
@@ -93,7 +93,7 @@ const Settings: React.FC = () => {
       return;
     }
     if(window.confirm("NOUVELLE ANNÉE : Voulez-vous archiver et effacer toutes les notes, présences, et transactions comptables de cette année ? Les élèves, le personnel et les classes seront conservés !")) {
-      saveDB({
+      safeMergeDB({
         ...db,
         grades: [],
         attendance: [],
@@ -120,7 +120,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nom de l'école</label>
             <input 
               value={db.school?.name || ''} 
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), name: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), name: e.target.value } })}
               style={{ width: '100%' }}
             />
           </div>
@@ -128,7 +128,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Année Scolaire</label>
             <input 
               value={db.school?.academicYear || ''} 
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), academicYear: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), academicYear: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="2026-2027"
             />
@@ -140,7 +140,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Directeur / Fondateur</label>
             <input 
               value={db.school?.directorName || ''} 
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), directorName: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), directorName: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Nom du Directeur"
             />
@@ -149,7 +149,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Numéro d'Agrément</label>
             <input 
               value={db.school?.accreditationNumber || ''} 
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), accreditationNumber: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), accreditationNumber: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Ex: Arrêté N° 123/MINEDUB/..."
             />
@@ -161,7 +161,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Téléphone Officiel</label>
             <input 
               value={db.school?.phone || ''} 
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), phone: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), phone: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Ex: (+237) 600 00 00 00"
             />
@@ -171,7 +171,7 @@ const Settings: React.FC = () => {
             <input 
               type="email"
               value={db.school?.email || ''} 
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), email: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), email: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Ex: contact@ecole.com"
             />
@@ -182,7 +182,7 @@ const Settings: React.FC = () => {
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Adresse Complète</label>
           <input 
             value={db.school?.address || ''} 
-            onChange={e => saveDB({ ...db, school: { ...(db.school as any), address: e.target.value } })}
+            onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), address: e.target.value } })}
             style={{ width: '100%' }}
             placeholder="Ex: Quartier Bonamoussadi, BP 1234 Douala, Cameroun"
           />
@@ -194,7 +194,7 @@ const Settings: React.FC = () => {
             <input 
               type="password"
               placeholder="Entrez un nouveau code pour le modifier..."
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), adminPin: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), adminPin: e.target.value } })}
               style={{ width: '100%', borderColor: 'var(--warning)' }}
             />
           </div>
@@ -204,7 +204,7 @@ const Settings: React.FC = () => {
               type="text"
               value={db.school?.paymentSettings?.campayPublic || ''}
               placeholder="Mode Simulation actif par défaut si vide..."
-              onChange={e => saveDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), campayPublic: e.target.value } } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), campayPublic: e.target.value } } })}
               style={{ width: '100%', borderColor: '#f97316', marginBottom: '1rem' }}
             />
 
@@ -261,31 +261,31 @@ const Settings: React.FC = () => {
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Scolarité T1</label>
                 <input type="number" min="0" value={db.school?.globalFees?.feeT1 || 0} onChange={e => {
-                   if(db.school) saveDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT1: parseFloat(e.target.value)||0}}});
+                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT1: parseFloat(e.target.value)||0}}});
                 }} />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Scolarité T2</label>
                 <input type="number" min="0" value={db.school?.globalFees?.feeT2 || 0} onChange={e => {
-                   if(db.school) saveDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT2: parseFloat(e.target.value)||0}}});
+                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT2: parseFloat(e.target.value)||0}}});
                 }} />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Scolarité T3</label>
                 <input type="number" min="0" value={db.school?.globalFees?.feeT3 || 0} onChange={e => {
-                   if(db.school) saveDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT3: parseFloat(e.target.value)||0}}});
+                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT3: parseFloat(e.target.value)||0}}});
                 }} />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Transport Bus</label>
                 <input type="number" min="0" value={db.school?.globalFees?.feeTransport || 0} onChange={e => {
-                   if(db.school) saveDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeTransport: parseFloat(e.target.value)||0}}});
+                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeTransport: parseFloat(e.target.value)||0}}});
                 }} />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Tenues Uniformes</label>
                 <input type="number" min="0" value={db.school?.globalFees?.feeUniforms || 0} onChange={e => {
-                   if(db.school) saveDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeUniforms: parseFloat(e.target.value)||0}}});
+                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeUniforms: parseFloat(e.target.value)||0}}});
                 }} />
              </div>
         </div>
@@ -357,7 +357,7 @@ const Settings: React.FC = () => {
                         <input type="checkbox" checked={isChecked} onChange={(e) => {
                            const newSubjects = e.target.checked ? [...clsSubjects, s.id] : clsSubjects.filter(id => id !== s.id);
                            const newDb = { ...db, classes: db.classes.map(c => c.id === currentClassId ? { ...c, subjects: newSubjects } : c) };
-                           saveDB(newDb);
+                           safeMergeDB(newDb);
                         }} />
                         <span style={{ fontWeight: isChecked ? 500 : 400 }}>{s.name}</span>
                       </label>
