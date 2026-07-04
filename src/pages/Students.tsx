@@ -105,8 +105,9 @@ const Students: React.FC = () => {
         targetName: inviteModalStudent.name,
         details: { inviteId }
       });
-    } catch (error: any) {
-      alert("Erreur lors de la génération de l'invitation : " + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      alert("Erreur lors de la génération de l'invitation : " + message);
     }
   };
 

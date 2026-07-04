@@ -37,8 +37,9 @@ const AITeacher: React.FC = () => {
     try {
       const response = await aiService.generateResponse(userMessage, { provider });
       setMessages(prev => [...prev, { role: 'assistant', content: response.content }]);
-    } catch (err: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Erreur: ${err.message}` }]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Erreur: ${message}` }]);
     } finally {
       setIsLoading(false);
     }

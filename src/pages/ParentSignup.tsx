@@ -56,7 +56,7 @@ const ParentSignup: React.FC = () => {
 
         setInvitation(data);
         setName(data.parentName || '');
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Erreur lecture invitation:", err);
         setError('Erreur lors de la lecture de l\'invitation. Veuillez réessayer.');
       } finally {

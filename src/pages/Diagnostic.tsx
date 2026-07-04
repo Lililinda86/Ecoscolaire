@@ -3,6 +3,9 @@ import { useAppContext } from '../context/AppContext';
 import { Activity, Database, Server, Users, Building, ChevronLeft, ShieldCheck, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 const Diagnostic: React.FC = () => {
   const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, supervisionSchoolId, currentSchool } = useAppContext();
   const navigate = useNavigate();
@@ -47,8 +50,8 @@ const Diagnostic: React.FC = () => {
       } else {
         setTestResult("❌ Échec : Document introuvable après écriture.");
       }
-    } catch (err: any) {
-      setTestResult(`❌ Erreur : ${err.message}`);
+    } catch (err: unknown) {
+      setTestResult(`❌ Erreur : ${getErrorMessage(err)}`);
     }
   };
 
@@ -80,8 +83,8 @@ Nombre d'écoles dans /schools : ${snap.docs.length}
 IDs trouvés : ${docsInfo.map(d => d.id).join(', ')}
 Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
 
-    } catch (err: any) {
-      setTestResult(`❌ Erreur : ${err.message}`);
+    } catch (err: unknown) {
+      setTestResult(`❌ Erreur : ${getErrorMessage(err)}`);
     }
   };
 
@@ -102,8 +105,8 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setTestResult(`✅ Export réussi ! ${data.length} école(s) sauvegardée(s).`);
-    } catch (e: any) {
-      setTestResult(`❌ Erreur d'export: ${e.message}`);
+    } catch (e: unknown) {
+      setTestResult(`❌ Erreur d'export: ${getErrorMessage(e)}`);
     }
   };
 
@@ -128,13 +131,13 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
             }
           }
           setTestResult(`✅ Restauration réussie ! ${schools.length} école(s) importée(s). Veuillez rafraîchir la page (F5).`);
-        } catch (err: any) {
-          setTestResult(`❌ Erreur de parsing JSON: ${err.message}`);
+        } catch (err: unknown) {
+          setTestResult(`❌ Erreur de parsing JSON: ${getErrorMessage(err)}`);
         }
       };
       reader.readAsText(file);
-    } catch (e: any) {
-      setTestResult(`❌ Erreur lors de l'import: ${e.message}`);
+    } catch (e: unknown) {
+      setTestResult(`❌ Erreur lors de l'import: ${getErrorMessage(e)}`);
     }
     event.target.value = ''; // Reset input
   };
@@ -180,8 +183,8 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
       } else {
         setTestResult(`⚠️ Réconciliation annulée. L'écart persiste (Actuel: ${currentCount}, Réel: ${realCount}).`);
       }
-    } catch (err: any) {
-      setTestResult(`❌ Erreur lors de la réconciliation : ${err.message}`);
+    } catch (err: unknown) {
+      setTestResult(`❌ Erreur lors de la réconciliation : ${getErrorMessage(err)}`);
     }
   };
 
