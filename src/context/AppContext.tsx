@@ -92,7 +92,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 schoolId: null,
                 createdAt: serverTimestamp()
               };
-              await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), userData);
+              await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), userData, { merge: true });
               console.log("Profil créé avec succès pour superAdmin:", userData);
             } catch (err: any) {
               console.error("Erreur lors de la création du profil Firestore:", err);
@@ -288,7 +288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               newItem.schoolId = currentSchool.id;
             }
             console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour ou ajout dans [${col}] :`, newItem);
-            await setDoc(doc(firestoreDb, col, newItem.id), newItem);
+            await setDoc(doc(firestoreDb, col, newItem.id), newItem, { merge: true });
           }
         }
 

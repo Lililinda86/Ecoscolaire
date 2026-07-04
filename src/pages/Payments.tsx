@@ -123,7 +123,7 @@ const Payments: React.FC = () => {
       
       // Option A - Safe minimal: On ne modifie plus student.feeT1/T2 aveuglément pour éviter les Lost Updates.
       // Le paiement est strictement append-only et idempotent.
-      await setDoc(doc(firestoreDb, 'payments', paymentId), newPayment);
+      await setDoc(doc(firestoreDb, 'payments', paymentId), newPayment, { merge: true });
 
       setModalOpen(false);
       logAuditAction({
@@ -156,7 +156,7 @@ const Payments: React.FC = () => {
       } as Expense;
       
       if (canSaveDirectly) {
-        await setDoc(doc(firestoreDb, 'expenses', expenseObj.id), expenseObj);
+        await setDoc(doc(firestoreDb, 'expenses', expenseObj.id), expenseObj, { merge: true });
         alert("Dépense enregistrée avec succès.");
       } else {
         const reqId = crypto.randomUUID();
@@ -171,7 +171,7 @@ const Payments: React.FC = () => {
           proposedData: expenseObj,
           status: 'pending',
           createdAt: new Date().toISOString()
-        });
+        }, { merge: true });
         alert(`Dépense de ${amount} FCFA soumise pour validation au Fondateur.`);
       }
       
