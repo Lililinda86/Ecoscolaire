@@ -40,16 +40,22 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     // Filtre Date
     if (dateFilter !== 'ALL') {
       const now = new Date();
-      const txDate = (tx: any) => new Date(tx.createdAt?.seconds ? tx.createdAt.seconds * 1000 : Date.now());
+      const txDate = (tx: any) => tx.createdAt?.seconds ? new Date(tx.createdAt.seconds * 1000) : null;
       
       if (dateFilter === 'TODAY') {
-        filtered = filtered.filter(tx => txDate(tx).toDateString() === now.toDateString());
+        filtered = filtered.filter(tx => txDate(tx)?.toDateString() === now.toDateString());
       } else if (dateFilter === '7DAYS') {
         const sevenDaysAgo = new Date(now.setDate(now.getDate() - 7));
-        filtered = filtered.filter(tx => txDate(tx) >= sevenDaysAgo);
+        filtered = filtered.filter(tx => {
+          const d = txDate(tx);
+          return d ? d >= sevenDaysAgo : false;
+        });
       } else if (dateFilter === '30DAYS') {
         const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
-        filtered = filtered.filter(tx => txDate(tx) >= thirtyDaysAgo);
+        filtered = filtered.filter(tx => {
+          const d = txDate(tx);
+          return d ? d >= thirtyDaysAgo : false;
+        });
       }
     }
 
@@ -148,13 +154,13 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
             ) : (
               filteredTransactions.map(tx => {
                 const student = students.find(s => s.id === tx.studentId);
-                const date = new Date(tx.createdAt?.seconds ? tx.createdAt.seconds * 1000 : Date.now());
+                const date = tx.createdAt?.seconds ? new Date(tx.createdAt.seconds * 1000) : null;
                 
                 return (
                   <tr key={tx.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover-row">
                     <td style={{ padding: '1rem' }}>
-                      <div style={{ fontWeight: '500' }}>{date.toLocaleDateString('fr-FR')}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{date.toLocaleTimeString('fr-FR')}</div>
+                      <div style={{ fontWeight: '500' }}>{date ? date.toLocaleDateString('fr-FR') : 'Date inconnue'}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{date ? date.toLocaleTimeString('fr-FR') : '-'}</div>
                     </td>
                     <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{tx.id}</td>
                     <td style={{ padding: '1rem', fontWeight: 500 }}>{student?.name || 'Inconnu'}</td>
@@ -223,7 +229,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Créé le</span>
-                <div>{new Date(selectedTx.createdAt?.seconds ? selectedTx.createdAt.seconds * 1000 : Date.now()).toLocaleString('fr-FR')}</div>
+                <div>{selectedTx.createdAt?.seconds ? new Date(selectedTx.createdAt.seconds * 1000).toLocaleString('fr-FR') : 'Date inconnue'}</div>
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mis à jour le</span>

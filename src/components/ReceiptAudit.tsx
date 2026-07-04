@@ -14,7 +14,7 @@ interface Anomaly {
   severity: 'warning' | 'critical';
   description: string;
   referenceId: string;
-  date: Date;
+  date?: Date;
 }
 
 const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
@@ -25,7 +25,7 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
     // 1. Paiements sans schoolId
     // 2. Paiement sans reçu
     payments.forEach(p => {
-      const pDate = new Date(p.date || Date.now());
+      const pDate = p.date ? new Date(p.date) : undefined;
       if (!p.schoolId) {
         issues.push({
           id: `no-school-${p.id}`,
@@ -54,7 +54,7 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
     // 4. Doublon de receiptNumber
     const receiptNumberCounts: Record<string, number> = {};
     receipts.forEach(r => {
-      const rDate = r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000) : new Date();
+      const rDate = r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000) : undefined;
       
       const hasPayment = payments.some(p => p.id === r.paymentId);
       if (!hasPayment) {
@@ -74,9 +74,8 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
     });
 
     receipts.forEach(r => {
-      const rDate = r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000) : new Date();
       if (r.receiptNumber && receiptNumberCounts[r.receiptNumber] > 1) {
-        // Pour éviter les doublons dans la liste des anomalies, on peut l'ajouter une seule fois ou pour chaque
+        const rDate = r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000) : undefined;
         issues.push({
           id: `duplicate-${r.id}`,
           type: 'DUPLICATE_RECEIPT_NUMBER',
@@ -98,7 +97,11 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
       return acc;
     }, [] as Anomaly[]);
 
-    return uniqueIssues.sort((a, b) => b.date.getTime() - a.date.getTime());
+    return uniqueIssues.sort((a, b) => {
+      const timeA = a.date ? a.date.getTime() : 0;
+      const timeB = b.date ? b.date.getTime() : 0;
+      return timeB - timeA;
+    });
   }, [payments, receipts]);
 
   if (anomalies.length === 0) {
@@ -131,7 +134,7 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
             {anomalies.map(anomaly => (
               <tr key={anomaly.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem' }}>
-                  {anomaly.date.toLocaleDateString('fr-FR')}
+                  {anomaly.date ? anomaly.date.toLocaleDateString('fr-FR') : 'Date inconnue'}
                 </td>
                 <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem', fontWeight: 500 }}>
                   {anomaly.type}
