@@ -38,7 +38,7 @@ const Diagnostic: React.FC = () => {
       await setDoc(testRef, {
         message: "Test de connexion Vercel réussi !",
         timestamp: new Date().toISOString()
-      });
+      }, { merge: true });
       
       const snap = await getDoc(testRef);
       if (snap.exists()) {
@@ -70,7 +70,7 @@ const Diagnostic: React.FC = () => {
         createdAt: new Date().toISOString()
       };
       
-      await setDoc(doc(firestoreDb, "schools", testSchool.id), testSchool);
+      await setDoc(doc(firestoreDb, "schools", testSchool.id), testSchool, { merge: true });
       
       const snap = await getDocs(collection(firestoreDb, "schools"));
       const docsInfo = snap.docs.map(d => ({id: d.id, name: d.data().name}));
@@ -124,7 +124,7 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
           
           for (const school of schools) {
             if (school.id) {
-              await setDoc(doc(firestoreDb, 'schools', school.id), school);
+              await setDoc(doc(firestoreDb, 'schools', school.id), school, { merge: true });
             }
           }
           setTestResult(`✅ Restauration réussie ! ${schools.length} école(s) importée(s). Veuillez rafraîchir la page (F5).`);

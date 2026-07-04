@@ -40,7 +40,7 @@ const ProtectedRouteForLogin = ({ children }: { children: React.ReactNode }) => 
 };
 
 function App() {
-  const { db, saveDB } = useAppContext();
+  const { db, safeMergeDB } = useAppContext();
 
   useEffect(() => {
     if (!db || !db.school) return;
@@ -108,9 +108,9 @@ function App() {
         );
       }
 
-      saveDB(payload);
+      safeMergeDB(payload);
     }
-  }, [db?.classes, db?.school, saveDB]);
+  }, [db?.classes, db?.school, safeMergeDB]);
 
   return (
     <HashRouter>

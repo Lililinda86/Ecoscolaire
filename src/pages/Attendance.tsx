@@ -8,7 +8,7 @@ import Modal from '../components/Modal';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 const Attendance: React.FC = () => {
-  const { db, saveDB, currentSchool, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentSchool, currentUser } = useAppContext();
   const { t } = useI18n();
 
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
@@ -45,7 +45,7 @@ const Attendance: React.FC = () => {
     } else {
       newDb.attendance.push({ id: crypto.randomUUID(), studentId, date, present, status, reason });
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
   };
 
   const toggleStaffAttendance = (staffId: string, status: 'present'|'absent'|'late'|'left_early', reason?: string) => {
@@ -58,7 +58,7 @@ const Attendance: React.FC = () => {
     } else {
       newDb.staffAttendance.push({ id: crypto.randomUUID(), staffId, date, present, status, reason });
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
   };
 
   const executeStatusChange = (id: string, isStaff: boolean, status: 'present'|'absent'|'late'|'left_early') => {
@@ -101,7 +101,7 @@ const Attendance: React.FC = () => {
            newDb.attendance.push({ id: crypto.randomUUID(), studentId: s.id, date, present, status });
        }
     });
-    saveDB(newDb);
+    safeMergeDB(newDb);
   };
 
   const markAllStaff = (status: 'present'|'absent') => {
@@ -115,7 +115,7 @@ const Attendance: React.FC = () => {
            newDb.staffAttendance.push({ id: crypto.randomUUID(), staffId: s.id, date, present, status });
        }
     });
-    saveDB(newDb);
+    safeMergeDB(newDb);
   };
 
   const yearNum = parseInt(month.split('-')[0]);

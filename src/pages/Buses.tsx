@@ -5,7 +5,7 @@ import Modal from '../components/Modal';
 import { Plus, Edit2, Trash2, Bus as BusIcon, Map as RouteIcon, Fuel, PenTool as Tool, AlertTriangle, Users, LayoutDashboard } from 'lucide-react';
 
 const Buses: React.FC = () => {
-  const { db, saveDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentUser } = useAppContext();
   
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role)) return null;
 
@@ -47,14 +47,14 @@ const Buses: React.FC = () => {
     } else {
       newDb[collectionName] = [...collection, { ...entity, id: crypto.randomUUID() }] as any;
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
   };
 
   const deleteEntity = <T extends { id: string }>(collectionName: keyof typeof db, id: string) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
       const newDb = { ...db };
       newDb[collectionName] = ((newDb[collectionName] as T[]) || []).filter(item => item.id !== id) as any;
-      saveDB(newDb);
+      safeMergeDB(newDb);
     }
   };
 

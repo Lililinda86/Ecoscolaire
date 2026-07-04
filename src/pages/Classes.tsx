@@ -4,7 +4,7 @@ import { useI18n } from '../context/I18nContext';
 import { sortClasses } from '../utils/sortClasses';
 
 const Classes: React.FC = () => {
-  const { db, saveDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentUser } = useAppContext();
   const { t } = useI18n();
   
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
@@ -21,7 +21,7 @@ const Classes: React.FC = () => {
     if (studentIndex >= 0) {
       newDb.students[studentIndex].classId = newClassId;
       // Optionnel : maj de la section si necessaire, on assume que ce n'est pas automatique ici.
-      saveDB(newDb);
+      safeMergeDB(newDb);
     }
   };
 
@@ -33,7 +33,7 @@ const Classes: React.FC = () => {
            import('../db/storage').then(({ defaultDB }) => {
              const missing = defaultDB.classes.filter(defCls => !db.classes.some(c => c.id === defCls.id));
              if (missing.length > 0) {
-               saveDB({ ...db, classes: [...db.classes, ...missing] });
+               safeMergeDB({ ...db, classes: [...db.classes, ...missing] });
                alert(`${missing.length} classes manquantes (ex: Pre-Nursery) ont été rajoutées avec succès !`);
              } else {
                alert("Toutes les classes de base sont déjà présentes.");

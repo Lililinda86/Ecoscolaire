@@ -6,7 +6,7 @@ import Modal from '../components/Modal';
 import { Plus, Edit2, AlertTriangle, ArrowRightLeft, Package, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 
 const Inventory: React.FC = () => {
-  const { db, saveDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentUser } = useAppContext();
   const { t } = useI18n();
 
   const allowedRoles = ['owner', 'director', 'secretary', 'accountant', 'superAdmin'];
@@ -47,7 +47,7 @@ const Inventory: React.FC = () => {
     } else {
       newDb.inventory.push({ ...currentItem, id: crypto.randomUUID() } as InventoryItem);
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setItemModalOpen(false);
   };
 
@@ -69,7 +69,7 @@ const Inventory: React.FC = () => {
         if (newDb.inventory[itemIndex].quantity < 0) newDb.inventory[itemIndex].quantity = 0;
       }
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setTxModalOpen(false);
   };
 

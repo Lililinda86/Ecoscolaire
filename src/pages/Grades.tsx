@@ -19,7 +19,7 @@ export const getAppreciation = (score: number, max: number = 20) => {
 };
 
 const Grades: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, safeMergeDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
   
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
@@ -99,7 +99,7 @@ const Grades: React.FC = () => {
       }
     });
     
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setModalOpen(false);
     if (hasValidations) {
       alert("Les notes ont été soumises pour validation par le Directeur.");
