@@ -12,6 +12,23 @@ import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return String(error);
+};
+
 const Payments: React.FC = () => {
   const { db, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
@@ -127,10 +144,11 @@ const Payments: React.FC = () => {
         alert(data.message || "Paiement Mobile Money initié avec succès.");
         setModalOpen(false);
         return; // CRITIQUE : on arrête ici, on n'écrit pas dans db.payments !
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
         console.error(error);
         setIsProcessingMoMo(false);
-        alert(`Erreur lors de l'initiation du paiement: ${error.message || "Erreur inconnue"}`);
+        alert(`Erreur lors de l'initiation du paiement: ${message || "Erreur inconnue"}`);
         return;
       }
     }
@@ -157,9 +175,10 @@ const Payments: React.FC = () => {
         targetId: newPayment.id,
         targetName: `Paiement ${newPayment.amount} FCFA - ${newPayment.type}`
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = getErrorMessage(err);
       console.error(err);
-      alert("Erreur lors de l'enregistrement: " + err.message);
+      alert("Erreur lors de l'enregistrement: " + message);
     } finally {
       setIsSaving(false);
     }
@@ -201,9 +220,10 @@ const Payments: React.FC = () => {
       }
       
       setExpenseModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = getErrorMessage(err);
       console.error(err);
-      alert("Erreur lors de l'enregistrement de la dépense: " + err.message);
+      alert("Erreur lors de l'enregistrement de la dépense: " + message);
     } finally {
       setIsSaving(false);
     }
@@ -227,8 +247,9 @@ const Payments: React.FC = () => {
           targetId: id,
           targetName: 'Paiement supprimé'
         });
-      } catch (err: any) {
-        alert("Erreur lors de la suppression: " + err.message);
+      } catch (err: unknown) {
+        const message = getErrorMessage(err);
+        alert("Erreur lors de la suppression: " + message);
       } finally {
         setIsSaving(false);
       }
@@ -281,9 +302,10 @@ const Payments: React.FC = () => {
          console.error(`[FRONTEND] Erreur retournée par mockConfirmPayment:`, data);
          alert("Erreur lors de la simulation.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = getErrorMessage(err);
       console.error(`[FRONTEND] Erreur catch lors de mockConfirmPayment:`, err);
-      alert("Erreur: " + err.message);
+      alert("Erreur: " + message);
     }
     setIsConfirmingTx(null);
   };
@@ -294,8 +316,9 @@ const Payments: React.FC = () => {
       setIsSaving(true);
       try {
         await deleteDoc(doc(firestoreDb, 'expenses', id));
-      } catch (err: any) {
-        alert("Erreur lors de l'annulation: " + err.message);
+      } catch (err: unknown) {
+        const message = getErrorMessage(err);
+        alert("Erreur lors de l'annulation: " + message);
       } finally {
         setIsSaving(false);
       }
@@ -786,7 +809,7 @@ const Payments: React.FC = () => {
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
               <label>Nature du Versement</label>
-              <select required value={currentPayment.type || 'tuition'} onChange={e => setCurrentPayment({...currentPayment, type: e.target.value as any})}>
+              <select required value={currentPayment.type || 'tuition'} onChange={e => setCurrentPayment({...currentPayment, type: e.target.value as 'tuition' | 'transport' | 'uniforms' | 'other'})}>
                 <option value="tuition">Scolarité (Tranche versée)</option>
                 <option value="transport">Transport (Bus)</option>
                 <option value="uniforms">Tenues</option>
@@ -796,7 +819,7 @@ const Payments: React.FC = () => {
             {currentPayment.type === 'tuition' && (
               <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Choix de la Tranche</label>
-                <select required value={currentPayment.installment || 'T1'} onChange={e => setCurrentPayment({...currentPayment, installment: e.target.value as any})}>
+                <select required value={currentPayment.installment || 'T1'} onChange={e => setCurrentPayment({...currentPayment, installment: e.target.value as 'T1' | 'T2' | 'T3'})}>
                   <option value="T1">Tranche 1</option>
                   <option value="T2">Tranche 2</option>
                   <option value="T3">Tranche 3</option>
