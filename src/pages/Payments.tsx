@@ -53,7 +53,7 @@ const Payments: React.FC = () => {
     } else {
       setModalExpectedAmount(0);
     }
-  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, isModalOpen]);
+  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, isModalOpen, db.payments, db.school?.globalFees, db.students]);
 
   const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
   if (!currentUser || !allowedRoles.includes(currentUser.role)) {
