@@ -1,5 +1,22 @@
 import * as admin from 'firebase-admin';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return String(error);
+};
+
 export interface QuotaReservationResult {
   success: boolean;
   errorCode?: string;
@@ -95,8 +112,8 @@ export async function reserveStudentImportQuota(
       reservedCount: result.reservedCount,
       isNoOp: result.isNoOp
     };
-  } catch (error: any) {
-    const errorCode = error.message; // From our throw statements
+  } catch (error: unknown) {
+    const errorCode = getErrorMessage(error); // From our throw statements
     
     // Map known errors to specific codes, else generic
     const knownCodes = ['JOB_NOT_FOUND', 'INVALID_JOB_STATUS', 'SCHOOL_NOT_FOUND', 'SUBSCRIPTION_SUSPENDED', 'LIMIT_UNDEFINED', 'QUOTA_EXCEEDED'];

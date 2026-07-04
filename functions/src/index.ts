@@ -6,6 +6,23 @@ import { CampayService } from './services/campayService';
 // Initialize the Firebase Admin SDK
 admin.initializeApp();
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return String(error);
+};
+
 // ----------------------------------------------------------------------
 // 1. createSaaSCheckout
 // Callable function to initiate a payment securely from the frontend.
@@ -179,11 +196,11 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     await db.collection('campay_logs').add({
       requestType: 'webhook_processing_error',
       external_reference: external_reference,
-      error: error.message,
+      error: getErrorMessage(error),
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
   }
@@ -337,7 +354,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           });
           
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Log error securely
           await db.collection('campay_logs').add({
             schoolId,
@@ -350,10 +367,10 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
               external_reference: generatedId
             },
             sanitizedResponse: null,
-            errorMessage: error.message,
+            errorMessage: getErrorMessage(error),
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           });
-          throw new functions.https.HttpsError('internal', `Campay initiation failed: ${error.message}`);
+          throw new functions.https.HttpsError('internal', `Campay initiation failed: ${getErrorMessage(error)}`);
         }
       // Removed the else block that was falling back to mock when not sandbox
     } else {

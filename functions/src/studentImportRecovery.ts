@@ -5,6 +5,23 @@ import { reserveStudentImportQuota } from './studentImportQuota';
 import { executeBulkWriterImport } from './studentImportBulkWriter';
 import { reconcileImportJobQuota } from './studentImportReconciler';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return String(error);
+};
+
 /**
  * Renews the lease for the current sweeper if it still owns it.
  */
@@ -195,9 +212,10 @@ export async function resumeImportJob(
     // 7. Reconciliation (Phase 2E)
     await reconcileImportJobQuota(db, jobId, schoolId);
 
-  } catch (error: any) {
-    if (error.message && error.message.includes('SafeAbort')) {
-      console.log(`Recovery for ${jobId} safely aborted: ${error.message}`);
+  } catch (error: unknown) {
+    const msg = getErrorMessage(error);
+    if (msg.includes('SafeAbort')) {
+      console.log(`Recovery for ${jobId} safely aborted: ${msg}`);
       return; // Do nothing, let it be RUNNING
     }
     console.error(`Recovery error for ${jobId}:`, error);
