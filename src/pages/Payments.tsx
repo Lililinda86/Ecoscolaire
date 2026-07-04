@@ -46,6 +46,14 @@ type WhatsAppPaymentStudent = {
   parentPhone?: string;
 };
 
+type LocalTransaction = {
+  id: string;
+  studentId?: string;
+  status?: string;
+  amount: number;
+  createdAt?: { seconds?: number };
+};
+
 const Payments: React.FC = () => {
   const { db, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
@@ -476,7 +484,7 @@ const Payments: React.FC = () => {
 
       {activeTab === 'encaissements' && (
         <>
-        {db.transactions && db.transactions.filter((t: any) => t.status === 'PENDING').length > 0 && (
+        {db.transactions && db.transactions.filter((t: LocalTransaction) => t.status === 'PENDING').length > 0 && (
           <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '2rem', border: '1px solid var(--warning)' }}>
             <div style={{ padding: '1rem', background: '#fffbeb', borderBottom: '1px solid var(--warning)' }}>
               <h3 style={{ margin: 0, color: '#b45309' }}>⏳ Transactions Mobile Money en attente</h3>
@@ -491,7 +499,7 @@ const Payments: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {db.transactions.filter((t: any) => t.status === 'PENDING').map((tx: any) => {
+                {db.transactions.filter((t: LocalTransaction) => t.status === 'PENDING').map((tx: LocalTransaction) => {
                   const student = db.students.find(s => s.id === tx.studentId);
                   const isDevOrStaging = import.meta.env.MODE === 'development' || import.meta.env.VITE_FIREBASE_PROJECT_ID === 'ecoscolaire-staging';
                   return (
