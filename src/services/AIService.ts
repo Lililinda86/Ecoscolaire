@@ -3,7 +3,7 @@ export type AIProvider = 'openai' | 'gemini' | 'claude' | 'ollama' | 'mock';
 export interface AIResponse {
   content: string;
   provider: AIProvider;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AIRequestOptions {

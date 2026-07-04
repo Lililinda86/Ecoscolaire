@@ -13,7 +13,7 @@ interface AuditLog {
   targetId: string;
   targetName: string;
   timestamp: string;
-  details: any;
+  details: Record<string, unknown>;
 }
 
 const AuditLogs: React.FC = () => {
