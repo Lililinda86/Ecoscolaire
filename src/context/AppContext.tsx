@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Database } from '../db/storage';
+import type { Database, DatabasePatch } from '../db/storage';
 import { defaultDB } from '../db/storage';
 import type { User, School } from '../types';
 
@@ -7,6 +7,7 @@ interface AppContextProps {
   db: Database | null;
   saveDB: (newDb: Database) => Promise<void>;
   safeMergeDB: (newDb: Database) => Promise<void>;
+  safePatchDB: (patch: DatabasePatch) => Promise<void>;
   currentUser: User | null;
   currentSchool: School | null;
   isSupervising: boolean;
@@ -309,6 +310,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const safePatchDB = async (patch: DatabasePatch) => {
+    if (!db || !currentUser) return;
+    
+    if (isSupervising) {
+      const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les données de cette école. Êtes-vous sûr ?");
+      if (!confirm) return;
+    }
+    
+    setDb(prev => prev ? { ...prev, ...patch } : prev);
+
+    try {
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
+
+      for (const [collectionName, items] of Object.entries(patch)) {
+        if (!Array.isArray(items)) continue;
+
+        for (const item of items) {
+          if (!item || typeof item !== "object" || !("id" in item)) continue;
+
+          const itemWithSchool = {
+            ...item,
+            ...(
+              !("schoolId" in item) &&
+              collectionName !== "schools" &&
+              collectionName !== "users" &&
+              currentSchool
+                ? { schoolId: currentSchool.id }
+                : {}
+            ),
+          };
+
+          await setDoc(
+            doc(firestoreDb, collectionName, String(item.id)),
+            itemWithSchool,
+            { merge: true }
+          );
+        }
+      }
+
+      setLastSyncDate(new Date());
+    } catch (e) {
+      console.error("Patch Sync Error:", e);
+      alert("Une erreur de permissions est survenue lors de la synchronisation.");
+    }
+  };
+
   const safeMergeDB = async (newDb: Database) => {
     if (!db || !currentUser) return;
     
@@ -485,7 +533,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      db, saveDB, safeMergeDB, currentUser, currentSchool, 
+      db, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended
