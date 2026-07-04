@@ -51,6 +51,12 @@ export interface Database {
   receipts?: any[];
 }
 
+export type DatabaseCollectionKey = {
+  [K in keyof Database]-?: NonNullable<Database[K]> extends Array<unknown> ? K : never
+}[keyof Database];
+
+export type DatabasePatch = Partial<Pick<Database, DatabaseCollectionKey>>;
+
 const initialDB: Database = {
   // Global SaaS
   schools: [],
@@ -119,3 +125,4 @@ const initialDB: Database = {
 };
 
 export const defaultDB = initialDB;
+
