@@ -3,6 +3,33 @@ import type { Database, DatabasePatch } from '../db/storage';
 import { defaultDB } from '../db/storage';
 import type { User, School } from '../types';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+  return String(error);
+};
+
+const getErrorCode = (error: unknown): string | undefined => {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string'
+  ) {
+    return (error as { code: string }).code;
+  }
+  return undefined;
+};
+
 interface AppContextProps {
   db: Database | null;
   saveDB: (newDb: Database) => Promise<void>;
@@ -95,9 +122,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               };
               await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), userData, { merge: true });
               console.log("Profil créé avec succès pour superAdmin:", userData);
-            } catch (err: any) {
+            } catch (err: unknown) {
+              const message = getErrorMessage(err);
               console.error("Erreur lors de la création du profil Firestore:", err);
-              alert("Erreur: Impossible de créer le profil dans Firestore. " + err.message);
+              alert("Erreur: Impossible de créer le profil dans Firestore. " + message);
               // On ne déconnecte pas, on continue avec un objet local temporaire
               userData = { id: firebaseUser.uid, email: firebaseUser.email, role: 'superAdmin', active: true, isActive: true };
             }
@@ -242,10 +270,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLastSyncDate(new Date());
         setLoading(false);
 
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
         console.error("Data Fetch Error:", error);
         setIsFirestoreConnected(false);
-        setFirestoreError(error.message);
+        setFirestoreError(message);
         setLoading(false);
       }
     };
@@ -489,12 +518,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const code = getErrorCode(error);
+      const message = getErrorMessage(error);
       console.error("Login Error:", error);
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      if (code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
         alert("Email ou mot de passe incorrect.");
       } else {
-        alert(error.message);
+        alert(message);
       }
       return false;
     }
