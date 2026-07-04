@@ -40,10 +40,10 @@ const ProtectedRouteForLogin = ({ children }: { children: React.ReactNode }) => 
 };
 
 function App() {
-  const { db, safeMergeDB } = useAppContext();
+  const { db, safePatchDB } = useAppContext();
 
   useEffect(() => {
-    if (!db || !db.school) return;
+    if (!db?.school || !db?.classes || !db?.students || !db?.staff) return;
 
     let shouldSave = false;
     let newClasses = [...db.classes];
@@ -95,22 +95,22 @@ function App() {
     });
 
     if (shouldSave) {
-      const payload: any = { ...db, classes: deduplicatedClasses };
+      const patch: any = { classes: deduplicatedClasses };
       
       if (duplicateClassIdsToRemap.size > 0) {
-        payload.students = db.students.map((s: any) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
+        patch.students = db.students.map((s: any) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
           ? { ...s, classId: duplicateClassIdsToRemap.get(s.classId)! } 
           : s
         );
-        payload.staff = db.staff.map((s: any) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
+        patch.staff = db.staff.map((s: any) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
           ? { ...s, assignedClassId: duplicateClassIdsToRemap.get(s.assignedClassId)! }
           : s
         );
       }
 
-      safeMergeDB(payload);
+      safePatchDB(patch);
     }
-  }, [db?.classes, db?.school, safeMergeDB]);
+  }, [db?.classes, db?.school, db?.students, db?.staff, safePatchDB]);
 
   return (
     <HashRouter>
