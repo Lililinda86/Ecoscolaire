@@ -10,7 +10,8 @@ const Diagnostic: React.FC = () => {
   const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, supervisionSchoolId, currentSchool } = useAppContext();
   const navigate = useNavigate();
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [directFetchData, setDirectFetchData] = useState<any>(null);
+  type DiagnosticFetchResult = { count: number; docs: Array<{ id: string; name: string }> };
+  const [directFetchData, setDirectFetchData] = useState<DiagnosticFetchResult | null>(null);
 
   useEffect(() => {
     import('../db/firebase').then(async ({ db: firestoreDb }) => {
@@ -317,7 +318,7 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
               <div style={{ fontFamily: 'monospace' }}>
                 <div style={{ marginBottom: '0.5rem' }}><strong>Écoles physiquement trouvées dans Firestore:</strong> <span style={{ fontSize: '1.2rem', color: '#15803d', fontWeight: 'bold' }}>{directFetchData.count}</span></div>
                 <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
-                  {directFetchData.docs.map((d: any, i: number) => (
+                  {directFetchData.docs.map((d, i: number) => (
                     <li key={i} style={{ padding: '0.5rem', background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                       <span style={{ color: '#0369a1' }}>ID: {d.id}</span> | <strong>Nom: {d.name}</strong>
                     </li>
