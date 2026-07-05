@@ -10,7 +10,7 @@ export interface SaaSInvoice {
   status: 'pending' | 'successful' | 'failed' | 'cancelled';
   createdAt: string; // ISO String
   paidAt: string | null;
-  webhookPayloads: any[]; // Trace brute pour l'audit
+  webhookPayloads: Record<string, unknown>[]; // Trace brute pour l'audit
 }
 
 export interface SubscriptionPlanConfig {
