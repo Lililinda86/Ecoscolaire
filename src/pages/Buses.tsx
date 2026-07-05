@@ -43,9 +43,9 @@ const Buses: React.FC = () => {
     const newDb = { ...db };
     const collection = (newDb[collectionName] as T[]) || [];
     if (entity.id) {
-      newDb[collectionName] = collection.map(item => item.id === entity.id ? entity : item) as any;
+        newDb[collectionName] = collection.map(item => item.id === entity.id ? entity : item) as never;
     } else {
-      newDb[collectionName] = [...collection, { ...entity, id: crypto.randomUUID() }] as any;
+        newDb[collectionName] = [...collection, { ...entity, id: crypto.randomUUID() }] as never;
     }
     safeMergeDB(newDb);
   };
@@ -53,7 +53,7 @@ const Buses: React.FC = () => {
   const deleteEntity = <T extends { id: string }>(collectionName: keyof typeof db, id: string) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
       const newDb = { ...db };
-      newDb[collectionName] = ((newDb[collectionName] as T[]) || []).filter(item => item.id !== id) as any;
+      newDb[collectionName] = ((newDb[collectionName] as T[]) || []).filter(item => item.id !== id) as never;
       safeMergeDB(newDb);
     }
   };
@@ -309,7 +309,7 @@ const Buses: React.FC = () => {
           <div className="form-group"><label>Immatriculation</label><input required value={currentBus.plate || ''} onChange={e => setCurrentBus({...currentBus, plate: e.target.value})} /></div>
           <div className="form-group"><label>Places</label><input type="number" required value={currentBus.capacity || ''} onChange={e => setCurrentBus({...currentBus, capacity: parseInt(e.target.value)})} /></div>
           <div className="form-group"><label>Statut</label>
-            <select required value={currentBus.status || 'actif'} onChange={e => setCurrentBus({...currentBus, status: e.target.value as any})}>
+            <select required value={currentBus.status || 'actif'} onChange={e => setCurrentBus({...currentBus, status: e.target.value as Bus['status']})}>
               <option value="actif">Actif</option><option value="en_panne">En panne</option><option value="en_entretien">En entretien</option>
             </select>
           </div>
@@ -330,7 +330,7 @@ const Buses: React.FC = () => {
           <div className="form-group"><label>Téléphone</label><input required value={currentDriver.phone || ''} onChange={e => setCurrentDriver({...currentDriver, phone: e.target.value})} /></div>
           <div className="form-group"><label>Permis</label><input required value={currentDriver.licenseNumber || ''} onChange={e => setCurrentDriver({...currentDriver, licenseNumber: e.target.value})} /></div>
           <div className="form-group"><label>Statut</label>
-            <select required value={currentDriver.status || 'actif'} onChange={e => setCurrentDriver({...currentDriver, status: e.target.value as any})}>
+            <select required value={currentDriver.status || 'actif'} onChange={e => setCurrentDriver({...currentDriver, status: e.target.value as Staff['status']})}>
               <option value="actif">Actif</option><option value="absent">Absent</option><option value="remplacé">Remplacé</option>
             </select>
           </div>
@@ -400,12 +400,12 @@ const Buses: React.FC = () => {
           </div>
           <div className="form-group"><label>Description</label><input required value={currentBreakdown.description || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, description: e.target.value})} /></div>
           <div className="form-group"><label>Gravité</label>
-            <select required value={currentBreakdown.severity || 'légère'} onChange={e => setCurrentBreakdown({...currentBreakdown, severity: e.target.value as any})}>
+            <select required value={currentBreakdown.severity || 'légère'} onChange={e => setCurrentBreakdown({...currentBreakdown, severity: e.target.value as Breakdown['severity']})}>
               <option value="légère">Légère</option><option value="moyenne">Moyenne</option><option value="urgente">Urgente</option>
             </select>
           </div>
           <div className="form-group"><label>Statut</label>
-            <select required value={currentBreakdown.status || 'signalée'} onChange={e => setCurrentBreakdown({...currentBreakdown, status: e.target.value as any})}>
+            <select required value={currentBreakdown.status || 'signalée'} onChange={e => setCurrentBreakdown({...currentBreakdown, status: e.target.value as Breakdown['status']})}>
               <option value="signalée">Signalée</option><option value="en_réparation">En réparation</option><option value="réparée">Réparée</option>
             </select>
           </div>

@@ -128,7 +128,7 @@ const StaffPage: React.FC = () => {
           </div>
           <div className="form-group">
             <label>{t('role')}</label>
-            <select value={currentStaff.role} onChange={e => setCurrentStaff({...currentStaff, role: e.target.value as any})}>
+            <select value={currentStaff.role} onChange={e => setCurrentStaff({...currentStaff, role: e.target.value as Staff['role']})}>
               <option value="teacher">Enseignant</option>
               <option value="driver">Chauffeur</option>
               <option value="assistant">Assistant</option>

@@ -9,7 +9,7 @@ import { sortClasses } from '../utils/sortClasses';
 const Settings: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
   const [newSubject, setNewSubject] = useState('');
-  const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as const });
+  const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as 'francophone' | 'anglophone' });
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
   const [currentClassId, setCurrentClassId] = useState('');
   const [campaySecretInput, setCampaySecretInput] = useState('');
@@ -27,7 +27,7 @@ const Settings: React.FC = () => {
         updatedAt: new Date().toISOString()
       }, { merge: true });
       
-      safeMergeDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), hasCampaySecret: true } } });
+      safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), paymentSettings: { ...(db.school?.paymentSettings||{}), hasCampaySecret: true } } });
       
       setCampaySecretInput('');
       alert("Secret Campay configuré et sauvegardé avec succès de façon sécurisée.");
@@ -120,7 +120,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nom de l'école</label>
             <input 
               value={db.school?.name || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), name: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), name: e.target.value } })}
               style={{ width: '100%' }}
             />
           </div>
@@ -128,7 +128,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Année Scolaire</label>
             <input 
               value={db.school?.academicYear || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), academicYear: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), academicYear: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="2026-2027"
             />
@@ -140,7 +140,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Directeur / Fondateur</label>
             <input 
               value={db.school?.directorName || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), directorName: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), directorName: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Nom du Directeur"
             />
@@ -149,7 +149,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Numéro d'Agrément</label>
             <input 
               value={db.school?.accreditationNumber || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), accreditationNumber: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), accreditationNumber: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Ex: Arrêté N° 123/MINEDUB/..."
             />
@@ -161,7 +161,7 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Téléphone Officiel</label>
             <input 
               value={db.school?.phone || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), phone: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), phone: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Ex: (+237) 600 00 00 00"
             />
@@ -171,7 +171,7 @@ const Settings: React.FC = () => {
             <input 
               type="email"
               value={db.school?.email || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), email: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), email: e.target.value } })}
               style={{ width: '100%' }}
               placeholder="Ex: contact@ecole.com"
             />
@@ -182,7 +182,7 @@ const Settings: React.FC = () => {
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Adresse Complète</label>
           <input 
             value={db.school?.address || ''} 
-            onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), address: e.target.value } })}
+            onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), address: e.target.value } })}
             style={{ width: '100%' }}
             placeholder="Ex: Quartier Bonamoussadi, BP 1234 Douala, Cameroun"
           />
@@ -194,7 +194,7 @@ const Settings: React.FC = () => {
             <input 
               type="password"
               placeholder="Entrez un nouveau code pour le modifier..."
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), adminPin: e.target.value } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), adminPin: e.target.value } })}
               style={{ width: '100%', borderColor: 'var(--warning)' }}
             />
           </div>
@@ -204,7 +204,7 @@ const Settings: React.FC = () => {
               type="text"
               value={db.school?.paymentSettings?.campayPublic || ''}
               placeholder="Mode Simulation actif par défaut si vide..."
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as any), paymentSettings: { ...(db.school?.paymentSettings||{}), campayPublic: e.target.value } } })}
+              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), paymentSettings: { ...(db.school?.paymentSettings||{}), campayPublic: e.target.value } } })}
               style={{ width: '100%', borderColor: '#f97316', marginBottom: '1rem' }}
             />
 
@@ -318,7 +318,7 @@ const Settings: React.FC = () => {
         <h2>Gestion des classes</h2>
         <form onSubmit={handleAddClass} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <input required value={newClass.name} onChange={e => setNewClass({...newClass, name: e.target.value})} placeholder="Nom de la classe..." style={{ flex: 1 }} />
-          <select value={newClass.type} onChange={e => setNewClass({...newClass, type: e.target.value as any})}>
+          <select value={newClass.type} onChange={e => setNewClass({...newClass, type: e.target.value as 'francophone' | 'anglophone'})}>
             <option value="francophone">Francophone</option>
             <option value="anglophone">Anglophone</option>
           </select>
