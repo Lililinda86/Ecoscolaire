@@ -1,6 +1,6 @@
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
-import { normalizeRows } from './studentImportNormalizer';
+import { normalizeRows, ImportStudentRow } from './studentImportNormalizer';
 import { runDiscovery } from './studentImportDiscovery';
 import { reserveStudentImportQuota, markImportJobFailedIfCurrent } from './studentImportQuota';
 import { executeBulkWriterImport, markImportJobCompletedIfRunning } from './studentImportBulkWriter';
@@ -96,7 +96,7 @@ export const processStudentImportJob = onDocumentCreated(
         throw new Error('File exceeds 10MB limit');
       }
 
-      let payload: any[];
+      let payload: ImportStudentRow[];
       try {
         const fileContent = fileBuffer.toString('utf-8');
         payload = JSON.parse(fileContent);
