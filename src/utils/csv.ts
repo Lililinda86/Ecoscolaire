@@ -18,7 +18,7 @@ export const generateCSVTemplate = () => {
   document.body.removeChild(link);
 };
 
-export const parseCSV = (content: string, separator: string = ';'): any[] => {
+export const parseCSV = (content: string, separator: string = ';'): Record<string, string>[] => {
   // Simple CSV parser that handles basic rows. 
   // Excel in French regions uses ';' by default for CSV.
   const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);

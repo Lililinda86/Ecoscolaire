@@ -353,7 +353,7 @@ const Students: React.FC = () => {
         const workbook = XLSX.read(data, { type: 'binary' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        const rawRows: unknown[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
         let headerRowIndex = -1;
         let headers: string[] = [];
@@ -384,7 +384,7 @@ const Students: React.FC = () => {
 
         for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
           const rawRow = rawRows[i];
-          const row: any = {};
+          const row: Record<string, unknown> = {};
           headers.forEach((h, index) => {
             row[h] = rawRow[index];
           });
