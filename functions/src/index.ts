@@ -559,7 +559,7 @@ export const onPaymentCreated = functions.firestore
       const receiptNumber = `REC-${year}-${formattedNum}`;
 
       // Helper to remove undefined values
-      const cleanUndefined = (obj: any) => {
+      const cleanUndefined = (obj: Record<string, unknown>): Record<string, unknown> => {
         return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
       };
 
