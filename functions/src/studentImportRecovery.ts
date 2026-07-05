@@ -71,7 +71,7 @@ async function finalizeRecoveryIfOwner(
   jobRef: admin.firestore.DocumentReference,
   sweeperId: string,
   finalStatus: string,
-  extraData: any = {}
+  extraData: Record<string, unknown> = {}
 ): Promise<void> {
   await db.runTransaction(async (t) => {
     const doc = await t.get(jobRef);

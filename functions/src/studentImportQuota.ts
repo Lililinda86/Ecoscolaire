@@ -34,7 +34,7 @@ export async function reserveStudentImportQuota(
   jobId: string,
   schoolId: string,
   newStudentsCount: number,
-  discoverySummary: any
+  discoverySummary: Record<string, unknown>
 ): Promise<QuotaReservationResult> {
   const jobRef = db.collection('student_import_jobs').doc(jobId);
   const schoolRef = db.collection('schools').doc(schoolId);

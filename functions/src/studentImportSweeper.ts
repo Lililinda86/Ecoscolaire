@@ -70,7 +70,7 @@ export const sweepZombieImportJobs = onSchedule('every 15 minutes', async () => 
   let zombiesDetected = 0;
   let skipped = 0;
   let leasesAcquired = 0;
-  const recoveryPromises: Promise<any>[] = [];
+  const recoveryPromises: Promise<void>[] = [];
 
   for (const doc of jobsSnap.docs) {
     scanned++;
