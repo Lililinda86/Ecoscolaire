@@ -24,14 +24,14 @@ export interface NormalizedStudentRow {
   allergies?: string;
   medicalConditions?: string;
   importJobId: string;
-  importedAt: any; // Firebase Timestamp or string depending on context
-  updatedAt: any;
+  importedAt: unknown; // Firebase Timestamp or string depending on context
+  updatedAt: unknown;
 }
 
 export interface RowNormalizationResult {
   validRows: NormalizedStudentRow[];
-  invalidRows: any[];
-  skippedRows: any[];
+  invalidRows: unknown[];
+  skippedRows: unknown[];
   summary: {
     total: number;
     valid: number;
