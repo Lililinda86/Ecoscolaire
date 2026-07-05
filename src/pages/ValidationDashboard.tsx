@@ -4,6 +4,7 @@ import { CheckCircle, XCircle, Clock, ShieldAlert } from 'lucide-react';
 import type { ValidationRequest } from '../types';
 
 const ValidationDashboard: React.FC = () => {
+  type ValidationEntity = { id: string; [key: string]: unknown };
   const { db, safeMergeDB, currentUser, logAuditAction } = useAppContext();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -32,21 +33,21 @@ const ValidationDashboard: React.FC = () => {
     try {
       // 1. Appliquer l'action
       const newDb = { ...db };
-      let targetArray = (newDb as any)[req.targetCollection] || [];
+      let targetArray = ((newDb as Record<string, unknown>)[req.targetCollection] as ValidationEntity[]) || [];
       
       if (req.actionType === 'DELETE_STUDENT') {
-        targetArray = targetArray.filter((i: any) => i.id !== req.targetDocumentId);
+        targetArray = targetArray.filter((i: ValidationEntity) => i.id !== req.targetDocumentId);
       } else {
         // UPDATE ou CREATE
-        const index = targetArray.findIndex((i: any) => i.id === req.targetDocumentId);
+        const index = targetArray.findIndex((i: ValidationEntity) => i.id === req.targetDocumentId);
         if (index >= 0) {
-          targetArray[index] = { ...targetArray[index], ...req.proposedData };
+          targetArray[index] = { ...targetArray[index], ...(req.proposedData as Record<string, unknown>) };
         } else {
-          targetArray.push(req.proposedData);
+          targetArray.push(req.proposedData as ValidationEntity);
         }
       }
       
-      (newDb as any)[req.targetCollection] = targetArray;
+      (newDb as Record<string, unknown>)[req.targetCollection] = targetArray;
 
       // 2. Mettre à jour la requête
       const reqIndex = newDb.validation_requests.findIndex(r => r.id === req.id);
