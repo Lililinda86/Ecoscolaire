@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy } from 'lucide-react';
-import type { Student, SectionType } from '../types';
+import type { Student, SectionType, School } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
@@ -199,7 +199,7 @@ const Students: React.FC = () => {
           
           const schoolData = schoolDoc.data();
           const currentCount = schoolData.studentCount || 0;
-          const limit = getStudentLimit(schoolData as any);
+          const limit = getStudentLimit(schoolData as School);
           
           if (currentCount >= limit) {
             throw new Error("QUOTA_EXCEEDED");
