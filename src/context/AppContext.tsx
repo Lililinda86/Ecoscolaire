@@ -10,6 +10,16 @@ type EntityWithId = {
   [key: string]: unknown;
 };
 
+type MergeableCollection = EntityWithId[];
+
+const getMergeableCollection = (
+  source: Partial<Database>,
+  key: keyof Database
+): MergeableCollection => {
+  const value = source[key];
+  return Array.isArray(value) ? (value as MergeableCollection) : [];
+};
+
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
@@ -324,8 +334,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ] as const;
       
       for (const col of collections) {
-        const oldArray: EntityWithId[] = (db as any)[col] || [];
-        const newArray: EntityWithId[] = (newDb as any)[col] || [];
+        const oldArray = getMergeableCollection(db, col as keyof Database);
+        const newArray = getMergeableCollection(newDb, col as keyof Database);
 
         const oldMap = new Map(oldArray.map((item) => [item.id, item]));
         const newMap = new Map(newArray.map((item) => [item.id, item]));
@@ -428,8 +438,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ] as const;
       
       for (const col of collections) {
-        const oldArray: EntityWithId[] = (db as any)[col] || [];
-        const newArray: EntityWithId[] = (newDb as any)[col] || [];
+        const oldArray = getMergeableCollection(db, col as keyof Database);
+        const newArray = getMergeableCollection(newDb, col as keyof Database);
 
         const oldMap = new Map(oldArray.map((item) => [item.id, item]));
         const newMap = new Map(newArray.map((item) => [item.id, item]));
