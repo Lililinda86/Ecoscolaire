@@ -4,6 +4,12 @@ import { defaultDB } from '../db/storage';
 import type { User, School } from '../types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+
+type EntityWithId = {
+  id: string;
+  [key: string]: unknown;
+};
+
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
@@ -318,11 +324,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ] as const;
       
       for (const col of collections) {
-        const oldArray = (db as any)[col] || [];
-        const newArray = (newDb as any)[col] || [];
+        const oldArray: EntityWithId[] = (db as any)[col] || [];
+        const newArray: EntityWithId[] = (newDb as any)[col] || [];
 
-        const oldMap = new Map(oldArray.map((item: any) => [item.id, item]));
-        const newMap = new Map(newArray.map((item: any) => [item.id, item]));
+        const oldMap = new Map(oldArray.map((item) => [item.id, item]));
+        const newMap = new Map(newArray.map((item) => [item.id, item]));
 
         for (const newItem of newArray) {
           const oldItem = oldMap.get(newItem.id);
@@ -422,11 +428,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ] as const;
       
       for (const col of collections) {
-        const oldArray = (db as any)[col] || [];
-        const newArray = (newDb as any)[col] || [];
+        const oldArray: EntityWithId[] = (db as any)[col] || [];
+        const newArray: EntityWithId[] = (newDb as any)[col] || [];
 
-        const oldMap = new Map(oldArray.map((item: any) => [item.id, item]));
-        const newMap = new Map(newArray.map((item: any) => [item.id, item]));
+        const oldMap = new Map(oldArray.map((item) => [item.id, item]));
+        const newMap = new Map(newArray.map((item) => [item.id, item]));
 
         for (const newItem of newArray) {
           const oldItem = oldMap.get(newItem.id);
