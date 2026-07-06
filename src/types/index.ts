@@ -80,7 +80,7 @@ export interface ValidationRequest {
   actionType: 'UPDATE_GRADE' | 'DELETE_STUDENT' | 'HIGH_EXPENSE' | 'CHANGE_ROLE';
   targetCollection: string;
   targetDocumentId?: string;
-  proposedData: any;
+  proposedData: unknown;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 }
