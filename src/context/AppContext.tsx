@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Database, DatabasePatch } from '../db/storage';
 import { defaultDB } from '../db/storage';
 import type { User, School } from '../types';
-
+import type { User as FirebaseUser } from 'firebase/auth';
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
@@ -47,7 +47,7 @@ interface AppContextProps {
   lastSyncDate: Date | null;
   supervisionSchoolId: string | null;
   authLoading: boolean;
-  logAuditAction: (params: { action: string, targetType: string, targetId: string, targetName: string, details?: any }) => Promise<void>;
+  logAuditAction: (params: { action: string, targetType: string, targetId: string, targetName: string, details?: Record<string, unknown> }) => Promise<void>;
   isSchoolSuspended: boolean;
 }
 
@@ -63,11 +63,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isFirestoreConnected, setIsFirestoreConnected] = useState<boolean | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<any>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 
   // 1. Auth Listener
   useEffect(() => {
-    let unsubscribe: any;
+    let unsubscribe: (() => void) | undefined;
     const initAuth = async () => {
       try {
         const { auth } = await import('../db/firebase');
@@ -104,32 +104,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Fetch user profile
         console.log("Utilisateur Firebase connecté:", firebaseUser.email, firebaseUser.uid);
         const userDoc = await getDoc(doc(firestoreDb, 'users', firebaseUser.uid));
-        let userData: any;
+        let userData: User;
 
         if (!userDoc.exists()) {
           console.log("Document Firestore non trouvé pour:", firebaseUser.email);
-          if (firebaseUser.email === 'kyrialove@gmail.com') {
-            try {
-              userData = {
-                id: firebaseUser.uid,
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                role: 'superAdmin',
-                active: true,
-                isActive: true,
-                schoolId: null,
-                createdAt: serverTimestamp()
-              };
-              await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), userData, { merge: true });
-              console.log("Profil créé avec succès pour superAdmin:", userData);
-            } catch (err: unknown) {
-              const message = getErrorMessage(err);
-              console.error("Erreur lors de la création du profil Firestore:", err);
-              alert("Erreur: Impossible de créer le profil dans Firestore. " + message);
-              // On ne déconnecte pas, on continue avec un objet local temporaire
-              userData = { id: firebaseUser.uid, email: firebaseUser.email, role: 'superAdmin', active: true, isActive: true };
-            }
-          } else {
+          if (firebaseUser.email === 'kyrialove@gmail.com') {              try {
+                userData = {
+                  id: firebaseUser.uid,
+                  email: firebaseUser.email ?? '',
+                  role: 'superAdmin',
+                  isActive: true,
+                  schoolId: undefined,
+                  createdAt: new Date().toISOString()
+                } as User;
+
+                const superAdminFirestorePayload = {
+                  ...userData,
+                  uid: firebaseUser.uid,
+                  active: true,
+                  schoolId: null,
+                  createdAt: serverTimestamp()
+                };
+
+                await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), superAdminFirestorePayload, { merge: true });
+                console.log("Profil créé avec succès pour superAdmin:", userData);
+              } catch (err: unknown) {
+                const message = getErrorMessage(err);
+                console.error("Erreur lors de la création du profil Firestore:", err);
+                alert("Erreur: Impossible de créer le profil dans Firestore. " + message);
+                // On ne déconnecte pas, on continue avec un objet local temporaire
+                userData = { 
+                  id: firebaseUser.uid, 
+                  email: firebaseUser.email ?? '', 
+                  role: 'superAdmin', 
+                  isActive: true,
+                  schoolId: undefined,
+                  createdAt: new Date().toISOString()
+                } as User;
+              }        }
+          else {
             console.error("Profil utilisateur introuvable et non autorisé à la création automatique.");
             const { auth } = await import('../db/firebase');
             auth.signOut();
@@ -196,11 +209,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return;
         }
 
-        let schoolDocData: any = null;
+        let schoolDocData: School | null = null;
         try {
           const schoolDoc = await getDoc(doc(firestoreDb, 'schools', targetSchoolId));
           if (schoolDoc.exists()) {
-            schoolDocData = { id: schoolDoc.id, ...schoolDoc.data() };
+            schoolDocData = { id: schoolDoc.id, ...schoolDoc.data() } as School;
             loadedDb.schools = [schoolDocData];
             setCurrentSchool(loadedDb.schools[0] as School);
           } else {
@@ -466,7 +479,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const logAuditAction = async (params: { action: string, targetType: string, targetId: string, targetName: string, details?: any }) => {
+  const logAuditAction = async (params: { action: string, targetType: string, targetId: string, targetName: string, details?: Record<string, unknown> }) => {
     if (!currentUser) return;
     try {
       const { collection, addDoc } = await import('firebase/firestore');
