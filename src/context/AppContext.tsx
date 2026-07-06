@@ -224,11 +224,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.warn("❌ [AppContext] Erreur lecture schools (schoolDoc) :", e);
         }
 
-        let usersData: any[] = [];
+        let usersData: User[] = [];
         try {
           const usersQ = query(collection(firestoreDb, 'users'), where('schoolId', '==', targetSchoolId));
           const usersSnap = await getDocs(usersQ);
-          usersData = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
+          usersData = usersSnap.docs.map(d => ({id: d.id, ...d.data()}) as User);
         } catch (e) {
           console.warn("❌ [AppContext] Erreur lecture users (permission refusée pour ce rôle) :", e);
           usersData = [userData]; // Fallback : on s'inclut soi-même a minima
