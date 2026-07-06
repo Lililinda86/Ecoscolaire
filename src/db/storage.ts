@@ -13,6 +13,7 @@ import type {
   Maintenance,
   Breakdown,
   Payment,
+  Expense,
   InventoryItem,
   InventoryTransaction,
   User,
@@ -43,13 +44,28 @@ export interface Database {
   maintenances: Maintenance[];
   breakdowns: Breakdown[];
   payments: Payment[];
-  expenses: any[];
+  expenses: Expense[];
   inventory: InventoryItem[];
   inventoryTransactions: InventoryTransaction[];
-  transactions: any[];
-  audit_logs: any[];
-  receipts?: any[];
+  transactions: StorageTransaction[];
+  audit_logs: StorageAuditLog[];
+  receipts?: StorageReceipt[];
 }
+
+export type StorageTransaction = {
+  id: string;
+  [key: string]: unknown;
+};
+
+export type StorageAuditLog = {
+  id: string;
+  [key: string]: unknown;
+};
+
+export type StorageReceipt = {
+  id: string;
+  [key: string]: unknown;
+};
 
 export type DatabaseCollectionKey = {
   [K in keyof Database]-?: NonNullable<Database[K]> extends Array<unknown> ? K : never
