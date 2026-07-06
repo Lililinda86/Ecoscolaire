@@ -3,6 +3,7 @@ import type { Database, DatabasePatch } from '../db/storage';
 import { defaultDB } from '../db/storage';
 import type { User, School } from '../types';
 import type { User as FirebaseUser } from 'firebase/auth';
+import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
@@ -251,7 +252,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               const snaps = await Promise.all(fetchQueries);
               const allDocs = new Map();
-              snaps.forEach((snap: any) => snap.docs.forEach((d: any) => allDocs.set(d.id, { id: d.id, ...d.data() })));
+              snaps.forEach((snap: QuerySnapshot<DocumentData>) => snap.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) => allDocs.set(d.id, { id: d.id, ...d.data() })));
               console.log(`🔵 [AppContext] Lecture Firestore [${colName}] pour parent : ${allDocs.size} document(s) chargé(s).`);
               return { colName, data: Array.from(allDocs.values()) };
             } else {
@@ -269,9 +270,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const results = await Promise.race([
           Promise.all(fetchPromises),
           new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Firestore")), 10000))
-        ]) as any;
+        ]) as { colName: string; data: unknown[] }[];
 
-        results.forEach((res: any) => {
+        results.forEach((res: { colName: string; data: unknown[] }) => {
           loadedDb[res.colName] = res.data;
         });
 
