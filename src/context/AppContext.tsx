@@ -181,8 +181,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         setCurrentUser(userData);
 
-        const loadedDb: any = { ...defaultDB };
-        const collectionsToFetch = [
+        const loadedDb: Database = { ...defaultDB };
+        const collectionsToFetch: (keyof Database)[] = [
           'classes', 'students', 'staff', 'buses', 'inventory', 
           'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
@@ -205,9 +205,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.log(`🔵 [AppContext] IDs trouvés : ${docsInfo.map(d => d.id).join(', ')}`);
           console.log(`🔵 [AppContext] Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
           
-          loadedDb.schools = schoolsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+          loadedDb.schools = schoolsSnap.docs.map(d => ({id: d.id, ...d.data()}) as School);
           const usersSnap = await getDocs(collection(firestoreDb, 'users'));
-          loadedDb.users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
+          loadedDb.users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}) as User);
           console.log("5. Contenu de loadedDb.schools avant setDb :", loadedDb.schools);
           
           setIsFirestoreConnected(true);
@@ -286,10 +286,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const results = await Promise.race([
           Promise.all(fetchPromises),
           new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Firestore")), 10000))
-        ]) as { colName: string; data: unknown[] }[];
+        ]) as { colName: keyof Database; data: unknown[] }[];
 
-        results.forEach((res: { colName: string; data: unknown[] }) => {
-          loadedDb[res.colName] = res.data;
+        results.forEach((res) => {
+          Object.assign(loadedDb, { [res.colName]: res.data });
         });
 
         console.log("5. Contenu de loadedDb.schools avant setDb final (Mode École) :", loadedDb.schools);
