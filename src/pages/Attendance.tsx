@@ -6,6 +6,7 @@ import { sortClasses } from '../utils/sortClasses';
 import { Check, X, Calendar, Clock, LogOut, Printer } from 'lucide-react';
 import Modal from '../components/Modal';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
+import type { Attendance as AttendanceRecord, StaffAttendance, AttendanceStatus } from '../types';
 
 const Attendance: React.FC = () => {
   const { db, safeMergeDB, currentSchool, currentUser } = useAppContext();
@@ -20,7 +21,7 @@ const Attendance: React.FC = () => {
 
   // Reason prompt state
   const [reasonModalOpen, setReasonModalOpen] = useState(false);
-  const [pendingReasonContext, setPendingReasonContext] = useState<{id: string, isStaff: boolean, status: any}>({id: '', isStaff: false, status: 'left_early'});
+  const [pendingReasonContext, setPendingReasonContext] = useState<{id: string, isStaff: boolean, status: AttendanceStatus}>({id: '', isStaff: false, status: 'left_early'});
   const [reasonText, setReasonText] = useState('');
 
   // History state
@@ -127,7 +128,7 @@ const Attendance: React.FC = () => {
     ? db.students.find(s => s.id === historyPersonId)
     : db.staff.find(s => s.id === historyPersonId);
     
-  let historyRecords: any[] = [];
+  let historyRecords: (AttendanceRecord | StaffAttendance)[] = [];
   if (historyPerson) {
     if (target === 'students') {
       historyRecords = db.attendance.filter(a => a.studentId === historyPerson.id && (a.status !== 'present' || a.reason));
@@ -137,7 +138,7 @@ const Attendance: React.FC = () => {
     historyRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
-  const getStatusLabel = (status: string, present: boolean) => {
+  const getStatusLabel = (status: string | undefined, present: boolean) => {
     if (status === 'absent' || (!status && !present)) return 'Absent';
     if (status === 'late') return 'En Retard';
     if (status === 'left_early') return 'Sortie Avant Heure';
@@ -165,7 +166,7 @@ const Attendance: React.FC = () => {
           <button className="secondary" onClick={() => window.print()}>
             <Printer size={18} /> Imprimer le rapport
           </button>
-          <select value={target} onChange={e => {setTarget(e.target.value as any); setClassFilter('all');}}>
+          <select value={target} onChange={e => {setTarget(e.target.value as 'students' | 'staff'); setClassFilter('all');}}>
             <option value="students">Élèves</option>
             <option value="staff">Personnel</option>
           </select>
@@ -329,7 +330,7 @@ const Attendance: React.FC = () => {
                         <div style={{ fontWeight: 500 }}>{person.name}</div>
                         {target === 'students' && (
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {db.classes.find(c => c.id === (person as any).classId)?.name || ''}
+                            {db.classes.find(c => c.id === (person as { classId?: string }).classId)?.name || ''}
                           </div>
                         )}
                       </td>

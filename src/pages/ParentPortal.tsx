@@ -204,7 +204,7 @@ const ParentPortal: React.FC = () => {
                         {['T1', 'T2', 'T3'].map(tranche => {
                           const expected = student[`fee${tranche}` as keyof Student] as number || 0;
                           const paid = db.payments.filter(p => p.studentId === student.id && p.type === 'tuition' && (p.installment === tranche || (!p.installment && tranche === 'T1'))).reduce((sum, p) => sum + p.amount, 0);
-                          const isPaid = isTranchePaid(student, tranche as any);
+                          const isPaid = isTranchePaid(student, tranche as 'T1' | 'T2' | 'T3');
                           return (
                             <tr key={tranche} style={{ borderBottom: '1px solid var(--border-color)' }}>
                               <td style={{ padding: '0.75rem' }}>{tranche === 'T1' ? 'Trimestre 1' : tranche === 'T2' ? 'Trimestre 2' : 'Trimestre 3'}</td>
