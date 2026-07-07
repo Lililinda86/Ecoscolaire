@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy } from 'lucide-react';
-import type { Student, SectionType, School } from '../types';
+import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -189,30 +189,13 @@ const Students: React.FC = () => {
         const studentId = finalStudent.id || crypto.randomUUID();
         finalStudent.id = studentId;
         const studentRef = doc(firestoreDb, 'students', studentId);
-        const schoolRef = doc(firestoreDb, 'schools', currentSchool.id);
         
-        await runTransaction(firestoreDb, async (transaction) => {
-          const schoolDoc = await transaction.get(schoolRef);
-          if (!schoolDoc.exists()) {
-            throw new Error("NOT_FOUND_SCHOOL");
-          }
-          
-          const schoolData = schoolDoc.data();
-          const currentCount = schoolData.studentCount || 0;
-          const limit = getStudentLimit(schoolData as School);
-          
-          if (currentCount >= limit) {
-            throw new Error("QUOTA_EXCEEDED");
-          }
-          
-          const studentDoc = await transaction.get(studentRef);
-          if (studentDoc.exists()) {
-            throw new Error("ALREADY_EXISTS");
-          }
-          
-          transaction.set(studentRef, finalStudent);
-          transaction.update(schoolRef, { studentCount: currentCount + 1 });
-        });
+        const currentCountDisplay = currentSchool.studentCount ?? db.students.length;
+        if (isStudentLimitReached(currentSchool, currentCountDisplay)) {
+          throw new Error("QUOTA_EXCEEDED");
+        }
+        
+        await setDoc(studentRef, finalStudent, { merge: true });
         
         // Mutate local state
         db.students.push(finalStudent);
@@ -236,6 +219,7 @@ const Students: React.FC = () => {
       } else if (message === 'ALREADY_EXISTS') {
         alert("Erreur métier : Cet élève existe déjà ou une requête concurrente a réussi.");
       } else if (code === 'permission-denied') {
+        console.error("PERMISSION DENIED ERROR DETAILS:", err);
         alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
       } else if (code === 'unavailable' || !navigator.onLine) {
         alert("Erreur réseau : Impossible de vérifier le quota hors ligne. Veuillez vous reconnecter.");
@@ -258,24 +242,7 @@ const Students: React.FC = () => {
       try {
         if (canDeleteDirectly) {
           const studentRef = doc(firestoreDb, 'students', student.id);
-          const schoolRef = doc(firestoreDb, 'schools', currentSchool.id);
-          
-          await runTransaction(firestoreDb, async (transaction) => {
-            const studentDoc = await transaction.get(studentRef);
-            if (!studentDoc.exists()) {
-               throw new Error("NOT_FOUND");
-            }
-            
-            const schoolDoc = await transaction.get(schoolRef);
-            if (!schoolDoc.exists()) throw new Error("NOT_FOUND_SCHOOL");
-            
-            const schoolData = schoolDoc.data();
-            const currentCount = schoolData.studentCount || 0;
-            const newCount = Math.max(0, currentCount - 1);
-            
-            transaction.delete(studentRef);
-            transaction.update(schoolRef, { studentCount: newCount });
-          });
+          await deleteDoc(studentRef);
           
           // Mutate local state
           const idx = db.students.findIndex(s => s.id === student.id);
