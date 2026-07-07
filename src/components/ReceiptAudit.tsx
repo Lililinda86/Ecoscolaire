@@ -1,11 +1,56 @@
 import React, { useMemo } from 'react';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import type { Payment, PaymentTransaction } from '../types';
+import type { Payment } from '../types';
+
+type DateLike =
+  | string
+  | number
+  | Date
+  | {
+      seconds?: number;
+      toDate?: () => Date;
+    }
+  | null
+  | undefined;
+
+type ReceiptLike = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  method?: string;
+  date?: DateLike;
+  createdAt?: DateLike;
+  updatedAt?: DateLike;
+  receiptNumber?: string;
+  paymentId?: string;
+  studentId?: string;
+  studentName?: string;
+  parentName?: string;
+  [key: string]: unknown;
+};
+
+type TransactionLike = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  method?: string;
+  type?: string;
+  date?: DateLike;
+  createdAt?: DateLike;
+  updatedAt?: DateLike;
+  reference?: string;
+  receiptNumber?: string;
+  paymentId?: string;
+  studentId?: string;
+  schoolId?: string;
+  userId?: string;
+  [key: string]: unknown;
+};
 
 interface ReceiptAuditProps {
   payments: Payment[];
-  transactions: PaymentTransaction[];
-  receipts: any[];
+  transactions: TransactionLike[];
+  receipts: ReceiptLike[];
 }
 
 interface Anomaly {
@@ -32,7 +77,7 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
           type: 'PAYMENT_NO_SCHOOL_ID',
           severity: 'critical',
           description: 'Paiement sans schoolId détecté.',
-          referenceId: p.id,
+          referenceId: p.id ?? 'inconnu',
           date: pDate
         });
       }
@@ -44,7 +89,7 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
           type: 'PAYMENT_NO_RECEIPT',
           severity: 'warning',
           description: 'Aucun reçu généré pour ce paiement.',
-          referenceId: p.id,
+          referenceId: p.id ?? 'inconnu',
           date: pDate
         });
       }
@@ -54,16 +99,29 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
     // 4. Doublon de receiptNumber
     const receiptNumberCounts: Record<string, number> = {};
     receipts.forEach(r => {
-      const rDate = r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000) : undefined;
+      let rDate: Date | undefined;
+      if (r.createdAt) {
+        if (typeof r.createdAt === 'object' && r.createdAt !== null) {
+          if ('toDate' in r.createdAt && typeof (r.createdAt as { toDate?: () => Date }).toDate === 'function') {
+            rDate = (r.createdAt as { toDate: () => Date }).toDate();
+          } else if ('seconds' in r.createdAt && typeof (r.createdAt as { seconds?: number }).seconds === 'number') {
+            rDate = new Date((r.createdAt as { seconds: number }).seconds * 1000);
+          } else {
+            rDate = new Date(r.createdAt as string | number | Date);
+          }
+        } else {
+          rDate = new Date(r.createdAt as string | number | Date);
+        }
+      }
       
       const hasPayment = payments.some(p => p.id === r.paymentId);
       if (!hasPayment) {
         issues.push({
-          id: `no-payment-${r.id}`,
+          id: `no-payment-${r.id ?? 'inconnu'}`,
           type: 'RECEIPT_NO_PAYMENT',
           severity: 'warning',
           description: 'Reçu existant sans paiement correspondant.',
-          referenceId: r.id,
+          referenceId: r.id ?? 'inconnu',
           date: rDate
         });
       }
@@ -74,14 +132,27 @@ const ReceiptAudit: React.FC<ReceiptAuditProps> = ({ payments, receipts }) => {
     });
 
     receipts.forEach(r => {
-      if (r.receiptNumber && receiptNumberCounts[r.receiptNumber] > 1) {
-        const rDate = r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000) : undefined;
+      if (r.receiptNumber && receiptNumberCounts[r.receiptNumber as string] > 1) {
+        let rDate: Date | undefined;
+        if (r.createdAt) {
+          if (typeof r.createdAt === 'object' && r.createdAt !== null) {
+            if ('toDate' in r.createdAt && typeof (r.createdAt as { toDate?: () => Date }).toDate === 'function') {
+              rDate = (r.createdAt as { toDate: () => Date }).toDate();
+            } else if ('seconds' in r.createdAt && typeof (r.createdAt as { seconds?: number }).seconds === 'number') {
+              rDate = new Date((r.createdAt as { seconds: number }).seconds * 1000);
+            } else {
+              rDate = new Date(r.createdAt as string | number | Date);
+            }
+          } else {
+            rDate = new Date(r.createdAt as string | number | Date);
+          }
+        }
         issues.push({
-          id: `duplicate-${r.id}`,
+          id: `duplicate-${r.id ?? 'inconnu'}`,
           type: 'DUPLICATE_RECEIPT_NUMBER',
           severity: 'critical',
           description: `Numéro de reçu en doublon: ${r.receiptNumber}`,
-          referenceId: r.receiptNumber,
+          referenceId: r.receiptNumber ?? 'inconnu',
           date: rDate
         });
       }

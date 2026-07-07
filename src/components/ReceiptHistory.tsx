@@ -5,8 +5,36 @@ import { jsPDF } from 'jspdf';
 import ReceiptPDFTemplate from './ReceiptPDFTemplate';
 import type { School, Student } from '../types';
 
+type DateLike =
+  | string
+  | number
+  | Date
+  | {
+      seconds?: number;
+      toDate?: () => Date;
+    }
+  | null
+  | undefined;
+
+type ReceiptLike = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  method?: string;
+  date?: DateLike;
+  createdAt?: DateLike;
+  updatedAt?: DateLike;
+  receiptNumber?: string;
+  paymentId?: string;
+  studentId?: string;
+  studentName?: string;
+  parentName?: string;
+  type?: string;
+  [key: string]: unknown;
+};
+
 interface ReceiptHistoryProps {
-  receipts: any[];
+  receipts: ReceiptLike[];
   students: Student[];
   school: School | null;
 }
@@ -20,7 +48,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
   console.log("receipts sample:", receipts?.slice(0, 2));
   console.log("currentUser (from AppContext? no, we need to pass it or just log receipts)");
   const printRef = useRef<HTMLDivElement>(null);
-  const [activeReceipt, setActiveReceipt] = useState<any | null>(null);
+  const [activeReceipt, setActiveReceipt] = useState<ReceiptLike | null>(null);
 
   const filteredReceipts = receipts
     .filter(r => {
@@ -34,16 +62,32 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
       );
     })
     .sort((a, b) => {
-      const dateA = a.createdAt?.seconds || 0;
-      const dateB = b.createdAt?.seconds || 0;
+      const dateAObj = a.createdAt;
+      let dateA = 0;
+      if (dateAObj) {
+        if (typeof dateAObj === 'object' && dateAObj !== null && 'seconds' in dateAObj && typeof dateAObj.seconds === 'number') {
+          dateA = dateAObj.seconds;
+        } else {
+          dateA = new Date(dateAObj as string | number | Date).getTime() / 1000;
+        }
+      }
+      const dateBObj = b.createdAt;
+      let dateB = 0;
+      if (dateBObj) {
+        if (typeof dateBObj === 'object' && dateBObj !== null && 'seconds' in dateBObj && typeof dateBObj.seconds === 'number') {
+          dateB = dateBObj.seconds;
+        } else {
+          dateB = new Date(dateBObj as string | number | Date).getTime() / 1000;
+        }
+      }
       return dateB - dateA;
     });
 
   console.log("=== ReceiptHistory Diagnostic (suite) ===");
   console.log("filteredReceipts length:", filteredReceipts.length);
 
-  const generatePDF = async (receipt: any, action: 'download' | 'print') => {
-    setIsGenerating(receipt.id);
+  const generatePDF = async (receipt: ReceiptLike, action: 'download' | 'print') => {
+    setIsGenerating(receipt.id ?? null);
     setActiveReceipt(receipt);
     
     // Wait for state to update and component to render
@@ -93,7 +137,13 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
           ref={printRef}
           receipt={{
             ...activeReceipt,
-            date: new Date(activeReceipt.date?.seconds ? activeReceipt.date.seconds * 1000 : Date.now())
+            paymentId: (activeReceipt.paymentId as string) || '',
+            receiptNumber: (activeReceipt.receiptNumber as string) || '',
+            amount: (activeReceipt.amount as number) || 0,
+            type: (activeReceipt.type as string) || '',
+            method: (activeReceipt.method as string) || '',
+            studentId: (activeReceipt.studentId as string) || null,
+            date: new Date(activeReceipt.date && typeof activeReceipt.date === 'object' && 'seconds' in activeReceipt.date ? (activeReceipt.date as { seconds: number }).seconds * 1000 : activeReceipt.date as string | number | Date || Date.now())
           }}
           school={school}
           student={students.find(s => s.id === activeReceipt.studentId) || null}
@@ -137,7 +187,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
             ) : (
               filteredReceipts.map(receipt => {
                 const student = students.find(s => s.id === receipt.studentId);
-                const date = new Date(receipt.createdAt?.seconds ? receipt.createdAt.seconds * 1000 : Date.now());
+                const date = new Date(receipt.createdAt && typeof receipt.createdAt === 'object' && 'seconds' in receipt.createdAt ? (receipt.createdAt as { seconds: number }).seconds * 1000 : receipt.createdAt as string | number | Date || Date.now());
                 
                 return (
                   <tr key={receipt.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover-row">

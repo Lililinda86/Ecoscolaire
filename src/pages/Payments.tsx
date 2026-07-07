@@ -46,12 +46,32 @@ type WhatsAppPaymentStudent = {
   parentPhone?: string;
 };
 
+type DateLike =
+  | string
+  | number
+  | Date
+  | {
+      seconds?: number;
+      toDate?: () => Date;
+    }
+  | null
+  | undefined;
+
 type LocalTransaction = {
-  id: string;
-  studentId?: string;
+  id?: string;
+  amount?: number;
   status?: string;
-  amount: number;
-  createdAt?: { seconds?: number };
+  method?: string;
+  type?: string;
+  date?: DateLike;
+  createdAt?: DateLike;
+  updatedAt?: DateLike;
+  reference?: string;
+  studentId?: string;
+  studentName?: string;
+  parentName?: string;
+  description?: string;
+  [key: string]: unknown;
 };
 
 const Payments: React.FC = () => {
@@ -504,14 +524,14 @@ const Payments: React.FC = () => {
                   const isDevOrStaging = import.meta.env.MODE === 'development' || import.meta.env.VITE_FIREBASE_PROJECT_ID === 'ecoscolaire-staging';
                   return (
                     <tr key={tx.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '1rem' }}>{new Date(tx.createdAt?.seconds ? tx.createdAt.seconds * 1000 : Date.now()).toLocaleDateString('fr-FR')}</td>
+                      <td style={{ padding: '1rem' }}>{new Date(tx.createdAt && typeof tx.createdAt === 'object' && 'seconds' in tx.createdAt ? (tx.createdAt as { seconds: number }).seconds * 1000 : Date.now()).toLocaleDateString('fr-FR')}</td>
                       <td style={{ padding: '1rem', fontWeight: 500 }}>{student?.name || 'Inconnu'}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{tx.amount.toLocaleString('fr-FR')} FCFA</td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{(tx.amount || 0).toLocaleString('fr-FR')} FCFA</td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
                         {isDevOrStaging && (
                            <button 
                              style={{ background: '#f59e0b', padding: '0.5rem 1rem' }} 
-                             onClick={() => handleConfirmMockTx(tx.id)}
+                             onClick={() => handleConfirmMockTx(tx.id as string)}
                              disabled={isConfirmingTx === tx.id}
                              data-testid={`btn-mock-confirm-${tx.id}`}
                              className={`btn-mock-confirm`}

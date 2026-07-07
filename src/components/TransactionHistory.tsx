@@ -3,8 +3,43 @@ import { Search, Filter, Eye, CheckCircle, Clock, XCircle } from 'lucide-react';
 import Modal from './Modal';
 import type { User, Student } from '../types';
 
+type DateLike =
+  | string
+  | number
+  | Date
+  | {
+      seconds?: number;
+      toDate?: () => Date;
+    }
+  | null
+  | undefined;
+
+type TransactionLike = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  method?: string;
+  type?: string;
+  date?: DateLike;
+  createdAt?: DateLike;
+  updatedAt?: DateLike;
+  reference?: string;
+  receiptNumber?: string;
+  paymentId?: string;
+  studentId?: string;
+  schoolId?: string;
+  userId?: string;
+  description?: string;
+  phoneNumber?: string;
+  mode?: string;
+  provider?: string;
+  providerTransactionId?: string;
+  failureReason?: string;
+  [key: string]: unknown;
+};
+
 interface TransactionHistoryProps {
-  transactions: any[];
+  transactions: TransactionLike[];
   students: Student[];
   currentUser: User;
   onMockConfirm: (txId: string) => void;
@@ -20,15 +55,31 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<string>('ALL');
-  const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [selectedTx, setSelectedTx] = useState<TransactionLike | null>(null);
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions];
 
     // Trier par date décroissante
     filtered.sort((a, b) => {
-      const dateA = a.createdAt?.seconds || 0;
-      const dateB = b.createdAt?.seconds || 0;
+      const dateAObj = a.createdAt;
+      let dateA = 0;
+      if (dateAObj) {
+        if (typeof dateAObj === 'object' && dateAObj !== null && 'seconds' in dateAObj && typeof dateAObj.seconds === 'number') {
+          dateA = dateAObj.seconds;
+        } else {
+          dateA = new Date(dateAObj as string | number | Date).getTime() / 1000;
+        }
+      }
+      const dateBObj = b.createdAt;
+      let dateB = 0;
+      if (dateBObj) {
+        if (typeof dateBObj === 'object' && dateBObj !== null && 'seconds' in dateBObj && typeof dateBObj.seconds === 'number') {
+          dateB = dateBObj.seconds;
+        } else {
+          dateB = new Date(dateBObj as string | number | Date).getTime() / 1000;
+        }
+      }
       return dateB - dateA;
     });
 
@@ -40,7 +91,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     // Filtre Date
     if (dateFilter !== 'ALL') {
       const now = new Date();
-      const txDate = (tx: any) => tx.createdAt?.seconds ? new Date(tx.createdAt.seconds * 1000) : null;
+      const txDate = (tx: TransactionLike) => {
+        const c = tx.createdAt;
+        if (c && typeof c === 'object' && 'seconds' in c && typeof c.seconds === 'number') return new Date(c.seconds * 1000);
+        return c ? new Date(c as string | number | Date) : null;
+      };
       
       if (dateFilter === 'TODAY') {
         filtered = filtered.filter(tx => txDate(tx)?.toDateString() === now.toDateString());
@@ -74,7 +129,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     return filtered;
   }, [transactions, students, searchTerm, statusFilter, dateFilter]);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'SUCCESS':
         return <span style={{ padding: '0.25rem 0.5rem', background: '#dcfce7', color: '#166534', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.25rem', width: 'fit-content' }}><CheckCircle size={12} /> SUCCESS</span>;
@@ -154,7 +209,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
             ) : (
               filteredTransactions.map(tx => {
                 const student = students.find(s => s.id === tx.studentId);
-                const date = tx.createdAt?.seconds ? new Date(tx.createdAt.seconds * 1000) : null;
+                const date = (() => {
+                  const c = tx.createdAt;
+                  if (c && typeof c === 'object' && 'seconds' in c && typeof c.seconds === 'number') return new Date(c.seconds * 1000);
+                  return c ? new Date(c as string | number | Date) : null;
+                })();
                 
                 return (
                   <tr key={tx.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover-row">
@@ -181,8 +240,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                         {tx.status === 'PENDING' && isDevOrStaging && (
                           <button 
                             style={{ background: '#f59e0b', padding: '0.25rem 0.5rem', fontSize: '0.8rem' }} 
-                            onClick={() => onMockConfirm(tx.id)}
-                            disabled={isConfirmingTx === tx.id}
+                            onClick={() => { if (tx.id) onMockConfirm(tx.id); }}
+                            disabled={!tx.id || isConfirmingTx === tx.id}
                             title="Simuler succès"
                           >
                             {isConfirmingTx === tx.id ? '...' : 'Mock'}
@@ -229,11 +288,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Créé le</span>
-                <div>{selectedTx.createdAt?.seconds ? new Date(selectedTx.createdAt.seconds * 1000).toLocaleString('fr-FR') : 'Date inconnue'}</div>
+                <div>{selectedTx.createdAt && typeof selectedTx.createdAt === 'object' && 'seconds' in selectedTx.createdAt ? new Date((selectedTx.createdAt.seconds as number) * 1000).toLocaleString('fr-FR') : selectedTx.createdAt ? new Date(selectedTx.createdAt as string | number | Date).toLocaleString('fr-FR') : 'Date inconnue'}</div>
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mis à jour le</span>
-                <div>{selectedTx.updatedAt ? new Date(selectedTx.updatedAt.seconds * 1000).toLocaleString('fr-FR') : '-'}</div>
+                <div>{selectedTx.updatedAt && typeof selectedTx.updatedAt === 'object' && 'seconds' in selectedTx.updatedAt ? new Date((selectedTx.updatedAt.seconds as number) * 1000).toLocaleString('fr-FR') : selectedTx.updatedAt ? new Date(selectedTx.updatedAt as string | number | Date).toLocaleString('fr-FR') : '-'}</div>
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Référence Provider</span>
