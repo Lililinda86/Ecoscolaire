@@ -6,6 +6,32 @@ import { db, auth } from '../db/firebase';
 import type { ParentInvitation } from '../types';
 import { GraduationCap, AlertCircle, CheckCircle } from 'lucide-react';
 
+
+type ExpirableValue =
+  | Date
+  | string
+  | number
+  | {
+      toDate?: () => Date;
+      seconds?: number;
+    }
+  | null
+  | undefined;
+
+const toNullableDate = (value: ExpirableValue): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === 'object') {
+    if (typeof value.toDate === 'function') return value.toDate();
+    if (typeof value.seconds === 'number') return new Date(value.seconds * 1000);
+  }
+  return null;
+};
+
 const getErrorCode = (error: unknown): string | undefined => {
   if (
     typeof error === 'object' &&
@@ -71,11 +97,10 @@ const ParentSignup: React.FC = () => {
           return;
         }
 
-        const expiresAtTime = typeof (data.expiresAt as any)?.toDate === 'function' 
-          ? (data.expiresAt as any).toDate().getTime() 
-          : new Date(data.expiresAt).getTime();
+        const parsedDate = toNullableDate(data.expiresAt as unknown as ExpirableValue);
+        const expiresAtTime = parsedDate ? parsedDate.getTime() : 0;
           
-        if (expiresAtTime < Date.now()) {
+        if (!parsedDate || expiresAtTime < Date.now()) {
           setError('Cette invitation a expiré.');
           setLoading(false);
           return;
@@ -267,3 +292,4 @@ const ParentSignup: React.FC = () => {
 };
 
 export default ParentSignup;
+

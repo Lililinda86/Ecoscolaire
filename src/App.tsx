@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
+import type { DatabasePatch } from './db/storage';
 
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -95,14 +96,14 @@ function App() {
     });
 
     if (shouldSave) {
-      const patch: any = { classes: deduplicatedClasses };
+      const patch: DatabasePatch = { classes: deduplicatedClasses };
       
       if (duplicateClassIdsToRemap.size > 0) {
-        patch.students = db.students.map((s: any) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
+        patch.students = db.students.map((s) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
           ? { ...s, classId: duplicateClassIdsToRemap.get(s.classId)! } 
           : s
         );
-        patch.staff = db.staff.map((s: any) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
+        patch.staff = db.staff.map((s) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
           ? { ...s, assignedClassId: duplicateClassIdsToRemap.get(s.assignedClassId)! }
           : s
         );
