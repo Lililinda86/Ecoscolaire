@@ -274,7 +274,7 @@ export interface Breakdown {
   actualCost?: number;
 }
 
-export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'other';
+export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'registration_fee' | 'other';
 
 export interface SchoolPaymentSettingsPublic {
   campayPublic?: string;

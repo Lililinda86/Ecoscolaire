@@ -124,6 +124,19 @@ service cloud.firestore {
           || (plan == 'starter' && count < 200);
     }
 
+    function isAccountantRegistrationFeeUpdate() {
+      return isAccountant() 
+          && hasSchoolAccess(resource.data.schoolId)
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'registrationFeePaid',
+            'registrationFeeStatus'
+          ])
+          && request.resource.data.registrationFeePaid is number
+          && request.resource.data.registrationFeePaid >= 0
+          && request.resource.data.registrationFeeStatus in ['unpaid', 'partial', 'paid'];
+    }
+
     // ==========================================
     // RULES PER COLLECTION
     // ==========================================
@@ -220,7 +233,10 @@ service cloud.firestore {
       // Création par Owner, Director, Secretary AVEC limite
       allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId) && canCreateStudentWithinLimits(request.resource.data.schoolId);
       // Update
-      allow update: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow update: if isAuthenticated() && isActive() && (
+        canManagePedagogy(request.resource.data.schoolId) ||
+        isAccountantRegistrationFeeUpdate()
+      );
       // Delete (Demande validation dans le client, mais ici la vraie suppression requiert owner)
       allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
     }

@@ -10,7 +10,7 @@ import { Plus, Minus, Wallet, ClipboardList, Trash2, History, FileText, Trending
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -93,6 +93,7 @@ const Payments: React.FC = () => {
 
   const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0] });
+  const [receiptToPrint, setReceiptToPrint] = useState<Payment | null>(null);
 
   React.useEffect(() => {
     if (isModalOpen && currentPayment.studentId && currentPayment.type !== 'other') {
@@ -106,6 +107,8 @@ const Payments: React.FC = () => {
           expected = student.feeTransport ?? g.feeTransport;
         } else if (currentPayment.type === 'uniforms') {
           expected = student.feeUniforms ?? g.feeUniforms;
+        } else if (currentPayment.type === 'registration_fee') {
+          expected = student.registrationFeeExpected ?? 15000;
         }
         setModalExpectedAmount(expected);
         const alreadyPaid = db.payments.filter(p => p.studentId === student.id && p.type === currentPayment.type && (currentPayment.type !== 'tuition' || p.installment === currentPayment.installment)).reduce((s, p) => s + p.amount, 0);
@@ -201,17 +204,38 @@ const Payments: React.FC = () => {
     setIsSaving(true);
     try {
       const paymentId = currentPayment.id || crypto.randomUUID();
-      const newPayment = { 
+      const rawPayment = { 
         ...currentPayment, 
         id: paymentId,
         method: paymentMethod,
-        transactionId: undefined,
         schoolId: currentSchool!.id
       } as Payment;
+      delete rawPayment.transactionId;
       
+      const newPayment = Object.fromEntries(Object.entries(rawPayment).filter(([_, v]) => v !== undefined));
+
       // Option A - Safe minimal: On ne modifie plus student.feeT1/T2 aveuglément pour éviter les Lost Updates.
       // Le paiement est strictement append-only et idempotent.
       await setDoc(doc(firestoreDb, 'payments', paymentId), newPayment, { merge: true });
+
+      if (newPayment.type === 'registration_fee' && newPayment.studentId) {
+        const studentRef = doc(firestoreDb, 'students', newPayment.studentId);
+        const student = db.students.find(s => s.id === newPayment.studentId);
+        if (student) {
+          const oldPaid = student.registrationFeePaid ?? 0;
+          const newPaid = oldPaid + (newPayment.amount || 0);
+          const expected = student.registrationFeeExpected ?? 15000;
+          let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
+          if (newPaid >= expected) status = 'paid';
+          else if (newPaid > 0) status = 'partial';
+          try {
+            await updateDoc(studentRef, { registrationFeePaid: newPaid, registrationFeeStatus: status });
+          } catch(err) {
+            console.error("Error updating student:", err);
+            throw err;
+          }
+        }
+      }
 
       setModalOpen(false);
       logAuditAction({
@@ -416,6 +440,26 @@ const Payments: React.FC = () => {
           }
         `}
       </style>
+
+      {receiptToPrint && (
+        <div className="print-area">
+          <SchoolDocumentHeader school={currentSchool} documentTitle="Reçu de Paiement" />
+          <div style={{ marginTop: '2rem', border: '1px solid #ccc', padding: '2rem', borderRadius: '8px' }}>
+            <h2 style={{ color: '#0369a1' }}>Reçu N° {receiptToPrint.id.substring(0, 8).toUpperCase()}</h2>
+            <div style={{ margin: '1rem 0', fontSize: '1.2rem', lineHeight: '1.8' }}>
+              <strong>Élève :</strong> {db.students.find(s => s.id === receiptToPrint.studentId)?.name} <br/>
+              <strong>Date :</strong> {new Date(receiptToPrint.date).toLocaleDateString('fr-FR')} <br/>
+              <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Droit d'inscription" : receiptToPrint.type} <br/>
+              <strong>Montant payé :</strong> <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>{receiptToPrint.amount.toLocaleString('fr-FR')} FCFA</span><br/>
+            </div>
+            <div style={{ marginTop: '4rem', display: 'flex', justifyContent: 'space-between', color: '#555' }}>
+              <div>Signature Client:</div>
+              <div>Signature Caisse:</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header no-print">
         <h1>{t('payments', 'Comptabilité Générale')}</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -565,7 +609,7 @@ const Payments: React.FC = () => {
               ) : (
                 db.payments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => {
                   const student = db.students.find(s => s.id === p.studentId);
-                  const typeMap: Record<string, string> = { transport: 'Transport', uniforms: 'Tenues', tuition: `Scolarité (${p.installment || ''})`, other: 'Autre' };
+                  const typeMap: Record<string, string> = { transport: 'Transport', uniforms: 'Tenues', tuition: `Scolarité (${p.installment || ''})`, registration_fee: "Droit d'inscription", other: 'Autre' };
                   
                   let remainingText = "-";
                   if (student && p.type !== 'other') {
@@ -575,6 +619,7 @@ const Payments: React.FC = () => {
                       expected = p.installment === 'T1' ? (student.feeT1 ?? g.feeT1) : p.installment === 'T2' ? (student.feeT2 ?? g.feeT2) : (student.feeT3 ?? g.feeT3);
                     } else if (p.type === 'transport') expected = student.feeTransport ?? g.feeTransport;
                     else if (p.type === 'uniforms') expected = student.feeUniforms ?? g.feeUniforms;
+                    else if (p.type === 'registration_fee') expected = student.registrationFeeExpected ?? 15000;
                     
                     const alreadyPaid = db.payments.filter(x => x.studentId === student.id && x.type === p.type && (p.type !== 'tuition' || x.installment === p.installment)).reduce((s, x) => s + x.amount, 0);
                     const remaining = Math.max(0, expected - alreadyPaid);
@@ -603,9 +648,14 @@ const Payments: React.FC = () => {
                         {remainingText}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeletePayment(p.id)} title="Supprimer">
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => { setReceiptToPrint(p); setTimeout(() => window.print(), 100); }} title="Imprimer Reçu">
+                            🖨️
+                          </button>
+                          <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeletePayment(p.id)} title="Supprimer">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -854,7 +904,8 @@ const Payments: React.FC = () => {
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
               <label>Nature du Versement</label>
-              <select required value={currentPayment.type || 'tuition'} onChange={e => setCurrentPayment({...currentPayment, type: e.target.value as 'tuition' | 'transport' | 'uniforms' | 'other'})}>
+              <select required value={currentPayment.type || 'tuition'} onChange={e => setCurrentPayment({...currentPayment, type: e.target.value as 'tuition' | 'transport' | 'uniforms' | 'registration_fee' | 'other'})}>
+                <option value="registration_fee">Droit d'inscription</option>
                 <option value="tuition">Scolarité (Tranche versée)</option>
                 <option value="transport">Transport (Bus)</option>
                 <option value="uniforms">Tenues</option>
