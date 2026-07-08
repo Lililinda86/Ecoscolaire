@@ -231,7 +231,27 @@ const Payments: React.FC = () => {
           try {
             await updateDoc(studentRef, { registrationFeePaid: newPaid, registrationFeeStatus: status });
           } catch(err) {
-            console.error("Error updating student:", err);
+            console.error("Error updating student registration fee:", err);
+            throw err;
+          }
+        }
+      }
+
+      if (newPayment.type === 'tuition' && newPayment.studentId) {
+        const studentRef = doc(firestoreDb, 'students', newPayment.studentId);
+        const student = db.students.find(s => s.id === newPayment.studentId);
+        if (student) {
+          const oldPaid = student.tuitionPaid ?? 0;
+          const newPaid = oldPaid + (newPayment.amount || 0);
+          const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
+          const expected = student.tuitionExpected ?? fallbackExpected;
+          let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
+          if (expected > 0 && newPaid >= expected) status = 'paid';
+          else if (newPaid > 0) status = 'partial';
+          try {
+            await updateDoc(studentRef, { tuitionPaid: newPaid, tuitionStatus: status });
+          } catch(err) {
+            console.error("Error updating student tuition:", err);
             throw err;
           }
         }

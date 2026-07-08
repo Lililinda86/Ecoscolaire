@@ -48,6 +48,37 @@ test.describe('Payments and Receipts', () => {
       await page.evaluate(() => { window.print = () => {} });
       await page.locator('button[title="Imprimer Reçu"]').first().click();
       await expect(page.locator('text=Reçu de Paiement').first()).toBeVisible();
+      // Close receipt if possible (or reload page for next test)
+      await page.reload();
+      await page.getByTestId('nav-payments').click();
+      
+      // Test tuition payment
+      await page.locator('button:has-text("Encaissement (+)")').click();
+      await page.waitForSelector('text=Nouvel Encaissement');
+      
+      // Select first available student again
+      const studentSelect2 = page.locator('.form-group select').first();
+      await page.waitForFunction(() => {
+        const select = document.querySelector('.form-group select') as HTMLSelectElement;
+        return select && select.options.length > 1;
+      }, { timeout: 15000 }).catch(() => {});
+      
+      await studentSelect2.selectOption({ index: 1 });
+      
+      // select tuition
+      const typeSelect2 = page.locator('select').nth(1);
+      await typeSelect2.selectOption('tuition');
+      // select installment T1 (should be visible when tuition is selected)
+      await page.locator('select').nth(2).selectOption('T1');
+      
+      // Fill amount 
+      const amountInput2 = page.locator('label:has-text("Montant")').locator('..').locator('input').last();
+      await amountInput2.fill('10000');
+      await page.locator('button:has-text("Enregistrer l\'encaissement")').click();
+      await expect(page.locator('text=Nouvel Encaissement')).toBeHidden({ timeout: 10000 });
+      
+      // verify it appears
+      await expect(page.locator('table').last()).toContainText('Scolarité (T1)', { timeout: 15000 });
     }
     
     monitor.assertNoCriticalErrors();

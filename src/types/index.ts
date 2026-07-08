@@ -145,6 +145,9 @@ export interface Student {
   registrationFeeExpected?: number;
   registrationFeePaid?: number;
   registrationFeeStatus?: 'unpaid' | 'partial' | 'paid';
+  tuitionExpected?: number;
+  tuitionPaid?: number;
+  tuitionStatus?: 'unpaid' | 'partial' | 'paid';
 }
 
 export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
