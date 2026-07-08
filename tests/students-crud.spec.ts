@@ -27,6 +27,8 @@ test.describe('Students CRUD', () => {
       await page.locator('.form-group').filter({ hasText: 'Nom du Tuteur' }).locator('input').fill('Parent Test');
       await page.locator('.form-group').filter({ hasText: 'Date de Naissance' }).locator('input').fill('2015-01-01');
       await page.locator('.form-group').filter({ hasText: 'Classe' }).locator('select').selectOption({ index: 1 });
+      await page.locator('.form-group').filter({ hasText: 'Année Scolaire (Inscription)' }).locator('input').fill('2026-2027');
+      await page.locator('.form-group').filter({ hasText: 'Montant payé (Inscription)' }).locator('input').fill('15000');
       
       await page.locator('button[type="submit"], button:has-text("Enregistrer")').click();
       

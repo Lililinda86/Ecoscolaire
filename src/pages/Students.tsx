@@ -80,10 +80,17 @@ const Students: React.FC = () => {
   const handleOpenModal = (student?: Student) => {
     if (student) {
       setIsEditing(true);
-      setCurrentStudent(student);
+      setCurrentStudent({
+        ...student,
+        studentStatus: student.studentStatus || 'nouveau',
+        registrationYear: student.registrationYear || '2026-2027',
+        registrationFeeExpected: student.registrationFeeExpected ?? 15000,
+        registrationFeePaid: student.registrationFeePaid ?? 0,
+        registrationFeeStatus: student.registrationFeeStatus || 'unpaid'
+      });
       setParentEmailsInput((student.parentEmails || []).join(', '));
     } else {
-      setCurrentStudent({ id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '' });
+      setCurrentStudent({ id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '', studentStatus: 'nouveau', registrationYear: '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0, registrationFeeStatus: 'unpaid' });
       setIsEditing(false);
       setParentEmailsInput('');
     }
@@ -155,6 +162,13 @@ const Students: React.FC = () => {
         finalStudent.schoolId = currentSchool.id;
       }
 
+      const expected = finalStudent.registrationFeeExpected ?? 15000;
+      const paid = finalStudent.registrationFeePaid ?? 0;
+      let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
+      if (paid >= expected) status = 'paid';
+      else if (paid > 0) status = 'partial';
+      finalStudent.registrationFeeStatus = status;
+
       if (isEditing && finalStudent.id) {
         const studentRef = doc(firestoreDb, 'students', finalStudent.id);
         const rawPatchData = {
@@ -176,6 +190,11 @@ const Students: React.FC = () => {
           emergencyContact: finalStudent.emergencyContact,
           allergies: finalStudent.allergies,
           medicalConditions: finalStudent.medicalConditions,
+          studentStatus: finalStudent.studentStatus,
+          registrationYear: finalStudent.registrationYear,
+          registrationFeeExpected: finalStudent.registrationFeeExpected,
+          registrationFeePaid: finalStudent.registrationFeePaid,
+          registrationFeeStatus: finalStudent.registrationFeeStatus,
         };
         const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
         await updateDoc(studentRef, patchData);
@@ -711,7 +730,38 @@ const Students: React.FC = () => {
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label style={{ color: '#0369a1' }}>Statut Élève</label>
+              <select value={currentStudent.studentStatus || 'nouveau'} onChange={e => setCurrentStudent({...currentStudent, studentStatus: e.target.value as 'nouveau' | 'ancien'})}>
+                <option value="nouveau">Nouveau</option>
+                <option value="ancien">Ancien</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label style={{ color: '#0369a1' }}>Année Scolaire (Inscription)</label>
+              <input value={currentStudent.registrationYear || '2026-2027'} onChange={e => setCurrentStudent({...currentStudent, registrationYear: e.target.value})} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', padding: '0 1rem 1rem 1rem', background: '#f0f9ff', borderRadius: '0 0 8px 8px', border: '1px solid #bae6fd', borderTop: 'none', marginBottom: '1rem' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label style={{ color: '#0369a1' }}>Droit d'inscription attendu</label>
+              <input type="number" min="0" step="1" value={currentStudent.registrationFeeExpected ?? 15000} onChange={e => setCurrentStudent({...currentStudent, registrationFeeExpected: parseInt(e.target.value) || 0})} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label style={{ color: '#0369a1' }}>Montant payé (Inscription)</label>
+              <input type="number" min="0" step="1" value={currentStudent.registrationFeePaid ?? 0} onChange={e => setCurrentStudent({...currentStudent, registrationFeePaid: parseInt(e.target.value) || 0})} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label style={{ color: '#0369a1' }}>Statut Inscription</label>
+              <input disabled value={
+                (currentStudent.registrationFeePaid ?? 0) >= (currentStudent.registrationFeeExpected ?? 15000) ? 'Payé' :
+                (currentStudent.registrationFeePaid ?? 0) > 0 ? 'Partiel' : 'Non payé'
+              } style={{ backgroundColor: '#e0f2fe', fontWeight: 'bold', color: '#0369a1' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label style={{ color: '#92400e' }}>Allergies (Santé)</label>
               <textarea 

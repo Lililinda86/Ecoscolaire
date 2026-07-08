@@ -140,6 +140,11 @@ export interface Student {
   allergies?: string;
   medicalConditions?: string;
   emergencyContact?: string;
+  studentStatus?: 'nouveau' | 'ancien';
+  registrationYear?: string;
+  registrationFeeExpected?: number;
+  registrationFeePaid?: number;
+  registrationFeeStatus?: 'unpaid' | 'partial' | 'paid';
 }
 
 export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
