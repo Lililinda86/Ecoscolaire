@@ -10,8 +10,13 @@ const roles = [
   { name: 'parent', email: 'parent1.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
 ];
 
+import { attachConsoleMonitor } from './helpers/console-monitor';
+
 for (const role of roles) {
   test(`Login with role: ${role.name}`, async ({ page }) => {
+    // The driver test fails natively on Playwright expect timeout, no need for broad console allowlist
+    const monitor = attachConsoleMonitor(page);
+
     await page.goto('/');
     await page.getByTestId('login-email').fill(role.email);
     await page.getByTestId('login-password').fill(role.pass);
@@ -20,5 +25,7 @@ for (const role of roles) {
     // Check successful login by waiting for dashboard/portal to load
     // Assuming a sign-out button or specific dashboard element appears
     await expect(page.getByTestId('logout-button').first()).toBeVisible({ timeout: 15000 });
+    
+    monitor.assertNoCriticalErrors();
   });
 }

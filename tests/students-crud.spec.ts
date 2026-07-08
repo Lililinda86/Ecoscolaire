@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
+import { attachConsoleMonitor } from './helpers/console-monitor';
 
 test.describe('Students CRUD', () => {
   test.beforeEach(async ({ page }) => {
@@ -12,9 +13,7 @@ test.describe('Students CRUD', () => {
       console.log('DIALOG:', dialog.message());
       dialog.accept().catch(() => {});
     });
-    page.on('console', msg => {
-      if (msg.type() === 'error') console.log('PAGE ERROR:', msg.text());
-    });
+    const monitor = attachConsoleMonitor(page);
 
     const addButton = page.locator('button', { hasText: /(Ajouter|Nouveau|\+)/i }).first();
     if (await addButton.isVisible()) {
@@ -38,5 +37,6 @@ test.describe('Students CRUD', () => {
       await row.locator('button[title*="Supprimer"]').first().click();
       await expect(row).not.toBeVisible();
     }
+    monitor.assertNoCriticalErrors();
   });
 });
