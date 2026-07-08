@@ -21,6 +21,12 @@ for (const role of roles) {
     await page.getByTestId('login-email').fill(role.email);
     await page.getByTestId('login-password').fill(role.pass);
     await page.getByTestId('login-submit').click();
+    // Le driver est redirigé vers '/' après login, mais n'y a pas accès (Accès refusé sans bouton de déconnexion).
+    // On corrige le flux du test en attendant la fin du login (écran d'erreur) puis on le dirige vers sa page autorisée.
+    if (role.name === 'driver') {
+      await expect(page.locator('text=Accès refusé')).toBeVisible({ timeout: 15000 });
+      await page.goto('/#/buses');
+    }
     
     // Check successful login by waiting for dashboard/portal to load
     // Assuming a sign-out button or specific dashboard element appears
