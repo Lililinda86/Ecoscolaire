@@ -49,6 +49,7 @@ const getErrorCode = (error: unknown): string | undefined => {
 
 interface AppContextProps {
   db: Database | null;
+  updateLocalState: (patch: Partial<Database>) => void;
   saveDB: (newDb: Database) => Promise<void>;
   safeMergeDB: (newDb: Database) => Promise<void>;
   safePatchDB: (patch: DatabasePatch) => Promise<void>;
@@ -592,9 +593,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isSchoolSuspended = !currentSchool?.isInternalSchool && (currentSchool?.subscriptionStatus === 'suspended' || currentSchool?.subscriptionStatus === 'expired');
 
+  const updateLocalState = (patch: Partial<Database>) => {
+    setDb(prev => prev ? { ...prev, ...patch } : null);
+  };
+
   return (
     <AppContext.Provider value={{ 
-      db, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool, 
+      db, updateLocalState, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool, 
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended

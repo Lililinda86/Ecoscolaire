@@ -8,7 +8,12 @@ test.describe('Payments and Receipts', () => {
     await loginAs(page, 'accountant.alpha@ecoscolaire.com', 'Test@2026Alpha!');
     
     await page.getByTestId('nav-payments').click();
-    page.on('console', msg => console.log('PAGE LOG:', msg.type(), msg.text()));
+    // Listen to page console
+    page.on('console', msg => {
+      if (msg.type() === 'error' || msg.text().includes('FirebaseError') || msg.text().includes('[AppContext]') || msg.text().includes('[FRONTEND]')) {
+        console.log(`PAGE LOG: ${msg.type()} ${msg.text()}`);
+      }
+    });
     page.on('pageerror', err => console.log('PAGE ERROR:', err));
     
     // Create a registration fee payment
@@ -79,6 +84,28 @@ test.describe('Payments and Receipts', () => {
       
       // verify it appears
       await expect(page.locator('table').last()).toContainText('Scolarité (T1)', { timeout: 15000 });
+
+      // ---- ITALO-5B Deletion Test ----
+      // Count rows before
+      const rowsBefore = await page.locator('table').last().locator('tr').filter({ hasText: 'Scolarité (T1)' }).count();
+
+      // Handle native dialogs for deletion
+      page.on('dialog', async dialog => {
+        console.log(`DIALOG: [${dialog.type()}] ${dialog.message()}`);
+        if (dialog.type() === 'prompt') {
+          await dialog.accept('778899');
+        } else {
+          await dialog.accept();
+        }
+      });
+
+      // Click delete button for the tuition payment
+      const deleteBtn = page.locator('table').last().locator('tr').filter({ hasText: 'Scolarité (T1)' }).first().locator('button[title="Supprimer"]');
+      await deleteBtn.click();
+
+      // Verify it is removed from table
+      await expect(page.locator('table').last().locator('tr').filter({ hasText: 'Scolarité (T1)' })).toHaveCount(rowsBefore - 1, { timeout: 15000 });
+      // --------------------------------
     }
     
     monitor.assertNoCriticalErrors();

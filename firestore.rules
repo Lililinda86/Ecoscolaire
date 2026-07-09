@@ -343,7 +343,8 @@ service cloud.firestore {
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
       // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId);
     }
     match /receipts/{receiptId} {
       allow read: if isAuthenticated() && isActive() && (

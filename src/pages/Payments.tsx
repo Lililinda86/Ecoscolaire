@@ -75,7 +75,7 @@ type LocalTransaction = {
 };
 
 const Payments: React.FC = () => {
-  const { db, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, updateLocalState, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
 
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'|'historique-recus'|'finance-momo'>('encaissements');
@@ -212,7 +212,7 @@ const Payments: React.FC = () => {
       } as Payment;
       delete rawPayment.transactionId;
       
-      const newPayment = Object.fromEntries(Object.entries(rawPayment).filter(([_, v]) => v !== undefined));
+      const newPayment = Object.fromEntries(Object.entries(rawPayment).filter(([, v]) => v !== undefined));
 
       // Option A - Safe minimal: On ne modifie plus student.feeT1/T2 aveuglément pour éviter les Lost Updates.
       // Le paiement est strictement append-only et idempotent.
@@ -230,6 +230,10 @@ const Payments: React.FC = () => {
           else if (newPaid > 0) status = 'partial';
           try {
             await updateDoc(studentRef, { registrationFeePaid: newPaid, registrationFeeStatus: status });
+            if (db) {
+              const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
+              updateLocalState({ students: newStudents });
+            }
           } catch(err) {
             console.error("Error updating student registration fee:", err);
             throw err;
@@ -250,11 +254,19 @@ const Payments: React.FC = () => {
           else if (newPaid > 0) status = 'partial';
           try {
             await updateDoc(studentRef, { tuitionPaid: newPaid, tuitionStatus: status });
+            if (db) {
+              const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
+              updateLocalState({ students: newStudents });
+            }
           } catch(err) {
             console.error("Error updating student tuition:", err);
             throw err;
           }
         }
+      }
+
+      if (db) {
+        updateLocalState({ payments: [newPayment as Payment, ...db.payments] });
       }
 
       setModalOpen(false);
@@ -329,14 +341,63 @@ const Payments: React.FC = () => {
     if (window.confirm('Voulez-vous vraiment supprimer cet encaissement ? Cela annulera le paiement.')) {
       setIsSaving(true);
       try {
+        const paymentToDelete = db.payments.find(p => p.id === id);
+        console.log(`[FRONTEND] Deleting payment ${id}`, paymentToDelete);
+        
         await deleteDoc(doc(firestoreDb, 'payments', id));
+        console.log(`[FRONTEND] deleteDoc completed for ${id}`);
+        
+        if (paymentToDelete && paymentToDelete.studentId) {
+          const studentRef = doc(firestoreDb, 'students', paymentToDelete.studentId);
+          const student = db.students.find(s => s.id === paymentToDelete.studentId);
+          console.log(`[FRONTEND] Updating student ${paymentToDelete.studentId}`, student);
+          
+          if (student) {
+            const remainingPayments = db.payments.filter(p => p.id !== id && p.studentId === paymentToDelete.studentId);
+            
+            if (paymentToDelete.type === 'registration_fee') {
+              const newPaid = remainingPayments.filter(p => p.type === 'registration_fee').reduce((sum, p) => sum + (p.amount || 0), 0);
+              const expected = student.registrationFeeExpected ?? 15000;
+              let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
+              if (newPaid >= expected) status = 'paid';
+              else if (newPaid > 0) status = 'partial';
+              
+              await updateDoc(studentRef, { registrationFeePaid: newPaid, registrationFeeStatus: status });
+              if (db) {
+                const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
+                updateLocalState({ students: newStudents });
+              }
+            } 
+            else if (paymentToDelete.type === 'tuition') {
+              const newPaid = remainingPayments.filter(p => p.type === 'tuition').reduce((sum, p) => sum + (p.amount || 0), 0);
+              const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
+              const expected = student.tuitionExpected ?? fallbackExpected;
+              let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
+              if (expected > 0 && newPaid >= expected) status = 'paid';
+              else if (newPaid > 0) status = 'partial';
+              
+              await updateDoc(studentRef, { tuitionPaid: newPaid, tuitionStatus: status });
+              if (db) {
+                const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
+                updateLocalState({ students: newStudents });
+              }
+            }
+          }
+        }
+
+        if (db) {
+          updateLocalState({ payments: db.payments.filter(p => p.id !== id) });
+        }
+
         logAuditAction({
           action: 'DELETE_PAYMENT',
           targetType: 'PAYMENT',
           targetId: id,
           targetName: 'Paiement supprimé'
         });
+        
       } catch (err: unknown) {
+        console.error("[FRONTEND] Error in handleDeletePayment:", err);
         const message = getErrorMessage(err);
         alert("Erreur lors de la suppression: " + message);
       } finally {
