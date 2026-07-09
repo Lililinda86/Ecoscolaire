@@ -1,14 +1,128 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { 
   UserPlus, GraduationCap, DollarSign, AlertCircle, 
-  CheckCircle2, XCircle, FileText, MessageSquare, Briefcase, PlusCircle
+  CheckCircle2, XCircle, FileText, MessageSquare, Briefcase, PlusCircle,
+  Users, Bus, AlertTriangle, Activity
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const { db, isFirestoreConnected, currentUser } = useAppContext();
   const navigate = useNavigate();
+
+  // ITALO Pilotage 2026-2027
+  const italoStats = useMemo(() => {
+    const students = db?.students ?? [];
+    
+    let totalStudents = 0;
+    let newStudents = 0;
+    let returningStudents = 0;
+    let transportedStudents = 0;
+
+    let registrationExpectedTotal = 0;
+    let registrationPaidTotal = 0;
+    
+    let tuitionExpectedTotal = 0;
+    let tuitionPaidTotal = 0;
+    
+    let transportPaidTotal = 0;
+
+    let studentsToRemindCount = 0;
+    let parentsWithoutPhoneCount = 0;
+
+    const priorityActions: Array<{name: string, className: string, reason: string, remaining: number}> = [];
+
+    students.forEach(student => {
+      totalStudents++;
+      
+      if (student.studentStatus === 'nouveau') {
+        newStudents++;
+      } else if (student.studentStatus === 'ancien') {
+        returningStudents++;
+      }
+
+      if (student.usesTransport) {
+        transportedStudents++;
+      }
+
+      const regExpected = student.registrationFeeExpected ?? 15000;
+      const regPaid = student.registrationFeePaid ?? 0;
+      const regRemaining = Math.max(regExpected - regPaid, 0);
+
+      registrationExpectedTotal += regExpected;
+      registrationPaidTotal += regPaid;
+
+      const tuiExpected = (student.tuitionExpected && student.tuitionExpected > 0)
+        ? student.tuitionExpected
+        : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
+      const tuiPaid = student.tuitionPaid ?? 0;
+      const tuiRemaining = Math.max(tuiExpected - tuiPaid, 0);
+
+      tuitionExpectedTotal += tuiExpected;
+      tuitionPaidTotal += tuiPaid;
+
+      const transPaid = student.transportPaid ?? 0;
+      transportPaidTotal += transPaid;
+      
+      const hasTransportDebt = student.usesTransport && !!student.transportMonthlyFee && student.transportMonthlyFee > 0 && transPaid <= 0;
+
+      let needsReminder = false;
+      const reasons: string[] = [];
+      let totalDebt = 0;
+
+      if (regRemaining > 0) {
+        needsReminder = true;
+        reasons.push('Inscription');
+        totalDebt += regRemaining;
+      }
+      if (tuiRemaining > 0) {
+        needsReminder = true;
+        reasons.push('Pension');
+        totalDebt += tuiRemaining;
+      }
+      if (hasTransportDebt) {
+        needsReminder = true;
+        reasons.push('Transport');
+      }
+
+      if (needsReminder) {
+        studentsToRemindCount++;
+        if (priorityActions.length < 10) {
+          priorityActions.push({
+            name: student.name,
+            className: student.rawClassName || 'Non assigné',
+            reason: reasons.join(', '),
+            remaining: totalDebt
+          });
+        }
+      }
+
+      if (!student.parentPhone || student.parentPhone.trim() === '') {
+        parentsWithoutPhoneCount++;
+        if (!needsReminder && priorityActions.length < 10) {
+          priorityActions.push({
+            name: student.name,
+            className: student.rawClassName || 'Non assigné',
+            reason: 'Téléphone manquant',
+            remaining: 0
+          });
+        }
+      }
+    });
+
+    const registrationRemainingTotal = Math.max(registrationExpectedTotal - registrationPaidTotal, 0);
+    const tuitionRemainingTotal = Math.max(tuitionExpectedTotal - tuitionPaidTotal, 0);
+
+    return {
+      totalStudents, newStudents, returningStudents, transportedStudents,
+      registrationExpectedTotal, registrationPaidTotal, registrationRemainingTotal,
+      tuitionExpectedTotal, tuitionPaidTotal, tuitionRemainingTotal,
+      transportPaidTotal,
+      studentsToRemindCount, parentsWithoutPhoneCount,
+      priorityActions
+    };
+  }, [db]);
 
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher'].includes(currentUser.role)) return null;
 
@@ -76,6 +190,112 @@ const Dashboard: React.FC = () => {
             <MessageSquare size={18} /> Envoyer WhatsApp
           </button>
         </div>
+      </div>
+
+      {/* Pilotage ITALO 2026-2027 */}
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <Activity size={24} color="var(--primary-color)" /> Pilotage ITALO 2026-2027
+        </h2>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          {/* Carte 1 - Inscriptions */}
+          <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={18} /> Inscriptions
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b' }}>Total élèves</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>{italoStats.totalStudents}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b' }}>Nouveaux</span>
+              <span style={{ fontWeight: 600, color: '#10b981' }}>{italoStats.newStudents}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#64748b' }}>Anciens</span>
+              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{italoStats.returningStudents}</span>
+            </div>
+          </div>
+
+          {/* Carte 2 - Paiements */}
+          <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <DollarSign size={18} /> Paiements
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Inscription (Enc. / Att.)</span>
+              <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>{italoStats.registrationPaidTotal.toLocaleString()} / {italoStats.registrationExpectedTotal.toLocaleString()}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Pension (Enc. / Att.)</span>
+              <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>{italoStats.tuitionPaidTotal.toLocaleString()} / {italoStats.tuitionExpectedTotal.toLocaleString()}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem' }}>
+              <span style={{ color: '#64748b', fontWeight: 600 }}>Reste total</span>
+              <span style={{ fontWeight: 700, color: '#ef4444' }}>{(italoStats.registrationRemainingTotal + italoStats.tuitionRemainingTotal).toLocaleString()} FCFA</span>
+            </div>
+          </div>
+
+          {/* Carte 3 - Transport */}
+          <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Bus size={18} /> Transport
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b' }}>Élèves transportés</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>{italoStats.transportedStudents}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#64748b' }}>Transport encaissé</span>
+              <span style={{ fontWeight: 600, color: '#10b981' }}>{italoStats.transportPaidTotal.toLocaleString()} FCFA</span>
+            </div>
+          </div>
+
+          {/* Carte 4 - Relances */}
+          <div className="card" style={{ background: '#fff1f2', border: '1px solid #fecdd3' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#9f1239', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertTriangle size={18} /> Relances
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#be123c' }}>Élèves à relancer</span>
+              <span style={{ fontWeight: 700, color: '#9f1239' }}>{italoStats.studentsToRemindCount}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#be123c' }}>Parents sans téléphone</span>
+              <span style={{ fontWeight: 700, color: '#9f1239' }}>{italoStats.parentsWithoutPhoneCount}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tableau Actions prioritaires */}
+        {italoStats.priorityActions.length > 0 && (
+          <div className="card" style={{ background: 'white', padding: '1rem', overflowX: 'auto', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155' }}>Actions prioritaires (Top 10)</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
+                  <th style={{ padding: '0.5rem' }}>Élève</th>
+                  <th style={{ padding: '0.5rem' }}>Classe</th>
+                  <th style={{ padding: '0.5rem' }}>Motif</th>
+                  <th style={{ padding: '0.5rem', textAlign: 'right' }}>Reste (FCFA)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {italoStats.priorityActions.map((action, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '0.5rem', fontWeight: 500, color: '#0f172a' }}>{action.name}</td>
+                    <td style={{ padding: '0.5rem', color: '#475569' }}>{action.className}</td>
+                    <td style={{ padding: '0.5rem', color: action.reason === 'Téléphone manquant' ? '#d97706' : '#ef4444' }}>{action.reason}</td>
+                    <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: action.remaining > 0 ? '#ef4444' : '#94a3b8' }}>
+                      {action.remaining > 0 ? action.remaining.toLocaleString() : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
