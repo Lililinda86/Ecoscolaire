@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
 import { loginAs } from './helpers/auth';
 import { attachConsoleMonitor } from './helpers/console-monitor';
 
@@ -52,6 +53,14 @@ test.describe('Students CRUD', () => {
 
     const filename = download.suggestedFilename();
     expect(filename).toMatch(/inscriptions/i);
+
+    const path = await download.path();
+    if (path) {
+      const content = fs.readFileSync(path, 'utf8');
+      expect(content.includes('sep=;')).toBeTruthy();
+      expect(content).toContain(';');
+      expect(content).toMatch(/Nom|Classe|Sexe/);
+    }
   });
 
   test('WhatsApp Reminder generation', async ({ page }) => {
