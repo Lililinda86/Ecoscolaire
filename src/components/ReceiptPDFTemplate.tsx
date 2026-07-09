@@ -37,13 +37,22 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #2563eb', paddingBottom: '1rem', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ margin: 0, color: '#1e40af', fontSize: '24pt' }}>{school?.name || 'EcoScolaire'}</h1>
-          <p style={{ margin: '0.5rem 0 0 0', color: '#4b5563', fontSize: '10pt' }}>
-            {school?.address || 'Adresse non renseignée'}<br />
-            {school?.phone || 'Téléphone non renseigné'}<br />
-            {school?.email || ''}
-          </p>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+          {school?.logoUrl && (
+            <img 
+              src={school.logoUrl} 
+              alt={`Logo ${school.name}`} 
+              style={{ width: '80px', height: '80px', objectFit: 'contain' }} 
+            />
+          )}
+          <div>
+            <h1 style={{ margin: 0, color: '#1e40af', fontSize: '24pt' }}>{school?.name || 'EcoScolaire'}</h1>
+            <p style={{ margin: '0.5rem 0 0 0', color: '#4b5563', fontSize: '10pt' }}>
+              {school?.address || 'Adresse non renseignée'}<br />
+              {school?.phone || 'Téléphone non renseigné'}<br />
+              {school?.email || ''}
+            </p>
+          </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <h2 style={{ margin: 0, color: '#374151', fontSize: '20pt', textTransform: 'uppercase' }}>REÇU DE PAIEMENT</h2>
