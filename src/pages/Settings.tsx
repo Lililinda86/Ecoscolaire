@@ -111,9 +111,9 @@ const Settings: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Validation: 1 MB limit
-    if (file.size > 1024 * 1024) {
-      alert("Erreur: Le fichier est trop volumineux (limite: 1 Mo).");
+    // Validation: 300 KB limit
+    if (file.size > 300 * 1024) {
+      alert("Erreur: Le fichier est trop volumineux (limite: 300 Ko maximum).");
       e.target.value = '';
       return;
     }
@@ -127,16 +127,22 @@ const Settings: React.FC = () => {
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64String = event.target?.result as string;
       if (db.school) {
-        safeMergeDB({
-          ...db,
-          school: {
-            ...db.school,
-            logoUrl: base64String
-          }
-        });
+        try {
+          await safeMergeDB({
+            ...db,
+            school: {
+              ...db.school,
+              logoUrl: base64String
+            }
+          });
+          alert("Logo enregistré avec succès");
+        } catch (error) {
+          console.error(error);
+          alert("Erreur lors de l'enregistrement du logo.");
+        }
       }
     };
     reader.onerror = () => {
@@ -145,15 +151,21 @@ const Settings: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = async () => {
     if (db.school) {
-      safeMergeDB({
-        ...db,
-        school: {
-          ...db.school,
-          logoUrl: undefined
-        }
-      });
+      try {
+        await safeMergeDB({
+          ...db,
+          school: {
+            ...db.school,
+            logoUrl: undefined
+          }
+        });
+        alert("Logo supprimé avec succès");
+      } catch (error) {
+        console.error(error);
+        alert("Erreur lors de la suppression du logo.");
+      }
     }
   };
 
@@ -208,8 +220,11 @@ const Settings: React.FC = () => {
 
         <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: 'var(--primary-color)' }}>Logo de l'établissement</label>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Ce logo apparaîtra sur les reçus et documents imprimables. Formats acceptés : PNG, JPG, JPEG, WEBP (Max 1 Mo).
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+            Ce logo apparaîtra sur les reçus et documents imprimables. Formats acceptés : PNG, JPG, JPEG, WEBP (Max 300 Ko).
+          </p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--primary-color)', marginBottom: '1rem', fontWeight: 500 }}>
+            Après avoir choisi le logo, l'enregistrement est automatique.
           </p>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>

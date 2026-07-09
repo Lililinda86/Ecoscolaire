@@ -467,6 +467,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       }
+
+      // Handle current school explicit save (since it is not an array, getMergeableCollection skips it)
+      if (newDb.school && newDb.school.id) {
+        if (!db.school || JSON.stringify(db.school) !== JSON.stringify(newDb.school)) {
+          console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour explicite de l'école :`, newDb.school.id);
+          await setDoc(doc(firestoreDb, 'schools', newDb.school.id), newDb.school, { merge: true });
+        }
+      }
+
       setLastSyncDate(new Date());
     } catch (e) {
       console.error("Sync Error:", e);
