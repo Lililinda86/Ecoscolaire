@@ -265,6 +265,25 @@ const Payments: React.FC = () => {
         }
       }
 
+      if (newPayment.type === 'transport' && newPayment.studentId) {
+        const studentRef = doc(firestoreDb, 'students', newPayment.studentId);
+        const student = db.students.find(s => s.id === newPayment.studentId);
+        if (student) {
+          const oldPaid = student.transportPaid ?? 0;
+          const newPaid = oldPaid + (newPayment.amount || 0);
+          try {
+            await updateDoc(studentRef, { transportPaid: newPaid });
+            if (db) {
+              const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
+              updateLocalState({ students: newStudents });
+            }
+          } catch(err) {
+            console.error("Error updating student transport paid:", err);
+            throw err;
+          }
+        }
+      }
+
       if (db) {
         updateLocalState({ payments: [newPayment as Payment, ...db.payments] });
       }
@@ -379,6 +398,14 @@ const Payments: React.FC = () => {
               await updateDoc(studentRef, { tuitionPaid: newPaid, tuitionStatus: status });
               if (db) {
                 const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
+                updateLocalState({ students: newStudents });
+              }
+            }
+            else if (paymentToDelete.type === 'transport') {
+              const newPaid = remainingPayments.filter(p => p.type === 'transport').reduce((sum, p) => sum + (p.amount || 0), 0);
+              await updateDoc(studentRef, { transportPaid: newPaid });
+              if (db) {
+                const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
                 updateLocalState({ students: newStudents });
               }
             }
@@ -530,7 +557,7 @@ const Payments: React.FC = () => {
             <div style={{ margin: '1rem 0', fontSize: '1.2rem', lineHeight: '1.8' }}>
               <strong>Élève :</strong> {db.students.find(s => s.id === receiptToPrint.studentId)?.name} <br/>
               <strong>Date :</strong> {new Date(receiptToPrint.date).toLocaleDateString('fr-FR')} <br/>
-              <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Droit d'inscription" : receiptToPrint.type} <br/>
+              <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Droit d'inscription" : receiptToPrint.type === 'transport' ? `Transport (${receiptToPrint.month || 'Mensuel'})` : receiptToPrint.type === 'tuition' ? `Scolarité (${receiptToPrint.installment || ''})` : receiptToPrint.type} <br/>
               <strong>Montant payé :</strong> <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>{receiptToPrint.amount.toLocaleString('fr-FR')} FCFA</span><br/>
             </div>
             <div style={{ marginTop: '4rem', display: 'flex', justifyContent: 'space-between', color: '#555' }}>
@@ -690,7 +717,7 @@ const Payments: React.FC = () => {
               ) : (
                 db.payments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => {
                   const student = db.students.find(s => s.id === p.studentId);
-                  const typeMap: Record<string, string> = { transport: 'Transport', uniforms: 'Tenues', tuition: `Scolarité (${p.installment || ''})`, registration_fee: "Droit d'inscription", other: 'Autre' };
+                  const typeMap: Record<string, string> = { transport: `Transport (${p.month || 'Mensuel'})`, uniforms: 'Tenues', tuition: `Scolarité (${p.installment || ''})`, registration_fee: "Droit d'inscription", other: 'Autre' };
                   
                   let remainingText = "-";
                   if (student && p.type !== 'other') {
@@ -1000,6 +1027,24 @@ const Payments: React.FC = () => {
                   <option value="T1">Tranche 1</option>
                   <option value="T2">Tranche 2</option>
                   <option value="T3">Tranche 3</option>
+                </select>
+              </div>
+            )}
+            {currentPayment.type === 'transport' && (
+              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
+                <label>Mois (Transport)</label>
+                <select required value={currentPayment.month || 'Septembre'} onChange={e => setCurrentPayment({...currentPayment, month: e.target.value})}>
+                  <option value="Septembre">Septembre</option>
+                  <option value="Octobre">Octobre</option>
+                  <option value="Novembre">Novembre</option>
+                  <option value="Décembre">Décembre</option>
+                  <option value="Janvier">Janvier</option>
+                  <option value="Février">Février</option>
+                  <option value="Mars">Mars</option>
+                  <option value="Avril">Avril</option>
+                  <option value="Mai">Mai</option>
+                  <option value="Juin">Juin</option>
+                  <option value="Autre">Autre</option>
                 </select>
               </div>
             )}

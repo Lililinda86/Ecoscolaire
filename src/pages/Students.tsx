@@ -86,11 +86,19 @@ const Students: React.FC = () => {
         registrationYear: student.registrationYear || '2026-2027',
         registrationFeeExpected: student.registrationFeeExpected ?? 15000,
         registrationFeePaid: student.registrationFeePaid ?? 0,
-        registrationFeeStatus: student.registrationFeeStatus || 'unpaid'
+        registrationFeeStatus: student.registrationFeeStatus || 'unpaid',
+        usesTransport: student.usesTransport || false,
+        transportMonthlyFee: student.transportMonthlyFee ?? 0,
+        transportStatus: student.transportStatus || 'none',
+        transportPaid: student.transportPaid ?? 0
       });
       setParentEmailsInput((student.parentEmails || []).join(', '));
     } else {
-      setCurrentStudent({ id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '', studentStatus: 'nouveau', registrationYear: '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0, registrationFeeStatus: 'unpaid' });
+      setCurrentStudent({ 
+        id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '', 
+        studentStatus: 'nouveau', registrationYear: '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0, 
+        registrationFeeStatus: 'unpaid', usesTransport: false, transportMonthlyFee: 0, transportStatus: 'none', transportPaid: 0 
+      });
       setIsEditing(false);
       setParentEmailsInput('');
     }
@@ -195,6 +203,13 @@ const Students: React.FC = () => {
           registrationFeeExpected: finalStudent.registrationFeeExpected,
           registrationFeePaid: finalStudent.registrationFeePaid,
           registrationFeeStatus: finalStudent.registrationFeeStatus,
+          usesTransport: finalStudent.usesTransport,
+          transportNeighborhood: finalStudent.transportNeighborhood,
+          transportPickupPoint: finalStudent.transportPickupPoint,
+          transportMonthlyFee: finalStudent.transportMonthlyFee,
+          transportFleet: finalStudent.transportFleet,
+          transportStatus: finalStudent.transportStatus,
+          transportPaid: finalStudent.transportPaid,
         };
         const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
         await updateDoc(studentRef, patchData);
@@ -758,6 +773,55 @@ const Students: React.FC = () => {
                 (currentStudent.registrationFeePaid ?? 0) >= (currentStudent.registrationFeeExpected ?? 15000) ? 'Payé' :
                 (currentStudent.registrationFeePaid ?? 0) > 0 ? 'Partiel' : 'Non payé'
               } style={{ backgroundColor: '#e0f2fe', fontWeight: 'bold', color: '#0369a1' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: '#f5f3ff', borderRadius: '8px', border: '1px solid #ddd6fe', marginBottom: '1rem' }}>
+            <div style={{ width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, color: '#4c1d95' }}>Transport Scolaire</h4>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: '#4c1d95' }}>
+                  <input type="checkbox" checked={currentStudent.usesTransport || false} onChange={e => setCurrentStudent({...currentStudent, usesTransport: e.target.checked})} />
+                  L'élève utilise le transport
+                </label>
+              </div>
+              
+              {currentStudent.usesTransport && (
+                <>
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ color: '#5b21b6' }}>Quartier</label>
+                      <input value={currentStudent.transportNeighborhood || ''} onChange={e => setCurrentStudent({...currentStudent, transportNeighborhood: e.target.value})} placeholder="Ex: Akwa" />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ color: '#5b21b6' }}>Point de ramassage</label>
+                      <input value={currentStudent.transportPickupPoint || ''} onChange={e => setCurrentStudent({...currentStudent, transportPickupPoint: e.target.value})} placeholder="Ex: Carrefour Ndokoti" />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ color: '#5b21b6' }}>Flotte / Bus</label>
+                      <input value={currentStudent.transportFleet || ''} onChange={e => setCurrentStudent({...currentStudent, transportFleet: e.target.value})} placeholder="Ex: Bus A" />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ color: '#5b21b6' }}>Tarif Mensuel (FCFA)</label>
+                      <input type="number" min="0" step="1" value={currentStudent.transportMonthlyFee ?? 0} onChange={e => setCurrentStudent({...currentStudent, transportMonthlyFee: parseInt(e.target.value) || 0})} />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ color: '#5b21b6' }}>Statut Transport</label>
+                      <select value={currentStudent.transportStatus || 'none'} onChange={e => setCurrentStudent({...currentStudent, transportStatus: e.target.value as 'none'|'active'|'suspended'})}>
+                        <option value="none">Aucun</option>
+                        <option value="active">Actif</option>
+                        <option value="suspended">Suspendu</option>
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label style={{ color: '#5b21b6' }}>Total Payé</label>
+                      <input type="number" disabled value={currentStudent.transportPaid ?? 0} style={{ backgroundColor: '#ede9fe' }} />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

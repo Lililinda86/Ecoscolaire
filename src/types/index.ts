@@ -148,6 +148,13 @@ export interface Student {
   tuitionExpected?: number;
   tuitionPaid?: number;
   tuitionStatus?: 'unpaid' | 'partial' | 'paid';
+  usesTransport?: boolean;
+  transportNeighborhood?: string;
+  transportPickupPoint?: string;
+  transportMonthlyFee?: number;
+  transportFleet?: string;
+  transportStatus?: 'none' | 'active' | 'suspended';
+  transportPaid?: number;
 }
 
 export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
@@ -319,6 +326,7 @@ export interface Payment {
   amount: number;
   type: PaymentType;
   installment?: 'T1' | 'T2' | 'T3';
+  month?: string;
   date: string;
   description?: string;
   method?: 'cash' | 'mobile_money';

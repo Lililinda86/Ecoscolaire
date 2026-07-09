@@ -150,6 +150,17 @@ service cloud.firestore {
           && request.resource.data.tuitionStatus in ['unpaid', 'partial', 'paid'];
     }
 
+    function isAccountantTransportUpdate() {
+      return isAccountant() 
+          && hasSchoolAccess(resource.data.schoolId)
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'transportPaid'
+          ])
+          && request.resource.data.transportPaid is number
+          && request.resource.data.transportPaid >= 0;
+    }
+
     // ==========================================
     // RULES PER COLLECTION
     // ==========================================
@@ -249,7 +260,8 @@ service cloud.firestore {
       allow update: if isAuthenticated() && isActive() && (
         canManagePedagogy(request.resource.data.schoolId) ||
         isAccountantRegistrationFeeUpdate() ||
-        isAccountantTuitionUpdate()
+        isAccountantTuitionUpdate() ||
+        isAccountantTransportUpdate()
       );
       // Delete (Demande validation dans le client, mais ici la vraie suppression requiert owner)
       allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
