@@ -53,4 +53,50 @@ test.describe('Students CRUD', () => {
     const filename = download.suggestedFilename();
     expect(filename).toMatch(/inscriptions/i);
   });
+
+  test('WhatsApp Reminder generation', async ({ page }) => {
+    page.on('dialog', dialog => {
+      dialog.accept().catch(() => {});
+    });
+
+    const addButton = page.locator('button', { hasText: /(Ajouter|Nouveau|\+)/i }).first();
+    await addButton.click();
+    
+    const uniqueSuffix = Date.now().toString();
+    const studentName = `WA Test ${uniqueSuffix}`;
+    
+    await page.locator('input[placeholder="Ex: MAT-001"]').fill(`MAT-WA-${uniqueSuffix}`);
+    await page.locator('.form-group').filter({ hasText: /^Nom$/ }).locator('input').fill(studentName);
+    await page.locator('.form-group').filter({ hasText: 'Nom du Tuteur' }).locator('input').fill('Parent WA');
+    await page.locator('.form-group').filter({ hasText: 'Contact (Téléphone)' }).locator('input').fill('00237699123456');
+    await page.locator('.form-group').filter({ hasText: 'Date de Naissance' }).locator('input').fill('2015-01-01');
+    await page.locator('.form-group').filter({ hasText: 'Classe' }).locator('select').selectOption({ index: 1 });
+    await page.locator('.form-group').filter({ hasText: 'Année Scolaire (Inscription)' }).locator('input').fill('2026-2027');
+    await page.locator('.form-group').filter({ hasText: 'Droit d\'inscription attendu' }).locator('input').fill('15000');
+    await page.locator('.form-group').filter({ hasText: 'Montant payé (Inscription)' }).locator('input').fill('0');
+    
+    await page.locator('button[type="submit"], button:has-text("Enregistrer")').click();
+    
+    const row = page.locator('tr').filter({ hasText: studentName });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    
+    const waButton = row.locator('button[title*="WhatsApp"]');
+    await expect(waButton).toBeVisible();
+    await expect(waButton).not.toBeDisabled();
+
+    const popupPromise = page.waitForEvent('popup');
+    await waButton.click();
+    const popup = await popupPromise;
+    const url = popup.url();
+
+    expect(url).toMatch(/wa\.me\/237699123456|api\.whatsapp\.com.*237699123456/);
+    expect(decodeURIComponent(url.replace(/\+/g, ' '))).toMatch(/15.*000/);
+    expect(decodeURIComponent(url.replace(/\+/g, ' '))).toContain(studentName);
+
+    await popup.close();
+
+    await row.locator('button[title*="Supprimer"]').first().click();
+    await expect(row).not.toBeVisible();
+  });
 });
+

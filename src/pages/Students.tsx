@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
-import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy } from 'lucide-react';
+import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy, MessageSquare } from 'lucide-react';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
@@ -585,6 +585,73 @@ const Students: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const formatPhoneForWhatsApp = (phone?: string) => {
+    if (!phone) return '';
+    let cleaned = phone.replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('00237')) {
+      cleaned = '237' + cleaned.substring(5);
+    } else if (cleaned.startsWith('237')) {
+      // keep it
+    } else if (cleaned.length === 9 && (cleaned.startsWith('6') || cleaned.startsWith('2'))) {
+      cleaned = '237' + cleaned;
+    }
+    return cleaned.length >= 9 ? cleaned : '';
+  };
+
+  const needsReminder = (student: Student) => {
+    const expectedReg = student.registrationFeeExpected ?? 15000;
+    const paidReg = student.registrationFeePaid ?? 0;
+    const remainingReg = Math.max(expectedReg - paidReg, 0);
+
+    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0 
+      ? student.tuitionExpected 
+      : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
+    const paidTuition = student.tuitionPaid ?? 0;
+    const remainingTuition = Math.max(expectedTuition - paidTuition, 0);
+
+    const expectedTransport = student.transportMonthlyFee || student.feeTransport || 0;
+    const transportOwed = student.usesTransport && expectedTransport > 0 && (student.transportPaid || 0) < expectedTransport;
+
+    return remainingReg > 0 || remainingTuition > 0 || transportOwed;
+  };
+
+  const handleWhatsAppReminder = (student: Student) => {
+    const phone = formatPhoneForWhatsApp(student.parentPhone);
+    if (!phone) return;
+
+    const expectedReg = student.registrationFeeExpected ?? 15000;
+    const paidReg = student.registrationFeePaid ?? 0;
+    const remainingReg = Math.max(expectedReg - paidReg, 0);
+
+    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0 
+      ? student.tuitionExpected 
+      : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
+    const paidTuition = student.tuitionPaid ?? 0;
+    const remainingTuition = Math.max(expectedTuition - paidTuition, 0);
+
+    const expectedTransport = student.transportMonthlyFee || student.feeTransport || 0;
+    const transportOwed = student.usesTransport && expectedTransport > 0 && (student.transportPaid || 0) < expectedTransport;
+
+    if (remainingReg === 0 && remainingTuition === 0 && !transportOwed) return;
+
+    let message = `Bonjour Madame/Monsieur,\n\nNous vous contactons au sujet du dossier scolaire de ${student.name} pour l'année 2026-2027.\n\nÀ ce jour, le solde à régulariser est le suivant :\n`;
+    
+    if (remainingReg > 0) {
+      message += `- Droit d'inscription : ${remainingReg.toLocaleString('fr-FR')} FCFA\n`;
+    }
+    if (remainingTuition > 0) {
+      message += `- Pension scolaire : ${remainingTuition.toLocaleString('fr-FR')} FCFA\n`;
+    }
+    if (transportOwed) {
+      message += `- Transport : à régulariser\n`;
+    }
+
+    message += `\nNous vous invitons à vous rapprocher de l'administration afin de régulariser la situation ou convenir d'un échéancier si nécessaire.\n\nCordialement,\nAdministration ITALO`;
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="page-container" id="students-page">
       <style>
@@ -694,6 +761,15 @@ const Students: React.FC = () => {
                     <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
                       <button className="secondary" onClick={() => handleOpenInviteModal(student)} style={{ marginRight: '0.5rem', color: 'var(--primary)' }} title="Inviter le parent" disabled={isSchoolSuspended}>
                         <Send size={16} />
+                      </button>
+                      <button 
+                        className="secondary" 
+                        onClick={() => handleWhatsAppReminder(student)} 
+                        style={{ marginRight: '0.5rem', color: '#25D366', borderColor: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? '#25D366' : undefined, opacity: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 1 : 0.5 }} 
+                        title="Relancer par WhatsApp (Droit d'inscription, Pension, Transport)" 
+                        disabled={isSchoolSuspended || !needsReminder(student) || !formatPhoneForWhatsApp(student.parentPhone)}
+                      >
+                        <MessageSquare size={16} />
                       </button>
                       <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }} title="Modifier" disabled={isSchoolSuspended}>
                         <Edit2 size={16} />
