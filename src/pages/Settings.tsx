@@ -107,6 +107,56 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validation: 1 MB limit
+    if (file.size > 1024 * 1024) {
+      alert("Erreur: Le fichier est trop volumineux (limite: 1 Mo).");
+      e.target.value = '';
+      return;
+    }
+    
+    // Validation: format (PNG, JPG, JPEG, WEBP)
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert("Erreur: Format non supporté. Veuillez utiliser PNG, JPG, JPEG ou WEBP.");
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64String = event.target?.result as string;
+      if (db.school) {
+        safeMergeDB({
+          ...db,
+          school: {
+            ...db.school,
+            logoUrl: base64String
+          }
+        });
+      }
+    };
+    reader.onerror = () => {
+      alert("Erreur lors de la lecture de l'image.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    if (db.school) {
+      safeMergeDB({
+        ...db,
+        school: {
+          ...db.school,
+          logoUrl: undefined
+        }
+      });
+    }
+  };
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -153,6 +203,44 @@ const Settings: React.FC = () => {
               style={{ width: '100%' }}
               placeholder="Ex: Arrêté N° 123/MINEDUB/..."
             />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: 'var(--primary-color)' }}>Logo de l'établissement</label>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Ce logo apparaîtra sur les reçus et documents imprimables. Formats acceptés : PNG, JPG, JPEG, WEBP (Max 1 Mo).
+          </p>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            {db.school?.logoUrl && (
+              <div style={{ padding: '0.5rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: '#fff' }}>
+                <img 
+                  src={db.school.logoUrl} 
+                  alt="Aperçu du logo" 
+                  style={{ width: '80px', height: '80px', objectFit: 'contain' }} 
+                />
+              </div>
+            )}
+            
+            <div style={{ flex: 1, minWidth: '250px' }}>
+              <input 
+                type="file" 
+                accept="image/png, image/jpeg, image/webp" 
+                onChange={handleLogoUpload}
+                style={{ marginBottom: '0.5rem', width: '100%' }}
+              />
+              
+              {db.school?.logoUrl && (
+                <button 
+                  type="button" 
+                  onClick={handleRemoveLogo} 
+                  style={{ background: 'var(--danger)', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Supprimer le logo
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
