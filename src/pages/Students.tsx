@@ -517,6 +517,74 @@ const Students: React.FC = () => {
     }
   };
 
+  const exportInscriptionsCSV = () => {
+    const rows = [
+      [
+        'ID', 'Nom', 'Sexe', 'Date de naissance', 'Section', 'Classe', 
+        'Statut élève', 'Année scolaire', 'Nom parent / tuteur', 'Téléphone parent', 'Email parent',
+        'Droit inscription attendu', 'Droit inscription payé', 'Statut droit inscription',
+        'Pension attendue', 'Pension payée', 'Statut pension',
+        'Utilise transport', 'Quartier transport', 'Point de ramassage transport', 
+        'Flotte / Bus transport', 'Tarif mensuel transport', 'Transport payé', 'Statut transport'
+      ]
+    ];
+
+    filteredStudents.forEach(student => {
+      const className = db.classes.find(c => c.id === student.classId)?.name || student.rawClassName || 'Inconnue';
+      const parentEmail = (student.parentEmails || [])[0] || '';
+      
+      const escapeCsv = (str: string | number | boolean | undefined | null) => {
+        if (str === null || str === undefined) return '';
+        const s = String(str);
+        if (s.includes(';') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+
+      const expectedTuition = (student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0);
+
+      rows.push([
+        escapeCsv(student.id),
+        escapeCsv(student.name),
+        escapeCsv(student.gender),
+        escapeCsv(student.dob),
+        escapeCsv(student.section),
+        escapeCsv(className),
+        escapeCsv(student.studentStatus || 'nouveau'),
+        escapeCsv(student.registrationYear || '2026-2027'),
+        escapeCsv(student.parentName),
+        escapeCsv(student.parentPhone),
+        escapeCsv(parentEmail),
+        escapeCsv(student.registrationFeeExpected ?? 15000),
+        escapeCsv(student.registrationFeePaid ?? 0),
+        escapeCsv(student.registrationFeeStatus || 'unpaid'),
+        escapeCsv(expectedTuition),
+        escapeCsv(student.tuitionPaid ?? 0),
+        escapeCsv(student.tuitionStatus || 'unpaid'),
+        escapeCsv(student.usesTransport ? 'Oui' : 'Non'),
+        escapeCsv(student.transportNeighborhood),
+        escapeCsv(student.transportPickupPoint),
+        escapeCsv(student.transportFleet),
+        escapeCsv(student.transportMonthlyFee ?? 0),
+        escapeCsv(student.transportPaid ?? 0),
+        escapeCsv(student.transportStatus || 'none')
+      ]);
+    });
+
+    const csvContent = '\uFEFF' + rows.map(e => e.join(";")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const isItalo = currentSchool?.name?.toLowerCase().includes('italo');
+    link.setAttribute("download", isItalo ? 'italo-inscriptions-2026-2027.csv' : 'inscriptions-2026-2027.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="page-container" id="students-page">
       <style>
@@ -547,6 +615,9 @@ const Students: React.FC = () => {
           </button>
           <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended}>
             <FileSpreadsheet size={18} /> Importer Excel
+          </button>
+          <button className="secondary" onClick={exportInscriptionsCSV} disabled={isSchoolSuspended || filteredStudents.length === 0}>
+            <FileSpreadsheet size={18} /> Exporter inscriptions
           </button>
           <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
             <Plus size={18} /> {t('add', 'Ajouter')}

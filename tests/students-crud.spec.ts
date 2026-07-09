@@ -41,4 +41,16 @@ test.describe('Students CRUD', () => {
     }
     monitor.assertNoCriticalErrors();
   });
+
+  test('Export inscriptions CSV', async ({ page }) => {
+    const exportBtn = page.locator('button:has-text("Exporter inscriptions")').first();
+    await expect(exportBtn).toBeVisible({ timeout: 15000 });
+
+    const downloadPromise = page.waitForEvent('download');
+    await exportBtn.click();
+    const download = await downloadPromise;
+
+    const filename = download.suggestedFilename();
+    expect(filename).toMatch(/inscriptions/i);
+  });
 });
