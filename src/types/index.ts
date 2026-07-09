@@ -105,7 +105,7 @@ export interface ClassSection {
   type: SectionType;
   subjects?: string[]; // Allowed subjects for this class
   capacity?: number;
-  level?: 'maternelle' | 'primaire';
+  level?: 'maternelle' | 'primaire' | 'secondaire';
 }
 
 export interface Subject {

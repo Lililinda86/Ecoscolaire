@@ -107,5 +107,43 @@ test.describe('Students CRUD', () => {
     await row.locator('button[title*="Supprimer"]').first().click();
     await expect(row).not.toBeVisible();
   });
+
+  test('Create student in secondary class (Form 1)', async ({ page }) => {
+    page.on('dialog', dialog => {
+      dialog.accept().catch(() => {});
+    });
+    
+    // Ensure Form 1 exists by visiting Classes page and clicking Repair
+    await page.getByTestId('nav-classes').click();
+    const repairBtn = page.locator('button:has-text("Réparer les classes manquantes")');
+    if (await repairBtn.isVisible()) {
+      const dialogPromise = page.waitForEvent('dialog', { timeout: 5000 }).catch(() => null);
+      await repairBtn.click();
+      await dialogPromise;
+    }
+    
+    await page.getByTestId('nav-students').click();
+
+    const addButton = page.locator('button', { hasText: /(Ajouter|Nouveau|\+)/i }).first();
+    await addButton.click();
+    
+    const uniqueSuffix = Date.now().toString();
+    const studentName = `Sec Student ${uniqueSuffix}`;
+    
+    await page.locator('input[placeholder="Ex: MAT-001"]').fill(`SEC-${uniqueSuffix}`);
+    await page.locator('.form-group').filter({ hasText: /^Nom$/ }).locator('input').fill(studentName);
+    await page.locator('form').first().locator('.form-group').filter({ has: page.locator('label', { hasText: /^Section$/ }) }).locator('select').selectOption('anglophone');
+    await page.locator('form').first().locator('.form-group').filter({ has: page.locator('label', { hasText: 'Nom du Tuteur' }) }).locator('input').fill('Parent Sec');
+    await page.locator('form').first().locator('.form-group').filter({ has: page.locator('label', { hasText: 'Date de Naissance' }) }).locator('input').fill('2010-01-01');
+    await page.locator('form').first().locator('.form-group').filter({ has: page.locator('label', { hasText: /^Classe$/ }) }).locator('select').selectOption('anglo-form-1');
+    
+    await page.locator('button[type="submit"], button:has-text("Enregistrer")').click();
+    
+    const row = page.locator('tr').filter({ hasText: studentName });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    
+    await row.locator('button[title*="Supprimer"]').first().click();
+    await expect(row).not.toBeVisible();
+  });
 });
 

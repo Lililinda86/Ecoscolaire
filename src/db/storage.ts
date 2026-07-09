@@ -94,28 +94,39 @@ const initialDB: Database = {
   students: [],
   staff: [],
   classes: [
-    // Anglophone
+    // Maternelle Anglophone
     { id: 'anglo-pre-nursery', name: 'Pre-Nursery', type: 'anglophone', capacity: 30, level: 'maternelle' },
     { id: 'anglo-nursery-1', name: 'Nursery 1', type: 'anglophone', capacity: 30, level: 'maternelle' },
     { id: 'anglo-nursery-2', name: 'Nursery 2', type: 'anglophone', capacity: 30, level: 'maternelle' },
     { id: 'anglo-nursery-3', name: 'Nursery 3', type: 'anglophone', capacity: 30, level: 'maternelle' },
+    // Primaire Anglophone
     { id: 'anglo-class-1', name: 'Class 1', type: 'anglophone', capacity: 40, level: 'primaire' },
     { id: 'anglo-class-2', name: 'Class 2', type: 'anglophone', capacity: 40, level: 'primaire' },
     { id: 'anglo-class-3', name: 'Class 3', type: 'anglophone', capacity: 40, level: 'primaire' },
     { id: 'anglo-class-4', name: 'Class 4', type: 'anglophone', capacity: 40, level: 'primaire' },
     { id: 'anglo-class-5', name: 'Class 5', type: 'anglophone', capacity: 40, level: 'primaire' },
     { id: 'anglo-class-6', name: 'Class 6', type: 'anglophone', capacity: 40, level: 'primaire' },
-    // Francophone
+    // Secondaire Anglophone
+    { id: 'anglo-form-1', name: 'Form 1', type: 'anglophone', capacity: 40, level: 'secondaire' },
+    { id: 'anglo-form-2', name: 'Form 2', type: 'anglophone', capacity: 40, level: 'secondaire' },
+    // Maternelle Francophone
     { id: 'franco-pre-maternelle', name: 'Pré-maternelle', type: 'francophone', capacity: 30, level: 'maternelle' },
     { id: 'franco-maternelle-1', name: 'Maternelle 1', type: 'francophone', capacity: 30, level: 'maternelle' },
     { id: 'franco-maternelle-2', name: 'Maternelle 2', type: 'francophone', capacity: 30, level: 'maternelle' },
     { id: 'franco-maternelle-3', name: 'Maternelle 3', type: 'francophone', capacity: 30, level: 'maternelle' },
+    { id: 'franco-petite-section', name: 'Petite section', type: 'francophone', capacity: 30, level: 'maternelle' },
+    { id: 'franco-moyenne-section', name: 'Moyenne section', type: 'francophone', capacity: 30, level: 'maternelle' },
+    { id: 'franco-grande-section', name: 'Grande section', type: 'francophone', capacity: 30, level: 'maternelle' },
+    // Primaire Francophone
     { id: 'franco-sil', name: 'SIL', type: 'francophone', capacity: 40, level: 'primaire' },
     { id: 'franco-cp', name: 'CP', type: 'francophone', capacity: 40, level: 'primaire' },
     { id: 'franco-ce1', name: 'CE1', type: 'francophone', capacity: 40, level: 'primaire' },
     { id: 'franco-ce2', name: 'CE2', type: 'francophone', capacity: 40, level: 'primaire' },
     { id: 'franco-cm1', name: 'CM1', type: 'francophone', capacity: 40, level: 'primaire' },
-    { id: 'franco-cm2', name: 'CM2', type: 'francophone', capacity: 40, level: 'primaire' }
+    { id: 'franco-cm2', name: 'CM2', type: 'francophone', capacity: 40, level: 'primaire' },
+    // Secondaire Francophone
+    { id: 'franco-6e', name: '6e', type: 'francophone', capacity: 40, level: 'secondaire' },
+    { id: 'franco-5e', name: '5e', type: 'francophone', capacity: 40, level: 'secondaire' }
   ],
   subjects: [
     { id: 'math', name: 'Mathématiques' },

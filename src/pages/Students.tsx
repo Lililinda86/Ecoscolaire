@@ -438,9 +438,15 @@ const Students: React.FC = () => {
               
               // Mapping Francophone
               if (['PRE MATER', 'PRE MATERNELLE'].includes(name)) return { name: 'Pré-maternelle', type: 'francophone' as const };
-              if (['PTTE SECTION', 'PETITE SECTION', 'PTE SECTION', 'MATERNELLE 1'].includes(name)) return { name: 'Maternelle 1', type: 'francophone' as const };
-              if (['MOY SECTION', 'MOYENNE SECTION', 'MATERNELLE 2'].includes(name)) return { name: 'Maternelle 2', type: 'francophone' as const };
-              if (['GRD SECTION', 'GRANDE SECTION', 'MATERNELLE 3'].includes(name)) return { name: 'Maternelle 3', type: 'francophone' as const };
+              if (['PTTE SECTION', 'PETITE SECTION', 'PTE SECTION', 'MATERNELLE 1'].includes(name)) return { name: 'Petite section', type: 'francophone' as const };
+              if (['MOY SECTION', 'MOYENNE SECTION', 'MATERNELLE 2'].includes(name)) return { name: 'Moyenne section', type: 'francophone' as const };
+              if (['GRD SECTION', 'GRANDE SECTION', 'MATERNELLE 3'].includes(name)) return { name: 'Grande section', type: 'francophone' as const };
+              
+              if (['6E', 'SIXIEME', 'SIXIÈME', '6EME', '6ÈME'].includes(name)) return { name: '6e', type: 'francophone' as const };
+              if (['5E', 'CINQUIEME', 'CINQUIÈME', '5EME', '5ÈME'].includes(name)) return { name: '5e', type: 'francophone' as const };
+              
+              if (['FORM 1', 'F1', 'FORM ONE'].includes(name)) return { name: 'Form 1', type: 'anglophone' as const };
+              if (['FORM 2', 'F2', 'FORM TWO'].includes(name)) return { name: 'Form 2', type: 'anglophone' as const };
               
               if (name === 'SIL') return { name: 'SIL', type: 'francophone' as const };
               if (name === 'CP') return { name: 'CP', type: 'francophone' as const };
