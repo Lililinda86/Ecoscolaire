@@ -41,10 +41,12 @@ const ProtectedRouteForLogin = ({ children }: { children: React.ReactNode }) => 
 };
 
 function App() {
-  const { db, safePatchDB } = useAppContext();
+  const { db, safePatchDB, currentUser } = useAppContext();
 
   useEffect(() => {
+    // Ce scrubbing écrit dans Firestore (classes) — restreint aux rôles autorisés à écrire dans classes
     if (!db?.school || !db?.classes || !db?.students || !db?.staff) return;
+    if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return;
 
     let shouldSave = false;
     let newClasses = [...db.classes];
@@ -111,7 +113,7 @@ function App() {
 
       safePatchDB(patch);
     }
-  }, [db?.classes, db?.school, db?.students, db?.staff, safePatchDB]);
+  }, [db?.classes, db?.school, db?.students, db?.staff, safePatchDB, currentUser]);
 
   return (
     <HashRouter>

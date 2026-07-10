@@ -233,7 +233,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (schoolDoc.exists()) {
             schoolDocData = { id: schoolDoc.id, ...schoolDoc.data() } as School;
             loadedDb.schools = [schoolDocData];
-            setCurrentSchool(loadedDb.schools[0] as School);
+            loadedDb.school = schoolDocData; // ITALO-16P: db.school doit être synchronisé avec Firestore au chargement
+            setCurrentSchool(schoolDocData);
           } else {
             setCurrentSchool(null);
           }
@@ -468,8 +469,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // Handle current school explicit save
-      if (newDb.school && newDb.school.id) {
+      // Handle current school explicit save — only authorized roles can write to schools/{id}
+      const canWriteSchool = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
+      if (canWriteSchool && newDb.school && newDb.school.id) {
         const { id, ...dataToSave } = newDb.school;
         const whitelist = ['name', 'address', 'phone', 'email', 'logoUrl', 'subscriptionStatus', 'isInternalSchool', 'directorName', 'accreditationNumber', 'adminPin', 'academicYear', 'globalFees', 'paymentSettings'];
         const filteredData = Object.fromEntries(
