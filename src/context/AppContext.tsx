@@ -468,11 +468,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // Handle current school explicit save (since it is not an array, getMergeableCollection skips it)
+      // Handle current school explicit save
       if (newDb.school && newDb.school.id) {
+        const { id, ...dataToSave } = newDb.school;
+        const whitelist = ['name', 'address', 'phone', 'email', 'logoUrl', 'subscriptionStatus', 'isInternalSchool', 'directorName', 'accreditationNumber', 'adminPin', 'academicYear', 'globalFees', 'paymentSettings'];
+        const filteredData = Object.fromEntries(
+            Object.entries(dataToSave).filter(([key]) => whitelist.includes(key))
+        );
         if (!db.school || JSON.stringify(db.school) !== JSON.stringify(newDb.school)) {
-          console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour explicite de l'école :`, newDb.school.id);
-          await setDoc(doc(firestoreDb, 'schools', newDb.school.id), newDb.school, { merge: true });
+          console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour explicite de l'école :`, id);
+          await setDoc(doc(firestoreDb, 'schools', id), filteredData, { merge: true });
+          // Synchronise le state local currentSchool pour que l'UI reflète
+          // immédiatement les changements (logo, etc.) sans attendre un reload
+          setCurrentSchool(newDb.school);
         }
       }
 

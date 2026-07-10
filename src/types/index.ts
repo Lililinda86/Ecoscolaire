@@ -6,7 +6,7 @@ export interface School {
   schoolCode: string;
   name: string; // schoolName
   academicYear: string;
-  logoUrl?: string; // Image en Base64
+  logoUrl?: string | null; // Image en Base64 ; null = logo supprimé explicitement
   logoFileName?: string;
   logoUpdatedAt?: string;
   adminPin?: string;

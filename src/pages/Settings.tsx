@@ -158,7 +158,7 @@ const Settings: React.FC = () => {
           ...db,
           school: {
             ...db.school,
-            logoUrl: undefined
+            logoUrl: null
           }
         });
         alert("Logo supprimé avec succès");

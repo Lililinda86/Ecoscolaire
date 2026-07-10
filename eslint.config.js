@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // scripts/validate-staging.cjs est encodé en UTF-16 (artefact du workflow CI
+  // validate-staging.yml qui l'exécute via `node scripts/validate-staging.cjs`).
+  // ESLint ne peut pas parser ce fichier (Unexpected character '\0').
+  // Il n'a pas besoin d'être linté : c'est un script CI exécuté directement par Node.js.
+  globalIgnores(['dist', 'scripts/validate-staging.cjs']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -20,6 +24,22 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
+      // Exemptions légitimes : hooks exportés co-localisés avec leur Provider
+      // (pattern React standard : AppProvider + useAppContext dans AppContext.tsx,
+      //  useI18n dans I18nContext.tsx, useGrades dans Grades.tsx)
+      // allowExportNames est l'API documentée du plugin react-refresh.
+      'react-refresh/only-export-components': [
+        'warn',
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            'useAppContext',
+            'AppProvider',
+            'useI18n',
+            'getAppreciation',
+          ],
+        },
+      ],
       'no-restricted-syntax': [
         'warn',
         {
