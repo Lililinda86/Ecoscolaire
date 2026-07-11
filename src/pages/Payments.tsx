@@ -10,7 +10,7 @@ import { Plus, Minus, Wallet, ClipboardList, Trash2, History, FileText, Trending
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, setDoc, updateDoc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -215,11 +215,10 @@ const Payments: React.FC = () => {
       const newPayment = Object.fromEntries(Object.entries(rawPayment).filter(([, v]) => v !== undefined));
 
       // Option A - Safe minimal: On ne modifie plus student.feeT1/T2 aveuglément pour éviter les Lost Updates.
-      // Le paiement est strictement append-only et idempotent.
+      // Le paiement est strictement append-only et idempotent. Le recalcul du solde est fait côté serveur via Firestore trigger.
       await setDoc(doc(firestoreDb, 'payments', paymentId), newPayment, { merge: true });
 
       if (newPayment.type === 'registration_fee' && newPayment.studentId) {
-        const studentRef = doc(firestoreDb, 'students', newPayment.studentId);
         const student = db.students.find(s => s.id === newPayment.studentId);
         if (student) {
           const oldPaid = student.registrationFeePaid ?? 0;
@@ -228,21 +227,14 @@ const Payments: React.FC = () => {
           let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
           if (newPaid >= expected) status = 'paid';
           else if (newPaid > 0) status = 'partial';
-          try {
-            await updateDoc(studentRef, { registrationFeePaid: newPaid, registrationFeeStatus: status });
-            if (db) {
-              const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
-              updateLocalState({ students: newStudents });
-            }
-          } catch(err) {
-            console.error("Error updating student registration fee:", err);
-            throw err;
+          if (db) {
+            const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
+            updateLocalState({ students: newStudents });
           }
         }
       }
 
       if (newPayment.type === 'tuition' && newPayment.studentId) {
-        const studentRef = doc(firestoreDb, 'students', newPayment.studentId);
         const student = db.students.find(s => s.id === newPayment.studentId);
         if (student) {
           const oldPaid = student.tuitionPaid ?? 0;
@@ -252,34 +244,21 @@ const Payments: React.FC = () => {
           let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
           if (expected > 0 && newPaid >= expected) status = 'paid';
           else if (newPaid > 0) status = 'partial';
-          try {
-            await updateDoc(studentRef, { tuitionPaid: newPaid, tuitionStatus: status });
-            if (db) {
-              const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
-              updateLocalState({ students: newStudents });
-            }
-          } catch(err) {
-            console.error("Error updating student tuition:", err);
-            throw err;
+          if (db) {
+            const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
+            updateLocalState({ students: newStudents });
           }
         }
       }
 
       if (newPayment.type === 'transport' && newPayment.studentId) {
-        const studentRef = doc(firestoreDb, 'students', newPayment.studentId);
         const student = db.students.find(s => s.id === newPayment.studentId);
         if (student) {
           const oldPaid = student.transportPaid ?? 0;
           const newPaid = oldPaid + (newPayment.amount || 0);
-          try {
-            await updateDoc(studentRef, { transportPaid: newPaid });
-            if (db) {
-              const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
-              updateLocalState({ students: newStudents });
-            }
-          } catch(err) {
-            console.error("Error updating student transport paid:", err);
-            throw err;
+          if (db) {
+            const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
+            updateLocalState({ students: newStudents });
           }
         }
       }
@@ -367,9 +346,8 @@ const Payments: React.FC = () => {
         console.log(`[FRONTEND] deleteDoc completed for ${id}`);
         
         if (paymentToDelete && paymentToDelete.studentId) {
-          const studentRef = doc(firestoreDb, 'students', paymentToDelete.studentId);
           const student = db.students.find(s => s.id === paymentToDelete.studentId);
-          console.log(`[FRONTEND] Updating student ${paymentToDelete.studentId}`, student);
+          console.log(`[FRONTEND] Reactively updating local student state ${paymentToDelete.studentId}`, student);
           
           if (student) {
             const remainingPayments = db.payments.filter(p => p.id !== id && p.studentId === paymentToDelete.studentId);
@@ -381,7 +359,6 @@ const Payments: React.FC = () => {
               if (newPaid >= expected) status = 'paid';
               else if (newPaid > 0) status = 'partial';
               
-              await updateDoc(studentRef, { registrationFeePaid: newPaid, registrationFeeStatus: status });
               if (db) {
                 const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
                 updateLocalState({ students: newStudents });
@@ -395,7 +372,6 @@ const Payments: React.FC = () => {
               if (expected > 0 && newPaid >= expected) status = 'paid';
               else if (newPaid > 0) status = 'partial';
               
-              await updateDoc(studentRef, { tuitionPaid: newPaid, tuitionStatus: status });
               if (db) {
                 const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
                 updateLocalState({ students: newStudents });
@@ -403,7 +379,6 @@ const Payments: React.FC = () => {
             }
             else if (paymentToDelete.type === 'transport') {
               const newPaid = remainingPayments.filter(p => p.type === 'transport').reduce((sum, p) => sum + (p.amount || 0), 0);
-              await updateDoc(studentRef, { transportPaid: newPaid });
               if (db) {
                 const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
                 updateLocalState({ students: newStudents });

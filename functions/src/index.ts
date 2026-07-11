@@ -645,4 +645,67 @@ export const enforceStudentSaasLimits = functions.firestore
     });
   });
 
+// ----------------------------------------------------------------------
+// 9. updateStudentFinancialStatus (Trigger)
+// Recalculates student tuition/registration/transport balances atomically
+// whenever a payment document is created, updated, or deleted.
+// ----------------------------------------------------------------------
+export const updateStudentFinancialStatus = functions.firestore
+  .document('payments/{paymentId}')
+  .onWrite(async (change) => {
+    const paymentData = change.after.exists ? change.after.data() : change.before.data();
+    if (!paymentData || !paymentData.studentId) return null;
+
+    const studentId = paymentData.studentId;
+    const db = admin.firestore();
+
+    return await db.runTransaction(async (transaction) => {
+      const paymentsSnap = await transaction.get(
+        db.collection('payments').where('studentId', '==', studentId)
+      );
+      
+      const paymentsList = paymentsSnap.docs.map(doc => doc.data());
+
+      const studentRef = db.collection('students').doc(studentId);
+      const studentSnap = await transaction.get(studentRef);
+      if (!studentSnap.exists) return null;
+
+      const student = studentSnap.data()!;
+
+      const registrationFeePaid = paymentsList
+        .filter(p => p.type === 'registration_fee' || p.type === 'registration')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      const tuitionPaid = paymentsList
+        .filter(p => p.type === 'tuition')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      const transportPaid = paymentsList
+        .filter(p => p.type === 'transport')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      const registrationFeeExpected = student.registrationFeeExpected ?? 15000;
+      let registrationFeeStatus = 'unpaid';
+      if (registrationFeePaid >= registrationFeeExpected) registrationFeeStatus = 'paid';
+      else if (registrationFeePaid > 0) registrationFeeStatus = 'partial';
+
+      const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
+      const tuitionExpected = student.tuitionExpected ?? fallbackExpected;
+      let tuitionStatus = 'unpaid';
+      if (tuitionExpected > 0 && tuitionPaid >= tuitionExpected) tuitionStatus = 'paid';
+      else if (tuitionPaid > 0) tuitionStatus = 'partial';
+
+      transaction.update(studentRef, {
+        registrationFeePaid,
+        registrationFeeStatus,
+        tuitionPaid,
+        tuitionStatus,
+        transportPaid
+      });
+
+      console.log(`[Finance Trigger] Recalculated balance for student ${studentId}: Reg=${registrationFeePaid}, Tuition=${tuitionPaid}, Transport=${transportPaid}`);
+      return null;
+    });
+  });
+
 export { sweepZombieImportJobs } from './studentImportSweeper';
