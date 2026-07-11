@@ -43,10 +43,6 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
   const [searchTerm, setSearchTerm] = useState('');
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
   
-  console.log("=== ReceiptHistory Diagnostic ===");
-  console.log("receipts length:", receipts?.length);
-  console.log("receipts sample:", receipts?.slice(0, 2));
-  console.log("currentUser (from AppContext? no, we need to pass it or just log receipts)");
   const printRef = useRef<HTMLDivElement>(null);
   const [activeReceipt, setActiveReceipt] = useState<ReceiptLike | null>(null);
 
@@ -82,9 +78,6 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
       }
       return dateB - dateA;
     });
-
-  console.log("=== ReceiptHistory Diagnostic (suite) ===");
-  console.log("filteredReceipts length:", filteredReceipts.length);
 
   const generatePDF = async (receipt: ReceiptLike, action: 'download' | 'print') => {
     setIsGenerating(receipt.id ?? null);
