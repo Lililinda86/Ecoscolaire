@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy, MessageSquare } from 'lucide-react';
+import { normalizeCameroonPhoneNumber, normalizeClassName } from '../utils/importUtils';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
@@ -57,6 +58,12 @@ const Students: React.FC = () => {
   const [inviteEmailTarget, setInviteEmailTarget] = useState<string>('');
   const [generatedInviteLink, setGeneratedInviteLink] = useState<string>('');
   const [isImportModalOpen, setImportModalOpen] = useState(false);
+  const [importReport, setImportReport] = useState<{
+    totalRead: number;
+    readyCount: number;
+    duplicates: number;
+    errors: string[];
+  } | null>(null);
   const [importSection, setImportSection] = useState<SectionType>('francophone');
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [previewStudents, setPreviewStudents] = useState<Student[] | null>(null);
@@ -382,6 +389,8 @@ const Students: React.FC = () => {
           detectedClassName: string;
         }
         const newStudents: PreviewStudent[] = [];
+        const errorsLog: string[] = [];
+        let duplicateCount = 0;
 
         for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
           const rawRow = rawRows[i];
@@ -403,72 +412,76 @@ const Students: React.FC = () => {
             return '';
           };
 
-          const fullName = getVal(['NOMS ET PRENOMS', 'NOM ET PRENOM']) || getVal(['NOM']) || getVal(['PRENOM']);
-          if (!fullName) continue; // Skip empty rows
+          const nom = getVal(['NOM']);
+          const prenom = getVal(['PRENOM']);
+          const fullName = getVal(['NOMS ET PRENOMS', 'NOM ET PRENOM']) || (nom ? `${nom} ${prenom}`.trim() : '');
+          
+          if (!fullName) {
+            errorsLog.push(`Ligne ${i + 1} : Nom ou prénom manquant.`);
+            continue;
+          }
 
           const classeNameRaw = getVal(['CLASSE']);
           const matricule = getVal(['MATRICULE']);
-          
           const parentEmailsStr = getVal(['EMAIL PARENT', 'EMAILS PARENTS', 'EMAIL PARENT 1', 'EMAILPARENT', 'PARENT EMAIL', 'EMAIL']);
           const normalizedEmails = normalizeParentEmails(parentEmailsStr);
-          
+
+          // Validation classe prédéfinie
           let classId = '';
           let finalSection: 'francophone' | 'anglophone' | '' = '';
           let detectedClassName = '';
 
           if (classeNameRaw) {
-            const normalizeClassName = (raw: string) => {
-              const name = raw.toUpperCase()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Supprime les accents
-                .replace(/[._-]/g, ' ') // Remplacer par des espaces
-                .replace(/\s+/g, ' ') // Espaces multiples
-                .trim();
-                
-              // Mapping Anglophone
-              if (['PRE NURSERY'].includes(name)) return { name: 'Pre-Nursery', type: 'anglophone' as const };
-              if (name === 'NURSERY 1') return { name: 'Nursery 1', type: 'anglophone' as const };
-              if (name === 'NURSERY 2') return { name: 'Nursery 2', type: 'anglophone' as const };
-              if (name === 'NURSERY 3') return { name: 'Nursery 3', type: 'anglophone' as const };
-              if (name === 'CLASS 1') return { name: 'Class 1', type: 'anglophone' as const };
-              if (name === 'CLASS 2') return { name: 'Class 2', type: 'anglophone' as const };
-              if (name === 'CLASS 3') return { name: 'Class 3', type: 'anglophone' as const };
-              if (name === 'CLASS 4') return { name: 'Class 4', type: 'anglophone' as const };
-              if (name === 'CLASS 5') return { name: 'Class 5', type: 'anglophone' as const };
-              if (name === 'CLASS 6') return { name: 'Class 6', type: 'anglophone' as const };
-              
-              // Mapping Francophone
-              if (['PRE MATER', 'PRE MATERNELLE'].includes(name)) return { name: 'Pré-maternelle', type: 'francophone' as const };
-              if (['PTTE SECTION', 'PETITE SECTION', 'PTE SECTION', 'MATERNELLE 1'].includes(name)) return { name: 'Petite section', type: 'francophone' as const };
-              if (['MOY SECTION', 'MOYENNE SECTION', 'MATERNELLE 2'].includes(name)) return { name: 'Moyenne section', type: 'francophone' as const };
-              if (['GRD SECTION', 'GRANDE SECTION', 'MATERNELLE 3'].includes(name)) return { name: 'Grande section', type: 'francophone' as const };
-              
-              if (['6E', 'SIXIEME', 'SIXIÈME', '6EME', '6ÈME'].includes(name)) return { name: '6e', type: 'francophone' as const };
-              if (['5E', 'CINQUIEME', 'CINQUIÈME', '5EME', '5ÈME'].includes(name)) return { name: '5e', type: 'francophone' as const };
-              
-              if (['FORM 1', 'F1', 'FORM ONE'].includes(name)) return { name: 'Form 1', type: 'anglophone' as const };
-              if (['FORM 2', 'F2', 'FORM TWO'].includes(name)) return { name: 'Form 2', type: 'anglophone' as const };
-              
-              if (name === 'SIL') return { name: 'SIL', type: 'francophone' as const };
-              if (name === 'CP') return { name: 'CP', type: 'francophone' as const };
-              if (name === 'CE1') return { name: 'CE1', type: 'francophone' as const };
-              if (name === 'CE2') return { name: 'CE2', type: 'francophone' as const };
-              if (name === 'CM1') return { name: 'CM1', type: 'francophone' as const };
-              if (name === 'CM2') return { name: 'CM2', type: 'francophone' as const };
-              
-              return null;
-            };
-
-            const mapping = normalizeClassName(classeNameRaw);
-            
-            if (mapping) {
-              const matchingClasses = db.classes.filter(c => c.name.toLowerCase() === mapping.name.toLowerCase() && c.type === mapping.type);
-              if (matchingClasses.length > 0) {
-                classId = matchingClasses[0].id;
-                finalSection = matchingClasses[0].type;
-                detectedClassName = matchingClasses[0].name;
+            const match = normalizeClassName(classeNameRaw);
+            if (match) {
+              const matchedClasses = db.classes.filter(c => c.name.toLowerCase() === match.matchedName.toLowerCase() && c.type === match.section);
+              if (matchedClasses.length > 0) {
+                classId = matchedClasses[0].id;
+                finalSection = matchedClasses[0].type;
+                detectedClassName = matchedClasses[0].name;
+              } else {
+                errorsLog.push(`Ligne ${i + 1} : Classe "${classeNameRaw}" reconnue comme "${match.matchedName}" mais pas encore créée dans l'école.`);
               }
+            } else {
+              // Tentative de suggestion
+              if (classeNameRaw.toUpperCase().includes('FROM')) {
+                errorsLog.push(`Ligne ${i + 1} : Classe "${classeNameRaw}" inconnue. Suggestion : "Form 1" ou "Form 2".`);
+              } else {
+                errorsLog.push(`Ligne ${i + 1} : Classe "${classeNameRaw}" inconnue dans le référentiel.`);
+              }
+              continue;
             }
+          } else {
+            errorsLog.push(`Ligne ${i + 1} : Classe non renseignée.`);
+            continue;
           }
+
+          // Validation Téléphone parent
+          const rawPhone = getVal(['CONTACT', 'TÉLÉPHONE', 'TELEPHONE', 'TEL', 'PHONE', 'TELEPHONE_PARENT']);
+          const normalizedPhone = normalizeCameroonPhoneNumber(rawPhone);
+          if (rawPhone && !normalizedPhone) {
+            errorsLog.push(`Ligne ${i + 1} : Téléphone parent "${rawPhone}" invalide.`);
+            continue;
+          }
+
+          // Détection doublon local / existant dans l'année scolaire
+          const isDuplicate = db.students.some(s => s.name.toLowerCase() === fullName.toLowerCase() && s.classId === classId) ||
+                              newStudents.some(s => s.name.toLowerCase() === fullName.toLowerCase() && s.classId === classId);
+          if (isDuplicate) {
+            duplicateCount++;
+            errorsLog.push(`Ligne ${i + 1} : Doublon détecté pour l'élève "${fullName}".`);
+            continue;
+          }
+
+          // Extraction des colonnes financières optionnelles
+          const regExpected = parseFloat(getVal(['INSCRIPTION_ATTENDUE', 'DROIT INSCRIPTION ATTENDU', 'REGISTRATION'])) || 15000;
+          const regPaid = parseFloat(getVal(['INSCRIPTION_PAYEE', 'DROIT INSCRIPTION PAYE'])) || 0;
+          const tuitionExpected = parseFloat(getVal(['SCOLARITE_ANNUELLE', 'PENSION ATTENDUE', 'TUITION'])) || 0;
+          const tuitionPaid = parseFloat(getVal(['PENSION PAYEE'])) || 0;
+          
+          const t1 = parseFloat(getVal(['TRANCHE_1', 'TRANCHE 1'])) || 0;
+          const t2 = parseFloat(getVal(['TRANCHE_2', 'TRANCHE 2'])) || 0;
+          const t3 = parseFloat(getVal(['TRANCHE_3', 'TRANCHE 3'])) || 0;
 
           newStudents.push({
             id: crypto.randomUUID(),
@@ -478,20 +491,37 @@ const Students: React.FC = () => {
             dob: getVal(['DATE DE NAISSANCE', 'DATE', 'DOB']),
             section: finalSection || importSection,
             classId: classId,
-            parentName: getVal(['TUTEUR', 'PARENT', 'NOMS DES PARENTS']) || 'Inconnu',
-            parentPhone: getVal(['CONTACT', 'TÉLÉPHONE', 'TELEPHONE', 'TEL']) || '',
-            address: getVal(['ADRESSE', 'QUARTIER']) || '',
-            feeT1: 0, feeT2: 0, feeT3: 0, feeTransport: 0, feeUniforms: 0,
+            parentName: getVal(['TUTEUR', 'PARENT', 'NOMS DES PARENTS', 'NOM_PARENT']) || 'Inconnu',
+            parentPhone: normalizedPhone || '',
+            address: getVal(['ADRESSE', 'QUARTIER', 'ADRESSE_PARENT']) || '',
+            
+            // Paramètres financiers enrichis
+            registrationFeeExpected: regExpected,
+            registrationFeePaid: regPaid,
+            registrationFeeStatus: regPaid >= regExpected ? 'paid' : (regPaid > 0 ? 'partial' : 'unpaid'),
+            
+            tuitionExpected: tuitionExpected || (t1 + t2 + t3),
+            tuitionPaid: tuitionPaid,
+            tuitionStatus: tuitionPaid >= (tuitionExpected || (t1 + t2 + t3)) ? 'paid' : (tuitionPaid > 0 ? 'partial' : 'unpaid'),
+            
+            feeT1: t1,
+            feeT2: t2,
+            feeT3: t3,
+            feeTransport: parseFloat(getVal(['TRANSPORT'])) || 0,
+            feeUniforms: parseFloat(getVal(['TENUE_GRATUITE'])) || 0,
+            
             rawClassName: classeNameRaw,
             detectedClassName: detectedClassName,
             parentEmails: normalizedEmails
           });
         }
 
-        if (newStudents.length === 0) {
-          alert("Aucun élève valide trouvé dans le fichier.");
-          return;
-        }
+        setImportReport({
+          totalRead: rawRows.length - (headerRowIndex + 1),
+          readyCount: newStudents.length,
+          duplicates: duplicateCount,
+          errors: errorsLog
+        });
 
         setPreviewStudents(newStudents);
       } catch (err) {
@@ -511,15 +541,12 @@ const Students: React.FC = () => {
         return;
       }
 
-      const hasUnrecognizedClasses = previewStudents.some(s => !s.classId);
-      if (hasUnrecognizedClasses) {
-        const confirm = window.confirm("Attention : Certaines classes n'ont pas été reconnues et seront enregistrées comme 'À définir'. Voulez-vous quand même continuer l'importation ?");
-        if (!confirm) return;
-      }
       safeMergeDB({ ...db, students: [...db.students, ...previewStudents] });
       setPreviewStudents(null);
+      setImportReport(null);
       setImportModalOpen(false);
       setExcelFile(null);
+      alert("Importation finalisée avec succès !");
     }
   };
 
@@ -1008,12 +1035,64 @@ const Students: React.FC = () => {
       </Modal>
 
       {/* Excel Import Modal */}
-      <Modal isOpen={isImportModalOpen} onClose={() => {setImportModalOpen(false); setPreviewStudents(null);}} title="Importation d'élèves depuis Excel">
+      <Modal isOpen={isImportModalOpen} onClose={() => {setImportModalOpen(false); setPreviewStudents(null); setImportReport(null);}} title="Importation d'élèves depuis Excel">
         {!previewStudents ? (
           <form onSubmit={handleImportSubmit}>
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#eef2ff', borderRadius: '4px', border: '1px solid var(--primary-color)' }}>
-              <p style={{ margin: '0 0 1rem 0', fontWeight: 500 }}>Étape 1 : Format de votre fichier Excel (.xlsx ou .xls)</p>
-              <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Assurez-vous d'avoir les colonnes suivantes : <strong>Nom, Prénom, Classe, Matricule</strong>.</p>
+              <p style={{ margin: '0 0 0.5rem 0', fontWeight: 500 }}>Étape 1 : Format de votre fichier Excel (.xlsx)</p>
+              <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                Pour garantir la compatibilité, téléchargez notre modèle standardisé contenant les barèmes et la liste des classes autorisées.
+              </p>
+              <button type="button" onClick={() => {
+                const wsDataEleves = [
+                  [
+                    'matricule', 'nom', 'prenom', 'sexe', 'date_naissance', 'section', 'classe', 'cycle', 'annee_scolaire', 'statut_eleve', 'nom_parent', 'telephone_parent', 'quartier',
+                    'inscription_attendue', 'inscription_payee', 'scolarite_annuelle', 'tranche_1', 'tranche_2', 'tranche_3', 'transport', 'transport_mensuel', 'tenue_gratuite',
+                    'adresse', 'ancien_etablissement', 'redoublant', 'contact_urgence', 'allergies', 'probleme_medical', 'observations'
+                  ],
+                  [
+                    'MAT-001', 'Dupont', 'Jean', 'M', '15/05/2015', 'francophone', 'CM2', 'primary', '2026-2027', 'nouveau', 'Paul Dupont', '650336558', 'Bastos',
+                    15000, 15000, 90000, 50000, 40000, 0, 0, 0, 0,
+                    'Bastos', 'Ecole Alpha', 'Non', '699887766', 'Aucune', 'Aucun', 'Excellent élève'
+                  ],
+                  [
+                    'MAT-002', 'Smith', 'Jane', 'F', '20/10/2016', 'anglophone', 'Class 1', 'primary', '2026-2027', 'ancien', 'John Smith', '677889900', 'Bonamoussadi',
+                    15000, 0, 85000, 40000, 30000, 15000, 0, 0, 0,
+                    'Bonamoussadi', '', 'Non', '', '', '', ''
+                  ]
+                ];
+                
+                const activeClasses = db.classes.filter(c => c.isActive !== false);
+                const wsDataClasses = [
+                  ['nom', 'section', 'cycle', 'educationType', 'levelOrder'],
+                  ...activeClasses.map(c => [c.name, c.type, c.cycle || '', c.educationType || '', c.levelOrder || ''])
+                ];
+
+                const wsDataBareme = [
+                  ['section', 'classe', 'inscription_attendue', 'scolarite_annuelle', 'tranche_1', 'tranche_2', 'tranche_3', 'transport_mensuel'],
+                  ['anglophone', 'Pre-Nursery', 15000, 130000, 60000, 40000, 20000, 0],
+                  ['anglophone', 'Nursery 1', 15000, 115000, 50000, 40000, 25000, 0],
+                  ['anglophone', 'Class 1', 15000, 85000, 40000, 30000, 15000, 0],
+                  ['anglophone', 'Class 6', 15000, 90000, 50000, 40000, 0, 0],
+                  ['francophone', 'SIL', 15000, 85000, 40000, 30000, 15000, 0],
+                  ['francophone', 'CM2', 15000, 90000, 50000, 40000, 0, 0],
+                  ['francophone', '6ème', 15000, 115000, 50000, 40000, 25000, 0],
+                  ['francophone', '5ème', 15000, 120000, 55000, 40000, 25000, 0]
+                ];
+
+                const wb = XLSX.utils.book_new();
+                const wsEleves = XLSX.utils.aoa_to_sheet(wsDataEleves);
+                const wsClasses = XLSX.utils.aoa_to_sheet(wsDataClasses);
+                const wsBareme = XLSX.utils.aoa_to_sheet(wsDataBareme);
+                
+                XLSX.utils.book_append_sheet(wb, wsEleves, 'Eleves');
+                XLSX.utils.book_append_sheet(wb, wsClasses, 'Classes_Autorisees');
+                XLSX.utils.book_append_sheet(wb, wsBareme, 'Bareme_Frais');
+                
+                XLSX.writeFile(wb, 'Modele_Import_Eleves.xlsx');
+              }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary-color)', fontSize: '0.85rem' }}>
+                📥 Télécharger le modèle d'import élèves (.xlsx)
+              </button>
             </div>
 
             <p style={{ margin: '0 0 1rem 0', fontWeight: 500 }}>Étape 2 : Chargement dans la base de données</p>
@@ -1025,22 +1104,6 @@ const Students: React.FC = () => {
                   <option value="anglophone">Anglophone</option>
                 </select>
               </div>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-               <button type="button" onClick={() => {
-                 import('../db/storage').then(({ defaultDB }) => {
-                   const missing = defaultDB.classes.filter(defCls => !db.classes.some(c => c.id === defCls.id));
-                   if (missing.length > 0) {
-                     safeMergeDB({ ...db, classes: [...db.classes, ...missing] });
-                     alert(`${missing.length} classes manquantes ont été injectées avec succès !`);
-                   } else {
-                     alert("Toutes les classes sont déjà présentes.");
-                   }
-                 });
-               }} style={{ background: 'var(--success)', padding: '0.5rem', width: '100%', marginBottom: '1rem' }}>
-                 🛠️ Cliquez ici pour réparer les classes manquantes (Pre-Nursery, etc.)
-               </button>
             </div>
 
             <div className="form-group">
@@ -1055,13 +1118,29 @@ const Students: React.FC = () => {
           </form>
         ) : (
           <div>
-            <div style={{ marginBottom: '1rem', padding: '1rem', background: '#dcfce7', borderRadius: '4px', border: '1px solid var(--success)', color: 'var(--success)' }}>
-              <p style={{ margin: 0, fontWeight: 500 }}>
-                Aperçu : {previewStudents.length} élèves trouvés. Veuillez vérifier les données.
-              </p>
-            </div>
+            {importReport && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-color)' }}>Rapport de Validation de l'Import</h4>
+                <ul style={{ listStyleType: 'disc', paddingLeft: '1.5rem', margin: 0 }}>
+                  <li>Lignes lues dans le fichier : <strong>{importReport.totalRead}</strong></li>
+                  <li style={{ color: 'var(--success)' }}>Élèves valides prêts à importer : <strong>{importReport.readyCount}</strong></li>
+                  {importReport.duplicates > 0 && <li style={{ color: '#d97706' }}>Doublons ignorés : <strong>{importReport.duplicates}</strong></li>}
+                </ul>
+
+                {importReport.errors.length > 0 && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--danger)' }}>Alertes et Rejets :</h5>
+                    <div style={{ maxHeight: '120px', overflowY: 'auto', background: '#fffefc', padding: '0.5rem', border: '1px solid #fee2e2', borderRadius: '4px', color: '#b91c1c', fontSize: '0.85rem' }}>
+                      {importReport.errors.map((err, idx) => (
+                        <div key={idx} style={{ marginBottom: '0.25rem' }}>⚠️ {err}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             
-            <div style={{ maxHeight: '350px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+            <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                 <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0 }}>
                   <tr>
@@ -1069,7 +1148,7 @@ const Students: React.FC = () => {
                     <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>Nom complet</th>
                     <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>Classe Excel (Brute)</th>
                     <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>Classe Détectée</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>Section</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>Pension Attendue</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1089,16 +1168,8 @@ const Students: React.FC = () => {
                             <span style={{color: 'var(--danger)', fontWeight: 500}}>À définir</span>
                           )}
                         </td>
-                        <td style={{ padding: '0.5rem' }}>
-                          <span style={{ 
-                            padding: '0.2rem 0.5rem', 
-                            background: s.section === 'anglophone' ? '#e0f2fe' : '#fce7f3', 
-                            color: s.section === 'anglophone' ? '#0369a1' : '#be185d',
-                            borderRadius: '999px',
-                            fontSize: '0.8rem'
-                          }}>
-                            {s.section || 'À définir'}
-                          </span>
+                        <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>
+                          {(s.tuitionExpected || 0).toLocaleString('fr-FR')} FCFA
                         </td>
                       </tr>
                     );
@@ -1106,10 +1177,10 @@ const Students: React.FC = () => {
                 </tbody>
               </table>
             </div>
-
+            
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-              <button type="button" className="secondary" onClick={() => setPreviewStudents(null)}>Retour</button>
-              <button type="button" onClick={handleConfirmImport} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>Confirmer l'importation</button>
+              <button type="button" className="secondary" onClick={() => { setPreviewStudents(null); setImportReport(null); }}>Retour</button>
+              <button type="button" onClick={handleConfirmImport} disabled={previewStudents.length === 0} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>Confirmer l'importation</button>
             </div>
           </div>
         )}
