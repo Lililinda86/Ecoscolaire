@@ -27,22 +27,79 @@ const Classes: React.FC = () => {
 
   return (
     <div className="page-container">
-       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <h1>{t('classes', 'Classes & Vue d\'ensemble')}</h1>
-         <button onClick={() => {
-           import('../db/storage').then(({ defaultDB }) => {
-             const missing = defaultDB.classes.filter(defCls => !db.classes.some(c => c.id === defCls.id));
-             if (missing.length > 0) {
-               safeMergeDB({ ...db, classes: [...db.classes, ...missing] });
-               alert(`${missing.length} classes manquantes (ex: Pre-Nursery) ont été rajoutées avec succès !`);
-             } else {
-               alert("Toutes les classes de base sont déjà présentes.");
-             }
-           });
-         }} style={{ background: 'var(--success)', fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
-           Réparer les classes manquantes
-         </button>
-       </div>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1>{t('classes', 'Classes & Vue d\'ensemble')}</h1>
+          <button onClick={() => {
+            import('../constants/defaultClasses').then(({ DEFAULT_CLASS_LEVELS }) => {
+              const currentSchool = db.school;
+              const isItalo = currentSchool?.name?.toLowerCase().includes('italo');
+              
+              const newClasses = DEFAULT_CLASS_LEVELS.map(defCls => {
+                const legacyMapping: Record<string, string> = {
+                  'Pré-maternelle': 'franco-pre-maternelle',
+                  'Maternelle 1': 'franco-maternelle-1',
+                  'Maternelle 2': 'franco-maternelle-2',
+                  'Maternelle 3': 'franco-maternelle-3',
+                  'SIL': 'franco-sil',
+                  'CP': 'franco-cp',
+                  'CE1': 'franco-ce1',
+                  'CE2': 'franco-ce2',
+                  'CM1': 'franco-cm1',
+                  'CM2': 'franco-cm2',
+                  '6ème': 'franco-6e',
+                  '5ème': 'franco-5e',
+                  'Pre-Nursery': 'anglo-pre-nursery',
+                  'Nursery 1': 'anglo-nursery-1',
+                  'Nursery 2': 'anglo-nursery-2',
+                  'Nursery 3': 'anglo-nursery-3',
+                  'Class 1': 'anglo-class-1',
+                  'Class 2': 'anglo-class-2',
+                  'Class 3': 'anglo-class-3',
+                  'Class 4': 'anglo-class-4',
+                  'Class 5': 'anglo-class-5',
+                  'Class 6': 'anglo-class-6',
+                  'Form 1': 'anglo-form-1',
+                  'Form 2': 'anglo-form-2'
+                };
+                const mappedId = legacyMapping[defCls.name];
+                
+                // Pour ITALO, seules certaines classes sont actives par défaut
+                const italoActiveClasses = [
+                  'Pré-maternelle', 'Maternelle 1', 'Maternelle 2', 'Maternelle 3',
+                  'SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2', '6ème', '5ème',
+                  'Pre-Nursery', 'Nursery 1', 'Nursery 2', 'Nursery 3',
+                  'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6',
+                  'Form 1', 'Form 2'
+                ];
+                const isActive = isItalo ? italoActiveClasses.includes(defCls.name) : defCls.isActive;
+
+                return {
+                  id: mappedId || defCls.id,
+                  name: defCls.name,
+                  type: defCls.section,
+                  section: defCls.section,
+                  cycle: defCls.cycle,
+                  educationType: defCls.educationType,
+                  levelOrder: defCls.levelOrder,
+                  isDefault: true,
+                  isActive: isActive
+                };
+              });
+
+              // Ajouter uniquement les classes qui n'existent pas encore
+              const toAdd = newClasses.filter(newCls => !db.classes.some(c => c.name.toLowerCase() === newCls.name.toLowerCase() && c.type === newCls.type));
+              
+              if (toAdd.length > 0) {
+                safeMergeDB({ ...db, classes: [...db.classes, ...toAdd] });
+                alert(`${toAdd.length} classes standards du Cameroun ont été initialisées avec succès !`);
+              } else {
+                alert("Toutes les classes du référentiel sont déjà présentes.");
+              }
+            });
+          }} style={{ background: 'var(--success)', fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
+            Initialiser les classes standard
+          </button>
+        </div>
        <div className="card" style={{ marginBottom: '2rem' }}>
          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Sélectionner une classe :</label>
          <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>

@@ -106,6 +106,14 @@ export interface ClassSection {
   subjects?: string[]; // Allowed subjects for this class
   capacity?: number;
   level?: 'maternelle' | 'primaire' | 'secondaire';
+  
+  // Réf. classes prédéfinies
+  section?: SectionType;
+  cycle?: 'preschool' | 'nursery' | 'primary' | 'secondary';
+  educationType?: 'general' | 'technical';
+  levelOrder?: number;
+  isDefault?: boolean;
+  isActive?: boolean;
 }
 
 export interface Subject {
