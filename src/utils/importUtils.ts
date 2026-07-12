@@ -113,3 +113,36 @@ export function normalizeClassName(rawName: string): { matchedName: string; matc
 
   return null;
 }
+
+/**
+ * Retourne le barème de frais standard camerounais/ITALO pour une classe et section données
+ */
+export function getDefaultFeesForClass(className: string, section: 'francophone' | 'anglophone') {
+  // Par défaut
+  const registration = 15000;
+  let tuition = 85000;
+  let t1 = 40000;
+  let t2 = 30000;
+  let t3 = 15000;
+
+  if (section === 'anglophone') {
+    if (className === 'Pre-Nursery') {
+      tuition = 130000; t1 = 60000; t2 = 40000; t3 = 20000;
+    } else if (className.startsWith('Nursery')) {
+      tuition = 115000; t1 = 50000; t2 = 40000; t3 = 25000;
+    } else if (className === 'Class 6') {
+      tuition = 90000; t1 = 50000; t2 = 40000; t3 = 0;
+    }
+  } else {
+    // Francophone
+    if (className === 'CM2') {
+      tuition = 90000; t1 = 50000; t2 = 40000; t3 = 0;
+    } else if (className === '6ème') {
+      tuition = 115000; t1 = 50000; t2 = 40000; t3 = 25000;
+    } else if (className === '5ème') {
+      tuition = 120000; t1 = 55000; t2 = 40000; t3 = 25000;
+    }
+  }
+
+  return { registration, tuition, t1, t2, t3 };
+}

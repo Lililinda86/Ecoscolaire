@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy, MessageSquare } from 'lucide-react';
-import { normalizeCameroonPhoneNumber, normalizeClassName } from '../utils/importUtils';
+import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClass } from '../utils/importUtils';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
@@ -172,7 +172,14 @@ const Students: React.FC = () => {
     setIsSaving(true);
     try {
       const normalizedEmails = normalizeParentEmails(parentEmailsInput);
-      const finalStudent = { ...currentStudent, parentEmails: normalizedEmails } as Student;
+      const parentPhone = currentStudent.parentPhone ? (normalizeCameroonPhoneNumber(currentStudent.parentPhone) || currentStudent.parentPhone) : '';
+      const matricule = currentStudent.matricule ? currentStudent.matricule.trim() : `MAT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const finalStudent = { 
+        ...currentStudent, 
+        parentEmails: normalizedEmails,
+        parentPhone,
+        matricule
+      } as Student;
       if (!finalStudent.schoolId && currentSchool) {
         finalStudent.schoolId = currentSchool.id;
       }
@@ -821,75 +828,119 @@ const Students: React.FC = () => {
 
       <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title={isEditing ? t('edit', 'Modifier') : t('add', 'Ajouter')}>
         <form onSubmit={handleSave}>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Matricule</label>
-              <input value={currentStudent.matricule || ''} onChange={e => setCurrentStudent({...currentStudent, matricule: e.target.value})} placeholder="Ex: MAT-001" />
+          {/* Section 1 : Informations Personnelles */}
+          <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>👤 1. Informations Personnelles</h4>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Matricule</label>
+                <input value={currentStudent.matricule || ''} onChange={e => setCurrentStudent({...currentStudent, matricule: e.target.value})} placeholder="Ex: MAT-001" />
+              </div>
+              <div className="form-group" style={{ flex: 2 }}>
+                <label>{t('name', 'Nom')}</label>
+                <input required value={currentStudent.name || ''} onChange={e => setCurrentStudent({...currentStudent, name: e.target.value})} placeholder="Ex: Dupont Jean" />
+              </div>
             </div>
-            <div className="form-group" style={{ flex: 2 }}>
-              <label>{t('name', 'Nom complet')}</label>
-              <input required value={currentStudent.name || ''} onChange={e => setCurrentStudent({...currentStudent, name: e.target.value})} />
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Sexe</label>
+                <select value={currentStudent.gender} onChange={e => setCurrentStudent({...currentStudent, gender: e.target.value as 'M'|'F'})}>
+                  <option value="M">Masculin</option>
+                  <option value="F">Féminin</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Date de Naissance</label>
+                <input type="date" required value={currentStudent.dob || ''} onChange={e => setCurrentStudent({...currentStudent, dob: e.target.value})} />
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Sexe</label>
-              <select value={currentStudent.gender} onChange={e => setCurrentStudent({...currentStudent, gender: e.target.value as 'M'|'F'})}>
-                <option value="M">Masculin</option>
-                <option value="F">Féminin</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Date de Naissance</label>
-              <input type="date" required value={currentStudent.dob || ''} onChange={e => setCurrentStudent({...currentStudent, dob: e.target.value})} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>{t('section', 'Section')}</label>
-              <select 
-                value={currentStudent.section} 
-                onChange={e => setCurrentStudent({...currentStudent, section: e.target.value as SectionType, classId: ''})}
-              >
-                <option value="francophone">Francophone</option>
-                <option value="anglophone">Anglophone</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Classe</label>
-              <select 
-                required
-                value={currentStudent.classId || ''} 
-                onChange={e => setCurrentStudent({...currentStudent, classId: e.target.value})}
-              >
-                <option value="">-- Choisir une classe --</option>
+
+          {/* Section 2 : Inscription Scolaire & Tarifs */}
+          <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>🏫 2. Classe & Frais de Scolarité</h4>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>{t('section', 'Section')}</label>
+                <select 
+                  value={currentStudent.section} 
+                  onChange={e => {
+                    const newSection = e.target.value as SectionType;
+                    setCurrentStudent(prev => ({ 
+                      ...prev, 
+                      section: newSection, 
+                      classId: '', 
+                      feeT1: 0, 
+                      feeT2: 0, 
+                      feeT3: 0, 
+                      registrationFeeExpected: 15000 
+                    }));
+                  }}
+                >
+                  <option value="francophone">Francophone</option>
+                  <option value="anglophone">Anglophone</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Classe</label>
+                <select 
+                  required
+                  value={currentStudent.classId || ''} 
+                  onChange={e => {
+                    const cId = e.target.value;
+                    const matchedClass = db.classes.find(c => c.id === cId);
+                    if (matchedClass) {
+                      const fees = getDefaultFeesForClass(matchedClass.name, currentStudent.section || 'francophone');
+                      setCurrentStudent(prev => ({
+                        ...prev,
+                        classId: cId,
+                        feeT1: fees.t1,
+                        feeT2: fees.t2,
+                        feeT3: fees.t3,
+                        registrationFeeExpected: fees.registration,
+                      }));
+                    } else {
+                      setCurrentStudent(prev => ({ ...prev, classId: cId }));
+                    }
+                  }}
+                >
+                  <option value="">-- Choisir une classe --</option>
                   {sortedClasses.filter(c => c.type === currentStudent.section).map(c => (
                     <option key={c.id} value={c.id}>{c.name.replace(/m[èe]re/gi, 'Maternelle')}</option>
                   ))}
-              </select>
+                </select>
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>{t('parent_name', 'Nom du Tuteur / Parent')}</label>
-              <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} />
+
+          {/* Section 3 : Contacts & Parents */}
+          <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>📞 3. Parents / Tuteurs</h4>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>{t('parent_name', 'Nom du Tuteur')}</label>
+                <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} placeholder="Ex: Paul Dupont" />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Contact (Téléphone)</label>
+                <input value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} placeholder="Normalisé automatiquement" />
+              </div>
             </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Emails des parents/tuteurs</label>
-              <input 
-                value={parentEmailsInput} 
-                onChange={e => setParentEmailsInput(e.target.value)} 
-                placeholder="email1@test.com, email2@test.com" 
-              />
-              <small style={{ color: 'var(--text-muted)' }}>Séparés par des virgules. Lie automatiquement l'élève au portail Parent.</small>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Emails des parents (séparés par des virgules)</label>
+                <input 
+                  value={parentEmailsInput} 
+                  onChange={e => setParentEmailsInput(e.target.value)} 
+                  placeholder="parent1@example.com, parent2@example.com" 
+                />
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Contact (Téléphone)</label>
-              <input value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} />
-            </div>
-          </div>
+
+          {/* Section 4 : Frais Annexes & Services */}
+          <div>
+            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>💼 4. Frais Détaillés & Services</h4>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label>Scolarité Tranche 1 (FCFA)</label>
@@ -1026,6 +1077,7 @@ const Students: React.FC = () => {
                 style={{ width: '100%', borderColor: '#fcd34d' }}
               />
             </div>
+          </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
             <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isSaving}>{t('cancel', 'Annuler')}</button>
