@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { normalizeCameroonPhoneNumber, normalizeClassName } from '../src/utils/importUtils';
+import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClass } from '../src/utils/importUtils';
 
 test.describe('Excel/CSV Import Normalization & Validation Helpers', () => {
   test('PhoneNumber Normalization checks', () => {
@@ -27,5 +27,21 @@ test.describe('Excel/CSV Import Normalization & Validation Helpers', () => {
     const matchForm1 = normalizeClassName('From 1');
     expect(matchForm1?.matchedName).toBe('Form 1');
     expect(matchForm1?.suggestion).toBe('Form 1');
+  });
+
+  test('Secondary vs Primary level registration fees', () => {
+    // Primary/Nursery should be 15000
+    expect(getDefaultFeesForClass('CM2', 'francophone').registration).toBe(15000);
+    expect(getDefaultFeesForClass('Class 6', 'anglophone').registration).toBe(15000);
+    expect(getDefaultFeesForClass('Pre-Nursery', 'anglophone').registration).toBe(15000);
+
+    // Secondary general and technical should be 20000
+    expect(getDefaultFeesForClass('6ème', 'francophone').registration).toBe(20000);
+    expect(getDefaultFeesForClass('5ème', 'francophone').registration).toBe(20000);
+    expect(getDefaultFeesForClass('6ème technique', 'francophone').registration).toBe(20000);
+    expect(getDefaultFeesForClass('Terminale technique', 'francophone').registration).toBe(20000);
+    expect(getDefaultFeesForClass('Form 1', 'anglophone').registration).toBe(20000);
+    expect(getDefaultFeesForClass('Form 2', 'anglophone').registration).toBe(20000);
+    expect(getDefaultFeesForClass('Technical Form 1', 'anglophone').registration).toBe(20000);
   });
 });
