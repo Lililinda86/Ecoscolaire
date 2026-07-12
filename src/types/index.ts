@@ -163,6 +163,32 @@ export interface Student {
   transportFleet?: string;
   transportStatus?: 'none' | 'active' | 'suspended';
   transportPaid?: number;
+
+  // --- Structured student identity ---
+  studentLastName?: string;
+  studentFirstName?: string;
+
+  // --- Structured parents / guardians ---
+  motherLastName?: string;
+  motherFirstName?: string;
+  motherPhone?: string;
+  motherEmail?: string;
+  motherWhatsapp?: boolean;
+
+  fatherLastName?: string;
+  fatherFirstName?: string;
+  fatherPhone?: string;
+  fatherEmail?: string;
+  fatherWhatsapp?: boolean;
+
+  guardianLastName?: string;
+  guardianFirstName?: string;
+  guardianPhone?: string;
+  guardianEmail?: string;
+  guardianWhatsapp?: boolean;
+  guardianRelation?: string;
+
+  primaryContactType?: "mother" | "father" | "guardian";
 }
 
 export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
