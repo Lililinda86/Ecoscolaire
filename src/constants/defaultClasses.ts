@@ -11,10 +11,10 @@ export interface DefaultClass {
 
 export const DEFAULT_CLASS_LEVELS: DefaultClass[] = [
   // SECTION FRANCOPHONE - MATERNELLE (Preschool/Nursery)
-  { id: 'fr-pre-maternelle', name: 'Pré-maternelle', section: 'francophone', cycle: 'preschool', educationType: 'general', levelOrder: 1, isDefault: true, isActive: true },
-  { id: 'fr-maternelle-1', name: 'Maternelle 1', section: 'francophone', cycle: 'preschool', educationType: 'general', levelOrder: 2, isDefault: true, isActive: true },
-  { id: 'fr-maternelle-2', name: 'Maternelle 2', section: 'francophone', cycle: 'preschool', educationType: 'general', levelOrder: 3, isDefault: true, isActive: true },
-  { id: 'fr-maternelle-3', name: 'Maternelle 3', section: 'francophone', cycle: 'preschool', educationType: 'general', levelOrder: 4, isDefault: true, isActive: true },
+  { id: 'fr-pre-maternelle', name: 'Pré-maternelle', section: 'francophone', cycle: 'nursery', educationType: 'general', levelOrder: 1, isDefault: true, isActive: true },
+  { id: 'fr-maternelle-1', name: 'Maternelle 1', section: 'francophone', cycle: 'nursery', educationType: 'general', levelOrder: 2, isDefault: true, isActive: true },
+  { id: 'fr-maternelle-2', name: 'Maternelle 2', section: 'francophone', cycle: 'nursery', educationType: 'general', levelOrder: 3, isDefault: true, isActive: true },
+  { id: 'fr-maternelle-3', name: 'Maternelle 3', section: 'francophone', cycle: 'nursery', educationType: 'general', levelOrder: 4, isDefault: true, isActive: true },
 
   // SECTION FRANCOPHONE - PRIMAIRE
   { id: 'fr-sil', name: 'SIL', section: 'francophone', cycle: 'primary', educationType: 'general', levelOrder: 5, isDefault: true, isActive: true },
