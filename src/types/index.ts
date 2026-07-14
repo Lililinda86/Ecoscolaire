@@ -114,6 +114,17 @@ export interface ClassSection {
   levelOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;
+
+  catalogLevelId?: string; // identifiant du niveau dans DEFAULT_CLASS_LEVELS
+  specialtyId?: string; // identifiant de la spécialité technique configurée par l'école
+}
+
+export interface TechnicalSpecialty {
+  id: string;
+  name: string;
+  code?: string;
+  isActive: boolean;
+  displayOrder?: number;
 }
 
 export interface Subject {
