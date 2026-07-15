@@ -104,7 +104,7 @@ const Classes: React.FC = () => {
          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Sélectionner une classe :</label>
          <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
             <option value="">-- Choisir --</option>
-            {sortClasses(db.classes).map(c => <option key={c.id} value={c.id}>{c.name} ({c.type})</option>)}
+            {sortClasses(db.classes.filter(c => c.isActive !== false)).map(c => <option key={c.id} value={c.id}>{c.name} ({c.type})</option>)}
          </select>
        </div>
        {currentClass && (
@@ -148,7 +148,7 @@ const Classes: React.FC = () => {
                            onChange={e => handleChangeClass(s.id, e.target.value)}
                            style={{ padding: '0.25rem', fontSize: '0.85rem' }}
                          >
-                           {sortClasses(db.classes).filter(c => c.type === s.section).map(c => (
+                           {sortClasses(db.classes.filter(c => c.isActive !== false)).filter(c => c.type === s.section).map(c => (
                              <option key={c.id} value={c.id}>{c.name}</option>
                            ))}
                          </select>
