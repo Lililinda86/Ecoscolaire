@@ -281,6 +281,26 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
     }
+    match /technicalSpecialties/{specialtyId} {
+      allow read: if isAuthenticated()
+        && isActive()
+        && hasSchoolAccess(resource.data.schoolId);
+
+      allow create: if isAuthenticated()
+        && isActive()
+        && request.resource.data.schoolId is string
+        && canManagePedagogy(request.resource.data.schoolId);
+
+      allow update: if isAuthenticated()
+        && isActive()
+        && request.resource.data.schoolId is string
+        && request.resource.data.schoolId == resource.data.schoolId
+        && canManagePedagogy(resource.data.schoolId);
+
+      allow delete: if isAuthenticated()
+        && isActive()
+        && canManagePedagogy(resource.data.schoolId);
+    }
 
     // --- STUDENT IMPORT JOBS ---
     match /student_import_jobs/{jobId} {

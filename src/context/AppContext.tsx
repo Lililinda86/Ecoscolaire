@@ -186,7 +186,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const collectionsToFetch: (keyof Database)[] = [
           'classes', 'students', 'staff', 'buses', 'inventory', 
           'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
-          'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
+          'subjects', 'technicalSpecialties', 'busRoutes', 'fuelExpenses', 'maintenances',
           'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts'
         ];
 
@@ -435,7 +435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const collections = [
         'schools', 'users', 'classes', 'students', 'staff', 'buses', 
         'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
-        'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
+        'subjects', 'technicalSpecialties', 'busRoutes', 'fuelExpenses', 'maintenances',
         'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'transactions'
       ] as const;
       

@@ -1,6 +1,6 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import fs from 'fs';
-import { setDoc, updateDoc, doc } from 'firebase/firestore';
+import { setDoc, updateDoc, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { test } from '@playwright/test';
 const { describe, beforeAll: before, beforeEach, afterAll: after } = test;
 const it = test;
@@ -138,6 +138,125 @@ describe('SaaS Fields Security Rules', () => {
     });
     const context = testEnv.authenticatedContext('sa-uid');
     await assertSucceeds(updateDoc(doc(context.firestore(), 'users', 'teacher-uid'), { role: 'director' }));
+  });
+
+});
+
+describe('Technical Specialties Security Rules', () => {
+  const SCHOOL_A_ID = 'school-A';
+  const SCHOOL_B_ID = 'school-B';
+
+  it('Lecture autorisée pour un utilisateur actif de la même école', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { schoolId: SCHOOL_A_ID, name: "Électricité", code: "ELEC", isActive: true });
+      await setDoc(doc(context.firestore(), 'users', 'user-A'), { role: 'teacher', schoolId: SCHOOL_A_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('user-A');
+    await assertSucceeds(
+      getDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'))
+    );
+  });
+
+  it('Lecture refusée pour un utilisateur rattaché à une autre école', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { schoolId: SCHOOL_A_ID, name: "Électricité", code: "ELEC", isActive: true });
+      await setDoc(doc(context.firestore(), 'users', 'user-B'), { role: 'teacher', schoolId: SCHOOL_B_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('user-B');
+    await assertFails(
+      getDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'))
+    );
+  });
+
+  it('Création autorisée pour un rôle canManagePedagogy dans sa propre école', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'users', 'owner-A'), { role: 'owner', schoolId: SCHOOL_A_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('owner-A');
+    await assertSucceeds(
+      setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-new'), {
+        schoolId: SCHOOL_A_ID,
+        name: "Électricité",
+        code: "ELEC",
+        isActive: true,
+        displayOrder: 1
+      })
+    );
+  });
+
+  it('Création refusée lorsque schoolId est absent', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'users', 'owner-A'), { role: 'owner', schoolId: SCHOOL_A_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('owner-A');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-new'), {
+        name: "Électricité",
+        code: "ELEC",
+        isActive: true,
+        displayOrder: 1
+      })
+    );
+  });
+
+  it('Création refusée pour une autre école', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'users', 'owner-A'), { role: 'owner', schoolId: SCHOOL_A_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('owner-A');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-new'), {
+        schoolId: SCHOOL_B_ID,
+        name: "Électricité",
+        code: "ELEC",
+        isActive: true,
+        displayOrder: 1
+      })
+    );
+  });
+
+  it('Mise à jour autorisée si schoolId inchangé', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { schoolId: SCHOOL_A_ID, name: "Électricité", code: "ELEC", isActive: true });
+      await setDoc(doc(context.firestore(), 'users', 'owner-A'), { role: 'owner', schoolId: SCHOOL_A_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('owner-A');
+    await assertSucceeds(
+      updateDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { name: "Nouveau Nom", schoolId: SCHOOL_A_ID })
+    );
+  });
+
+  it('Mise à jour refusée si schoolId modifié', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { schoolId: SCHOOL_A_ID, name: "Électricité", code: "ELEC", isActive: true });
+      await setDoc(doc(context.firestore(), 'users', 'owner-A'), { role: 'owner', schoolId: SCHOOL_A_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('owner-A');
+    await assertFails(
+      updateDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { name: "Nouveau Nom", schoolId: SCHOOL_B_ID })
+    );
+  });
+
+  it('Suppression autorisée pour canManagePedagogy dans la même école', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { schoolId: SCHOOL_A_ID, name: "Électricité", code: "ELEC", isActive: true });
+      await setDoc(doc(context.firestore(), 'users', 'owner-A'), { role: 'owner', schoolId: SCHOOL_A_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('owner-A');
+    await assertSucceeds(
+      deleteDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'))
+    );
+  });
+
+  it('Suppression refusée pour une autre école', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { schoolId: SCHOOL_A_ID, name: "Électricité", code: "ELEC", isActive: true });
+      await setDoc(doc(context.firestore(), 'users', 'owner-B'), { role: 'owner', schoolId: SCHOOL_B_ID, active: true });
+    });
+    const context = testEnv.authenticatedContext('owner-B');
+    await assertFails(
+      deleteDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'))
+    );
   });
 
 });

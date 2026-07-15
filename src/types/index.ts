@@ -121,6 +121,7 @@ export interface ClassSection {
 
 export interface TechnicalSpecialty {
   id: string;
+  schoolId?: string;
   name: string;
   code?: string;
   isActive: boolean;

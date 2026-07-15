@@ -18,7 +18,8 @@ import type {
   InventoryTransaction,
   User,
   ValidationRequest,
-  Notification
+  Notification,
+  TechnicalSpecialty
 } from '../types';
 
 export interface Database {
@@ -35,6 +36,7 @@ export interface Database {
   staff: Staff[];
   classes: ClassSection[];
   subjects: Subject[];
+  technicalSpecialties: TechnicalSpecialty[];
   attendance: Attendance[];
   staffAttendance: StaffAttendance[];
   grades: Grade[];
@@ -134,6 +136,7 @@ const initialDB: Database = {
     { id: 'history', name: 'Histoire-Géo' },
     { id: 'science', name: 'Sciences' }
   ],
+  technicalSpecialties: [],
   attendance: [],
   staffAttendance: [],
   grades: [],
