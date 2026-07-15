@@ -13,7 +13,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   };
 
   return (
-    <div className="app-layout" style={{ position: 'relative' }}>
+    <div className="app-container" style={{ position: 'relative' }}>
       {isSupervising && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000, background: '#ef4444', color: 'white', padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 'bold' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
