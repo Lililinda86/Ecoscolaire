@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Edit2, Trash2, BookOpen } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
+import type { School } from '../types';
 
 const Settings: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
@@ -13,6 +14,63 @@ const Settings: React.FC = () => {
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
   const [currentClassId, setCurrentClassId] = useState('');
   const [campaySecretInput, setCampaySecretInput] = useState('');
+
+  // Draft state variables for batch updates
+  const [draftName, setDraftName] = useState('');
+  const [draftAcademicYear, setDraftAcademicYear] = useState('');
+  const [draftDirectorName, setDraftDirectorName] = useState('');
+  const [draftAccreditationNumber, setDraftAccreditationNumber] = useState('');
+  const [draftPhone, setDraftPhone] = useState('');
+  const [draftEmail, setDraftEmail] = useState('');
+  const [draftAddress, setDraftAddress] = useState('');
+  // 1. PIN security: draft initialized to empty string and never exposed or logged.
+  const [draftAdminPin, setDraftAdminPin] = useState('');
+  // 2. Draft fees stored as strings to capture exact raw user typing.
+  const [draftFees, setDraftFees] = useState({
+    feeT1: '0',
+    feeT2: '0',
+    feeT3: '0',
+    feeTransport: '0',
+    feeUniforms: '0'
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 3. Draft initialization strategy: Keep track of initialized school id via ref to avoid overwriting modified drafts on contextual reload of db.school.
+  const initializedSchoolIdRef = useRef<string | null>(null);
+
+  const initDraftsFromSchool = useCallback(
+    (school: School) => {
+      setDraftName(school.name || '');
+      setDraftAcademicYear(school.academicYear || '');
+      setDraftDirectorName(school.directorName || '');
+      setDraftAccreditationNumber(school.accreditationNumber || '');
+      setDraftPhone(school.phone || '');
+      setDraftEmail(school.email || '');
+      setDraftAddress(school.address || '');
+      setDraftAdminPin(''); // PIN input is always blank initially
+      setDraftFees({
+        feeT1: String(school.globalFees?.feeT1 ?? 0),
+        feeT2: String(school.globalFees?.feeT2 ?? 0),
+        feeT3: String(school.globalFees?.feeT3 ?? 0),
+        feeTransport: String(school.globalFees?.feeTransport ?? 0),
+        feeUniforms: String(school.globalFees?.feeUniforms ?? 0)
+      });
+      initializedSchoolIdRef.current = school.id;
+    },
+    []
+  );
+
+  useEffect(() => {
+    const school = db.school;
+
+    if (!school || initializedSchoolIdRef.current === school.id) {
+      return;
+    }
+
+    initDraftsFromSchool(school);
+    initializedSchoolIdRef.current = school.id;
+  }, [db.school, initDraftsFromSchool]);
 
   if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return null;
 
@@ -34,6 +92,103 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error(error);
       alert("Erreur : Seul le propriétaire ou superAdmin peut modifier les secrets de paiement.");
+    }
+  };
+
+  const normalizeFee = (label: string, rawValue: string): number => {
+    const value = rawValue.trim();
+    if (!/^\d+$/.test(value)) {
+      throw new Error(`${label} doit être un nombre entier positif ou nul.`);
+    }
+    const amount = Number(value);
+    if (!Number.isSafeInteger(amount) || amount < 0) {
+      throw new Error(`${label} est invalide.`);
+    }
+    return amount;
+  };
+
+  const handleSaveChanges = async () => {
+    if (!db.school || isSaving) return;
+
+    // 1. Validation Name
+    const normName = draftName.trim();
+    if (!normName) {
+      alert("Le nom de l'école est obligatoire.");
+      return;
+    }
+
+    // 2. Validation Academic Year (YYYY-YYYY format where year2 = year1 + 1)
+    const yearRegex = /^(\d{4})-(\d{4})$/;
+    const yearMatch = draftAcademicYear.trim().match(yearRegex);
+    if (!yearMatch) {
+      alert("L'année scolaire doit respecter le format YYYY-YYYY (ex: 2026-2027).");
+      return;
+    }
+    const yearStart = parseInt(yearMatch[1], 10);
+    const yearEnd = parseInt(yearMatch[2], 10);
+    if (yearEnd !== yearStart + 1) {
+      alert("L'année de fin doit être égale à l'année de début + 1 (ex: 2026-2027).");
+      return;
+    }
+
+    // 3. Validation Email
+    const normEmail = draftEmail.trim();
+    if (normEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail)) {
+      alert("Le format de l'adresse email est incorrect.");
+      return;
+    }
+
+    // 4. Validation Fees
+    let normalizedFees;
+    try {
+      normalizedFees = {
+        feeT1: normalizeFee("Scolarité T1", draftFees.feeT1),
+        feeT2: normalizeFee("Scolarité T2", draftFees.feeT2),
+        feeT3: normalizeFee("Scolarité T3", draftFees.feeT3),
+        feeTransport: normalizeFee("Transport Bus", draftFees.feeTransport),
+        feeUniforms: normalizeFee("Tenues Uniformes", draftFees.feeUniforms)
+      };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Frais comptables invalides.";
+      alert(errorMsg);
+      return;
+    }
+
+    // 5. PIN Conditional Inclusion
+    const normPin = draftAdminPin.trim();
+
+    setIsSaving(true);
+    try {
+      const updatedSchool = {
+        ...db.school,
+        name: normName,
+        academicYear: draftAcademicYear.trim(),
+        directorName: draftDirectorName.trim(),
+        accreditationNumber: draftAccreditationNumber.trim(),
+        phone: draftPhone.trim(),
+        email: normEmail,
+        address: draftAddress.trim(),
+        ...(normPin ? { adminPin: normPin } : {}),
+        globalFees: {
+          ...(db.school.globalFees || {}),
+          feeT1: normalizedFees.feeT1,
+          feeT2: normalizedFees.feeT2,
+          feeT3: normalizedFees.feeT3,
+          feeTransport: normalizedFees.feeTransport,
+          feeUniforms: normalizedFees.feeUniforms
+        }
+      };
+      await safeMergeDB({
+        ...db,
+        school: updatedSchool
+      });
+      alert("Paramètres enregistrés avec succès.");
+      initDraftsFromSchool(updatedSchool);
+    } catch (err) {
+      console.error(err);
+      alert("Une erreur est survenue lors de l'enregistrement.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -171,8 +326,16 @@ const Settings: React.FC = () => {
 
   return (
     <div className="page-container">
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>Paramètres</h1>
+        <button
+          type="button"
+          onClick={handleSaveChanges}
+          disabled={isSaving}
+          style={{ background: 'var(--primary-color)', color: 'white', padding: '0.6rem 1.5rem', fontWeight: 600 }}
+        >
+          {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+        </button>
       </div>
 
       <div className="card" style={{ marginBottom: '2rem' }}>
@@ -180,17 +343,17 @@ const Settings: React.FC = () => {
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div style={{ flex: 1 }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nom de l'école</label>
-            <input 
-              value={db.school?.name || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), name: e.target.value } })}
+            <input
+              value={draftName}
+              onChange={e => setDraftName(e.target.value)}
               style={{ width: '100%' }}
             />
           </div>
           <div style={{ flex: 1 }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Année Scolaire</label>
-            <input 
-              value={db.school?.academicYear || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), academicYear: e.target.value } })}
+            <input
+              value={draftAcademicYear}
+              onChange={e => setDraftAcademicYear(e.target.value)}
               style={{ width: '100%' }}
               placeholder="2026-2027"
             />
@@ -200,18 +363,18 @@ const Settings: React.FC = () => {
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Directeur / Fondateur</label>
-            <input 
-              value={db.school?.directorName || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), directorName: e.target.value } })}
+            <input
+              value={draftDirectorName}
+              onChange={e => setDraftDirectorName(e.target.value)}
               style={{ width: '100%' }}
               placeholder="Nom du Directeur"
             />
           </div>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Numéro d'Agrément</label>
-            <input 
-              value={db.school?.accreditationNumber || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), accreditationNumber: e.target.value } })}
+            <input
+              value={draftAccreditationNumber}
+              onChange={e => setDraftAccreditationNumber(e.target.value)}
               style={{ width: '100%' }}
               placeholder="Ex: Arrêté N° 123/MINEDUB/..."
             />
@@ -262,19 +425,19 @@ const Settings: React.FC = () => {
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Téléphone Officiel</label>
-            <input 
-              value={db.school?.phone || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), phone: e.target.value } })}
+            <input
+              value={draftPhone}
+              onChange={e => setDraftPhone(e.target.value)}
               style={{ width: '100%' }}
               placeholder="Ex: (+237) 600 00 00 00"
             />
           </div>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Email Officiel</label>
-            <input 
+            <input
               type="email"
-              value={db.school?.email || ''} 
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), email: e.target.value } })}
+              value={draftEmail}
+              onChange={e => setDraftEmail(e.target.value)}
               style={{ width: '100%' }}
               placeholder="Ex: contact@ecole.com"
             />
@@ -283,9 +446,9 @@ const Settings: React.FC = () => {
 
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Adresse Complète</label>
-          <input 
-            value={db.school?.address || ''} 
-            onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), address: e.target.value } })}
+          <input
+            value={draftAddress}
+            onChange={e => setDraftAddress(e.target.value)}
             style={{ width: '100%' }}
             placeholder="Ex: Quartier Bonamoussadi, BP 1234 Douala, Cameroun"
           />
@@ -296,8 +459,11 @@ const Settings: React.FC = () => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nouveau Code PIN Administrateur</label>
             <input 
               type="password"
+              name="new-admin-pin"
+              autoComplete="new-password"
+              value={draftAdminPin}
               placeholder="Entrez un nouveau code pour le modifier..."
-              onChange={e => safeMergeDB({ ...db, school: { ...(db.school as NonNullable<typeof db.school>), adminPin: e.target.value } })}
+              onChange={e => setDraftAdminPin(e.target.value)}
               style={{ width: '100%', borderColor: 'var(--warning)' }}
             />
           </div>
@@ -363,33 +529,53 @@ const Settings: React.FC = () => {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '5px' }}>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Scolarité T1</label>
-                <input type="number" min="0" value={db.school?.globalFees?.feeT1 || 0} onChange={e => {
-                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT1: parseFloat(e.target.value)||0}}});
-                }} />
+                <input
+                  type="text"
+                  value={draftFees.feeT1}
+                  onChange={e => {
+                    setDraftFees(prev => ({ ...prev, feeT1: e.target.value }));
+                  }}
+                />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Scolarité T2</label>
-                <input type="number" min="0" value={db.school?.globalFees?.feeT2 || 0} onChange={e => {
-                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT2: parseFloat(e.target.value)||0}}});
-                }} />
+                <input
+                  type="text"
+                  value={draftFees.feeT2}
+                  onChange={e => {
+                    setDraftFees(prev => ({ ...prev, feeT2: e.target.value }));
+                  }}
+                />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Scolarité T3</label>
-                <input type="number" min="0" value={db.school?.globalFees?.feeT3 || 0} onChange={e => {
-                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeT3: parseFloat(e.target.value)||0}}});
-                }} />
+                <input
+                  type="text"
+                  value={draftFees.feeT3}
+                  onChange={e => {
+                    setDraftFees(prev => ({ ...prev, feeT3: e.target.value }));
+                  }}
+                />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Transport Bus</label>
-                <input type="number" min="0" value={db.school?.globalFees?.feeTransport || 0} onChange={e => {
-                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeTransport: parseFloat(e.target.value)||0}}});
-                }} />
+                <input
+                  type="text"
+                  value={draftFees.feeTransport}
+                  onChange={e => {
+                    setDraftFees(prev => ({ ...prev, feeTransport: e.target.value }));
+                  }}
+                />
              </div>
              <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Tenues Uniformes</label>
-                <input type="number" min="0" value={db.school?.globalFees?.feeUniforms || 0} onChange={e => {
-                   if(db.school) safeMergeDB({...db, school: {...db.school, globalFees: {...(db.school.globalFees||{feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0}), feeUniforms: parseFloat(e.target.value)||0}}});
-                }} />
+                <input
+                  type="text"
+                  value={draftFees.feeUniforms}
+                  onChange={e => {
+                    setDraftFees(prev => ({ ...prev, feeUniforms: e.target.value }));
+                  }}
+                />
              </div>
         </div>
       </div>
