@@ -222,7 +222,7 @@ export async function resumeImportJob(
     try {
       await finalizeRecoveryIfOwner(db, jobRef, sweeperId, 'FAILED', {
         errorType: 'SYSTEM_ERROR',
-        errorMessage: error.message || 'Unknown recovery error'
+        errorMessage: getErrorMessage(error) || 'Unknown recovery error'
       });
       if (quotaReserved) {
         await reconcileImportJobQuota(db, jobId, schoolId);

@@ -122,13 +122,13 @@ export async function reserveStudentImportQuota(
       // It's a business logic failure we explicitly threw
       // We must mark the job as failed, except for JOB_NOT_FOUND (can't update it)
       if (errorCode !== 'JOB_NOT_FOUND' && errorCode !== 'INVALID_JOB_STATUS') {
-        await markImportJobFailedIfCurrent(db, jobId, errorCode, error.message);
+        await markImportJobFailedIfCurrent(db, jobId, errorCode, getErrorMessage(error));
       }
       return { success: false, errorCode, reservedCount: 0 };
     }
 
     // Unhandled / Transaction aborted / Permission denied
-    return { success: false, errorCode: 'TRANSACTION_ERROR', errorMessage: error.message, reservedCount: 0 };
+    return { success: false, errorCode: 'TRANSACTION_ERROR', errorMessage: getErrorMessage(error), reservedCount: 0 };
   }
 }
 
