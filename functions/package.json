@@ -1,7 +1,7 @@
 {
   "name": "ecoscolaire-functions",
   "scripts": {
-    "lint": "eslint --ext .js,.ts .",
+    "lint": "npx --prefix .. --no-install eslint src",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
