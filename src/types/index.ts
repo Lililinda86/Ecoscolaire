@@ -1,6 +1,20 @@
 export type SubscriptionPlan = 'starter' | 'standard' | 'premium' | 'pilot';
 export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired';
 
+export type EducationCycle = 'nursery' | 'primary' | 'secondary';
+
+export interface CycleNames {
+  nursery?: string;
+  primary?: string;
+  secondary?: string;
+}
+
+export interface CycleAccreditationNumbers {
+  nursery?: string;
+  primary?: string;
+  secondary?: string;
+}
+
 export interface School {
   id: string; // schoolId
   schoolCode: string;
@@ -16,6 +30,11 @@ export interface School {
   email?: string;
   directorName?: string;
   accreditationNumber?: string;
+  educationCycles?: EducationCycle[];
+  founderName?: string;
+  principalName?: string;
+  cycleNames?: CycleNames;
+  cycleAccreditationNumbers?: CycleAccreditationNumbers;
   // --- Nouveaux champs SaaS ---
   subscriptionPlan?: SubscriptionPlan;
   subscriptionStatus?: SubscriptionStatus;

@@ -5,7 +5,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
-import type { School } from '../types';
+import type { School, EducationCycle } from '../types';
 
 const Settings: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
@@ -25,6 +25,26 @@ const Settings: React.FC = () => {
   const [draftAddress, setDraftAddress] = useState('');
   // 1. PIN security: draft initialized to empty string and never exposed or logged.
   const [draftAdminPin, setDraftAdminPin] = useState('');
+
+  const [draftEducationCycles, setDraftEducationCycles] = useState<EducationCycle[]>([]);
+  const [draftFounderName, setDraftFounderName] = useState('');
+  const [draftPrincipalName, setDraftPrincipalName] = useState('');
+
+  const [draftCycleNames, setDraftCycleNames] = useState({
+    nursery: '',
+    primary: '',
+    secondary: ''
+  });
+
+  const [
+    draftCycleAccreditationNumbers,
+    setDraftCycleAccreditationNumbers
+  ] = useState({
+    nursery: '',
+    primary: '',
+    secondary: ''
+  });
+
   // 2. Draft fees stored as strings to capture exact raw user typing.
   const [draftFees, setDraftFees] = useState({
     feeT1: '0',
@@ -49,6 +69,19 @@ const Settings: React.FC = () => {
       setDraftEmail(school.email || '');
       setDraftAddress(school.address || '');
       setDraftAdminPin(''); // PIN input is always blank initially
+      setDraftEducationCycles(school.educationCycles ?? []);
+      setDraftFounderName(school.founderName || '');
+      setDraftPrincipalName(school.principalName || '');
+      setDraftCycleNames({
+        nursery: school.cycleNames?.nursery || '',
+        primary: school.cycleNames?.primary || '',
+        secondary: school.cycleNames?.secondary || ''
+      });
+      setDraftCycleAccreditationNumbers({
+        nursery: school.cycleAccreditationNumbers?.nursery || '',
+        primary: school.cycleAccreditationNumbers?.primary || '',
+        secondary: school.cycleAccreditationNumbers?.secondary || ''
+      });
       setDraftFees({
         feeT1: String(school.globalFees?.feeT1 ?? 0),
         feeT2: String(school.globalFees?.feeT2 ?? 0),
@@ -138,7 +171,13 @@ const Settings: React.FC = () => {
       return;
     }
 
-    // 4. Validation Fees
+    // 4. Validation Cycles
+    if (draftEducationCycles.length === 0) {
+      alert("Vous devez sélectionner au moins un cycle scolaire pour l'établissement.");
+      return;
+    }
+
+    // 5. Validation Fees
     let normalizedFees;
     try {
       normalizedFees = {
@@ -154,7 +193,7 @@ const Settings: React.FC = () => {
       return;
     }
 
-    // 5. PIN Conditional Inclusion
+    // 6. PIN Conditional Inclusion
     const normPin = draftAdminPin.trim();
 
     setIsSaving(true);
@@ -168,6 +207,24 @@ const Settings: React.FC = () => {
         phone: draftPhone.trim(),
         email: normEmail,
         address: draftAddress.trim(),
+        educationCycles: [...draftEducationCycles].sort((a, b) => {
+          const order = { nursery: 0, primary: 1, secondary: 2 };
+          return order[a] - order[b];
+        }),
+        founderName: draftFounderName.trim(),
+        principalName: draftPrincipalName.trim(),
+        cycleNames: {
+          ...(db.school.cycleNames ?? {}),
+          nursery: draftCycleNames.nursery.trim(),
+          primary: draftCycleNames.primary.trim(),
+          secondary: draftCycleNames.secondary.trim()
+        },
+        cycleAccreditationNumbers: {
+          ...(db.school.cycleAccreditationNumbers ?? {}),
+          nursery: draftCycleAccreditationNumbers.nursery.trim(),
+          primary: draftCycleAccreditationNumbers.primary.trim(),
+          secondary: draftCycleAccreditationNumbers.secondary.trim()
+        },
         ...(normPin ? { adminPin: normPin } : {}),
         globalFees: {
           ...(db.school.globalFees || {}),
@@ -360,26 +417,182 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Numéro d'Agrément</label>
+          <input
+            value={draftAccreditationNumber}
+            onChange={e => setDraftAccreditationNumber(e.target.value)}
+            style={{ width: '100%' }}
+            placeholder="Ex: Arrêté N° 123/MINEDUB/..."
+          />
+        </div>
+
+        <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
+
+        <h2>Cycles proposés par l'établissement</h2>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+          Les cycles sélectionnés décrivent l’établissement. Les classes sont gérées séparément dans le module Classes.
+        </p>
+        <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={draftEducationCycles.includes('nursery')}
+              onChange={e => {
+                if (e.target.checked) {
+                  setDraftEducationCycles(prev => [...prev, 'nursery']);
+                } else {
+                  setDraftEducationCycles(prev => prev.filter(c => c !== 'nursery'));
+                }
+              }}
+            />
+            Maternelle
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={draftEducationCycles.includes('primary')}
+              onChange={e => {
+                if (e.target.checked) {
+                  setDraftEducationCycles(prev => [...prev, 'primary']);
+                } else {
+                  setDraftEducationCycles(prev => prev.filter(c => c !== 'primary'));
+                }
+              }}
+            />
+            Primaire
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={draftEducationCycles.includes('secondary')}
+              onChange={e => {
+                if (e.target.checked) {
+                  setDraftEducationCycles(prev => [...prev, 'secondary']);
+                } else {
+                  setDraftEducationCycles(prev => prev.filter(c => c !== 'secondary'));
+                }
+              }}
+            />
+            Secondaire
+          </label>
+        </div>
+
+        <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
+
+        <h2>Noms officiels par cycle</h2>
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Directeur / Fondateur</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nom officiel maternelle</label>
+            <input
+              value={draftCycleNames.nursery}
+              onChange={e => setDraftCycleNames(prev => ({ ...prev, nursery: e.target.value }))}
+              style={{ width: '100%' }}
+              placeholder={draftName || "Nom général"}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nom officiel primaire</label>
+            <input
+              value={draftCycleNames.primary}
+              onChange={e => setDraftCycleNames(prev => ({ ...prev, primary: e.target.value }))}
+              style={{ width: '100%' }}
+              placeholder={draftName || "Nom général"}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nom officiel secondaire</label>
+            <input
+              value={draftCycleNames.secondary}
+              onChange={e => setDraftCycleNames(prev => ({ ...prev, secondary: e.target.value }))}
+              style={{ width: '100%' }}
+              placeholder={draftName || "Nom général"}
+            />
+          </div>
+        </div>
+
+        <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
+
+        <h2>Numéros d'agrément par cycle</h2>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Agrément maternelle</label>
+            <input
+              value={draftCycleAccreditationNumbers.nursery}
+              onChange={e => setDraftCycleAccreditationNumbers(prev => ({ ...prev, nursery: e.target.value }))}
+              style={{ width: '100%' }}
+              placeholder={draftAccreditationNumber || "Agrément général"}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Agrément primaire</label>
+            <input
+              value={draftCycleAccreditationNumbers.primary}
+              onChange={e => setDraftCycleAccreditationNumbers(prev => ({ ...prev, primary: e.target.value }))}
+              style={{ width: '100%' }}
+              placeholder={draftAccreditationNumber || "Agrément général"}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Agrément secondaire</label>
+            <input
+              value={draftCycleAccreditationNumbers.secondary}
+              onChange={e => setDraftCycleAccreditationNumbers(prev => ({ ...prev, secondary: e.target.value }))}
+              style={{ width: '100%' }}
+              placeholder={draftAccreditationNumber || "Agrément général"}
+            />
+          </div>
+        </div>
+
+        <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
+
+        <h2>Direction et gouvernance</h2>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Fondateur / Promoteur</label>
+            <input
+              value={draftFounderName}
+              onChange={e => setDraftFounderName(e.target.value)}
+              style={{ width: '100%' }}
+              placeholder="Nom du Fondateur ou Promoteur"
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Directeur maternelle et primaire</label>
             <input
               value={draftDirectorName}
               onChange={e => setDraftDirectorName(e.target.value)}
               style={{ width: '100%' }}
               placeholder="Nom du Directeur"
             />
+            {(draftEducationCycles.includes('nursery') || draftEducationCycles.includes('primary')) && !draftDirectorName.trim() && (
+              <span style={{ fontSize: '0.8rem', color: '#b91c1c', display: 'block', marginTop: '0.25rem' }}>
+                ⚠️ Recommandé : renseignez un directeur pour les cycles maternelle/primaire actifs.
+              </span>
+            )}
           </div>
           <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Numéro d'Agrément</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Principal du secondaire</label>
             <input
-              value={draftAccreditationNumber}
-              onChange={e => setDraftAccreditationNumber(e.target.value)}
+              value={draftPrincipalName}
+              onChange={e => setDraftPrincipalName(e.target.value)}
               style={{ width: '100%' }}
-              placeholder="Ex: Arrêté N° 123/MINEDUB/..."
+              placeholder="Nom du Principal"
             />
+            {draftEducationCycles.includes('secondary') && !draftPrincipalName.trim() && (
+              <span style={{ fontSize: '0.8rem', color: '#b91c1c', display: 'block', marginTop: '0.25rem' }}>
+                ⚠️ Recommandé : renseignez un principal pour le cycle secondaire actif.
+              </span>
+            )}
           </div>
         </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+          Les autres responsables sont gérés dans le module Personnel.
+        </p>
+
+        <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
+
+        <h2>Logo et coordonnées</h2>
 
         <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, color: 'var(--primary-color)' }}>Logo de l'établissement</label>

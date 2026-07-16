@@ -473,7 +473,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const canWriteSchool = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
       if (canWriteSchool && newDb.school && newDb.school.id) {
         const { id, ...dataToSave } = newDb.school;
-        const whitelist = ['name', 'address', 'phone', 'email', 'logoUrl', 'subscriptionStatus', 'isInternalSchool', 'directorName', 'accreditationNumber', 'adminPin', 'academicYear', 'globalFees', 'paymentSettings'];
+        const whitelist = ['name', 'address', 'phone', 'email', 'logoUrl', 'subscriptionStatus', 'isInternalSchool', 'directorName', 'accreditationNumber', 'adminPin', 'academicYear', 'globalFees', 'paymentSettings', 'educationCycles', 'founderName', 'principalName', 'cycleNames', 'cycleAccreditationNumbers'];
         const filteredData = Object.fromEntries(
             Object.entries(dataToSave).filter(([key]) => whitelist.includes(key))
         );
@@ -483,6 +483,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Synchronise le state local currentSchool pour que l'UI reflète
           // immédiatement les changements (logo, etc.) sans attendre un reload
           setCurrentSchool(newDb.school);
+          if (newDb.schools) {
+            setDb(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                schools: prev.schools.map(s => s.id === id ? { ...s, ...filteredData } : s)
+              };
+            });
+          }
         }
       }
 
@@ -490,6 +499,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.error("Sync Error:", e);
       alert("Une erreur de permissions est survenue lors de la synchronisation.");
+      throw e;
     }
   };
 
