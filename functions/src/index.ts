@@ -2,6 +2,8 @@ import * as functions from 'firebase-functions';
 export * from './importStudents';
 import * as admin from 'firebase-admin';
 import { CampayService } from './services/campayService';
+import * as crypto from 'crypto';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // Initialize the Firebase Admin SDK
 admin.initializeApp();
@@ -655,6 +657,10 @@ export const updateStudentFinancialStatus = functions.firestore
   .onWrite(async (change) => {
     const paymentData = change.after.exists ? change.after.data() : change.before.data();
     if (!paymentData || !paymentData.studentId) return null;
+    if (!change.before.exists && paymentData.byRecordCashPayment) {
+      console.log('Skipping legacy financial status recalculation for atomic payment creation');
+      return null;
+    }
 
     const studentId = paymentData.studentId;
     const db = admin.firestore();
@@ -707,5 +713,375 @@ export const updateStudentFinancialStatus = functions.firestore
       return null;
     });
   });
+
+// ----------------------------------------------------------------------
+// 9. recordCashPayment
+// Atomically records a cash payment, updates student balances, increments counters,
+// and creates an immutable receipt in one Firestore transaction.
+// ----------------------------------------------------------------------
+// Helper to validate Firestore Document IDs strictly
+const isValidFirestoreId = (id: unknown): id is string => {
+  if (typeof id !== 'string') return false;
+  const trimmed = id.trim();
+  if (trimmed.length === 0 || trimmed.length > 512) return false;
+  if (trimmed.includes('/')) return false;
+  if (id !== trimmed) return false;
+  if (trimmed === '.' || trimmed === '..') return false;
+  if (Buffer.byteLength(trimmed, 'utf8') > 1500) return false;
+  return true;
+};
+
+// ----------------------------------------------------------------------
+// 9. recordCashPayment
+// Atomically records a cash payment, updates student balances, increments counters,
+// and creates an immutable receipt in one Firestore transaction.
+// ----------------------------------------------------------------------
+export const recordCashPayment = functions.https.onCall(async (data, context) => {
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+
+  const uid = context.auth.uid;
+
+  const {
+    requestId,
+    schoolId,
+    studentId,
+    amount,
+    type,
+    installment,
+    description,
+    academicYear
+  } = data || {};
+
+  // Input Validation
+  if (!requestId || typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(requestId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'requestId must be a string between 16 and 128 characters containing only alphanumeric, underscore, or dash.');
+  }
+  if (!isValidFirestoreId(schoolId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'schoolId is invalid.');
+  }
+  if (!isValidFirestoreId(studentId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'studentId is invalid.');
+  }
+  if (!academicYear || typeof academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(academicYear)) {
+    throw new functions.https.HttpsError('invalid-argument', 'academicYear must be in YYYY-YYYY format.');
+  }
+  const [y1, y2] = academicYear.split('-').map(Number);
+  if (y2 !== y1 + 1) {
+    throw new functions.https.HttpsError('invalid-argument', 'academicYear second year must be first year + 1.');
+  }
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || !Number.isSafeInteger(amount) || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'amount must be a positive safe integer.');
+  }
+  const allowedTypes = ['tuition', 'registration_fee'];
+  if (!allowedTypes.includes(type)) {
+    throw new functions.https.HttpsError('invalid-argument', 'type must be tuition or registration_fee.');
+  }
+  if (type === 'tuition') {
+    const allowedInstallments = ['T1', 'T2', 'T3'];
+    if (!installment || !allowedInstallments.includes(installment)) {
+      throw new functions.https.HttpsError('invalid-argument', 'installment must be T1, T2, or T3 for tuition.');
+    }
+  } else if (type === 'registration_fee') {
+    if (installment) {
+      throw new functions.https.HttpsError('invalid-argument', 'installment must not be provided for registration fee.');
+    }
+  }
+
+  // Description Validation
+  let cleanDescription = null;
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string') {
+      throw new functions.https.HttpsError('invalid-argument', 'Description must be a string.');
+    }
+    const trimmed = description.trim();
+    if (trimmed.length > 0) {
+      if (trimmed.length > 500) {
+        throw new functions.https.HttpsError('invalid-argument', 'Description exceeds maximum length of 500 characters.');
+      }
+      cleanDescription = trimmed;
+    }
+  }
+
+  const db = admin.firestore();
+
+  // Operator Authorization check
+  const userSnap = await db.collection('users').doc(uid).get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('permission-denied', 'Operator user not found.');
+  }
+  const user = userSnap.data();
+  if (!user || user.isActive !== true) {
+    throw new functions.https.HttpsError('permission-denied', 'Operator is inactive.');
+  }
+  const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
+  if (!allowedRoles.includes(user.role)) {
+    throw new functions.https.HttpsError('permission-denied', 'Operator role not authorized.');
+  }
+  if (user.role !== 'superAdmin' && user.schoolId !== schoolId) {
+    throw new functions.https.HttpsError('permission-denied', 'Operator does not belong to this school.');
+  }
+
+  // Collision prevention: derive paymentId deterministically using sha256 JSON array serialization
+  const paymentIdentity = JSON.stringify([schoolId, requestId]);
+  const paymentHash = crypto
+    .createHash('sha256')
+    .update(paymentIdentity, 'utf8')
+    .digest('hex');
+  const paymentId = `pay_${paymentHash}`;
+
+  return await db.runTransaction(async (transaction) => {
+    // 1. Idempotency Check
+    const paymentRef = db.collection('payments').doc(paymentId);
+    const paymentSnap = await transaction.get(paymentRef);
+    if (paymentSnap.exists) {
+      const existing = paymentSnap.data()!;
+      if (
+        existing.schoolId === schoolId &&
+        existing.studentId === studentId &&
+        existing.amount === amount &&
+        existing.type === type &&
+        (existing.installment ?? null) === (installment ?? null) &&
+        existing.academicYear === academicYear &&
+        existing.method === 'cash' &&
+        (existing.description ?? null) === (cleanDescription ?? null) &&
+        existing.requestId === requestId
+      ) {
+        const receiptRef = db.collection('receipts').doc(paymentId);
+        const receiptSnap = await transaction.get(receiptRef);
+        if (!receiptSnap.exists || receiptSnap.data()?.paymentId !== paymentId || receiptSnap.data()?.schoolId !== schoolId) {
+          throw new functions.https.HttpsError('failed-precondition', 'Payment exists but corresponding receipt is missing or invalid.');
+        }
+        const receiptData = receiptSnap.data()!;
+        return {
+          paymentId,
+          receiptId: paymentId,
+          receiptNumber: receiptData.receiptNumber || null,
+          amount,
+          previousPaid: receiptData.previousPaid ?? 0,
+          newPaid: receiptData.newPaid ?? amount,
+          remainingBalance: receiptData.remainingBalance ?? 0,
+          idempotentReplay: true
+        };
+      } else {
+        throw new functions.https.HttpsError('already-exists', 'A different payment already exists with this requestId.');
+      }
+    }
+
+    // 2. Fetch School Context
+    const schoolRef = db.collection('schools').doc(schoolId);
+    const schoolSnap = await transaction.get(schoolRef);
+    if (!schoolSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'School not found.');
+    }
+    const school = schoolSnap.data()!;
+
+    // Verrouiller l'année scolaire active pour éviter les desynchronisations car Student ne gère pas d'historique annuel
+    if (!school.academicYear || typeof school.academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(school.academicYear)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Active academic year is not defined or invalid for this school.');
+    }
+    if (academicYear !== school.academicYear) {
+      throw new functions.https.HttpsError('failed-precondition', 'The requested academic year is not the active academic year of the school.');
+    }
+
+    // 3. Fetch Student Context
+    const studentRef = db.collection('students').doc(studentId);
+    const studentSnap = await transaction.get(studentRef);
+    if (!studentSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Student not found.');
+    }
+    const student = studentSnap.data()!;
+    if (student.schoolId !== schoolId) {
+      throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school.');
+    }
+
+    // 4. Fetch Class Context (for className and cycle names validation)
+    const classId = student.classId || '';
+    let className = '';
+    let cycle = '';
+    if (classId) {
+      const classRef = db.collection('classes').doc(classId);
+      const classSnap = await transaction.get(classRef);
+      if (!classSnap.exists) {
+        throw new functions.https.HttpsError('failed-precondition', 'Student class not found.');
+      }
+      const classData = classSnap.data()!;
+      if (classData.schoolId !== schoolId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Class schoolId mismatch.');
+      }
+      className = classData.name || '';
+      const rawCycle = classData.level || classData.cycle || '';
+      const allowedCycles = ['nursery', 'primary', 'secondary'];
+      if (allowedCycles.includes(rawCycle)) {
+        cycle = rawCycle;
+      }
+    }
+
+    // 5. Fetch Receipts Counter
+    const counterRef = db.collection('counters').doc(`receipts_${schoolId}`);
+    const counterSnap = await transaction.get(counterRef);
+    let lastReceiptNumber = 0;
+    if (counterSnap.exists) {
+      lastReceiptNumber = counterSnap.data()?.lastReceiptNumber || 0;
+    }
+
+    // 6. Fetch previous payments to calculate cumulative previousPaid for the tranche/category
+    let previousPaid = 0;
+    let expectedAmount = 0;
+    const globalFees = school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 };
+    let paymentsList: admin.firestore.DocumentData[] = [];
+
+    if (type === 'registration_fee') {
+      expectedAmount = student.registrationFeeExpected;
+      if (!expectedAmount || expectedAmount <= 0) {
+        throw new functions.https.HttpsError('failed-precondition', 'Registration fee expected amount is not defined for this student.');
+      }
+      const paymentsSnap = await transaction.get(
+        db.collection('payments').where('studentId', '==', studentId).where('type', '==', 'registration_fee')
+      );
+      paymentsList = paymentsSnap.docs.map(doc => doc.data());
+      for (const p of paymentsList) {
+        if (p.schoolId === schoolId && !p.academicYear) {
+          throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy payments found without academicYear. Recording blocked.');
+        }
+      }
+      previousPaid = paymentsList
+        .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+    } else if (type === 'tuition') {
+      expectedAmount = installment === 'T1' ? (student.feeT1 ?? globalFees.feeT1 ?? 0) : installment === 'T2' ? (student.feeT2 ?? globalFees.feeT2 ?? 0) : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+      if (!expectedAmount || expectedAmount <= 0) {
+        throw new functions.https.HttpsError('failed-precondition', `Expected tuition fee for installment ${installment} is not defined.`);
+      }
+      const paymentsSnap = await transaction.get(
+        db.collection('payments').where('studentId', '==', studentId).where('type', '==', 'tuition')
+      );
+      paymentsList = paymentsSnap.docs.map(doc => doc.data());
+      for (const p of paymentsList) {
+        if (p.schoolId === schoolId && !p.academicYear) {
+          throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy payments found without academicYear. Recording blocked.');
+        }
+      }
+      previousPaid = paymentsList
+        .filter(p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment)
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+    }
+
+    const remainingBalance = Math.max(0, expectedAmount - previousPaid);
+    if (amount > remainingBalance) {
+      throw new functions.https.HttpsError('failed-precondition', `Payment amount (${amount}) exceeds remaining balance (${remainingBalance}).`);
+    }
+
+    const newPaid = previousPaid + amount;
+    const newRemaining = Math.max(0, expectedAmount - newPaid);
+
+    // 7. Increment counter
+    const nextReceiptNumber = lastReceiptNumber + 1;
+    transaction.set(counterRef, { lastReceiptNumber: nextReceiptNumber }, { merge: true });
+
+    // 8. Format receipt number
+    const currentYear = new Date().getFullYear();
+    const formattedNum = String(nextReceiptNumber).padStart(4, '0');
+    const receiptNumber = `REC-${currentYear}-${formattedNum}`;
+
+    // 9. Create Payment document
+    const paymentData = {
+      id: paymentId,
+      schoolId,
+      studentId,
+      amount,
+      type,
+      installment: installment || null,
+      date: new Date().toISOString().split('T')[0],
+      description: cleanDescription,
+      method: 'cash',
+      academicYear,
+      createdBy: uid,
+      createdAt: FieldValue.serverTimestamp(),
+      requestId,
+      byRecordCashPayment: true
+    };
+
+    const cleanUndefined = (obj: Record<string, unknown>) => {
+      return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null));
+    };
+
+    transaction.set(paymentRef, cleanUndefined(paymentData as Record<string, unknown>));
+
+    // 10. Update Student balances
+    const studentUpdate: Record<string, unknown> = {};
+    if (type === 'registration_fee') {
+      const totalRegPaid = (student.registrationFeePaid || 0) + amount;
+      studentUpdate.registrationFeePaid = totalRegPaid;
+      studentUpdate.registrationFeeStatus = totalRegPaid >= expectedAmount ? 'paid' : (totalRegPaid > 0 ? 'partial' : 'unpaid');
+    } else if (type === 'tuition') {
+      for (const tp of paymentsList) {
+        if (tp.schoolId === schoolId && !tp.academicYear) {
+          throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy tuition payments found without academicYear.');
+        }
+      }
+      const totalTuitionPaidForYear = paymentsList
+        .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
+        .reduce((sum, p) => sum + (p.amount || 0), 0) + amount;
+
+      const fallbackExpected = (student.feeT1 ?? globalFees.feeT1 ?? 0) + (student.feeT2 ?? globalFees.feeT2 ?? 0) + (student.feeT3 ?? globalFees.feeT3 ?? 0);
+      const totalTuitionExpectedForYear = student.tuitionExpected || fallbackExpected;
+
+      studentUpdate.tuitionPaid = totalTuitionPaidForYear;
+      studentUpdate.tuitionStatus = totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid');
+    }
+    transaction.update(studentRef, studentUpdate);
+
+    // 11. Determine school name based on cycle Names
+    let schoolName = school.name || 'EcoScolaire';
+    if (cycle && school.cycleNames && school.cycleNames[cycle]) {
+      schoolName = school.cycleNames[cycle];
+    }
+
+    // 12. Create Receipt document
+    const receiptRef = db.collection('receipts').doc(paymentId);
+    const receiptData = {
+      id: paymentId,
+      paymentId,
+      schoolId,
+      receiptNumber,
+      studentId,
+      studentName: student.name || '',
+      studentRegistrationNumber: student.matricule || '',
+      classId,
+      className,
+      academicYear,
+      schoolName,
+      type,
+      method: 'cash',
+      date: paymentData.date,
+      paymentType: type,
+      paymentMethod: 'cash',
+      paymentDate: paymentData.date,
+      amount,
+      expectedAmount,
+      previousPaid,
+      newPaid,
+      remainingBalance: newRemaining,
+      collectedByUserId: uid,
+      collectedByName: user.name || user.email || '',
+      createdAt: FieldValue.serverTimestamp()
+    };
+
+    transaction.set(receiptRef, cleanUndefined(receiptData));
+
+    return {
+      paymentId,
+      receiptId: paymentId,
+      receiptNumber,
+      amount,
+      previousPaid,
+      newPaid,
+      remainingBalance: newRemaining,
+      idempotentReplay: false
+    };
+  });
+});
 
 export { sweepZombieImportJobs } from './studentImportSweeper';
