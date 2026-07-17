@@ -10,6 +10,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isProtectedCashPayment(data) {
+      return (
+        (data.keys().hasAll(['byRecordCashPayment']) && data.byRecordCashPayment == true)
+        || (
+          data.keys().hasAll(['type', 'method'])
+          && (data.type == 'tuition' || data.type == 'registration_fee')
+          && data.method == 'cash'
+        )
+      );
+    }
+
     function getUserData() {
       // Les données de l'utilisateur qui fait la requête
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -375,8 +386,15 @@ service cloud.firestore {
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
       // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
-      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
-      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId)
+                    && !isProtectedCashPayment(request.resource.data);
+      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant())
+                    && hasSchoolAccess(resource.data.schoolId)
+                    && hasSchoolAccess(request.resource.data.schoolId)
+                    && !isProtectedCashPayment(resource.data)
+                    && !isProtectedCashPayment(request.resource.data);
+      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)
+                    && !isProtectedCashPayment(resource.data);
     }
     match /receipts/{receiptId} {
       allow read: if isAuthenticated() && isActive() && (
@@ -384,7 +402,7 @@ service cloud.firestore {
         ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
-      // Création gérée uniquement par le backend (Cloud Functions onPaymentCreated)
+      // Écritures gérées uniquement par le backend avec Firebase Admin SDK.
       allow write: if false;
     }
     match /expenses/{expenseId} {
