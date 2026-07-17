@@ -951,7 +951,8 @@ exports.recordCashPayment = functions.https.onCall(async (data, context) => {
             remainingBalance: newRemaining,
             collectedByUserId: uid,
             collectedByName: user.name || user.email || '',
-            createdAt: firestore_1.FieldValue.serverTimestamp()
+            createdAt: firestore_1.FieldValue.serverTimestamp(),
+            ...(type === 'tuition' && installment ? { installment } : {})
         };
         transaction.set(receiptRef, cleanUndefined(receiptData));
         return {

@@ -1066,7 +1066,8 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
       remainingBalance: newRemaining,
       collectedByUserId: uid,
       collectedByName: user.name || user.email || '',
-      createdAt: FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp(),
+      ...(type === 'tuition' && installment ? { installment } : {})
     };
 
     transaction.set(receiptRef, cleanUndefined(receiptData));
