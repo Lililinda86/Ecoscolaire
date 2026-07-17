@@ -178,7 +178,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{displayModel.formattedAmount}</td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                          <button 
+                          <button
                             className="secondary"
                             style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => generatePDF(receipt, 'download')}
@@ -188,7 +188,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                             <Download size={14} />
                             {isGenerating === displayModel.id ? '...' : 'PDF'}
                           </button>
-                          <button 
+                          <button
                             className="secondary"
                             style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => generatePDF(receipt, 'print')}

@@ -1249,14 +1249,14 @@ const Payments: React.FC = () => {
           )}
           <div className="form-group">
             <label>Montant Versé (FCFA)</label>
-            <input 
-              type="number" 
-              min={1} 
-              step={1} 
-              inputMode="numeric" 
-              autoComplete="off" 
-              required 
-              value={currentPayment.amount ?? ''} 
+            <input
+              type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
+              autoComplete="off"
+              required
+              value={currentPayment.amount ?? ''}
               onChange={e => setCurrentPayment({...currentPayment, amount: e.target.value as unknown as number})}
               onWheel={(e) => e.currentTarget.blur()}
             />

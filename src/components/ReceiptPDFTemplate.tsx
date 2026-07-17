@@ -10,13 +10,13 @@ interface ReceiptPDFTemplateProps {
 const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplateProps>(
   ({ displayModel, school }, ref) => {
     return (
-      <div 
-        ref={ref} 
-        style={{ 
-          width: '210mm', 
-          minHeight: '297mm', 
-          padding: '20mm', 
-          background: '#ffffff', 
+      <div
+        ref={ref}
+        style={{
+          width: '210mm',
+          minHeight: '297mm',
+          padding: '20mm',
+          background: '#ffffff',
           color: '#000000',
           fontFamily: 'Arial, sans-serif',
           boxSizing: 'border-box',
@@ -30,10 +30,10 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #2563eb', paddingBottom: '1rem', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
             {school?.logoUrl && (
-              <img 
-                src={school.logoUrl} 
-                alt={`Logo ${school.name}`} 
-                style={{ width: '80px', height: '80px', objectFit: 'contain' }} 
+              <img
+                src={school.logoUrl}
+                alt={`Logo ${school.name}`}
+                style={{ width: '80px', height: '80px', objectFit: 'contain' }}
               />
             )}
             <div>
