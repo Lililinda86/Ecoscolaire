@@ -1,50 +1,28 @@
 import React, { useRef, useState } from 'react';
-import { Download, Printer, Search, FileText } from 'lucide-react';
+import { Download, Printer, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import ReceiptPDFTemplate from './ReceiptPDFTemplate';
-import type { School, Student } from '../types';
-
-type DateLike =
-  | string
-  | number
-  | Date
-  | {
-      seconds?: number;
-      toDate?: () => Date;
-    }
-  | null
-  | undefined;
-
-type ReceiptLike = {
-  id?: string;
-  amount?: number;
-  status?: string;
-  method?: string;
-  date?: DateLike;
-  createdAt?: DateLike;
-  updatedAt?: DateLike;
-  receiptNumber?: string;
-  paymentId?: string;
-  studentId?: string;
-  studentName?: string;
-  parentName?: string;
-  type?: string;
-  [key: string]: unknown;
-};
+import type { School, Student, ReceiptLike } from '../types';
+import { buildReceiptDisplayModel } from '../utils/paymentReceipt';
+import type { ClassLike } from '../utils/paymentReceipt';
+import { useAppContext } from '../context/AppContext';
 
 interface ReceiptHistoryProps {
   receipts: ReceiptLike[];
   students: Student[];
   school: School | null;
+  classes: ClassLike[];
 }
 
-const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, school }) => {
+const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, school, classes }) => {
+  const { db } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
   
   const printRef = useRef<HTMLDivElement>(null);
   const [activeReceipt, setActiveReceipt] = useState<ReceiptLike | null>(null);
+  const [expandedReceiptId, setExpandedReceiptId] = useState<string | null>(null);
 
   const filteredReceipts = receipts
     .filter(r => {
@@ -128,18 +106,8 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
       {activeReceipt && (
         <ReceiptPDFTemplate 
           ref={printRef}
-          receipt={{
-            ...activeReceipt,
-            paymentId: (activeReceipt.paymentId as string) || '',
-            receiptNumber: (activeReceipt.receiptNumber as string) || '',
-            amount: (activeReceipt.amount as number) || 0,
-            type: (activeReceipt.type as string) || '',
-            method: (activeReceipt.method as string) || '',
-            studentId: (activeReceipt.studentId as string) || null,
-            date: new Date(activeReceipt.date && typeof activeReceipt.date === 'object' && 'seconds' in activeReceipt.date ? (activeReceipt.date as { seconds: number }).seconds * 1000 : activeReceipt.date as string | number | Date || Date.now())
-          }}
+          displayModel={buildReceiptDisplayModel(activeReceipt, students, classes, db.payments)}
           school={school}
-          student={students.find(s => s.id === activeReceipt.studentId) || null}
         />
       )}
 
@@ -162,6 +130,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
             <tr>
+              <th style={{ padding: '1rem', textAlign: 'left', width: '40px' }}></th>
               <th style={{ padding: '1rem', textAlign: 'left' }}>N° Reçu</th>
               <th style={{ padding: '1rem', textAlign: 'left' }}>Date</th>
               <th style={{ padding: '1rem', textAlign: 'left' }}>Élève</th>
@@ -173,54 +142,128 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
           <tbody>
             {filteredReceipts.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   Aucun reçu trouvé
                 </td>
               </tr>
             ) : (
               filteredReceipts.map(receipt => {
-                const student = students.find(s => s.id === receipt.studentId);
-                const date = new Date(receipt.createdAt && typeof receipt.createdAt === 'object' && 'seconds' in receipt.createdAt ? (receipt.createdAt as { seconds: number }).seconds * 1000 : receipt.createdAt as string | number | Date || Date.now());
+                const displayModel = buildReceiptDisplayModel(receipt, students, classes, db.payments);
+                const isExpanded = expandedReceiptId === displayModel.id;
                 
                 return (
-                  <tr key={receipt.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover-row">
-                    <td style={{ padding: '1rem', fontWeight: 'bold', color: '#1e40af' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FileText size={16} />
-                        {receipt.receiptNumber || 'En attente'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      {date.toLocaleDateString('fr-FR')} {date.toLocaleTimeString('fr-FR')}
-                    </td>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{student?.name || 'Inconnu'}</td>
-                    <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{receipt.paymentId}</td>
-                    <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{receipt.amount?.toLocaleString('fr-FR')} FCFA</td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                        <button 
+                  <React.Fragment key={displayModel.id}>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)' }} className="hover-row">
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <button
+                          type="button"
                           className="secondary"
-                          style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                          onClick={() => generatePDF(receipt, 'download')}
-                          disabled={isGenerating === receipt.id || !receipt.receiptNumber}
-                          title="Télécharger le PDF"
+                          style={{ padding: '0.2rem', display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                          onClick={() => setExpandedReceiptId(isExpanded ? null : displayModel.id)}
                         >
-                          <Download size={14} />
-                          {isGenerating === receipt.id ? '...' : 'PDF'}
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </button>
-                        <button 
-                          className="secondary"
-                          style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                          onClick={() => generatePDF(receipt, 'print')}
-                          disabled={isGenerating === receipt.id || !receipt.receiptNumber}
-                          title="Imprimer"
-                        >
-                          <Printer size={14} />
-                          Imprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td style={{ padding: '1rem', fontWeight: 'bold', color: '#1e40af' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <FileText size={16} />
+                          {displayModel.receiptNumber}
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        {displayModel.date}
+                      </td>
+                      <td style={{ padding: '1rem', fontWeight: 500 }}>{displayModel.studentName}</td>
+                      <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{displayModel.paymentId}</td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{displayModel.formattedAmount}</td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <button 
+                            className="secondary"
+                            style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => generatePDF(receipt, 'download')}
+                            disabled={isGenerating === displayModel.id || displayModel.receiptNumber === 'En attente'}
+                            title="Télécharger le PDF"
+                          >
+                            <Download size={14} />
+                            {isGenerating === displayModel.id ? '...' : 'PDF'}
+                          </button>
+                          <button 
+                            className="secondary"
+                            style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => generatePDF(receipt, 'print')}
+                            disabled={isGenerating === displayModel.id || displayModel.receiptNumber === 'En attente'}
+                            title="Imprimer"
+                          >
+                            <Printer size={14} />
+                            Imprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr style={{ background: '#f8fafc' }}>
+                        <td colSpan={7} style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nature / Tranche</div>
+                              <div style={{ fontWeight: 500 }}>
+                                {displayModel.nature}
+                                {displayModel.tranche ? ` (${displayModel.tranche})` : ''}
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Méthode d'encaissement</div>
+                              <div style={{ fontWeight: 500 }}>{displayModel.method}</div>
+                            </div>
+                            {displayModel.className && (
+                              <div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Classe</div>
+                                <div style={{ fontWeight: 500 }}>{displayModel.className}</div>
+                              </div>
+                            )}
+                            <div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Matricule Élève</div>
+                              <div style={{ fontWeight: 500 }}>{displayModel.studentRegistrationNumber}</div>
+                            </div>
+                          </div>
+
+                          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                            {displayModel.hasSnapshots ? (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', background: '#fff', padding: '1rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Montant attendu</div>
+                                  <div style={{ fontWeight: 'bold' }}>{displayModel.formattedExpectedAmount}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Déjà payé avant</div>
+                                  <div style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>{displayModel.formattedPreviousPaid}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Versement actuel</div>
+                                  <div style={{ fontWeight: 'bold', color: 'var(--success)' }}>+ {displayModel.formattedAmount}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cumul après versement</div>
+                                  <div style={{ fontWeight: 'bold', color: '#1e40af' }}>{displayModel.formattedNewPaid}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Reste à payer</div>
+                                  <div style={{ fontWeight: 'bold', color: displayModel.remainingBalance && displayModel.remainingBalance > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                    {displayModel.formattedRemainingBalance}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                Détail financier historique non disponible pour ce reçu.
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}

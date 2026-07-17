@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
-import type { Payment, Expense } from '../types';
+import type { Payment, Expense, Student } from '../types';
 import Modal from '../components/Modal';
 import TransactionHistory from '../components/TransactionHistory';
 import ReceiptHistory from '../components/ReceiptHistory';
@@ -10,7 +10,8 @@ import { Plus, Minus, Wallet, ClipboardList, Trash2, History, FileText, Trending
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, runTransaction, getDoc } from 'firebase/firestore';
+import { translatePaymentType, translateInstallment, formatCurrency } from '../utils/paymentReceipt';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -74,8 +75,42 @@ type LocalTransaction = {
   [key: string]: unknown;
 };
 
+interface PendingAttempt {
+  fingerprintHash: string;
+  requestId: string;
+}
+
+interface RecordCashPaymentInput {
+  requestId: string;
+  schoolId: string;
+  studentId: string;
+  amount: number;
+  type: 'tuition' | 'registration_fee';
+  installment?: 'T1' | 'T2' | 'T3';
+  description?: string;
+  academicYear: string;
+}
+
+interface RecordCashPaymentResult {
+  paymentId: string;
+  receiptId: string;
+  receiptNumber: string;
+  amount: number;
+  previousPaid: number;
+  newPaid: number;
+  remainingBalance: number;
+  idempotentReplay: boolean;
+}
+
+const computeSHA256 = async (text: string): Promise<string> => {
+  const msgBuffer = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 const Payments: React.FC = () => {
-  const { db, updateLocalState, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, updateLocalState, patchLocalEntities, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
 
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'|'historique-recus'|'finance-momo'>('encaissements');
@@ -86,15 +121,61 @@ const Payments: React.FC = () => {
   const [parentPhone, setParentPhone] = useState('');
   const [isProcessingMoMo, setIsProcessingMoMo] = useState(false);
   const [momoSuccess, setMomoSuccess] = useState(false);
-  const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({ date: new Date().toISOString().split('T')[0], type: 'tuition' });
+  const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({ date: new Date().toISOString().split('T')[0], type: 'tuition', amount: '' as unknown as number });
   const [modalExpectedAmount, setModalExpectedAmount] = useState(0);
   const [isConfirmingTx, setIsConfirmingTx] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingAttempt, setPendingAttemptState] = useState<PendingAttempt | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('ecoscolaire_pending_cash_payment');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          typeof parsed.requestId === 'string' &&
+          /^[A-Za-z0-9_-]{16,128}$/.test(parsed.requestId) &&
+          typeof parsed.fingerprintHash === 'string' &&
+          /^[a-f0-9]{64}$/.test(parsed.fingerprintHash)
+        ) {
+          return parsed as PendingAttempt;
+        }
+      }
+      sessionStorage.removeItem('ecoscolaire_pending_cash_payment');
+      return null;
+    } catch {
+      try {
+        sessionStorage.removeItem('ecoscolaire_pending_cash_payment');
+      } catch (err) {
+        console.warn("sessionStorage remove failed", err);
+      }
+      return null;
+    }
+  });
+
+  const setPendingAttempt = (attempt: PendingAttempt | null) => {
+    setPendingAttemptState(attempt);
+    try {
+      if (attempt) {
+        sessionStorage.setItem('ecoscolaire_pending_cash_payment', JSON.stringify(attempt));
+      } else {
+        sessionStorage.removeItem('ecoscolaire_pending_cash_payment');
+      }
+    } catch {
+      console.warn("sessionStorage is not accessible.");
+    }
+  };
 
   const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0] });
   const [receiptToPrint, setReceiptToPrint] = useState<Payment | null>(null);
 
+  // 1. Reset input amount to empty string strictly when student, type or installment changes
+  React.useEffect(() => {
+    setCurrentPayment(prev => ({ ...prev, amount: '' as unknown as number }));
+  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment]);
+
+  // 2. Fetch modal expected amount details (no amount prefilling)
   React.useEffect(() => {
     if (isModalOpen && currentPayment.studentId && currentPayment.type !== 'other') {
       const student = db.students.find(s => s.id === currentPayment.studentId);
@@ -111,9 +192,6 @@ const Payments: React.FC = () => {
           expected = student.registrationFeeExpected ?? 15000;
         }
         setModalExpectedAmount(expected);
-        const alreadyPaid = db.payments.filter(p => p.studentId === student.id && p.type === currentPayment.type && (currentPayment.type !== 'tuition' || p.installment === currentPayment.installment)).reduce((s, p) => s + p.amount, 0);
-        const remaining = Math.max(0, expected - alreadyPaid);
-        setCurrentPayment(prev => ({ ...prev, amount: remaining }));
       }
     } else {
       setModalExpectedAmount(0);
@@ -137,7 +215,7 @@ const Payments: React.FC = () => {
       date: new Date().toISOString().split('T')[0], 
       type: 'tuition', 
       installment: 'T1', 
-      amount: 0 
+      amount: '' as unknown as number
     });
     setPaymentMethod('cash');
     setParentPhone('');
@@ -203,81 +281,216 @@ const Payments: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const paymentId = currentPayment.id || crypto.randomUUID();
-      const rawPayment = { 
-        ...currentPayment, 
-        id: paymentId,
-        method: paymentMethod,
-        schoolId: currentSchool!.id
-      } as Payment;
-      delete rawPayment.transactionId;
-      
-      const newPayment = Object.fromEntries(Object.entries(rawPayment).filter(([, v]) => v !== undefined));
-
-      // Option A - Safe minimal: On ne modifie plus student.feeT1/T2 aveuglément pour éviter les Lost Updates.
-      // Le paiement est strictement append-only et idempotent. Le recalcul du solde est fait côté serveur via Firestore trigger.
-      await setDoc(doc(firestoreDb, 'payments', paymentId), newPayment, { merge: true });
-
-      if (newPayment.type === 'registration_fee' && newPayment.studentId) {
-        const student = db.students.find(s => s.id === newPayment.studentId);
-        if (student) {
-          const oldPaid = student.registrationFeePaid ?? 0;
-          const newPaid = oldPaid + (newPayment.amount || 0);
-          const expected = student.registrationFeeExpected ?? 15000;
-          let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-          if (newPaid >= expected) status = 'paid';
-          else if (newPaid > 0) status = 'partial';
-          if (db) {
-            const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
-            updateLocalState({ students: newStudents });
-          }
-        }
+      // 1. Périmètre & blocage temporaire (Phase 4)
+      if (currentPayment.type === 'transport') {
+        alert("Le paiement du transport sera activé après la mise en place des tarifs par période, des réductions familiales et des paiements par tranches.");
+        setIsSaving(false);
+        return;
+      }
+      if (currentPayment.type === 'uniforms' || currentPayment.type === 'other') {
+        alert("Ce type de paiement n’est pas encore disponible dans le circuit sécurisé.");
+        setIsSaving(false);
+        return;
       }
 
-      if (newPayment.type === 'tuition' && newPayment.studentId) {
-        const student = db.students.find(s => s.id === newPayment.studentId);
-        if (student) {
-          const oldPaid = student.tuitionPaid ?? 0;
-          const newPaid = oldPaid + (newPayment.amount || 0);
-          const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
-          const expected = student.tuitionExpected ?? fallbackExpected;
-          let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-          if (expected > 0 && newPaid >= expected) status = 'paid';
-          else if (newPaid > 0) status = 'partial';
-          if (db) {
-            const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
-            updateLocalState({ students: newStudents });
-          }
-        }
+      // 2. Validation client (Phase 5)
+      const student = db.students.find(s => s.id === currentPayment.studentId);
+      if (!student) {
+        alert("Veuillez sélectionner un élève.");
+        setIsSaving(false);
+        return;
+      }
+      if (!currentSchool?.id) {
+        alert("Erreur: École manquante.");
+        setIsSaving(false);
+        return;
+      }
+      if (!currentSchool.academicYear) {
+        alert("Erreur: Année académique non définie pour l'école.");
+        setIsSaving(false);
+        return;
+      }
+      const amountStr = String(currentPayment.amount ?? '').trim();
+      if (amountStr === '') {
+        alert("Veuillez saisir un montant.");
+        setIsSaving(false);
+        return;
+      }
+      const amount = Number(amountStr);
+      if (!Number.isFinite(amount) || !Number.isSafeInteger(amount) || amount <= 0) {
+        alert("Le montant doit être un entier positif valide.");
+        setIsSaving(false);
+        return;
+      }
+      if (currentPayment.type === 'tuition' && !currentPayment.installment) {
+        alert("Veuillez sélectionner une tranche pour les frais de scolarité.");
+        setIsSaving(false);
+        return;
+      }
+      if (currentPayment.type === 'registration_fee' && currentPayment.installment) {
+        alert("La tranche ne doit pas être spécifiée pour les frais d'inscription.");
+        setIsSaving(false);
+        return;
+      }
+      if (currentPayment.type !== 'tuition' && currentPayment.type !== 'registration_fee') {
+        alert("Ce type de paiement n'est pas pris en charge en espèces.");
+        setIsSaving(false);
+        return;
       }
 
-      if (newPayment.type === 'transport' && newPayment.studentId) {
-        const student = db.students.find(s => s.id === newPayment.studentId);
-        if (student) {
-          const oldPaid = student.transportPaid ?? 0;
-          const newPaid = oldPaid + (newPayment.amount || 0);
-          if (db) {
-            const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
-            updateLocalState({ students: newStudents });
-          }
-        }
+      // 3. Request ID stable (Phase 6)
+      const currentFingerprint = JSON.stringify([
+        currentSchool.id,
+        currentPayment.studentId,
+        amount,
+        currentPayment.type,
+        currentPayment.installment ?? null,
+        currentSchool.academicYear,
+        (currentPayment.description || '').trim()
+      ]);
+
+      const fingerprintHash = await computeSHA256(currentFingerprint);
+
+      let reqId = pendingAttempt?.fingerprintHash === fingerprintHash ? pendingAttempt.requestId : '';
+      if (!reqId) {
+        reqId = crypto.randomUUID();
+        setPendingAttempt({ fingerprintHash, requestId: reqId });
       }
 
-      if (db) {
-        updateLocalState({ payments: [newPayment as Payment, ...db.payments] });
+      // 4. Appel Callable (Phase 7)
+      const recordCashPaymentCall = httpsCallable<RecordCashPaymentInput, RecordCashPaymentResult>(
+        functions,
+        'recordCashPayment'
+      );
+
+      const payload: RecordCashPaymentInput = {
+        requestId: reqId,
+        schoolId: currentSchool.id,
+        studentId: currentPayment.studentId,
+        amount,
+        type: currentPayment.type as 'tuition' | 'registration_fee',
+        installment: currentPayment.installment || undefined,
+        description: currentPayment.description || undefined,
+        academicYear: currentSchool.academicYear
+      };
+
+      const result = await recordCashPaymentCall(payload);
+      const resData = result.data;
+
+      // 5. Nettoyage de la tentative après succès
+      setPendingAttempt(null);
+
+      // 6. Succès et rafraîchissement local (Phase 9)
+      const isReplay = resData.idempotentReplay;
+      const replayMsg = isReplay ? "\n\n(Cette tentative avait déjà été enregistrée. Aucun paiement supplémentaire n'a été créé.)" : ""
+
+      const natureText = translatePaymentType(currentPayment.type);
+      const trancheText = currentPayment.type === 'tuition' ? translateInstallment(currentPayment.installment) : '';
+
+      const cumulLabel = currentPayment.type === 'tuition' ? "Cumul sur la tranche" : "Cumul des frais d’inscription";
+      const resteLabel = currentPayment.type === 'tuition' ? "Reste sur la tranche" : "Reste des frais d’inscription";
+
+      const detailsMsg =
+        `Nature : ${natureText}\n` +
+        (trancheText ? `Tranche : ${trancheText}\n` : '') +
+        `Versement : ${formatCurrency(resData.amount)}\n` +
+        `Payé avant ce versement : ${formatCurrency(resData.previousPaid)}\n` +
+        `${cumulLabel} : ${formatCurrency(resData.newPaid)}\n` +
+        `${resteLabel} : ${formatCurrency(resData.remainingBalance)}`;
+
+      alert(
+        `Paiement enregistré.\n\n` +
+        `Reçu : ${resData.receiptNumber}\n` +
+        `${detailsMsg}${replayMsg}`
+      );
+
+      // 1. Lire depuis Firestore les documents réels (recalculés de façon autoritative)
+      const studentDocRef = doc(firestoreDb, 'students', currentPayment.studentId);
+      const studentDocSnap = await getDoc(studentDocRef);
+
+      const paymentDocRef = doc(firestoreDb, 'payments', resData.paymentId);
+      let paymentDocSnap = await getDoc(paymentDocRef);
+      let readRetries = 0;
+      while (!paymentDocSnap.exists() && readRetries < 5) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        paymentDocSnap = await getDoc(paymentDocRef);
+        readRetries++;
+      }
+
+      const receiptDocRef = doc(firestoreDb, 'receipts', resData.receiptId);
+      let receiptDocSnap = await getDoc(receiptDocRef);
+      let receiptRetries = 0;
+      while (!receiptDocSnap.exists() && receiptRetries < 5) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        receiptDocSnap = await getDoc(receiptDocRef);
+        receiptRetries++;
+      }
+
+      if (studentDocSnap.exists() && paymentDocSnap.exists() && receiptDocSnap.exists()) {
+        const serverStudent = { id: studentDocSnap.id, ...studentDocSnap.data() } as unknown as Student;
+        const serverPayment = { id: paymentDocSnap.id, ...paymentDocSnap.data() } as unknown as Payment;
+        const serverReceipt = { id: receiptDocSnap.id, ...receiptDocSnap.data() } as { id: string; [key: string]: unknown };
+
+        // Mettre à jour l'état local de manière atomique sans copie externe périmée de db
+        patchLocalEntities(serverStudent, serverPayment, serverReceipt);
+      } else {
+        console.warn("[FRONTEND] Impossible de lire les documents persistés pour rafraîchissement.");
       }
 
       setModalOpen(false);
+
       logAuditAction({
         action: 'CREATE_PAYMENT',
         targetType: 'PAYMENT',
-        targetId: newPayment.id,
-        targetName: `Paiement ${newPayment.amount} FCFA - ${newPayment.type}`
+        targetId: resData.paymentId,
+        targetName: `Paiement ${amount} FCFA - ${currentPayment.type}`
       });
+
     } catch (err: unknown) {
-      const message = getErrorMessage(err);
-      console.error(err);
-      alert("Erreur lors de l'enregistrement: " + message);
+      // 7. Gestion des erreurs (Phase 8)
+      const error = err as { code?: string; message?: string };
+      const errCode = error.code || '';
+      let errorMsg = "Le résultat du paiement n’a pas pu être confirmé. Ne modifiez pas le formulaire et utilisez Réessayer afin de conserver la même référence.";
+
+      // Déterminer s'il s'agit d'une erreur définitive pour abandonner le requestId
+      const isDefinitiveError = [
+        'functions/invalid-argument',
+        'functions/permission-denied',
+        'functions/unauthenticated',
+        'functions/not-found',
+        'functions/failed-precondition',
+        'functions/already-exists',
+        'invalid-argument',
+        'permission-denied',
+        'unauthenticated',
+        'not-found',
+        'failed-precondition',
+        'already-exists'
+      ].includes(errCode);
+
+      if (isDefinitiveError) {
+        setPendingAttempt(null);
+        if (errCode.includes('invalid-argument')) {
+          errorMsg = "Données de paiement invalides.";
+        } else if (errCode.includes('permission-denied')) {
+          errorMsg = "Vous n’êtes pas autorisé à enregistrer ce paiement.";
+        } else if (errCode.includes('unauthenticated')) {
+          errorMsg = "Votre session a expiré. Reconnectez-vous.";
+        } else if (errCode.includes('not-found')) {
+          errorMsg = "L’école ou l’élève est introuvable.";
+        } else if (errCode.includes('failed-precondition')) {
+          errorMsg = "Le paiement ne peut pas être enregistré dans l’état actuel du dossier.";
+        } else if (errCode.includes('already-exists')) {
+          errorMsg = "Cette tentative existe déjà avec des informations différentes.";
+        }
+      }
+
+      console.log(JSON.stringify({
+        functionName: "recordCashPayment",
+        code: errCode,
+        hasPendingAttempt: pendingAttempt ? true : false
+      }));
+      alert(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -335,11 +548,15 @@ const Payments: React.FC = () => {
   };
 
   const handleDeletePayment = async (id: string) => {
+    const paymentToDelete = db.payments.find(p => p.id === id);
+    if (paymentToDelete?.byRecordCashPayment) {
+      alert("Paiement sécurisé. Toute correction doit passer par une annulation ou une contre-opération.");
+      return;
+    }
     if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
     if (window.confirm('Voulez-vous vraiment supprimer cet encaissement ? Cela annulera le paiement.')) {
       setIsSaving(true);
       try {
-        const paymentToDelete = db.payments.find(p => p.id === id);
         console.log(`[FRONTEND] Deleting payment ${id}`, paymentToDelete);
         
         await deleteDoc(doc(firestoreDb, 'payments', id));
@@ -606,6 +823,7 @@ const Payments: React.FC = () => {
           receipts={db.receipts || []}
           students={db.students || []}
           school={currentSchool}
+          classes={db.classes || []}
         />
       )}
 
@@ -725,9 +943,13 @@ const Payments: React.FC = () => {
                           <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => { setReceiptToPrint(p); setTimeout(() => window.print(), 100); }} title="Imprimer Reçu">
                             🖨️
                           </button>
-                          <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeletePayment(p.id)} title="Supprimer">
-                            <Trash2 size={14} />
-                          </button>
+                          {!p.byRecordCashPayment ? (
+                            <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeletePayment(p.id)} title="Supprimer">
+                              <Trash2 size={14} />
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sécurisé</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1027,17 +1249,36 @@ const Payments: React.FC = () => {
           )}
           <div className="form-group">
             <label>Montant Versé (FCFA)</label>
-            <input type="number" min="0" step="1" required value={currentPayment.amount ?? ''} onChange={e => setCurrentPayment({...currentPayment, amount: parseFloat(e.target.value) || 0})} />
+            <input 
+              type="number" 
+              min={1} 
+              step={1} 
+              inputMode="numeric" 
+              autoComplete="off" 
+              required 
+              value={currentPayment.amount ?? ''} 
+              onChange={e => setCurrentPayment({...currentPayment, amount: e.target.value as unknown as number})}
+              onWheel={(e) => e.currentTarget.blur()}
+            />
             
-            {feeDetails && currentPayment.type !== 'other' && (
-               <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f3f4f6', padding: '0.5rem', borderRadius: '4px' }}>
-                 <strong>Attendu :</strong> {modalExpectedAmount.toLocaleString('fr-FR')} FCFA | 
-                 <strong> Déjà payé :</strong> {feeDetails.alreadyPaid.toLocaleString('fr-FR')} FCFA | 
-                 <strong style={{ color: (modalExpectedAmount - feeDetails.alreadyPaid - (currentPayment.amount || 0)) > 0 ? 'var(--danger)' : 'var(--success)' }}> 
-                   Nouveau Reste à payer : {Math.max(0, modalExpectedAmount - feeDetails.alreadyPaid - (currentPayment.amount || 0)).toLocaleString('fr-FR')} FCFA
-                 </strong>
-               </div>
-            )}
+            {feeDetails && currentPayment.type !== 'other' && (() => {
+               const expected = modalExpectedAmount;
+               const paidBefore = feeDetails.alreadyPaid;
+               const resteAvant = Math.max(0, expected - paidBefore);
+               const saisi = Number(currentPayment.amount) || 0;
+               const resteApres = Math.max(0, resteAvant - saisi);
+               return (
+                 <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f3f4f6', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
+                   <div>• <strong>Montant attendu :</strong> {expected.toLocaleString('fr-FR')} FCFA</div>
+                   <div>• <strong>Déjà payé sur la tranche :</strong> {paidBefore.toLocaleString('fr-FR')} FCFA</div>
+                   <div>• <strong>Reste avant versement :</strong> {resteAvant.toLocaleString('fr-FR')} FCFA</div>
+                   {saisi > 0 && <div>• <strong>Montant saisi :</strong> {saisi.toLocaleString('fr-FR')} FCFA</div>}
+                   <div style={{ color: resteApres > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold', marginTop: '0.25rem' }}>
+                     → Nouveau reste prévisionnel : {resteApres.toLocaleString('fr-FR')} FCFA
+                   </div>
+                 </div>
+               );
+            })()}
           </div>
           {currentPayment.type === 'other' && (
             <div className="form-group">
@@ -1051,7 +1292,7 @@ const Payments: React.FC = () => {
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 1rem', background: paymentMethod === 'cash' ? '#fff' : 'transparent', border: paymentMethod === 'cash' ? '1px solid var(--border-color)' : '1px solid transparent', borderRadius: '4px', boxShadow: paymentMethod === 'cash' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
                 <input type="radio" name="method" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} style={{ margin: 0 }} />
-                💵 Espèces (Cash)
+                💵 Espèces
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 1rem', background: paymentMethod === 'mobile_money' ? '#fff' : 'transparent', border: paymentMethod === 'mobile_money' ? '1px solid #f97316' : '1px solid transparent', borderRadius: '4px', boxShadow: paymentMethod === 'mobile_money' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
                 <input type="radio" name="method" checked={paymentMethod === 'mobile_money'} onChange={() => setPaymentMethod('mobile_money')} style={{ margin: 0 }} />

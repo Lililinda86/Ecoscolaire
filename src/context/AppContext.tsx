@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Database, DatabasePatch } from '../db/storage';
 import { defaultDB } from '../db/storage';
-import type { User, School } from '../types';
+import type { User, School, Student, Payment } from '../types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 
@@ -50,6 +50,7 @@ const getErrorCode = (error: unknown): string | undefined => {
 interface AppContextProps {
   db: Database | null;
   updateLocalState: (patch: Partial<Database>) => void;
+  patchLocalEntities: (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => void;
   saveDB: (newDb: Database) => Promise<void>;
   safeMergeDB: (newDb: Database) => Promise<void>;
   safePatchDB: (patch: DatabasePatch) => Promise<void>;
@@ -257,6 +258,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const fetchPromises = collectionsToFetch.map(async (colName) => {
           try {
             let q;
+            if (colName === 'students') {
+              console.log(`[DEBUG STUDENTS] Avant getDocs pour students. targetSchoolId: ${targetSchoolId}, role: ${userData.role}`);
+            }
             if (userData.role === 'parent' && colName === 'students') {
               const fetchQueries = [];
               if (userData.studentIds && userData.studentIds.length > 0) {
@@ -266,17 +270,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId), where('parentEmails', 'array-contains', firebaseUser.email.toLowerCase().trim()))));
               }
               if (fetchQueries.length === 0) {
+                if (colName === 'students') console.log(`[DEBUG STUDENTS] Parent sans liaison, aucun document chargé.`);
                 return { colName, data: [] };
               }
               const snaps = await Promise.all(fetchQueries);
               const allDocs = new Map();
               snaps.forEach((snap: QuerySnapshot<DocumentData>) => snap.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) => allDocs.set(d.id, { id: d.id, ...d.data() })));
               console.log(`🔵 [AppContext] Lecture Firestore [${colName}] pour parent : ${allDocs.size} document(s) chargé(s).`);
+              if (colName === 'students') {
+                console.log(`[DEBUG STUDENTS] Documents trouvés (${allDocs.size}):`);
+                allDocs.forEach((val, key) => console.log(` - ID: ${key}, Name: ${val.name}, schoolId: ${val.schoolId}`));
+              }
               return { colName, data: Array.from(allDocs.values()) };
             } else {
               q = query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId));
             }
             const snap = await getDocs(q);
+            if (colName === 'students') {
+              console.log(`[DEBUG STUDENTS] Après getDocs pour students. Nombre docs: ${snap.docs.length}`);
+              snap.docs.forEach(d => console.log(` - ID: ${d.id}, Name: ${d.data().name}, schoolId: ${d.data().schoolId}`));
+            }
             console.log(`🔵 [AppContext] Lecture Firestore [${colName}] : ${snap.docs.length} document(s) chargé(s).`);
             return { colName, data: snap.docs.map(d => ({id: d.id, ...d.data()})) };
           } catch (e) {
@@ -626,9 +639,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDb(prev => prev ? { ...prev, ...patch } : null);
   };
 
+  const patchLocalEntities = (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => {
+    setDb(prev => {
+      if (!prev) return prev;
+      const students = prev.students.map(item =>
+        item.id === student.id ? student : item
+      );
+      const paymentExists = prev.payments.some(item =>
+        item.id === payment.id
+      );
+      const payments = paymentExists
+        ? prev.payments.map(item =>
+            item.id === payment.id ? payment : item
+          )
+        : [payment, ...prev.payments];
+
+      let receipts = prev.receipts || [];
+      if (receipt) {
+        const receiptExists = receipts.some(item => item.id === receipt.id);
+        receipts = receiptExists
+          ? receipts.map(item => item.id === receipt.id ? receipt : item)
+          : [receipt, ...receipts];
+      }
+
+      return {
+        ...prev,
+        students,
+        payments,
+        receipts
+      };
+    });
+  };
+
   return (
     <AppContext.Provider value={{ 
-      db, updateLocalState, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool, 
+      db, updateLocalState, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool,
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended

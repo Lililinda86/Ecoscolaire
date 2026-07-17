@@ -55,6 +55,29 @@ export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 
+if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true') {
+  const g = globalThis as unknown as {
+    __firestore_emulator_connected__?: boolean;
+    __auth_emulator_connected__?: boolean;
+    __functions_emulator_connected__?: boolean;
+  };
+  if (!g.__firestore_emulator_connected__) {
+    const { connectFirestoreEmulator } = await import('firebase/firestore');
+    connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    g.__firestore_emulator_connected__ = true;
+  }
+  if (!g.__auth_emulator_connected__) {
+    const { connectAuthEmulator } = await import('firebase/auth');
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099');
+    g.__auth_emulator_connected__ = true;
+  }
+  if (!g.__functions_emulator_connected__) {
+    const { connectFunctionsEmulator } = await import('firebase/functions');
+    connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+    g.__functions_emulator_connected__ = true;
+  }
+}
+
 // Application secondaire pour créer des comptes sans déconnecter l'admin
 export const createSecondaryUser = async (email: string, pass: string) => {
   const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp');

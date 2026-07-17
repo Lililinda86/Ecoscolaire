@@ -384,6 +384,16 @@ export interface PaymentTransaction {
   updatedAt: string;
 }
 
+export type DateLike =
+  | string
+  | number
+  | Date
+  | {
+      seconds?: number;
+      toDate?: () => Date;
+    }
+  | null;
+
 export interface Payment {
   id: string;
   schoolId?: string;
@@ -396,6 +406,37 @@ export interface Payment {
   description?: string;
   method?: 'cash' | 'mobile_money';
   transactionId?: string;
+  academicYear?: string;
+  createdBy?: string;
+  createdAt?: DateLike;
+  requestId?: string;
+  byRecordCashPayment?: boolean;
+}
+
+export interface ReceiptLike {
+  id?: string;
+  paymentId?: string;
+  schoolId?: string;
+  receiptNumber?: string;
+  studentId?: string;
+  studentName?: string;
+  studentRegistrationNumber?: string;
+  classId?: string;
+  className?: string;
+  academicYear?: string;
+  schoolName?: string;
+  type?: string;
+  method?: string;
+  date?: string;
+  amount?: number;
+  expectedAmount?: number;
+  previousPaid?: number;
+  newPaid?: number;
+  remainingBalance?: number;
+  collectedByUserId?: string;
+  collectedByName?: string;
+  createdAt?: DateLike;
+  [key: string]: unknown;
 }
 
 export interface Expense {
