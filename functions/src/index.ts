@@ -57,7 +57,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
   await db.collection('campay_logs').add({
     requestType: 'webhook_received_raw',
     payload: payload,
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
+    createdAt: FieldValue.serverTimestamp()
   });
 
   // 2. Validation minimale du payload
@@ -66,7 +66,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
       requestType: 'webhook_aborted',
       reason: 'Missing external_reference or reference in payload',
       payload: payload,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
     res.status(200).send('OK');
     return;
@@ -82,7 +82,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
         requestType: 'webhook_aborted',
         reason: 'Transaction not found locally',
         external_reference: external_reference,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: FieldValue.serverTimestamp()
       });
       res.status(200).send('OK');
       return;
@@ -95,7 +95,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
         reason: 'Transaction is not PENDING',
         external_reference: external_reference,
         currentStatus: txInitialData.status,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: FieldValue.serverTimestamp()
       });
       res.status(200).send('OK');
       return;
@@ -122,7 +122,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
       requestType: 'api_verification_response',
       external_reference: external_reference,
       apiResponse: apiTx,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
 
     // Extraction robuste des champs (defensive validation)
@@ -154,7 +154,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
           status: 'SUCCESS',
           providerReference: reference || null,
           providerResponse: apiTx,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: FieldValue.serverTimestamp()
         });
 
         const paymentRef = db.collection('payments').doc(external_reference);
@@ -170,28 +170,28 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
           providerReference: reference || null,
           transactionId: external_reference,
           status: 'completed',
-          date: admin.firestore.FieldValue.serverTimestamp(),
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          date: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp()
         });
 
         transaction.set(db.collection('campay_logs').doc(), {
           requestType: 'webhook_success_verified',
           external_reference: external_reference,
           status: 'SUCCESS',
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          createdAt: FieldValue.serverTimestamp()
         });
       } else if (['FAILED', 'FAILURE', 'ERROR'].includes(upperStatus)) {
         transaction.update(txRef, {
           status: 'FAILED',
           failureReason: apiTx,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: FieldValue.serverTimestamp()
         });
 
         transaction.set(db.collection('campay_logs').doc(), {
           requestType: 'webhook_failed_verified',
           external_reference: external_reference,
           status: 'FAILED',
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          createdAt: FieldValue.serverTimestamp()
         });
       } else {
         transaction.set(db.collection('campay_logs').doc(), {
@@ -200,7 +200,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
           reason: 'Mismatch in amount, reference, or unknown status',
           apiTx: apiTx,
           localTxAmount: txData.amount,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          createdAt: FieldValue.serverTimestamp()
         });
       }
     });
@@ -210,7 +210,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
       requestType: 'webhook_processing_error',
       external_reference: external_reference,
       error: getErrorMessage(error),
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
   }
 
@@ -360,7 +360,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
             },
             sanitizedResponse: response,
             errorMessage: null,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
+            createdAt: FieldValue.serverTimestamp()
           });
           
         } catch (error: unknown) {
@@ -377,7 +377,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
             },
             sanitizedResponse: null,
             errorMessage: getErrorMessage(error),
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
+            createdAt: FieldValue.serverTimestamp()
           });
           throw new functions.https.HttpsError('internal', `Campay initiation failed: ${getErrorMessage(error)}`);
         }
@@ -404,8 +404,8 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     failureReason: null,
     idempotencyKey,
     mode,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
   };
 
   await transactionRef.set(transactionData);
@@ -489,7 +489,7 @@ export const mockConfirmPayment = functions.https.onCall(async (data, context) =
     // Update transaction
     transaction.update(txRef, {
       status: 'SUCCESS',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp()
     });
 
     // Create payment document
@@ -504,8 +504,8 @@ export const mockConfirmPayment = functions.https.onCall(async (data, context) =
       installment: txData.installment || null,
       status: 'completed',
       transactionId: transactionId,
-      date: admin.firestore.FieldValue.serverTimestamp(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      date: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp()
     };
     
     transaction.set(paymentRef, paymentData);
@@ -582,8 +582,8 @@ export const onPaymentCreated = functions.firestore
         amount: paymentData.amount || 0,
         type: paymentData.type || paymentData.method || 'PAYMENT',
         method: paymentData.method || 'unknown',
-        date: paymentData.date || admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        date: paymentData.date || FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp()
       });
 
       transaction.set(receiptRef, receiptData);
@@ -844,35 +844,204 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
     const paymentSnap = await transaction.get(paymentRef);
     if (paymentSnap.exists) {
       const existing = paymentSnap.data()!;
+
+      const hasStoredPaymentId = Object.prototype.hasOwnProperty.call(existing, 'id');
       if (
-        existing.schoolId === schoolId &&
-        existing.studentId === studentId &&
-        existing.amount === amount &&
-        existing.type === type &&
-        (existing.installment ?? null) === (installment ?? null) &&
-        existing.academicYear === academicYear &&
-        existing.method === 'cash' &&
-        (existing.description ?? null) === (cleanDescription ?? null) &&
-        existing.requestId === requestId
+        hasStoredPaymentId &&
+        (
+          typeof existing.id !== 'string' ||
+          existing.id !== paymentId
+        )
       ) {
-        const receiptRef = db.collection('receipts').doc(paymentId);
-        const receiptSnap = await transaction.get(receiptRef);
-        if (!receiptSnap.exists || receiptSnap.data()?.paymentId !== paymentId || receiptSnap.data()?.schoolId !== schoolId) {
-          throw new functions.https.HttpsError('failed-precondition', 'Payment exists but corresponding receipt is missing or invalid.');
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Stored Payment ID is inconsistent.'
+        );
+      }
+
+      const reqInstallment = installment ?? null;
+      const payInstallment = existing.installment ?? null;
+      if (
+        existing.schoolId !== schoolId ||
+        existing.studentId !== studentId ||
+        existing.academicYear !== academicYear ||
+        existing.type !== type ||
+        payInstallment !== reqInstallment ||
+        existing.amount !== amount ||
+        existing.method !== 'cash' ||
+        existing.requestId !== requestId ||
+        (existing.description ?? null) !== (cleanDescription ?? null)
+      ) {
+        throw new functions.https.HttpsError('already-exists', 'A different payment already exists with this requestId.');
+      }
+
+      const receiptRef = db.collection('receipts').doc(paymentId);
+      const receiptSnap = await transaction.get(receiptRef);
+      if (!receiptSnap.exists) {
+        throw new functions.https.HttpsError('failed-precondition', 'Payment exists but corresponding receipt is missing.');
+      }
+      const receiptData = receiptSnap.data()!;
+
+      // 3. CHAMPS COMMUNS OBLIGATOIRES BETWEEN PAYMENT AND RECEIPT
+      if (
+        (receiptData.id !== undefined && receiptData.id !== paymentId) ||
+        receiptData.paymentId !== paymentId ||
+        receiptData.schoolId !== schoolId ||
+        receiptData.studentId !== studentId ||
+        receiptData.academicYear !== academicYear ||
+        receiptData.type !== type ||
+        (receiptData.installment ?? null) !== payInstallment ||
+        receiptData.amount !== amount ||
+        receiptData.method !== 'cash' ||
+        receiptData.paymentMethod !== 'cash'
+      ) {
+        throw new functions.https.HttpsError('failed-precondition', 'Receipt and Payment records are inconsistent.');
+      }
+
+      // 4. VALIDATION FINANCIÈRE DU RECEIPT
+      const expectedAmountVal = receiptData.expectedAmount;
+      const previousPaidVal = receiptData.previousPaid;
+      const newPaidVal = receiptData.newPaid;
+      const remainingBalanceVal = receiptData.remainingBalance;
+
+      if (
+        typeof expectedAmountVal !== 'number' || !Number.isFinite(expectedAmountVal) || !Number.isSafeInteger(expectedAmountVal) || expectedAmountVal <= 0 ||
+        typeof previousPaidVal !== 'number' || !Number.isFinite(previousPaidVal) || !Number.isSafeInteger(previousPaidVal) || previousPaidVal < 0 ||
+        typeof newPaidVal !== 'number' || !Number.isFinite(newPaidVal) || !Number.isSafeInteger(newPaidVal) || newPaidVal <= 0 ||
+        typeof remainingBalanceVal !== 'number' || !Number.isFinite(remainingBalanceVal) || !Number.isSafeInteger(remainingBalanceVal) || remainingBalanceVal < 0 ||
+        newPaidVal !== previousPaidVal + amount ||
+        remainingBalanceVal !== expectedAmountVal - newPaidVal ||
+        newPaidVal > expectedAmountVal
+      ) {
+        throw new functions.https.HttpsError('failed-precondition', 'Receipt financial values are inconsistent or invalid.');
+      }
+
+      // 5. PRÉSENCE STRICTE DES SNAPSHOTS DE RÉDUCTION
+      const keys = ['discountId', 'discountCode', 'grossExpectedAmount', 'discountAmount', 'netExpectedAmount'];
+
+      const payHasMap = keys.map(k => Object.prototype.hasOwnProperty.call(existing, k));
+      const recHasMap = keys.map(k => Object.prototype.hasOwnProperty.call(receiptData, k));
+
+      const payCount = payHasMap.filter(Boolean).length;
+      const recCount = recHasMap.filter(Boolean).length;
+
+      if (payCount !== 0 && payCount !== 5) {
+        throw new functions.https.HttpsError('failed-precondition', 'Payment has a partial set of reduction fields.');
+      }
+      if (recCount !== 0 && recCount !== 5) {
+        throw new functions.https.HttpsError('failed-precondition', 'Receipt has a partial set of reduction fields.');
+      }
+
+      const payIsReduced = payCount === 5;
+      const recIsReduced = recCount === 5;
+
+      if (payIsReduced !== recIsReduced) {
+        throw new functions.https.HttpsError('failed-precondition', 'Payment and Receipt reduction states do not match.');
+      }
+
+      if (payIsReduced) {
+        for (const k of keys) {
+          const val = existing[k];
+          if (val === null || val === undefined) {
+            throw new functions.https.HttpsError('failed-precondition', `Field ${k} is null or undefined in Payment.`);
+          }
+          const recVal = receiptData[k];
+          if (recVal === null || recVal === undefined) {
+            throw new functions.https.HttpsError('failed-precondition', `Field ${k} is null or undefined in Receipt.`);
+          }
+
+          if (k === 'discountId' || k === 'discountCode') {
+            if (typeof val !== 'string' || typeof recVal !== 'string') {
+              throw new functions.https.HttpsError('failed-precondition', `Field ${k} must be a string.`);
+            }
+          } else {
+            if (typeof val !== 'number' || typeof recVal !== 'number') {
+              throw new functions.https.HttpsError('failed-precondition', `Field ${k} must be a number.`);
+            }
+          }
         }
-        const receiptData = receiptSnap.data()!;
+      }
+
+      // 6. REPLAY RÉDUIT STRICT
+      if (payIsReduced) {
+        const discountIdVal = existing.discountId;
+        const discountCodeVal = existing.discountCode;
+        const grossExpectedAmountVal = existing.grossExpectedAmount;
+        const discountAmountVal = existing.discountAmount;
+        const netExpectedAmountVal = existing.netExpectedAmount;
+
+        if (
+          discountIdVal.trim() !== discountIdVal || discountIdVal.length === 0 ||
+          typeof discountCodeVal !== 'string' || discountCodeVal.trim() === '' || discountCodeVal !== discountCodeVal.trim() ||
+          typeof grossExpectedAmountVal !== 'number' || !Number.isSafeInteger(grossExpectedAmountVal) || grossExpectedAmountVal <= 0 ||
+          typeof discountAmountVal !== 'number' || !Number.isSafeInteger(discountAmountVal) || discountAmountVal <= 0 ||
+          typeof netExpectedAmountVal !== 'number' || !Number.isSafeInteger(netExpectedAmountVal) || netExpectedAmountVal <= 0 ||
+          discountAmountVal >= grossExpectedAmountVal
+        ) {
+          throw new functions.https.HttpsError('failed-precondition', 'Reduction snapshot values are invalid.');
+        }
+
+        try {
+          const calc = calculateTuitionDiscountAmounts(grossExpectedAmountVal, discountAmountVal);
+          if (calc.netExpectedAmount !== netExpectedAmountVal) {
+            throw new Error();
+          }
+        } catch {
+          throw new functions.https.HttpsError('failed-precondition', 'calculateTuitionDiscountAmounts mismatch.');
+        }
+
+        if (expectedAmountVal !== netExpectedAmountVal) {
+          throw new functions.https.HttpsError('failed-precondition', 'expectedAmount must equal netExpectedAmount for reduced replay.');
+        }
+
+        for (const k of keys) {
+          if (existing[k] !== receiptData[k]) {
+            throw new functions.https.HttpsError('failed-precondition', `Reduction snapshot field ${k} mismatch between Payment and Receipt.`);
+          }
+        }
+
+        const financeKeys = ['expectedAmount', 'previousPaid', 'newPaid', 'remainingBalance'];
+        for (const fk of financeKeys) {
+          if (!Object.prototype.hasOwnProperty.call(existing, fk)) {
+            throw new functions.https.HttpsError('failed-precondition', `Financial field ${fk} must exist in Payment for reduced replay.`);
+          }
+          if (existing[fk] !== receiptData[fk]) {
+            throw new functions.https.HttpsError('failed-precondition', `Financial field ${fk} mismatch between Payment and Receipt.`);
+          }
+        }
+
         return {
           paymentId,
           receiptId: paymentId,
           receiptNumber: receiptData.receiptNumber || null,
           amount,
-          previousPaid: receiptData.previousPaid ?? 0,
-          newPaid: receiptData.newPaid ?? amount,
-          remainingBalance: receiptData.remainingBalance ?? 0,
+          previousPaid: previousPaidVal,
+          newPaid: newPaidVal,
+          remainingBalance: remainingBalanceVal,
           idempotentReplay: true
         };
+
       } else {
-        throw new functions.https.HttpsError('already-exists', 'A different payment already exists with this requestId.');
+        // 7. REPLAY NON RÉDUIT
+        const financeKeys = ['expectedAmount', 'previousPaid', 'newPaid', 'remainingBalance'];
+        for (const fk of financeKeys) {
+          if (Object.prototype.hasOwnProperty.call(existing, fk)) {
+            if (existing[fk] !== receiptData[fk]) {
+              throw new functions.https.HttpsError('failed-precondition', `Financial field ${fk} mismatch between Payment and Receipt.`);
+            }
+          }
+        }
+
+        return {
+          paymentId,
+          receiptId: paymentId,
+          receiptNumber: receiptData.receiptNumber || null,
+          amount,
+          previousPaid: previousPaidVal,
+          newPaid: newPaidVal,
+          remainingBalance: remainingBalanceVal,
+          idempotentReplay: true
+        };
       }
     }
 
@@ -884,7 +1053,6 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
     }
     const school = schoolSnap.data()!;
 
-    // Verrouiller l'année scolaire active pour éviter les desynchronisations car Student ne gère pas d'historique annuel
     if (!school.academicYear || typeof school.academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(school.academicYear)) {
       throw new functions.https.HttpsError('failed-precondition', 'Active academic year is not defined or invalid for this school.');
     }
@@ -903,7 +1071,7 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
       throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school.');
     }
 
-    // 4. Fetch Class Context (for className and cycle names validation)
+    // 4. Fetch Class Context
     const classId = student.classId || '';
     let className = '';
     let cycle = '';
@@ -925,104 +1093,222 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
       }
     }
 
-    // 5. Fetch Receipts Counter
-    const counterRef = db.collection('counters').doc(`receipts_${schoolId}`);
-    const counterSnap = await transaction.get(counterRef);
-    let lastReceiptNumber = 0;
-    if (counterSnap.exists) {
-      lastReceiptNumber = counterSnap.data()?.lastReceiptNumber || 0;
+    // 5. Fetch Tuition Discount Slot if applicable
+    let hasValidSlot = false;
+    let slotId = '';
+    let slotSnap: admin.firestore.DocumentSnapshot | null = null;
+    let discountSnap: admin.firestore.DocumentSnapshot | null = null;
+
+    if (type === 'tuition' && (installment === 'T1' || installment === 'T2' || installment === 'T3')) {
+      slotId = makeTuitionDiscountSlotId({ schoolId, studentId, academicYear, installment });
+      const slotRef = db.collection('tuitionDiscountSlots').doc(slotId);
+      slotSnap = await transaction.get(slotRef);
+      if (slotSnap.exists) {
+        const slotData = slotSnap.data()!;
+        if (
+          (slotData.id !== undefined && slotData.id !== slotId) ||
+          slotData.schoolId !== schoolId ||
+          slotData.studentId !== studentId ||
+          slotData.academicYear !== academicYear ||
+          slotData.installment !== installment ||
+          typeof slotData.discountId !== 'string' ||
+          slotData.discountId.trim() === '' ||
+          slotData.discountId !== slotData.discountId.trim()
+        ) {
+          throw new functions.https.HttpsError('failed-precondition', 'Slot data is inconsistent or invalid.');
+        }
+
+        const discountRef = db.collection('tuitionDiscounts').doc(slotData.discountId);
+        discountSnap = await transaction.get(discountRef);
+        if (!discountSnap.exists) {
+          throw new functions.https.HttpsError('failed-precondition', 'Discount document not found.');
+        }
+        const discountData = discountSnap.data()!;
+
+        const hasStoredDiscountId = Object.prototype.hasOwnProperty.call(discountData, 'id');
+        if (hasStoredDiscountId) {
+          if (typeof discountData.id !== 'string' || discountData.id !== slotData.discountId) {
+            throw new functions.https.HttpsError('failed-precondition', 'Discount ID is invalid.');
+          }
+        }
+        if (
+          discountData.schoolId !== schoolId ||
+          discountData.studentId !== studentId ||
+          discountData.academicYear !== academicYear ||
+          discountData.installment !== installment ||
+          typeof discountData.discountCode !== 'string' ||
+          discountData.discountCode.trim() === '' ||
+          typeof discountData.reason !== 'string' ||
+          discountData.reason.trim() === '' ||
+          typeof discountData.grossExpectedAmount !== 'number' ||
+          !Number.isFinite(discountData.grossExpectedAmount) ||
+          !Number.isSafeInteger(discountData.grossExpectedAmount) ||
+          discountData.grossExpectedAmount <= 0 ||
+          typeof discountData.discountAmount !== 'number' ||
+          !Number.isFinite(discountData.discountAmount) ||
+          !Number.isSafeInteger(discountData.discountAmount) ||
+          discountData.discountAmount <= 0 ||
+          typeof discountData.netExpectedAmount !== 'number' ||
+          !Number.isFinite(discountData.netExpectedAmount) ||
+          !Number.isSafeInteger(discountData.netExpectedAmount) ||
+          discountData.netExpectedAmount <= 0 ||
+          discountData.discountAmount >= discountData.grossExpectedAmount
+        ) {
+          throw new functions.https.HttpsError('failed-precondition', 'Discount parameters are invalid.');
+        }
+
+        try {
+          const calc = calculateTuitionDiscountAmounts(discountData.grossExpectedAmount, discountData.discountAmount);
+          if (calc.netExpectedAmount !== discountData.netExpectedAmount) {
+            throw new Error();
+          }
+        } catch {
+          throw new functions.https.HttpsError('failed-precondition', 'Discount amounts calculation mismatch.');
+        }
+
+        const allowedStatuses = ['approved', 'applied'];
+        if (!allowedStatuses.includes(discountData.status)) {
+          throw new functions.https.HttpsError('failed-precondition', `New payments are not allowed for status ${discountData.status}.`);
+        }
+
+        hasValidSlot = true;
+      }
     }
 
-    // 6. Fetch previous payments to calculate cumulative previousPaid for the tranche/category
+    // 6. Fetch previous payments
+    let paymentsSnap: admin.firestore.QuerySnapshot;
+    if (type === 'registration_fee') {
+      paymentsSnap = await transaction.get(
+        db.collection('payments').where('studentId', '==', studentId).where('type', '==', 'registration_fee')
+      );
+    } else {
+      paymentsSnap = await transaction.get(
+        db.collection('payments').where('studentId', '==', studentId).where('type', '==', 'tuition')
+      );
+    }
+
+    // 7. Fetch Receipts Counter
+    const counterRef = db.collection('counters').doc(`receipts_${schoolId}`);
+    const counterSnap = await transaction.get(counterRef);
+
+    // Calculations Phase
     let previousPaid = 0;
     let expectedAmount = 0;
     const globalFees = school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 };
-    let paymentsList: admin.firestore.DocumentData[] = [];
+    const paymentsList = paymentsSnap.docs.map(doc => doc.data());
 
-    if (type === 'registration_fee') {
-      expectedAmount = student.registrationFeeExpected;
-      if (!expectedAmount || expectedAmount <= 0) {
-        throw new functions.https.HttpsError('failed-precondition', 'Registration fee expected amount is not defined for this student.');
-      }
-      const paymentsSnap = await transaction.get(
-        db.collection('payments').where('studentId', '==', studentId).where('type', '==', 'registration_fee')
-      );
-      paymentsList = paymentsSnap.docs.map(doc => doc.data());
+    if (hasValidSlot) {
+      const discountData = discountSnap!.data()!;
+      expectedAmount = discountData.netExpectedAmount;
+
       for (const p of paymentsList) {
         if (p.schoolId === schoolId && !p.academicYear) {
           throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy payments found without academicYear. Recording blocked.');
         }
       }
-      previousPaid = paymentsList
-        .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
-    } else if (type === 'tuition') {
-      expectedAmount = installment === 'T1' ? (student.feeT1 ?? globalFees.feeT1 ?? 0) : installment === 'T2' ? (student.feeT2 ?? globalFees.feeT2 ?? 0) : (student.feeT3 ?? globalFees.feeT3 ?? 0);
-      if (!expectedAmount || expectedAmount <= 0) {
-        throw new functions.https.HttpsError('failed-precondition', `Expected tuition fee for installment ${installment} is not defined.`);
-      }
-      const paymentsSnap = await transaction.get(
-        db.collection('payments').where('studentId', '==', studentId).where('type', '==', 'tuition')
+
+      const filteredPayments = paymentsList.filter(
+        p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment && p.type === 'tuition'
       );
-      paymentsList = paymentsSnap.docs.map(doc => doc.data());
-      for (const p of paymentsList) {
-        if (p.schoolId === schoolId && !p.academicYear) {
-          throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy payments found without academicYear. Recording blocked.');
+
+      for (const p of filteredPayments) {
+        if (
+          typeof p.amount !== 'number' ||
+          !Number.isFinite(p.amount) ||
+          !Number.isSafeInteger(p.amount) ||
+          p.amount <= 0 ||
+          p.discountId !== slotSnap!.data()!.discountId ||
+          p.discountCode !== discountData.discountCode ||
+          p.grossExpectedAmount !== discountData.grossExpectedAmount ||
+          p.discountAmount !== discountData.discountAmount ||
+          p.netExpectedAmount !== discountData.netExpectedAmount ||
+          p.expectedAmount !== discountData.netExpectedAmount
+        ) {
+          throw new functions.https.HttpsError('failed-precondition', 'Historical payments are inconsistent or not reduced.');
+        }
+
+        if (!Number.isSafeInteger(previousPaid + p.amount)) {
+          throw new functions.https.HttpsError('failed-precondition', 'Safe integer overflow while calculating previousPaid.');
+        }
+        previousPaid += p.amount;
+      }
+
+      const remainingBalance = expectedAmount - previousPaid;
+      if (amount > remainingBalance) {
+        throw new functions.https.HttpsError('failed-precondition', `Payment amount (${amount}) exceeds remaining balance (${remainingBalance}).`);
+      }
+
+      if (discountData.status === 'approved') {
+        if (previousPaid !== 0) {
+          throw new functions.https.HttpsError('failed-precondition', 'Discount is approved but previousPaid is not zero.');
+        }
+      } else if (discountData.status === 'applied') {
+        if (previousPaid <= 0 || previousPaid >= expectedAmount) {
+          throw new functions.https.HttpsError('failed-precondition', 'Discount is applied but previousPaid is invalid.');
+        }
+        if (typeof discountData.firstPaymentId !== 'string' || discountData.firstPaymentId.trim() === '') {
+          throw new functions.https.HttpsError('failed-precondition', 'Discount is applied but firstPaymentId is missing.');
+        }
+        if (!discountData.firstAppliedAt) {
+          throw new functions.https.HttpsError('failed-precondition', 'Discount is applied but firstAppliedAt is missing.');
         }
       }
-      previousPaid = paymentsList
-        .filter(p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment)
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
-    }
 
-    const remainingBalance = Math.max(0, expectedAmount - previousPaid);
-    if (amount > remainingBalance) {
-      throw new functions.https.HttpsError('failed-precondition', `Payment amount (${amount}) exceeds remaining balance (${remainingBalance}).`);
-    }
+      const newPaid = previousPaid + amount;
+      const newRemaining = expectedAmount - newPaid;
 
-    const newPaid = previousPaid + amount;
-    const newRemaining = Math.max(0, expectedAmount - newPaid);
+      if (
+        !Number.isSafeInteger(previousPaid) || previousPaid < 0 || previousPaid > expectedAmount ||
+        !Number.isSafeInteger(newPaid) || newPaid <= 0 || newPaid > expectedAmount ||
+        !Number.isSafeInteger(newRemaining) || newRemaining < 0
+      ) {
+        throw new functions.https.HttpsError('failed-precondition', 'Financial calculations resulted in unsafe integers or values out of bounds.');
+      }
 
-    // 7. Increment counter
-    const nextReceiptNumber = lastReceiptNumber + 1;
-    transaction.set(counterRef, { lastReceiptNumber: nextReceiptNumber }, { merge: true });
+      let lastReceiptNumber = 0;
+      if (counterSnap.exists) {
+        lastReceiptNumber = counterSnap.data()?.lastReceiptNumber || 0;
+      }
+      const nextReceiptNumber = lastReceiptNumber + 1;
+      transaction.set(counterRef, { lastReceiptNumber: nextReceiptNumber }, { merge: true });
 
-    // 8. Format receipt number
-    const currentYear = new Date().getFullYear();
-    const formattedNum = String(nextReceiptNumber).padStart(4, '0');
-    const receiptNumber = `REC-${currentYear}-${formattedNum}`;
+      const currentYear = new Date().getFullYear();
+      const formattedNum = String(nextReceiptNumber).padStart(4, '0');
+      const receiptNumber = `REC-${currentYear}-${formattedNum}`;
 
-    // 9. Create Payment document
-    const paymentData = {
-      id: paymentId,
-      schoolId,
-      studentId,
-      amount,
-      type,
-      installment: installment || null,
-      date: new Date().toISOString().split('T')[0],
-      description: cleanDescription,
-      method: 'cash',
-      academicYear,
-      createdBy: uid,
-      createdAt: FieldValue.serverTimestamp(),
-      requestId,
-      byRecordCashPayment: true
-    };
+      const paymentData = {
+        id: paymentId,
+        schoolId,
+        studentId,
+        amount,
+        type,
+        installment: installment || null,
+        date: new Date().toISOString().split('T')[0],
+        description: cleanDescription,
+        method: 'cash',
+        academicYear,
+        createdBy: uid,
+        createdAt: FieldValue.serverTimestamp(),
+        requestId,
+        byRecordCashPayment: true,
+        expectedAmount,
+        previousPaid,
+        newPaid,
+        remainingBalance: newRemaining,
+        discountId: slotSnap!.data()!.discountId,
+        discountCode: discountData.discountCode,
+        grossExpectedAmount: discountData.grossExpectedAmount,
+        discountAmount: discountData.discountAmount,
+        netExpectedAmount: discountData.netExpectedAmount
+      };
 
-    const cleanUndefined = (obj: Record<string, unknown>) => {
-      return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null));
-    };
+      const cleanUndefined = (obj: Record<string, unknown>) => {
+        return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null));
+      };
 
-    transaction.set(paymentRef, cleanUndefined(paymentData as Record<string, unknown>));
+      transaction.set(paymentRef, cleanUndefined(paymentData));
 
-    // 10. Update Student balances
-    const studentUpdate: Record<string, unknown> = {};
-    if (type === 'registration_fee') {
-      const totalRegPaid = (student.registrationFeePaid || 0) + amount;
-      studentUpdate.registrationFeePaid = totalRegPaid;
-      studentUpdate.registrationFeeStatus = totalRegPaid >= expectedAmount ? 'paid' : (totalRegPaid > 0 ? 'partial' : 'unpaid');
-    } else if (type === 'tuition') {
+      const studentUpdate: Record<string, unknown> = {};
       for (const tp of paymentsList) {
         if (tp.schoolId === schoolId && !tp.academicYear) {
           throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy tuition payments found without academicYear.');
@@ -1037,58 +1323,232 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
 
       studentUpdate.tuitionPaid = totalTuitionPaidForYear;
       studentUpdate.tuitionStatus = totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid');
+      transaction.update(studentRef, studentUpdate);
+
+      const discountRef = db.collection('tuitionDiscounts').doc(slotSnap!.data()!.discountId);
+      const isFinalPayment = newRemaining === 0;
+
+      if (discountData.status === 'approved') {
+        if (isFinalPayment) {
+          transaction.update(discountRef, {
+            status: 'settled',
+            firstAppliedAt: FieldValue.serverTimestamp(),
+            firstPaymentId: paymentId,
+            settledAt: FieldValue.serverTimestamp(),
+            settlementPaymentId: paymentId
+          });
+        } else {
+          transaction.update(discountRef, {
+            status: 'applied',
+            firstAppliedAt: FieldValue.serverTimestamp(),
+            firstPaymentId: paymentId
+          });
+        }
+      } else if (discountData.status === 'applied') {
+        if (isFinalPayment) {
+          transaction.update(discountRef, {
+            status: 'settled',
+            settledAt: FieldValue.serverTimestamp(),
+            settlementPaymentId: paymentId
+          });
+        }
+      }
+
+      let schoolName = school.name || 'EcoScolaire';
+      if (cycle && school.cycleNames && school.cycleNames[cycle]) {
+        schoolName = school.cycleNames[cycle];
+      }
+
+      const receiptData = {
+        id: paymentId,
+        paymentId,
+        schoolId,
+        receiptNumber,
+        studentId,
+        studentName: student.name || '',
+        studentRegistrationNumber: student.matricule || '',
+        classId,
+        className,
+        academicYear,
+        schoolName,
+        type,
+        method: 'cash',
+        date: paymentData.date,
+        paymentType: type,
+        paymentMethod: 'cash',
+        paymentDate: paymentData.date,
+        amount,
+        expectedAmount,
+        previousPaid,
+        newPaid,
+        remainingBalance: newRemaining,
+        collectedByUserId: uid,
+        collectedByName: user.name || user.email || '',
+        createdAt: FieldValue.serverTimestamp(),
+        installment,
+        discountId: slotSnap!.data()!.discountId,
+        discountCode: discountData.discountCode,
+        grossExpectedAmount: discountData.grossExpectedAmount,
+        discountAmount: discountData.discountAmount,
+        netExpectedAmount: discountData.netExpectedAmount
+      };
+
+      const receiptRef = db.collection('receipts').doc(paymentId);
+      transaction.set(receiptRef, cleanUndefined(receiptData));
+
+      return {
+        paymentId,
+        receiptId: paymentId,
+        receiptNumber,
+        amount,
+        previousPaid,
+        newPaid,
+        remainingBalance: newRemaining,
+        idempotentReplay: false
+      };
+
+    } else {
+      if (type === 'registration_fee') {
+        expectedAmount = student.registrationFeeExpected;
+        if (!expectedAmount || expectedAmount <= 0) {
+          throw new functions.https.HttpsError('failed-precondition', 'Registration fee expected amount is not defined for this student.');
+        }
+        for (const p of paymentsList) {
+          if (p.schoolId === schoolId && !p.academicYear) {
+            throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy payments found without academicYear. Recording blocked.');
+          }
+        }
+        previousPaid = paymentsList
+          .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+      } else if (type === 'tuition') {
+        expectedAmount = installment === 'T1' ? (student.feeT1 ?? globalFees.feeT1 ?? 0) : installment === 'T2' ? (student.feeT2 ?? globalFees.feeT2 ?? 0) : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+        if (!expectedAmount || expectedAmount <= 0) {
+          throw new functions.https.HttpsError('failed-precondition', `Expected tuition fee for installment ${installment} is not defined.`);
+        }
+        for (const p of paymentsList) {
+          if (p.schoolId === schoolId && !p.academicYear) {
+            throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy payments found without academicYear. Recording blocked.');
+          }
+        }
+        previousPaid = paymentsList
+          .filter(p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment)
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+      }
+
+      const remainingBalance = Math.max(0, expectedAmount - previousPaid);
+      if (amount > remainingBalance) {
+        throw new functions.https.HttpsError('failed-precondition', `Payment amount (${amount}) exceeds remaining balance (${remainingBalance}).`);
+      }
+
+      const newPaid = previousPaid + amount;
+      const newRemaining = Math.max(0, expectedAmount - newPaid);
+
+      let lastReceiptNumber = 0;
+      if (counterSnap.exists) {
+        lastReceiptNumber = counterSnap.data()?.lastReceiptNumber || 0;
+      }
+      const nextReceiptNumber = lastReceiptNumber + 1;
+      transaction.set(counterRef, { lastReceiptNumber: nextReceiptNumber }, { merge: true });
+
+      const currentYear = new Date().getFullYear();
+      const formattedNum = String(nextReceiptNumber).padStart(4, '0');
+      const receiptNumber = `REC-${currentYear}-${formattedNum}`;
+
+      const paymentData = {
+        id: paymentId,
+        schoolId,
+        studentId,
+        amount,
+        type,
+        installment: installment || null,
+        date: new Date().toISOString().split('T')[0],
+        description: cleanDescription,
+        method: 'cash',
+        academicYear,
+        createdBy: uid,
+        createdAt: FieldValue.serverTimestamp(),
+        requestId,
+        byRecordCashPayment: true
+      };
+
+      const cleanUndefined = (obj: Record<string, unknown>) => {
+        return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null));
+      };
+
+      transaction.set(paymentRef, cleanUndefined(paymentData));
+
+      const studentUpdate: Record<string, unknown> = {};
+      if (type === 'registration_fee') {
+        const totalRegPaid = (student.registrationFeePaid || 0) + amount;
+        studentUpdate.registrationFeePaid = totalRegPaid;
+        studentUpdate.registrationFeeStatus = totalRegPaid >= expectedAmount ? 'paid' : (totalRegPaid > 0 ? 'partial' : 'unpaid');
+      } else if (type === 'tuition') {
+        for (const tp of paymentsList) {
+          if (tp.schoolId === schoolId && !tp.academicYear) {
+            throw new functions.https.HttpsError('failed-precondition', 'Ambiguous legacy tuition payments found without academicYear.');
+          }
+        }
+        const totalTuitionPaidForYear = paymentsList
+          .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
+          .reduce((sum, p) => sum + (p.amount || 0), 0) + amount;
+
+        const fallbackExpected = (student.feeT1 ?? globalFees.feeT1 ?? 0) + (student.feeT2 ?? globalFees.feeT2 ?? 0) + (student.feeT3 ?? globalFees.feeT3 ?? 0);
+        const totalTuitionExpectedForYear = student.tuitionExpected || fallbackExpected;
+
+        studentUpdate.tuitionPaid = totalTuitionPaidForYear;
+        studentUpdate.tuitionStatus = totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid');
+      }
+      transaction.update(studentRef, studentUpdate);
+
+      let schoolName = school.name || 'EcoScolaire';
+      if (cycle && school.cycleNames && school.cycleNames[cycle]) {
+        schoolName = school.cycleNames[cycle];
+      }
+
+      const receiptData = {
+        id: paymentId,
+        paymentId,
+        schoolId,
+        receiptNumber,
+        studentId,
+        studentName: student.name || '',
+        studentRegistrationNumber: student.matricule || '',
+        classId,
+        className,
+        academicYear,
+        schoolName,
+        type,
+        method: 'cash',
+        date: paymentData.date,
+        paymentType: type,
+        paymentMethod: 'cash',
+        paymentDate: paymentData.date,
+        amount,
+        expectedAmount,
+        previousPaid,
+        newPaid,
+        remainingBalance: newRemaining,
+        collectedByUserId: uid,
+        collectedByName: user.name || user.email || '',
+        createdAt: FieldValue.serverTimestamp(),
+        ...(type === 'tuition' && installment ? { installment } : {})
+      };
+
+      const receiptRef = db.collection('receipts').doc(paymentId);
+      transaction.set(receiptRef, cleanUndefined(receiptData));
+
+      return {
+        paymentId,
+        receiptId: paymentId,
+        receiptNumber,
+        amount,
+        previousPaid,
+        newPaid,
+        remainingBalance: newRemaining,
+        idempotentReplay: false
+      };
     }
-    transaction.update(studentRef, studentUpdate);
-
-    // 11. Determine school name based on cycle Names
-    let schoolName = school.name || 'EcoScolaire';
-    if (cycle && school.cycleNames && school.cycleNames[cycle]) {
-      schoolName = school.cycleNames[cycle];
-    }
-
-    // 12. Create Receipt document
-    const receiptRef = db.collection('receipts').doc(paymentId);
-    const receiptData = {
-      id: paymentId,
-      paymentId,
-      schoolId,
-      receiptNumber,
-      studentId,
-      studentName: student.name || '',
-      studentRegistrationNumber: student.matricule || '',
-      classId,
-      className,
-      academicYear,
-      schoolName,
-      type,
-      method: 'cash',
-      date: paymentData.date,
-      paymentType: type,
-      paymentMethod: 'cash',
-      paymentDate: paymentData.date,
-      amount,
-      expectedAmount,
-      previousPaid,
-      newPaid,
-      remainingBalance: newRemaining,
-      collectedByUserId: uid,
-      collectedByName: user.name || user.email || '',
-      createdAt: FieldValue.serverTimestamp(),
-      ...(type === 'tuition' && installment ? { installment } : {})
-    };
-
-    transaction.set(receiptRef, cleanUndefined(receiptData));
-
-    return {
-      paymentId,
-      receiptId: paymentId,
-      receiptNumber,
-      amount,
-      previousPaid,
-      newPaid,
-      remainingBalance: newRemaining,
-      idempotentReplay: false
-    };
   });
 });
 
