@@ -115,7 +115,7 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
           {displayModel.hasSnapshots ? (
             <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
               <h3 style={{ margin: '0 0 1rem 0', fontSize: '11pt', color: '#475569', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                Situation financière de la tranche
+                {displayModel.paymentType === 'registration_fee' ? "Situation financière des frais d’inscription" : "Situation financière de la tranche"}
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '11pt' }}>
                 <div>

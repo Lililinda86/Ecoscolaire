@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
-import type { Payment, Expense, Student } from '../types';
+import type { Payment, Expense, Student, ReceiptLike } from '../types';
 import Modal from '../components/Modal';
 import TransactionHistory from '../components/TransactionHistory';
 import ReceiptHistory from '../components/ReceiptHistory';
@@ -11,7 +11,7 @@ import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, deleteDoc, runTransaction, getDoc } from 'firebase/firestore';
-import { translatePaymentType, translateInstallment, formatCurrency } from '../utils/paymentReceipt';
+import { translatePaymentType, translateInstallment, formatCurrency, translatePaymentMethod } from '../utils/paymentReceipt';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -28,6 +28,20 @@ const getErrorMessage = (error: unknown): string => {
   }
 
   return String(error);
+};
+
+const findSnapshotReceiptForPayment = (
+  payment: Payment,
+  receipts?: ReceiptLike[]
+): ReceiptLike | undefined => {
+  if (!receipts) return undefined;
+  return receipts.find(r => {
+    if (r.paymentId !== payment.id) return false;
+    if (payment.schoolId && r.schoolId && r.schoolId !== payment.schoolId) return false;
+    if (payment.studentId && r.studentId && r.studentId !== payment.studentId) return false;
+    if (payment.academicYear && r.academicYear && r.academicYear !== payment.academicYear) return false;
+    return true;
+  });
 };
 
 type InitiatePaymentResult = {
@@ -912,23 +926,21 @@ const Payments: React.FC = () => {
               ) : (
                 db.payments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => {
                   const student = db.students.find(s => s.id === p.studentId);
-                  const typeMap: Record<string, string> = { transport: `Transport (${p.month || 'Mensuel'})`, uniforms: 'Tenues', tuition: `Scolarité (${p.installment || ''})`, registration_fee: "Frais d'inscription", other: 'Autre' };
                   
-                  let remainingText = "-";
-                  if (student && p.type !== 'other') {
-                    let expected = 0;
-                    const g = db.school?.globalFees || {feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0};
-                    if (p.type === 'tuition') {
-                      expected = p.installment === 'T1' ? (student.feeT1 ?? g.feeT1) : p.installment === 'T2' ? (student.feeT2 ?? g.feeT2) : (student.feeT3 ?? g.feeT3);
-                    } else if (p.type === 'transport') expected = student.feeTransport ?? g.feeTransport;
-                    else if (p.type === 'uniforms') expected = student.feeUniforms ?? g.feeUniforms;
-                    else if (p.type === 'registration_fee') expected = student.registrationFeeExpected ?? 15000;
-                    
-                    const alreadyPaid = db.payments.filter(x => x.studentId === student.id && x.type === p.type && (p.type !== 'tuition' || x.installment === p.installment)).reduce((s, x) => s + x.amount, 0);
-                    const remaining = Math.max(0, expected - alreadyPaid);
-                    if (expected > 0) {
-                      remainingText = remaining === 0 ? "Soldé ✓" : `${remaining.toLocaleString('fr-FR')} FCFA`;
-                    }
+                  const typeMap: Record<string, string> = {
+                    transport: `Transport (${p.month || 'Mensuel'})`,
+                    uniforms: 'Tenues',
+                    tuition: p.installment ? `Frais de scolarité (${translateInstallment(p.installment)})` : 'Frais de scolarité',
+                    registration_fee: "Frais d'inscription",
+                    other: 'Autre'
+                  };
+
+                  let remainingText = "—";
+                  const receipt = findSnapshotReceiptForPayment(p, db.receipts);
+                  if (receipt && receipt.remainingBalance !== undefined && receipt.remainingBalance !== null) {
+                    remainingText = receipt.remainingBalance === 0
+                      ? "Soldé ✓"
+                      : `${receipt.remainingBalance.toLocaleString('fr-FR')} FCFA`;
                   }
 
                   return (
@@ -938,9 +950,9 @@ const Payments: React.FC = () => {
                       <td style={{ padding: '1rem' }}>
                         {typeMap[p.type] || p.type}
                         {p.method === 'mobile_money' ? (
-                          <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.4rem', background: 'rgba(249, 115, 22, 0.1)', color: '#f97316', fontSize: '0.75em', borderRadius: '4px' }}>📱 MoMo</span>
+                          <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.4rem', background: 'rgba(249, 115, 22, 0.1)', color: '#f97316', fontSize: '0.75em', borderRadius: '4px' }}>📱 {translatePaymentMethod(p.method)}</span>
                         ) : (
-                          <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.4rem', background: '#e5e7eb', color: '#374151', fontSize: '0.75em', borderRadius: '4px' }}>💵 Cash</span>
+                          <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.4rem', background: '#e5e7eb', color: '#374151', fontSize: '0.75em', borderRadius: '4px' }}>💵 {translatePaymentMethod(p.method)}</span>
                         )}
                         {p.type === 'other' && p.description && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{p.description}</div>}
                       </td>

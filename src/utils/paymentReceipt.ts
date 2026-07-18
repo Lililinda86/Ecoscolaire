@@ -29,6 +29,7 @@ export interface ReceiptDisplayModel {
   formattedPreviousPaid: string;
   formattedNewPaid: string;
   formattedRemainingBalance: string;
+  paymentType?: string;
 }
 
 // Centralized Translation Mappings
@@ -155,6 +156,7 @@ export const buildReceiptDisplayModel = (
     formattedExpectedAmount: formatCurrency(receipt.expectedAmount),
     formattedPreviousPaid: formatCurrency(receipt.previousPaid),
     formattedNewPaid: formatCurrency(receipt.newPaid),
-    formattedRemainingBalance: formatCurrency(receipt.remainingBalance)
+    formattedRemainingBalance: formatCurrency(receipt.remainingBalance),
+    paymentType: (receipt.type || receipt.paymentType) as string | undefined
   };
 };
