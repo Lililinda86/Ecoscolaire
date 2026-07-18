@@ -363,16 +363,28 @@ const Payments: React.FC = () => {
         'recordCashPayment'
       );
 
+      // Vérification défensive frontend
+      if (currentPayment.type === 'tuition' && !currentPayment.installment) {
+        alert("Veuillez sélectionner une tranche pour les frais de scolarité.");
+        setIsSaving(false);
+        return;
+      }
+
       const payload: RecordCashPaymentInput = {
         requestId: reqId,
         schoolId: currentSchool.id,
         studentId: currentPayment.studentId,
         amount,
         type: currentPayment.type as 'tuition' | 'registration_fee',
-        installment: currentPayment.installment || undefined,
-        description: currentPayment.description || undefined,
-        academicYear: currentSchool.academicYear
-      };
+        ...(currentPayment.description ? { description: currentPayment.description } : {}),
+        academicYear: currentSchool.academicYear,
+        ...(currentPayment.type === 'tuition' ? { installment: currentPayment.installment } : {})
+      } as RecordCashPaymentInput;
+
+      // Sécurité supplémentaire : suppression de la clé installment si type !== tuition
+      if (payload.type !== 'tuition' && 'installment' in payload) {
+        delete (payload as Partial<RecordCashPaymentInput>).installment;
+      }
 
       const result = await recordCashPaymentCall(payload);
       const resData = result.data;
@@ -749,7 +761,7 @@ const Payments: React.FC = () => {
             <div style={{ margin: '1rem 0', fontSize: '1.2rem', lineHeight: '1.8' }}>
               <strong>Élève :</strong> {db.students.find(s => s.id === receiptToPrint.studentId)?.name} <br/>
               <strong>Date :</strong> {new Date(receiptToPrint.date).toLocaleDateString('fr-FR')} <br/>
-              <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Droit d'inscription" : receiptToPrint.type === 'transport' ? `Transport (${receiptToPrint.month || 'Mensuel'})` : receiptToPrint.type === 'tuition' ? `Scolarité (${receiptToPrint.installment || ''})` : receiptToPrint.type} <br/>
+              <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Frais d'inscription" : receiptToPrint.type === 'transport' ? `Transport (${receiptToPrint.month || 'Mensuel'})` : receiptToPrint.type === 'tuition' ? `Scolarité (${receiptToPrint.installment || ''})` : receiptToPrint.type} <br/>
               <strong>Montant payé :</strong> <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>{receiptToPrint.amount.toLocaleString('fr-FR')} FCFA</span><br/>
             </div>
             <div style={{ marginTop: '4rem', display: 'flex', justifyContent: 'space-between', color: '#555' }}>
@@ -900,7 +912,7 @@ const Payments: React.FC = () => {
               ) : (
                 db.payments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => {
                   const student = db.students.find(s => s.id === p.studentId);
-                  const typeMap: Record<string, string> = { transport: `Transport (${p.month || 'Mensuel'})`, uniforms: 'Tenues', tuition: `Scolarité (${p.installment || ''})`, registration_fee: "Droit d'inscription", other: 'Autre' };
+                  const typeMap: Record<string, string> = { transport: `Transport (${p.month || 'Mensuel'})`, uniforms: 'Tenues', tuition: `Scolarité (${p.installment || ''})`, registration_fee: "Frais d'inscription", other: 'Autre' };
                   
                   let remainingText = "-";
                   if (student && p.type !== 'other') {
@@ -1197,10 +1209,32 @@ const Payments: React.FC = () => {
             </select>
           </div>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+             <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
               <label>Nature du Versement</label>
-              <select required value={currentPayment.type || 'tuition'} onChange={e => setCurrentPayment({...currentPayment, type: e.target.value as 'tuition' | 'transport' | 'uniforms' | 'registration_fee' | 'other'})}>
-                <option value="registration_fee">Droit d'inscription</option>
+              <select required value={currentPayment.type || 'tuition'} onChange={e => {
+                const newType = e.target.value as 'tuition' | 'transport' | 'uniforms' | 'registration_fee' | 'other';
+                if (newType === 'registration_fee') {
+                  setCurrentPayment(prev => {
+                    const nextPayment: Partial<Payment> = { ...prev, type: 'registration_fee', amount: '' as unknown as number };
+                    delete nextPayment.installment;
+                    return nextPayment;
+                  });
+                } else if (newType === 'tuition') {
+                  setCurrentPayment(prev => ({
+                    ...prev,
+                    type: 'tuition',
+                    installment: 'T1',
+                    amount: '' as unknown as number
+                  }));
+                } else {
+                  setCurrentPayment(prev => {
+                    const nextPayment: Partial<Payment> = { ...prev, type: newType, amount: '' as unknown as number };
+                    delete nextPayment.installment;
+                    return nextPayment;
+                  });
+                }
+              }}>
+                <option value="registration_fee">Frais d'inscription</option>
                 <option value="tuition">Scolarité (Tranche versée)</option>
                 <option value="transport">Transport (Bus)</option>
                 <option value="uniforms">Tenues</option>
@@ -1270,7 +1304,7 @@ const Payments: React.FC = () => {
                return (
                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f3f4f6', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
                    <div>• <strong>Montant attendu :</strong> {expected.toLocaleString('fr-FR')} FCFA</div>
-                   <div>• <strong>Déjà payé sur la tranche :</strong> {paidBefore.toLocaleString('fr-FR')} FCFA</div>
+                   <div>• <strong>{currentPayment.type === 'tuition' ? 'Déjà payé sur la tranche :' : 'Déjà payé :'}</strong> {paidBefore.toLocaleString('fr-FR')} FCFA</div>
                    <div>• <strong>Reste avant versement :</strong> {resteAvant.toLocaleString('fr-FR')} FCFA</div>
                    {saisi > 0 && <div>• <strong>Montant saisi :</strong> {saisi.toLocaleString('fr-FR')} FCFA</div>}
                    <div style={{ color: resteApres > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold', marginTop: '0.25rem' }}>
