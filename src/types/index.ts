@@ -465,3 +465,51 @@ export interface InventoryTransaction {
   personName: string;
   date: string;
 }
+
+export type DiscountStatus =
+  | 'draft'
+  | 'approved'
+  | 'applied'
+  | 'settled'
+  | 'revoked';
+
+export type TuitionInstallment = 'T1' | 'T2' | 'T3';
+
+/**
+ * TuitionDiscount represents a discount allocated to a student for a specific trimester.
+ * Note: Amounts are temporary drafts until approved, when they become immutable snapshots.
+ */
+export interface TuitionDiscount {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  academicYear: string;
+  discountCode: string;
+  installment: TuitionInstallment;
+  grossExpectedAmount: number;
+  discountAmount: number;
+  netExpectedAmount: number;
+  reason: string;
+  status: DiscountStatus;
+  createdByUserId: string;
+  approvedByUserId?: string;
+  createdAt: DateLike;
+  approvedAt?: DateLike;
+  firstAppliedAt?: DateLike;
+  settledAt?: DateLike;
+  revokedAt?: DateLike;
+  revokedByUserId?: string;
+  revocationReason?: string;
+  firstPaymentId?: string;
+  settlementPaymentId?: string;
+}
+
+export interface TuitionDiscountSlot {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  academicYear: string;
+  installment: TuitionInstallment;
+  discountId: string;
+  createdAt: DateLike;
+}
