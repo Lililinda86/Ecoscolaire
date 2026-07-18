@@ -4,6 +4,12 @@ import * as admin from 'firebase-admin';
 import { CampayService } from './services/campayService';
 import * as crypto from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
+import {
+  isTuitionInstallment,
+  calculateTuitionDiscountAmounts,
+  makeTuitionDiscountCounterId
+} from './utils/discountHelpers';
+
 
 // Initialize the Firebase Admin SDK
 admin.initializeApp();
@@ -1085,4 +1091,239 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
   });
 });
 
+// ----------------------------------------------------------------------
+// 10. createTuitionDiscount (Callable)
+// ----------------------------------------------------------------------
+export const createTuitionDiscount = functions.https.onCall(async (data, context) => {
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+
+  const uid = context.auth.uid;
+
+  const {
+    studentId,
+    installment,
+    discountAmount,
+    reason,
+    requestId
+  } = data || {};
+
+  // Input Validation
+  if (typeof studentId !== 'string' || studentId.trim() === '') {
+    throw new functions.https.HttpsError('invalid-argument', 'studentId must be a non-empty string.');
+  }
+  if (!isTuitionInstallment(installment)) {
+    throw new functions.https.HttpsError('invalid-argument', 'installment must be T1, T2, or T3.');
+  }
+  if (typeof discountAmount !== 'number' || !Number.isFinite(discountAmount) || !Number.isSafeInteger(discountAmount) || discountAmount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'discountAmount must be a positive safe integer.');
+  }
+  if (typeof reason !== 'string' || reason.trim() === '' || reason.trim().length < 3 || reason.trim().length > 500) {
+    throw new functions.https.HttpsError('invalid-argument', 'reason must be a string between 3 and 500 characters.');
+  }
+  if (typeof requestId !== 'string' || requestId.trim() === '' || requestId.trim().length > 128) {
+    throw new functions.https.HttpsError('invalid-argument', 'requestId must be a string under 128 characters.');
+  }
+
+  const cleanReason = reason.trim();
+  const cleanRequestId = requestId.trim();
+  const cleanStudentId = studentId.trim();
+
+  const db = admin.firestore();
+
+  return await db.runTransaction(async (transaction) => {
+    // 1. users/{uid}
+    const userRef = db.collection('users').doc(uid);
+    const userSnap = await transaction.get(userRef);
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError('permission-denied', 'Operator user not found.');
+    }
+    const user = userSnap.data()!;
+    if (user.isActive !== true) {
+      throw new functions.https.HttpsError('permission-denied', 'Operator is inactive.');
+    }
+    const allowedRoles = ['owner', 'director', 'superAdmin'];
+    if (!allowedRoles.includes(user.role)) {
+      throw new functions.https.HttpsError('permission-denied', 'Operator role not authorized for discounts.');
+    }
+
+    // 2. students/{studentId}
+    const studentRef = db.collection('students').doc(cleanStudentId);
+    const studentSnap = await transaction.get(studentRef);
+    if (!studentSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Student not found.');
+    }
+    const student = studentSnap.data()!;
+    const schoolId = student.schoolId;
+    const academicYear = student.academicYear;
+
+    if (!schoolId || !academicYear) {
+      throw new functions.https.HttpsError('failed-precondition', 'Student schoolId or academicYear is missing.');
+    }
+
+    if (student.active === false || student.isActive === false) {
+      throw new functions.https.HttpsError('failed-precondition', 'Student is inactive.');
+    }
+
+    // Role checks with schoolId context
+    if (user.role !== 'superAdmin' && user.schoolId !== schoolId) {
+      throw new functions.https.HttpsError('permission-denied', 'Operator does not belong to this school.');
+    }
+
+    // 3. schools/{schoolId}
+    const schoolRef = db.collection('schools').doc(schoolId);
+    const schoolSnap = await transaction.get(schoolRef);
+    if (!schoolSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'School not found.');
+    }
+    const school = schoolSnap.data()!;
+
+    // Academic Year validation
+    if (!school.academicYear || typeof school.academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(school.academicYear)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Active academic year is not defined or invalid for this school.');
+    }
+    if (academicYear !== school.academicYear) {
+      throw new functions.https.HttpsError('failed-precondition', 'The requested academic year is not the active academic year of the school.');
+    }
+
+    // School active/subscription status checks
+    if (school.active === false || school.isActive === false || school.status === 'inactive') {
+      throw new functions.https.HttpsError('failed-precondition', 'School is inactive.');
+    }
+    if (school.subscriptionStatus && school.subscriptionStatus !== 'active' && school.subscriptionStatus !== 'trialing') {
+      throw new functions.https.HttpsError('failed-precondition', 'School subscription is not active.');
+    }
+
+    // 4. tuitionDiscounts/{deterministicDiscountId}
+    const discountIdentity = JSON.stringify([schoolId, cleanRequestId]);
+    const discountHash = crypto.createHash('sha256').update(discountIdentity, 'utf8').digest('hex');
+    const discountId = `discount_${discountHash}`;
+    const discountRef = db.collection('tuitionDiscounts').doc(discountId);
+    const discountSnap = await transaction.get(discountRef);
+
+    if (discountSnap.exists) {
+      const existing = discountSnap.data()!;
+      if (
+        existing.schoolId === schoolId &&
+        existing.studentId === cleanStudentId &&
+        existing.academicYear === academicYear &&
+        existing.installment === installment &&
+        existing.discountAmount === discountAmount &&
+        existing.reason === cleanReason
+      ) {
+        return {
+          success: true,
+          discountId,
+          discountCode: existing.discountCode,
+          status: existing.status,
+          schoolId: existing.schoolId,
+          studentId: existing.studentId,
+          academicYear: existing.academicYear,
+          installment: existing.installment,
+          grossExpectedAmount: existing.grossExpectedAmount,
+          discountAmount: existing.discountAmount,
+          netExpectedAmount: existing.netExpectedAmount,
+          idempotentReplay: true
+        };
+      } else {
+        throw new functions.https.HttpsError('already-exists', 'A different discount already exists with this requestId.');
+      }
+    }
+
+    // Resolve current tuition fee
+    const globalFees = school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 };
+    const grossExpectedAmount = installment === 'T1'
+      ? (student.feeT1 ?? globalFees.feeT1 ?? 0)
+      : installment === 'T2'
+        ? (student.feeT2 ?? globalFees.feeT2 ?? 0)
+        : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+
+    if (
+      typeof grossExpectedAmount !== 'number' ||
+      !Number.isFinite(grossExpectedAmount) ||
+      !Number.isSafeInteger(grossExpectedAmount) ||
+      grossExpectedAmount <= 0
+    ) {
+      throw new functions.https.HttpsError('failed-precondition', `Expected tuition fee for installment ${installment} is not defined or invalid.`);
+    }
+
+    // Validate discount calculation
+    let discountAmounts;
+    try {
+      discountAmounts = calculateTuitionDiscountAmounts(grossExpectedAmount, discountAmount);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Calcul de réduction invalide.';
+      throw new functions.https.HttpsError('failed-precondition', msg);
+    }
+
+    // Academic year starting digits extraction validation
+    if (!academicYear || typeof academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(academicYear)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Academic year format is invalid.');
+    }
+    const yearPrefix = academicYear.substring(0, 4);
+
+    // 5. tuitionDiscountCounters/{counterId} (only when Discount does not exist)
+    const counterId = makeTuitionDiscountCounterId({ schoolId, academicYear });
+    const counterRef = db.collection('tuitionDiscountCounters').doc(counterId);
+    const counterSnap = await transaction.get(counterRef);
+    let nextSequence = 1;
+    if (counterSnap.exists) {
+      const cData = counterSnap.data();
+      if (cData) {
+        const lastSequence = cData.lastSequence;
+        if (
+          typeof lastSequence !== 'number' ||
+          !Number.isFinite(lastSequence) ||
+          !Number.isSafeInteger(lastSequence) ||
+          lastSequence < 0 ||
+          !Number.isSafeInteger(lastSequence + 1)
+        ) {
+          throw new functions.https.HttpsError('failed-precondition', 'Counter is malformed.');
+        }
+        nextSequence = lastSequence + 1;
+      }
+    }
+
+    // Format code
+    const formattedSeq = String(nextSequence).padStart(4, '0');
+    const discountCode = `RED-${yearPrefix}-${formattedSeq}`;
+
+    // Writes
+    transaction.set(counterRef, { lastSequence: nextSequence }, { merge: true });
+
+    const discountData = {
+      id: discountId,
+      schoolId,
+      studentId: cleanStudentId,
+      academicYear,
+      discountCode,
+      installment,
+      grossExpectedAmount,
+      discountAmount,
+      netExpectedAmount: discountAmounts.netExpectedAmount,
+      reason: cleanReason,
+      status: 'draft',
+      createdByUserId: uid,
+      createdAt: FieldValue.serverTimestamp()
+    };
+
+    transaction.set(discountRef, discountData);
+
+    return {
+      success: true,
+      discountId,
+      discountCode,
+      status: 'draft',
+      schoolId,
+      studentId: cleanStudentId,
+      academicYear,
+      installment,
+      grossExpectedAmount,
+      discountAmount,
+      netExpectedAmount: discountAmounts.netExpectedAmount,
+      idempotentReplay: false
+    };
+  });
+});
 export { sweepZombieImportJobs } from './studentImportSweeper';
