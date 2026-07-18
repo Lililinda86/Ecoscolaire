@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sweepZombieImportJobs = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
+exports.sweepZombieImportJobs = exports.approveTuitionDiscount = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
 __exportStar(require("./importStudents"), exports);
 const admin = require("firebase-admin");
@@ -1164,6 +1164,232 @@ exports.createTuitionDiscount = functions.https.onCall(async (data, context) => 
             grossExpectedAmount,
             discountAmount,
             netExpectedAmount: discountAmounts.netExpectedAmount,
+            idempotentReplay: false
+        };
+    });
+});
+exports.approveTuitionDiscount = functions.https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.uid) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    const uid = context.auth.uid;
+    const { discountId } = data || {};
+    if (!discountId || typeof discountId !== 'string' || discountId.trim() === '') {
+        throw new functions.https.HttpsError('invalid-argument', 'discountId is required.');
+    }
+    const cleanDiscountId = discountId.trim();
+    if (cleanDiscountId.length > 512) {
+        throw new functions.https.HttpsError('invalid-argument', 'discountId exceeds maximum length.');
+    }
+    const db = admin.firestore();
+    return await db.runTransaction(async (transaction) => {
+        // 1. users/{uid}
+        const userRef = db.collection('users').doc(uid);
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists) {
+            throw new functions.https.HttpsError('permission-denied', 'Operator user not found.');
+        }
+        const user = userSnap.data();
+        if (user.isActive !== true) {
+            throw new functions.https.HttpsError('permission-denied', 'Operator is inactive.');
+        }
+        const allowedRoles = ['owner', 'director', 'superAdmin'];
+        if (!allowedRoles.includes(user.role)) {
+            throw new functions.https.HttpsError('permission-denied', 'Operator role not authorized.');
+        }
+        // 2. tuitionDiscounts/{discountId}
+        const discountRef = db.collection('tuitionDiscounts').doc(cleanDiscountId);
+        const discountSnap = await transaction.get(discountRef);
+        if (!discountSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Tuition discount not found.');
+        }
+        const discount = discountSnap.data();
+        const hasStoredDiscountId = Object.prototype.hasOwnProperty.call(discount, 'id');
+        if (hasStoredDiscountId && (typeof discount.id !== 'string' || discount.id !== cleanDiscountId)) {
+            throw new functions.https.HttpsError('failed-precondition', 'Discount ID mismatch.');
+        }
+        // Snapshot validation
+        const { schoolId, studentId, academicYear, discountCode, installment, grossExpectedAmount, discountAmount, netExpectedAmount, reason, status } = discount;
+        if (!schoolId || typeof schoolId !== 'string' || schoolId.trim() === '' ||
+            !studentId || typeof studentId !== 'string' || studentId.trim() === '' ||
+            !discountCode || typeof discountCode !== 'string' || discountCode.trim() === '' ||
+            !reason || typeof reason !== 'string' || reason.trim() === '') {
+            throw new functions.https.HttpsError('failed-precondition', 'Discount snapshot is malformed.');
+        }
+        if (!academicYear || typeof academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(academicYear)) {
+            throw new functions.https.HttpsError('failed-precondition', 'Academic year snapshot format is invalid.');
+        }
+        if (installment !== 'T1' && installment !== 'T2' && installment !== 'T3') {
+            throw new functions.https.HttpsError('failed-precondition', 'Installment snapshot is invalid.');
+        }
+        if (typeof grossExpectedAmount !== 'number' || !Number.isFinite(grossExpectedAmount) || !Number.isSafeInteger(grossExpectedAmount) || grossExpectedAmount <= 0 ||
+            typeof discountAmount !== 'number' || !Number.isFinite(discountAmount) || !Number.isSafeInteger(discountAmount) || discountAmount <= 0 ||
+            typeof netExpectedAmount !== 'number' || !Number.isFinite(netExpectedAmount) || !Number.isSafeInteger(netExpectedAmount) || netExpectedAmount <= 0) {
+            throw new functions.https.HttpsError('failed-precondition', 'Discount snapshot amounts are malformed.');
+        }
+        if (discountAmount >= grossExpectedAmount) {
+            throw new functions.https.HttpsError('failed-precondition', 'Discount amount must be strictly less than gross.');
+        }
+        let calculatedAmounts;
+        try {
+            calculatedAmounts = (0, discountHelpers_1.calculateTuitionDiscountAmounts)(grossExpectedAmount, discountAmount);
+        }
+        catch (e) {
+            throw new functions.https.HttpsError('failed-precondition', `Invalid tuition discount amounts calculation: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        if (calculatedAmounts.netExpectedAmount !== netExpectedAmount) {
+            throw new functions.https.HttpsError('failed-precondition', 'Discount snapshot net amount does not match calculated net amount.');
+        }
+        const recognizedStatuses = ['draft', 'approved', 'applied', 'settled', 'revoked'];
+        if (!recognizedStatuses.includes(status)) {
+            throw new functions.https.HttpsError('failed-precondition', 'Discount snapshot status is unknown.');
+        }
+        // Role schoolId authorization check
+        if (user.role !== 'superAdmin' && user.schoolId !== schoolId) {
+            throw new functions.https.HttpsError('permission-denied', 'Operator does not belong to this school.');
+        }
+        // 3. students/{studentId}
+        const studentRef = db.collection('students').doc(studentId);
+        const studentSnap = await transaction.get(studentRef);
+        if (!studentSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Student not found.');
+        }
+        const student = studentSnap.data();
+        if (student.schoolId !== schoolId) {
+            throw new functions.https.HttpsError('failed-precondition', 'Student schoolId mismatch.');
+        }
+        if (student.academicYear !== academicYear) {
+            throw new functions.https.HttpsError('failed-precondition', 'Student academicYear mismatch.');
+        }
+        if (student.active === false || student.isActive === false) {
+            throw new functions.https.HttpsError('failed-precondition', 'Student is inactive.');
+        }
+        // 4. schools/{schoolId}
+        const schoolRef = db.collection('schools').doc(schoolId);
+        const schoolSnap = await transaction.get(schoolRef);
+        if (!schoolSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'School not found.');
+        }
+        const school = schoolSnap.data();
+        if (school.academicYear !== academicYear) {
+            throw new functions.https.HttpsError('failed-precondition', 'School academicYear mismatch.');
+        }
+        if (school.active === false || school.isActive === false || school.status === 'inactive') {
+            throw new functions.https.HttpsError('failed-precondition', 'School is inactive.');
+        }
+        if (school.subscriptionStatus && school.subscriptionStatus !== 'active' && school.subscriptionStatus !== 'trialing') {
+            throw new functions.https.HttpsError('failed-precondition', 'School subscription is not active.');
+        }
+        // 5. tuitionDiscountSlots/{slotId}
+        const slotId = (0, discountHelpers_1.makeTuitionDiscountSlotId)({ schoolId, studentId, academicYear, installment });
+        const slotRef = db.collection('tuitionDiscountSlots').doc(slotId);
+        const slotSnap = await transaction.get(slotRef);
+        // Structural Slot Validation (if it exists)
+        if (slotSnap.exists) {
+            const slotData = slotSnap.data();
+            if ((slotData.id !== undefined && slotData.id !== slotId) ||
+                slotData.schoolId !== schoolId ||
+                slotData.studentId !== studentId ||
+                slotData.academicYear !== academicYear ||
+                slotData.installment !== installment ||
+                !slotData.discountId ||
+                typeof slotData.discountId !== 'string' ||
+                slotData.discountId.trim() === '') {
+                throw new functions.https.HttpsError('failed-precondition', 'Slot document metadata is corrupted or mismatch.');
+            }
+        }
+        // Status / Slot Matrix Checks
+        if (status === 'approved') {
+            if (!slotSnap.exists) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount is approved but slot is missing.');
+            }
+            const slotData = slotSnap.data();
+            if (slotData.discountId === cleanDiscountId) {
+                // Case B: Idempotent replay
+                return {
+                    success: true,
+                    discountId: cleanDiscountId,
+                    discountCode,
+                    slotId,
+                    status: 'approved',
+                    schoolId,
+                    studentId,
+                    academicYear,
+                    installment,
+                    grossExpectedAmount,
+                    discountAmount,
+                    netExpectedAmount,
+                    idempotentReplay: true
+                };
+            }
+            else {
+                // Case D: Slot points to another discount
+                throw new functions.https.HttpsError('failed-precondition', 'Slot points to a different discount.');
+            }
+        }
+        if (status === 'draft') {
+            if (slotSnap.exists) {
+                const slotData = slotSnap.data();
+                if (slotData.discountId === cleanDiscountId) {
+                    // Case E: Draft with slot pointing to the same discount
+                    throw new functions.https.HttpsError('failed-precondition', 'Inconsistent state: slot already points to this draft discount.');
+                }
+                else {
+                    // Case F: Slot points to another discount (active)
+                    throw new functions.https.HttpsError('already-exists', 'An approved discount already exists for this slot.');
+                }
+            }
+        }
+        else {
+            // Case G: applied, settled, revoked
+            throw new functions.https.HttpsError('failed-precondition', `Discount is in non-approvable status: ${status}`);
+        }
+        // 6. Payments Tuition validation (only when transitioning from draft to approved)
+        const paymentsSnap = await transaction.get(db.collection('payments')
+            .where('studentId', '==', studentId)
+            .where('type', '==', 'tuition'));
+        for (const doc of paymentsSnap.docs) {
+            const p = doc.data();
+            if (p.schoolId === schoolId &&
+                p.academicYear === academicYear &&
+                p.installment === installment) {
+                const amount = p.amount;
+                if (typeof amount !== 'number' || !Number.isFinite(amount) || !Number.isSafeInteger(amount) || amount <= 0) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Malformed tuition payment found on this installment.');
+                }
+                // Valid positive payment exists on this slot
+                throw new functions.https.HttpsError('failed-precondition', 'Cannot approve discount: a payment already exists on this installment.');
+            }
+        }
+        // 8. Writes: creation of Slot and update of Discount status
+        const newSlot = {
+            id: slotId,
+            schoolId,
+            studentId,
+            academicYear,
+            installment,
+            discountId: cleanDiscountId,
+            createdAt: firestore_1.FieldValue.serverTimestamp()
+        };
+        transaction.set(slotRef, newSlot);
+        transaction.update(discountRef, {
+            status: 'approved',
+            approvedByUserId: uid,
+            approvedAt: firestore_1.FieldValue.serverTimestamp()
+        });
+        return {
+            success: true,
+            discountId: cleanDiscountId,
+            discountCode,
+            slotId,
+            status: 'approved',
+            schoolId,
+            studentId,
+            academicYear,
+            installment,
+            grossExpectedAmount,
+            discountAmount,
+            netExpectedAmount,
             idempotentReplay: false
         };
     });
