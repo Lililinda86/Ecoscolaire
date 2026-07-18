@@ -685,6 +685,17 @@ export const updateStudentFinancialStatus = functions.firestore
 
       const student = studentSnap.data()!;
 
+      // Read school for discount-aware tuition status
+      const studentSchoolId = typeof student.schoolId === 'string' ? student.schoolId : '';
+      let schoolForTrigger: admin.firestore.DocumentData | null = null;
+      if (studentSchoolId) {
+        const triggerSchoolRef = db.collection('schools').doc(studentSchoolId);
+        const triggerSchoolSnap = await transaction.get(triggerSchoolRef);
+        if (triggerSchoolSnap.exists) {
+          schoolForTrigger = triggerSchoolSnap.data() ?? null;
+        }
+      }
+
       const registrationFeePaid = paymentsList
         .filter(p => p.type === 'registration_fee' || p.type === 'registration')
         .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -702,11 +713,38 @@ export const updateStudentFinancialStatus = functions.firestore
       if (registrationFeePaid >= registrationFeeExpected) registrationFeeStatus = 'paid';
       else if (registrationFeePaid > 0) registrationFeeStatus = 'partial';
 
-      const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
-      const tuitionExpected = student.tuitionExpected ?? fallbackExpected;
       let tuitionStatus = 'unpaid';
-      if (tuitionExpected > 0 && tuitionPaid >= tuitionExpected) tuitionStatus = 'paid';
-      else if (tuitionPaid > 0) tuitionStatus = 'partial';
+      const triggerAcademicYear = schoolForTrigger?.academicYear;
+      if (studentSchoolId && schoolForTrigger && typeof triggerAcademicYear === 'string' && /^\d{4}-\d{4}$/.test(triggerAcademicYear)) {
+        const effectiveResult = await computeEffectiveAnnualExpected({
+          schoolId: studentSchoolId,
+          studentId,
+          academicYear: triggerAcademicYear,
+          studentFees: { feeT1: student.feeT1, feeT2: student.feeT2, feeT3: student.feeT3 },
+          schoolGlobalFees: schoolForTrigger.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 },
+          reader: (ref) => transaction.get(ref)
+        });
+
+        if (effectiveResult.corruption) {
+          console.error(`[Finance Trigger] Slot/Discount corruption detected, skipping update for student ${studentId}, school ${studentSchoolId}, year ${triggerAcademicYear}: ${effectiveResult.corruption}`);
+          return null;
+        }
+
+        if (effectiveResult.hasAnyValidSlot) {
+          if (effectiveResult.effectiveAnnualExpected > 0 && tuitionPaid >= effectiveResult.effectiveAnnualExpected) tuitionStatus = 'paid';
+          else if (tuitionPaid > 0) tuitionStatus = 'partial';
+        } else {
+          const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
+          const tuitionExpected = student.tuitionExpected ?? fallbackExpected;
+          if (tuitionExpected > 0 && tuitionPaid >= tuitionExpected) tuitionStatus = 'paid';
+          else if (tuitionPaid > 0) tuitionStatus = 'partial';
+        }
+      } else {
+        const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
+        const tuitionExpected = student.tuitionExpected ?? fallbackExpected;
+        if (tuitionExpected > 0 && tuitionPaid >= tuitionExpected) tuitionStatus = 'paid';
+        else if (tuitionPaid > 0) tuitionStatus = 'partial';
+      }
 
       transaction.update(studentRef, {
         registrationFeePaid,
@@ -720,6 +758,182 @@ export const updateStudentFinancialStatus = functions.firestore
       return null;
     });
   });
+
+// Helper: Compute effective annual expected considering discount slots
+interface EffectiveAnnualResult {
+  effectiveAnnualExpected: number;
+  grossAnnualExpected: number;
+  totalDiscountAmount: number;
+  hasAnyValidSlot: boolean;
+  corruption: string | null;
+}
+
+async function computeEffectiveAnnualExpected(params: {
+  schoolId: string;
+  studentId: string;
+  academicYear: string;
+  studentFees: { feeT1?: number; feeT2?: number; feeT3?: number };
+  schoolGlobalFees: { feeT1?: number; feeT2?: number; feeT3?: number };
+  reader: (ref: admin.firestore.DocumentReference) => Promise<admin.firestore.DocumentSnapshot>;
+}): Promise<EffectiveAnnualResult> {
+  const { schoolId, studentId, academicYear, studentFees, schoolGlobalFees, reader } = params;
+  const db = admin.firestore();
+
+  const grossAmounts = {
+    T1: studentFees.feeT1 ?? schoolGlobalFees.feeT1 ?? 0,
+    T2: studentFees.feeT2 ?? schoolGlobalFees.feeT2 ?? 0,
+    T3: studentFees.feeT3 ?? schoolGlobalFees.feeT3 ?? 0
+  };
+  const grossAnnualExpected = grossAmounts.T1 + grossAmounts.T2 + grossAmounts.T3;
+
+  const installments = ['T1', 'T2', 'T3'] as const;
+  const effectiveAmounts: number[] = [];
+  let hasAnyValidSlot = false;
+  let totalDiscountAmount = 0;
+
+  for (const inst of installments) {
+    const slotId = makeTuitionDiscountSlotId({ schoolId, studentId, academicYear, installment: inst });
+    const slotRef = db.collection('tuitionDiscountSlots').doc(slotId);
+    const slotSnap = await reader(slotRef);
+
+    if (!slotSnap.exists) {
+      effectiveAmounts.push(grossAmounts[inst]);
+      continue;
+    }
+
+    const slotData = slotSnap.data()!;
+
+    if (
+      (slotData.id !== undefined && slotData.id !== slotId) ||
+      slotData.schoolId !== schoolId ||
+      slotData.studentId !== studentId ||
+      slotData.academicYear !== academicYear ||
+      slotData.installment !== inst ||
+      typeof slotData.discountId !== 'string' ||
+      slotData.discountId.trim() === '' ||
+      slotData.discountId !== slotData.discountId.trim()
+    ) {
+      return {
+        effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+        hasAnyValidSlot: false,
+        corruption: `Slot ${inst} data is inconsistent (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+      };
+    }
+
+    const discountRef = db.collection('tuitionDiscounts').doc(slotData.discountId);
+    const discountSnap = await reader(discountRef);
+
+    if (!discountSnap.exists) {
+      return {
+        effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+        hasAnyValidSlot: false,
+        corruption: `Discount ${slotData.discountId} for slot ${inst} not found (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+      };
+    }
+
+    const discountData = discountSnap.data()!;
+
+    const hasStoredId = Object.prototype.hasOwnProperty.call(discountData, 'id');
+    if (hasStoredId && (typeof discountData.id !== 'string' || discountData.id !== slotData.discountId)) {
+      return {
+        effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+        hasAnyValidSlot: false,
+        corruption: `Discount ID mismatch for slot ${inst} (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+      };
+    }
+
+    if (
+      discountData.schoolId !== schoolId ||
+      discountData.studentId !== studentId ||
+      discountData.academicYear !== academicYear ||
+      discountData.installment !== inst ||
+      typeof discountData.discountCode !== 'string' ||
+      discountData.discountCode.trim() === '' ||
+      typeof discountData.grossExpectedAmount !== 'number' ||
+      !Number.isFinite(discountData.grossExpectedAmount) ||
+      !Number.isSafeInteger(discountData.grossExpectedAmount) ||
+      discountData.grossExpectedAmount <= 0 ||
+      typeof discountData.discountAmount !== 'number' ||
+      !Number.isFinite(discountData.discountAmount) ||
+      !Number.isSafeInteger(discountData.discountAmount) ||
+      discountData.discountAmount <= 0 ||
+      typeof discountData.netExpectedAmount !== 'number' ||
+      !Number.isFinite(discountData.netExpectedAmount) ||
+      !Number.isSafeInteger(discountData.netExpectedAmount) ||
+      discountData.netExpectedAmount <= 0 ||
+      discountData.discountAmount >= discountData.grossExpectedAmount
+    ) {
+      return {
+        effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+        hasAnyValidSlot: false,
+        corruption: `Discount parameters invalid for slot ${inst} (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+      };
+    }
+
+    try {
+      const calc = calculateTuitionDiscountAmounts(discountData.grossExpectedAmount, discountData.discountAmount);
+      if (calc.netExpectedAmount !== discountData.netExpectedAmount) {
+        throw new Error('mismatch');
+      }
+    } catch {
+      return {
+        effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+        hasAnyValidSlot: false,
+        corruption: `Discount amounts calculation mismatch for slot ${inst} (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+      };
+    }
+
+    const validStatuses = ['approved', 'applied', 'settled'];
+    if (!validStatuses.includes(discountData.status)) {
+      return {
+        effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+        hasAnyValidSlot: false,
+        corruption: `Slot ${inst} exists but discount status '${discountData.status}' is invalid (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+      };
+    }
+
+    effectiveAmounts.push(discountData.netExpectedAmount);
+    totalDiscountAmount += discountData.discountAmount;
+    hasAnyValidSlot = true;
+  }
+
+  let effectiveAnnualExpected = 0;
+  for (const ea of effectiveAmounts) {
+    if (hasAnyValidSlot) {
+      if (typeof ea !== 'number' || !Number.isFinite(ea) || !Number.isSafeInteger(ea) || ea < 0) {
+        return {
+          effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+          hasAnyValidSlot,
+          corruption: `Installment amount is not a valid safe integer (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+        };
+      }
+    }
+    effectiveAnnualExpected += ea;
+    if (hasAnyValidSlot && !Number.isSafeInteger(effectiveAnnualExpected)) {
+      return {
+        effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+        hasAnyValidSlot,
+        corruption: `Effective annual expected overflow (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+      };
+    }
+  }
+
+  if (hasAnyValidSlot && effectiveAnnualExpected <= 0) {
+    return {
+      effectiveAnnualExpected: 0, grossAnnualExpected, totalDiscountAmount: 0,
+      hasAnyValidSlot,
+      corruption: `Effective annual expected is not strictly positive (school=${schoolId}, student=${studentId}, year=${academicYear}).`
+    };
+  }
+
+  return {
+    effectiveAnnualExpected,
+    grossAnnualExpected,
+    totalDiscountAmount,
+    hasAnyValidSlot,
+    corruption: null
+  };
+}
 
 // ----------------------------------------------------------------------
 // 9. recordCashPayment
@@ -1197,6 +1411,20 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
     const globalFees = school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 };
     const paymentsList = paymentsSnap.docs.map(doc => doc.data());
 
+    // Compute effective annual expected for tuition status (all reads before writes)
+    let effectiveAnnualResult: EffectiveAnnualResult | null = null;
+    if (type === 'tuition') {
+      effectiveAnnualResult = await computeEffectiveAnnualExpected({
+        schoolId, studentId, academicYear,
+        studentFees: { feeT1: student.feeT1, feeT2: student.feeT2, feeT3: student.feeT3 },
+        schoolGlobalFees: globalFees,
+        reader: (ref) => transaction.get(ref)
+      });
+      if (effectiveAnnualResult.corruption) {
+        throw new functions.https.HttpsError('failed-precondition', effectiveAnnualResult.corruption);
+      }
+    }
+
     if (hasValidSlot) {
       const discountData = discountSnap!.data()!;
       expectedAmount = discountData.netExpectedAmount;
@@ -1318,8 +1546,11 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
         .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
         .reduce((sum, p) => sum + (p.amount || 0), 0) + amount;
 
-      const fallbackExpected = (student.feeT1 ?? globalFees.feeT1 ?? 0) + (student.feeT2 ?? globalFees.feeT2 ?? 0) + (student.feeT3 ?? globalFees.feeT3 ?? 0);
-      const totalTuitionExpectedForYear = student.tuitionExpected || fallbackExpected;
+      // Effective annual expected already computed before writes (hasAnyValidSlot is true in reduced path)
+      const totalTuitionExpectedForYear = effectiveAnnualResult!.effectiveAnnualExpected;
+      if (!Number.isFinite(totalTuitionPaidForYear) || !Number.isSafeInteger(totalTuitionPaidForYear) || totalTuitionPaidForYear < 0) {
+        throw new functions.https.HttpsError('failed-precondition', 'Annual tuition paid is not a valid safe integer.');
+      }
 
       studentUpdate.tuitionPaid = totalTuitionPaidForYear;
       studentUpdate.tuitionStatus = totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid');
@@ -1493,8 +1724,16 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
           .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
           .reduce((sum, p) => sum + (p.amount || 0), 0) + amount;
 
-        const fallbackExpected = (student.feeT1 ?? globalFees.feeT1 ?? 0) + (student.feeT2 ?? globalFees.feeT2 ?? 0) + (student.feeT3 ?? globalFees.feeT3 ?? 0);
-        const totalTuitionExpectedForYear = student.tuitionExpected || fallbackExpected;
+        let totalTuitionExpectedForYear: number;
+        if (effectiveAnnualResult!.hasAnyValidSlot) {
+          totalTuitionExpectedForYear = effectiveAnnualResult!.effectiveAnnualExpected;
+          if (!Number.isFinite(totalTuitionPaidForYear) || !Number.isSafeInteger(totalTuitionPaidForYear) || totalTuitionPaidForYear < 0) {
+            throw new functions.https.HttpsError('failed-precondition', 'Annual tuition paid is not a valid safe integer.');
+          }
+        } else {
+          const fallbackExpected = (student.feeT1 ?? globalFees.feeT1 ?? 0) + (student.feeT2 ?? globalFees.feeT2 ?? 0) + (student.feeT3 ?? globalFees.feeT3 ?? 0);
+          totalTuitionExpectedForYear = student.tuitionExpected || fallbackExpected;
+        }
 
         studentUpdate.tuitionPaid = totalTuitionPaidForYear;
         studentUpdate.tuitionStatus = totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid');
