@@ -1036,7 +1036,7 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
   if (!user || user.isActive !== true) {
     throw new functions.https.HttpsError('permission-denied', 'Operator is inactive.');
   }
-  const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
+  const allowedRoles = ['owner', 'director', 'accountant', 'secretary', 'superAdmin'];
   if (!allowedRoles.includes(user.role)) {
     throw new functions.https.HttpsError('permission-denied', 'Operator role not authorized.');
   }
