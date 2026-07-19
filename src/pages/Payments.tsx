@@ -269,6 +269,19 @@ const Payments: React.FC = () => {
           return;
         }
 
+        const rawAmount =
+          typeof currentPayment.amount === 'number'
+            ? currentPayment.amount
+            : Number(String(currentPayment.amount ?? '').replace(/\s+/g, ''));
+
+        if (!Number.isSafeInteger(rawAmount) || rawAmount <= 0) {
+          alert("Le montant doit être un nombre entier positif en FCFA.");
+          setIsProcessingMoMo(false);
+          return;
+        }
+
+        const normalizedAmount = rawAmount;
+
         const initiatePayment = httpsCallable(functions, 'initiatePayment');
         let provider = db.school?.paymentSettings?.activeProvider;
         if (provider !== 'campay' && provider !== 'flutterwave') {
@@ -278,7 +291,7 @@ const Payments: React.FC = () => {
         const payload = {
           schoolId: currentSchool!.id,
           studentId: currentPayment.studentId,
-          amount: currentPayment.amount || 0,
+          amount: normalizedAmount,
           type: currentPayment.type,
           installment: currentPayment.installment,
           provider,
