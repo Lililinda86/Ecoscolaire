@@ -49,6 +49,7 @@ interface TransactionHistoryProps {
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ 
   transactions, 
   students, 
+  currentUser,
   onMockConfirm,
   isConfirmingTx 
 }) => {
@@ -237,7 +238,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                           <Eye size={16} />
                         </button>
                         
-                        {tx.status === 'PENDING' && isDevOrStaging && (
+                        {tx.status === 'PENDING' && isDevOrStaging && currentUser.role !== 'secretary' && (
                           <button 
                             style={{ background: '#f59e0b', padding: '0.25rem 0.5rem', fontSize: '0.8rem' }} 
                             onClick={() => { if (tx.id) onMockConfirm(tx.id); }}

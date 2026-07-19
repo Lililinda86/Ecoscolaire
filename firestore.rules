@@ -374,7 +374,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         resource.data.userId == request.auth.uid ||
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isAccountant()) && hasSchoolAccess(resource.data.schoolId))
+        ((isOwner() || isDirector() || isAccountant() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
       );
       allow create, update, delete: if false;
     }

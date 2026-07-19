@@ -589,7 +589,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'User is inactive or missing');
   }
 
-  const allowedRoles = ['parent', 'owner', 'director', 'accountant', 'superAdmin'];
+  const allowedRoles = ['parent', 'owner', 'director', 'accountant', 'secretary', 'superAdmin'];
   if (!allowedRoles.includes(user.role)) {
     throw new functions.https.HttpsError('permission-denied', 'Role not authorized for payments');
   }

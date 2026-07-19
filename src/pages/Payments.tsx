@@ -822,19 +822,19 @@ const Payments: React.FC = () => {
         <button className={activeTab === 'encaissements' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'encaissements' ? '' : 'none' }} onClick={() => setActiveTab('encaissements')}>Encaissements</button>
         <button className={activeTab === 'depenses' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'depenses' ? '' : 'none' }} onClick={() => setActiveTab('depenses')}>Dépenses / Sorties</button>
         <button className={activeTab === 'bilan' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'bilan' ? '' : 'none' }} onClick={() => setActiveTab('bilan')}><ClipboardList size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Bilan Scolarité</button>
-        {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+        {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
           <button className={activeTab === 'historique-momo' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-momo' ? '' : 'none' }} onClick={() => setActiveTab('historique-momo')}><History size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Historique MoMo</button>
         )}
         {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
           <button className={activeTab === 'historique-recus' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-recus' ? '' : 'none' }} onClick={() => setActiveTab('historique-recus')}><FileText size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Reçus</button>
         )}
-        {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+        {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
           <button className={activeTab === 'finance-momo' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'finance-momo' ? '' : 'none' }} onClick={() => setActiveTab('finance-momo')}><TrendingUp size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Finance Mobile Money</button>
         )}
         <button className={activeTab === 'brouillard' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'brouillard' ? '' : 'none', background: activeTab === 'brouillard' ? 'var(--warning)' : undefined, color: activeTab === 'brouillard' ? '#000' : undefined }} onClick={() => setActiveTab('brouillard')}>🔒 Brouillard de Caisse</button>
       </div>
 
-      {activeTab === 'historique-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+      {activeTab === 'historique-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
         <TransactionHistory 
           transactions={db.transactions || []}
           students={db.students || []}
@@ -855,7 +855,7 @@ const Payments: React.FC = () => {
         />
       )}
 
-      {activeTab === 'finance-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+      {activeTab === 'finance-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
         <FinanceDashboard 
           payments={db.payments || []}
           transactions={db.transactions || []}
@@ -884,7 +884,7 @@ const Payments: React.FC = () => {
               <tbody>
                 {db.transactions.filter((t: LocalTransaction) => t.status === 'PENDING').map((tx: LocalTransaction) => {
                   const student = db.students.find(s => s.id === tx.studentId);
-                  const isDevOrStaging = import.meta.env.MODE === 'development' || import.meta.env.VITE_FIREBASE_PROJECT_ID === 'ecoscolaire-staging';
+                  const isDevOrStaging = (import.meta.env.MODE === 'development' || import.meta.env.VITE_FIREBASE_PROJECT_ID === 'ecoscolaire-staging') && currentUser.role !== 'secretary';
                   return (
                     <tr key={tx.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '1rem' }}>{new Date(tx.createdAt && typeof tx.createdAt === 'object' && 'seconds' in tx.createdAt ? (tx.createdAt as { seconds: number }).seconds * 1000 : Date.now()).toLocaleDateString('fr-FR')}</td>
