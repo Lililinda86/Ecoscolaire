@@ -552,18 +552,53 @@ const Payments: React.FC = () => {
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentExpense.amount || !currentExpense.person || !currentUser || !currentSchool) return;
-    
+    if (isSaving) return;
+    if (!currentUser || !currentSchool) return;
+
+    const rawAmount = typeof currentExpense.amount === 'number'
+      ? currentExpense.amount
+      : Number(String(currentExpense.amount ?? '').replace(/\s+/g, ''));
+
+    if (!Number.isSafeInteger(rawAmount) || rawAmount <= 0) {
+      alert("Le montant doit être un nombre entier positif en FCFA.");
+      return;
+    }
+
+    const person = (currentExpense.person || '').trim();
+    const reason = (currentExpense.reason || '').trim();
+    const date = (currentExpense.date || '').trim();
+
+    if (!person) {
+      alert("L'auteur / bénéficiaire est requis.");
+      return;
+    }
+    if (!reason) {
+      alert("Le motif / but de la dépense est requis.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      alert("La date est invalide (format attendu YYYY-MM-DD).");
+      return;
+    }
+    const [yr, mo, dy] = date.split('-').map(Number);
+    const parsedDate = new Date(Date.UTC(yr, mo - 1, dy));
+    if (parsedDate.getUTCFullYear() !== yr || parsedDate.getUTCMonth() !== (mo - 1) || parsedDate.getUTCDate() !== dy) {
+      alert("La date saisie n'existe pas réellement.");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const amount = currentExpense.amount;
-      const canSaveDirectly = amount <= 50000 || ['superAdmin', 'owner'].includes(currentUser.role);
+      const canSaveDirectly = rawAmount <= 50000 || ['superAdmin', 'owner'].includes(currentUser.role);
       
       const expenseObj: Expense = { 
-        ...currentExpense, 
-        id: crypto.randomUUID(),
+        id: currentExpense.id || crypto.randomUUID(),
+        amount: rawAmount,
+        date,
+        person,
+        reason,
         schoolId: currentSchool.id 
-      } as Expense;
+      };
       
       if (canSaveDirectly) {
         await setDoc(doc(firestoreDb, 'expenses', expenseObj.id), expenseObj, { merge: true });
@@ -582,7 +617,7 @@ const Payments: React.FC = () => {
           status: 'pending',
           createdAt: new Date().toISOString()
         }, { merge: true });
-        alert(`Dépense de ${amount} FCFA soumise pour validation au Fondateur.`);
+        alert(`Dépense de ${rawAmount} FCFA soumise pour validation au Fondateur.`);
       }
       
       setExpenseModalOpen(false);
@@ -734,6 +769,12 @@ const Payments: React.FC = () => {
   };
 
   const handleDeleteExpense = async (id: string) => {
+    if (isSaving) return;
+    const expense = (db.expenses || []).find(e => e.id === id);
+    if (!expense || expense.schoolId !== currentSchool?.id) {
+      alert("Erreur : Cette dépense n'appartient pas à l'école active.");
+      return;
+    }
     if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
     if (window.confirm("Voulez-vous vraiment annuler cette sortie d'argent ?")) {
       setIsSaving(true);
