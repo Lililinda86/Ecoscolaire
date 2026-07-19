@@ -137,19 +137,195 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
     // 6. Transaction Firestore finale (Mise à jour sécurisée)
     await db.runTransaction(async (transaction) => {
       const txSnap = await transaction.get(txRef);
+      if (!txSnap.exists) {
+        throw new Error('Transaction document not found');
+      }
       const txData = txSnap.data()!;
 
-      // Re-vérification idempotence stricte
+      // Re-vérification idempotence stricte et validation Campay dans la transaction
       if (txData.status !== 'PENDING') {
         return;
       }
+      if (txData.provider !== 'campay') {
+        throw new Error('Transaction provider is not campay');
+      }
+      if (Number(apiAmount) !== Number(txData.amount)) {
+        throw new Error('Amount mismatch between Campay API and transaction document');
+      }
+      if (String(apiExtRef) !== String(external_reference)) {
+        throw new Error('External reference mismatch');
+      }
+      if (txData.id !== external_reference) {
+        throw new Error('Transaction document ID is inconsistent');
+      }
 
-      // Validation croisée stricte
-      const isAmountMatch = Number(apiAmount) === Number(txData.amount);
-      const isExtRefMatch = String(apiExtRef) === String(external_reference);
       const upperStatus = String(apiStatus).toUpperCase();
 
-      if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus) && isAmountMatch && isExtRefMatch) {
+      if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus)) {
+        // --- 1. ALL READ OPERATIONS FIRST ---
+
+        // Read 1: Check if payment document already exists
+        const paymentRef = db.collection('payments').doc(external_reference);
+        const paymentSnap = await transaction.get(paymentRef);
+        if (paymentSnap.exists) {
+          throw new Error('Inconsistent state: Payment already exists but transaction is still PENDING');
+        }
+
+        // Read 1.5: Check if receipt document already exists
+        const receiptRef = db.collection('receipts').doc(external_reference);
+        const receiptSnapForCheck = await transaction.get(receiptRef);
+        if (receiptSnapForCheck.exists) {
+          throw new Error('Inconsistent state: Receipt already exists but transaction is still PENDING');
+        }
+
+        // Snapshot validation
+        if (
+          txData.provider !== 'campay' ||
+          typeof txData.schoolId !== 'string' || !txData.schoolId ||
+          typeof txData.studentId !== 'string' || !txData.studentId ||
+          typeof txData.academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(txData.academicYear) ||
+          (txData.type !== 'tuition' && txData.type !== 'registration_fee') ||
+          typeof txData.amount !== 'number' || !Number.isFinite(txData.amount) || !Number.isSafeInteger(txData.amount) || txData.amount <= 0 ||
+          typeof txData.netExpectedAmount !== 'number' || !Number.isFinite(txData.netExpectedAmount) || !Number.isSafeInteger(txData.netExpectedAmount) || txData.netExpectedAmount <= 0 ||
+          (txData.type === 'tuition' && txData.installment !== 'T1' && txData.installment !== 'T2' && txData.installment !== 'T3')
+        ) {
+          throw new Error('Local transaction snapshot is corrupted or invalid');
+        }
+
+        // Read 2: Student
+        const studentRef = db.collection('students').doc(txData.studentId);
+        const studentSnap = await transaction.get(studentRef);
+        if (!studentSnap.exists) {
+          throw new Error('Student not found');
+        }
+        const student = studentSnap.data()!;
+        if (student.schoolId !== txData.schoolId) {
+          throw new Error('Student schoolId mismatch');
+        }
+
+        // Read 3: Counter
+        const counterRef = db.collection('counters').doc(`receipts_${txData.schoolId}`);
+        const counterSnap = await transaction.get(counterRef);
+
+        // Read 4: School
+        const schoolRef = db.collection('schools').doc(txData.schoolId);
+        const schoolSnap = await transaction.get(schoolRef);
+        if (!schoolSnap.exists) {
+          throw new Error('School not found');
+        }
+        const school = schoolSnap.data()!;
+
+        // Read 5: Previous payments for installment / type limit validation
+        let query = db.collection('payments').where('studentId', '==', txData.studentId);
+        if (txData.type === 'registration_fee') {
+          query = query.where('type', '==', 'registration_fee');
+        } else {
+          query = query.where('type', '==', 'tuition');
+        }
+        const paymentsSnap = await transaction.get(query);
+        const paymentsList = paymentsSnap.docs.map(doc => doc.data());
+
+        // Read 6: Compute Effective Annual Expected (does reads inside)
+        let effectiveAnnualResult = null;
+        if (txData.type === 'tuition') {
+          effectiveAnnualResult = await computeEffectiveAnnualExpected({
+            schoolId: txData.schoolId,
+            studentId: txData.studentId,
+            academicYear: txData.academicYear,
+            studentFees: { feeT1: student.feeT1, feeT2: student.feeT2, feeT3: student.feeT3 },
+            schoolGlobalFees: school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 },
+            reader: (ref) => transaction.get(ref)
+          });
+          if (effectiveAnnualResult.corruption) {
+            throw new Error(effectiveAnnualResult.corruption);
+          }
+        }
+
+        // Read 7: All tuition payments for student to compute totals
+        let allTuitionSnap = null;
+        if (txData.type === 'tuition') {
+          allTuitionSnap = await transaction.get(
+            db.collection('payments').where('studentId', '==', txData.studentId).where('type', '==', 'tuition')
+          );
+        }
+
+        // Read 8: All registration fee payments for student to compute totals
+        let allRegSnap = null;
+        if (txData.type === 'registration_fee') {
+          allRegSnap = await transaction.get(
+            db.collection('payments').where('studentId', '==', txData.studentId).where('type', '==', 'registration_fee')
+          );
+        }
+
+        // Read 9: Tuition Discount if applicable
+        let discountSnap = null;
+        let discountRef = null;
+        if (txData.discountId) {
+          discountRef = db.collection('tuitionDiscounts').doc(txData.discountId);
+          discountSnap = await transaction.get(discountRef);
+          if (!discountSnap.exists) {
+            throw new Error('Discount not found');
+          }
+          const discount = discountSnap.data()!;
+          if (
+            discountSnap.id !== txData.discountId ||
+            discount.schoolId !== txData.schoolId ||
+            discount.studentId !== txData.studentId ||
+            discount.academicYear !== txData.academicYear ||
+            discount.installment !== txData.installment ||
+            (discount.paymentType !== undefined && discount.paymentType !== 'tuition') ||
+            discount.grossExpectedAmount !== txData.grossExpectedAmount ||
+            discount.discountAmount !== txData.discountAmount ||
+            discount.netExpectedAmount !== txData.netExpectedAmount
+          ) {
+            throw new Error('Tuition discount snapshot mismatch or corrupted');
+          }
+          const calculated = calculateTuitionDiscountAmounts(discount.grossExpectedAmount, discount.discountAmount);
+          if (calculated.netExpectedAmount !== discount.netExpectedAmount) {
+            throw new Error('Tuition discount amounts integrity check failed');
+          }
+          if (discount.status !== 'approved' && discount.status !== 'applied') {
+            throw new Error(`Tuition discount is in incompatible status: ${discount.status}`);
+          }
+        }
+
+        // --- 2. CALCULATIONS ---
+
+        const isConfirmedPayment = (p: admin.firestore.DocumentData) => {
+          return p.status === undefined || p.status === null || p.status === 'completed';
+        };
+
+        const validatePaymentAmount = (amt: unknown): amt is number => {
+          return typeof amt === 'number' && Number.isFinite(amt) && Number.isSafeInteger(amt) && amt > 0;
+        };
+
+        let previousPaid = 0;
+        const filteredPayments = paymentsList.filter(p => {
+          if (p.schoolId !== txData.schoolId || p.academicYear !== txData.academicYear) {
+            return false;
+          }
+          if (txData.type === 'tuition') {
+            return p.installment === txData.installment && p.type === 'tuition' && isConfirmedPayment(p);
+          } else {
+            return p.type === 'registration_fee' && isConfirmedPayment(p);
+          }
+        });
+
+        for (const p of filteredPayments) {
+          if (!validatePaymentAmount(p.amount)) {
+            throw new Error('Historical payment amount is invalid or corrupted.');
+          }
+          previousPaid += p.amount;
+        }
+
+        const remaining = Math.max(0, txData.netExpectedAmount - previousPaid);
+        if (txData.amount > remaining) {
+          throw new Error('Payment exceeds remaining balance');
+        }
+
+        // --- 3. ALL WRITE OPERATIONS LAST ---
+
+        // Write 1: Update transaction status
         transaction.update(txRef, {
           status: 'SUCCESS',
           providerReference: reference || null,
@@ -157,23 +333,141 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
           updatedAt: FieldValue.serverTimestamp()
         });
 
-        const paymentRef = db.collection('payments').doc(external_reference);
-        transaction.set(paymentRef, {
+        // Write 2: Create Payment
+        const paymentData = {
           id: external_reference,
           schoolId: txData.schoolId,
-          studentId: txData.studentId || null,
+          studentId: txData.studentId,
           amount: txData.amount,
-          type: txData.type || 'PAYMENT',
+          type: txData.type,
           installment: txData.installment || null,
           paymentMethod: 'Mobile Money',
           provider: 'Campay',
           providerReference: reference || null,
           transactionId: external_reference,
           status: 'completed',
-          date: FieldValue.serverTimestamp(),
-          createdAt: FieldValue.serverTimestamp()
-        });
+          date: new Date().toISOString().split('T')[0],
+          createdAt: FieldValue.serverTimestamp(),
+          bycampayWebhook: true,
+          academicYear: txData.academicYear,
+          expectedAmount: txData.netExpectedAmount,
+          previousPaid,
+          newPaid: previousPaid + txData.amount,
+          remainingBalance: remaining - txData.amount,
+          discountId: txData.discountId || null,
+          grossExpectedAmount: txData.grossExpectedAmount,
+          discountAmount: txData.discountAmount,
+          netExpectedAmount: txData.netExpectedAmount
+        };
+        transaction.set(paymentRef, paymentData);
 
+        // Write 3: Create Receipt
+        let lastReceiptNumber = 0;
+        if (counterSnap.exists) {
+          lastReceiptNumber = counterSnap.data()?.lastReceiptNumber || 0;
+        }
+        const nextReceiptNumber = lastReceiptNumber + 1;
+        transaction.set(counterRef, { lastReceiptNumber: nextReceiptNumber }, { merge: true });
+
+        const currentYear = new Date().getFullYear();
+        const formattedNum = String(nextReceiptNumber).padStart(4, '0');
+        const receiptNumber = `REC-${currentYear}-${formattedNum}`;
+
+        const receiptData = {
+          id: external_reference,
+          paymentId: external_reference,
+          schoolId: txData.schoolId,
+          receiptNumber,
+          studentId: txData.studentId,
+          amount: txData.amount,
+          type: txData.type,
+          method: 'mobile_money',
+          paymentMethod: 'mobile_money',
+          date: new Date().toISOString().split('T')[0],
+          createdAt: FieldValue.serverTimestamp(),
+          expectedAmount: txData.netExpectedAmount,
+          previousPaid,
+          newPaid: previousPaid + txData.amount,
+          remainingBalance: remaining - txData.amount,
+          discountId: txData.discountId || null,
+          grossExpectedAmount: txData.grossExpectedAmount,
+          discountAmount: txData.discountAmount,
+          netExpectedAmount: txData.netExpectedAmount
+        };
+        transaction.set(receiptRef, receiptData);
+
+        // Write 4: Update Student & tuitionStatus/registrationFeeStatus
+        if (txData.type === 'tuition' && effectiveAnnualResult && allTuitionSnap) {
+          const allTuitionList = allTuitionSnap.docs.map(doc => doc.data());
+          const totalTuitionPaidForYear = allTuitionList
+            .filter(p => p.schoolId === txData.schoolId && p.academicYear === txData.academicYear && isConfirmedPayment(p) && p.id !== external_reference)
+            .reduce((sum, p) => {
+              if (!validatePaymentAmount(p.amount)) {
+                throw new Error('Historical tuition payment amount is invalid.');
+              }
+              return sum + p.amount;
+            }, 0) + txData.amount;
+
+          const totalTuitionExpectedForYear = effectiveAnnualResult.effectiveAnnualExpected;
+
+          const studentUpdate: Record<string, unknown> = {
+            tuitionPaid: totalTuitionPaidForYear,
+            tuitionStatus: totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid')
+          };
+          transaction.update(studentRef, studentUpdate);
+        } else if (txData.type === 'registration_fee' && allRegSnap) {
+          const allRegList = allRegSnap.docs.map(doc => doc.data());
+          const totalRegPaidForYear = allRegList
+            .filter(p => p.schoolId === txData.schoolId && p.academicYear === txData.academicYear && isConfirmedPayment(p) && p.id !== external_reference)
+            .reduce((sum, p) => {
+              if (!validatePaymentAmount(p.amount)) {
+                throw new Error('Historical registration fee payment amount is invalid.');
+              }
+              return sum + p.amount;
+            }, 0) + txData.amount;
+
+          const registrationFeeExpected = student.registrationFeeExpected ?? 15000;
+          const registrationFeeStatus = totalRegPaidForYear >= registrationFeeExpected ? 'paid' : (totalRegPaidForYear > 0 ? 'partial' : 'unpaid');
+
+          const studentUpdate: Record<string, unknown> = {
+            registrationFeePaid: totalRegPaidForYear,
+            registrationFeeStatus
+          };
+          transaction.update(studentRef, studentUpdate);
+        }
+
+        // Write 5: Update Tuition Discount status if applicable
+        if (discountRef && discountSnap && discountSnap.exists) {
+          const discountData = discountSnap.data()!;
+          const isFinalPayment = (remaining - txData.amount) === 0;
+          if (discountData.status === 'approved') {
+            if (isFinalPayment) {
+              transaction.update(discountRef, {
+                status: 'settled',
+                firstAppliedAt: FieldValue.serverTimestamp(),
+                firstPaymentId: external_reference,
+                settledAt: FieldValue.serverTimestamp(),
+                settlementPaymentId: external_reference
+              });
+            } else {
+              transaction.update(discountRef, {
+                status: 'applied',
+                firstAppliedAt: FieldValue.serverTimestamp(),
+                firstPaymentId: external_reference
+              });
+            }
+          } else if (discountData.status === 'applied') {
+            if (isFinalPayment) {
+              transaction.update(discountRef, {
+                status: 'settled',
+                settledAt: FieldValue.serverTimestamp(),
+                settlementPaymentId: external_reference
+              });
+            }
+          }
+        }
+
+        // Write 6: Create log entry
         transaction.set(db.collection('campay_logs').doc(), {
           requestType: 'webhook_success_verified',
           external_reference: external_reference,
@@ -775,6 +1069,11 @@ export const onPaymentCreated = functions.firestore
       return null;
     }
 
+    if (paymentData.byRecordCashPayment || paymentData.bycampayWebhook) {
+      console.log('Skipping receipt generation trigger for atomic payment creation');
+      return null;
+    }
+
     const schoolId = paymentData.schoolId;
     const db = admin.firestore();
     
@@ -904,7 +1203,7 @@ export const updateStudentFinancialStatus = functions.firestore
   .onWrite(async (change) => {
     const paymentData = change.after.exists ? change.after.data() : change.before.data();
     if (!paymentData || !paymentData.studentId) return null;
-    if (!change.before.exists && paymentData.byRecordCashPayment) {
+    if (!change.before.exists && (paymentData.byRecordCashPayment || paymentData.bycampayWebhook)) {
       console.log('Skipping legacy financial status recalculation for atomic payment creation');
       return null;
     }
