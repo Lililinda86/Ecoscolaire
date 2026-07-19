@@ -173,7 +173,7 @@ function App() {
         <Route path="/inventory" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'accountant', 'superAdmin']}><Layout><Inventory /></Layout></ProtectedRoute>} />
         <Route path="/grades" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><Grades /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><Settings /></Layout></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'secretary', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director']}><Layout><UsersManagement /></Layout></ProtectedRoute>} />
         <Route path="/validations" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
         <Route path="/ai-director" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><AIDirector /></Layout></ProtectedRoute>} />

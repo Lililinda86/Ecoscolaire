@@ -114,7 +114,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">FINANCES</div>
                   <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-payments">
