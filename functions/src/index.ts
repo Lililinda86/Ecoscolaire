@@ -248,20 +248,34 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
   }
 
-  const { schoolId, studentId, amount, type, installment, provider, phoneNumber } = data;
+  const { schoolId, studentId, amount, type, installment, provider, phoneNumber, academicYear } = data;
 
   if (!schoolId) {
     throw new functions.https.HttpsError('invalid-argument', 'schoolId is required');
+  }
+  if (!studentId || typeof studentId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'studentId is required');
+  }
+  if (!academicYear || typeof academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(academicYear)) {
+    throw new functions.https.HttpsError('invalid-argument', 'academicYear must be in YYYY-YYYY format.');
+  }
+  if (type !== 'tuition' && type !== 'registration_fee') {
+    throw new functions.https.HttpsError('invalid-argument', 'type must be tuition or registration_fee.');
+  }
+  if (type === 'tuition') {
+    if (!installment || (installment !== 'T1' && installment !== 'T2' && installment !== 'T3')) {
+      throw new functions.https.HttpsError('invalid-argument', 'installment must be T1, T2, or T3 for tuition.');
+    }
+  } else {
+    if (installment) {
+      throw new functions.https.HttpsError('invalid-argument', 'installment must not be provided for registration fee.');
+    }
   }
 
   if (provider === 'campay') {
     if (!phoneNumber || typeof phoneNumber !== 'string' || !phoneNumber.startsWith('237') || !/^\d+$/.test(phoneNumber)) {
       throw new functions.https.HttpsError('invalid-argument', 'A valid Cameroonian phone number starting with 237 is required for Campay');
     }
-  }
-
-  if (typeof amount !== 'number' || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Amount must be greater than 0');
   }
 
   if (provider !== 'campay' && provider !== 'flutterwave') {
@@ -290,19 +304,235 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'School access denied');
   }
 
-  // 2. If studentId is provided, check if student belongs to the school
-  if (studentId) {
-    const studentSnap = await db.collection('students').doc(studentId).get();
-    if (!studentSnap.exists) {
-      throw new functions.https.HttpsError('not-found', 'Student not found');
-    }
-    const student = studentSnap.data();
-    if (student?.schoolId !== schoolId) {
-      throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school');
+  // 2. Fetch School Context
+  const schoolSnap = await db.collection('schools').doc(schoolId).get();
+  if (!schoolSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'School not found.');
+  }
+  const school = schoolSnap.data()!;
+  if (!school.academicYear || typeof school.academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(school.academicYear)) {
+    throw new functions.https.HttpsError('failed-precondition', 'Active academic year is not defined or invalid for this school.');
+  }
+  if (academicYear !== school.academicYear) {
+    throw new functions.https.HttpsError('failed-precondition', 'The requested academic year is not the active academic year of the school.');
+  }
+
+  // 3. Fetch Student Context
+  const studentSnap = await db.collection('students').doc(studentId).get();
+  if (!studentSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'Student not found.');
+  }
+  const student = studentSnap.data()!;
+  if (student.schoolId !== schoolId) {
+    throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school.');
+  }
+
+  // 4. Fetch Tuition Discount Slot if applicable
+  let hasValidSlot = false;
+  let slotSnap = null;
+  let discountSnap = null;
+
+  if (type === 'tuition') {
+    const slotId = makeTuitionDiscountSlotId({ schoolId, studentId, academicYear, installment });
+    const slotRef = db.collection('tuitionDiscountSlots').doc(slotId);
+    slotSnap = await slotRef.get();
+    if (slotSnap.exists) {
+      const slotData = slotSnap.data()!;
+      if (typeof slotData.discountId !== 'string' || slotData.discountId.trim() === '') {
+        throw new functions.https.HttpsError('failed-precondition', 'Slot discountId is invalid.');
+      }
+      if (slotData.id !== undefined && slotData.id !== slotId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Slot id mismatch.');
+      }
+      if (slotData.schoolId !== undefined && slotData.schoolId !== schoolId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Slot schoolId mismatch.');
+      }
+      if (slotData.studentId !== undefined && slotData.studentId !== studentId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Slot studentId mismatch.');
+      }
+      if (slotData.academicYear !== undefined && slotData.academicYear !== academicYear) {
+        throw new functions.https.HttpsError('failed-precondition', 'Slot academicYear mismatch.');
+      }
+      if (slotData.installment !== undefined && slotData.installment !== installment) {
+        throw new functions.https.HttpsError('failed-precondition', 'Slot installment mismatch.');
+      }
+
+      const discountRef = db.collection('tuitionDiscounts').doc(slotData.discountId);
+      discountSnap = await discountRef.get();
+      if (!discountSnap.exists) {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount document not found.');
+      }
+
+      const discountData = discountSnap.data()!;
+      if (discountData.id !== undefined && discountData.id !== null && discountData.id !== discountSnap.id) {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount ID mismatch between document body and document ID.');
+      }
+      if (discountData.schoolId !== schoolId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount schoolId mismatch.');
+      }
+      if (discountData.studentId !== studentId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount studentId mismatch.');
+      }
+      if (discountData.academicYear !== academicYear) {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount academicYear mismatch.');
+      }
+      if (discountData.paymentType !== undefined && discountData.paymentType !== type) {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount paymentType mismatch.');
+      }
+      if (discountData.installment !== installment) {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount installment mismatch.');
+      }
+
+      const allowedStatuses = ['approved', 'applied'];
+      if (!allowedStatuses.includes(discountData.status)) {
+        throw new functions.https.HttpsError('failed-precondition', `New payments are not allowed for status ${discountData.status}.`);
+      }
+
+      try {
+        const calc = calculateTuitionDiscountAmounts(discountData.grossExpectedAmount, discountData.discountAmount);
+        if (
+          calc.grossExpectedAmount !== discountData.grossExpectedAmount ||
+          calc.discountAmount !== discountData.discountAmount ||
+          calc.netExpectedAmount !== discountData.netExpectedAmount
+        ) {
+          throw new Error('mismatch');
+        }
+      } catch {
+        throw new functions.https.HttpsError('failed-precondition', 'Discount amounts calculation mismatch.');
+      }
+
+      hasValidSlot = true;
     }
   }
 
-  // 3. Create transaction
+  // 5. Fetch previous payments
+  let paymentsSnap;
+  if (type === 'registration_fee') {
+    paymentsSnap = await db.collection('payments')
+      .where('studentId', '==', studentId)
+      .where('type', '==', 'registration_fee')
+      .get();
+  } else {
+    paymentsSnap = await db.collection('payments')
+      .where('studentId', '==', studentId)
+      .where('type', '==', 'tuition')
+      .get();
+  }
+  const paymentsList = paymentsSnap.docs.map(doc => doc.data());
+
+  // 6. Calculations Phase
+  let previousPaid = 0;
+  let grossExpectedAmount = 0;
+  let discountAmount = 0;
+  let netExpectedAmount = 0;
+  let discountId = null;
+
+  const globalFees = school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 };
+
+  const isConfirmedPayment = (p: admin.firestore.DocumentData) => {
+    return p.status === undefined || p.status === null || p.status === 'completed';
+  };
+
+  if (hasValidSlot) {
+    const discountData = discountSnap!.data()!;
+    grossExpectedAmount = discountData.grossExpectedAmount;
+    discountAmount = discountData.discountAmount;
+    netExpectedAmount = discountData.netExpectedAmount;
+    discountId = discountSnap!.id;
+
+    const filteredPayments = paymentsList.filter(
+      p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment && p.type === 'tuition' && isConfirmedPayment(p)
+    );
+    for (const p of filteredPayments) {
+      if (
+        typeof p.amount !== 'number' ||
+        !Number.isFinite(p.amount) ||
+        !Number.isSafeInteger(p.amount) ||
+        p.amount <= 0
+      ) {
+        throw new functions.https.HttpsError('failed-precondition', 'Historical payment amount is invalid or corrupted.');
+      }
+      previousPaid += p.amount;
+    }
+  } else {
+    if (type === 'registration_fee') {
+      grossExpectedAmount = student.registrationFeeExpected || 0;
+      discountAmount = 0;
+      netExpectedAmount = grossExpectedAmount;
+
+      const filteredPayments = paymentsList.filter(
+        p => p.schoolId === schoolId && p.academicYear === academicYear && p.type === 'registration_fee' && isConfirmedPayment(p)
+      );
+      for (const p of filteredPayments) {
+        if (
+          typeof p.amount !== 'number' ||
+          !Number.isFinite(p.amount) ||
+          !Number.isSafeInteger(p.amount) ||
+          p.amount <= 0
+        ) {
+          throw new functions.https.HttpsError('failed-precondition', 'Historical payment amount is invalid or corrupted.');
+        }
+        previousPaid += p.amount;
+      }
+    } else if (type === 'tuition') {
+      grossExpectedAmount = installment === 'T1'
+        ? (student.feeT1 ?? globalFees.feeT1 ?? 0)
+        : installment === 'T2'
+          ? (student.feeT2 ?? globalFees.feeT2 ?? 0)
+          : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+      discountAmount = 0;
+      netExpectedAmount = grossExpectedAmount;
+
+      const filteredPayments = paymentsList.filter(
+        p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment && p.type === 'tuition' && isConfirmedPayment(p)
+      );
+      for (const p of filteredPayments) {
+        if (
+          typeof p.amount !== 'number' ||
+          !Number.isFinite(p.amount) ||
+          !Number.isSafeInteger(p.amount) ||
+          p.amount <= 0
+        ) {
+          throw new functions.https.HttpsError('failed-precondition', 'Historical payment amount is invalid or corrupted.');
+        }
+        previousPaid += p.amount;
+      }
+    }
+  }
+
+  if (
+    typeof grossExpectedAmount !== 'number' ||
+    !Number.isFinite(grossExpectedAmount) ||
+    !Number.isSafeInteger(grossExpectedAmount) ||
+    grossExpectedAmount <= 0
+  ) {
+    throw new functions.https.HttpsError('failed-precondition', 'Fees expected amount is not defined or invalid.');
+  }
+
+  const remainingAmount = Math.max(0, netExpectedAmount - previousPaid);
+
+  if (remainingAmount <= 0) {
+    throw new functions.https.HttpsError('failed-precondition', 'No remaining amount to pay.');
+  }
+
+  const requestedAmount = amount ?? remainingAmount;
+
+  if (
+    typeof requestedAmount !== 'number' ||
+    !Number.isFinite(requestedAmount) ||
+    !Number.isSafeInteger(requestedAmount) ||
+    requestedAmount <= 0
+  ) {
+    throw new functions.https.HttpsError('invalid-argument', 'Amount must be a positive safe integer.');
+  }
+
+  if (requestedAmount > remainingAmount) {
+    throw new functions.https.HttpsError('invalid-argument', `The requested amount (${requestedAmount}) exceeds the remaining balance (${remainingAmount}).`);
+  }
+
+  const serverAmount = requestedAmount;
+
+  // 7. Create transaction
   const transactionRef = db.collection('transactions').doc();
   const generatedId = transactionRef.id;
   const idempotencyKey = `idemp_${generatedId}`;
@@ -310,7 +540,8 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
   let mode: 'mock' | 'campay_sandbox' | 'campay_production' = 'mock';
   let mockPaymentUrl = `https://mock.campay.net/pay/${generatedId}`;
   let message = 'Payment initiated securely (Mock Mode)';
-    let secretsValidated = false;
+  let secretsValidated = false;
+
   if (provider === 'campay') {
     // Attempt to read secrets
     const secretSnap = await db.collection('schools').doc(schoolId).collection('secrets').doc('payment').get();
@@ -337,7 +568,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
           const description = `Paiement pour ${studentId || 'élève inconnu'}`;
           const response = await campayService.requestToPay(
             token,
-            amount,
+            serverAmount,
             phoneNumber,
             description,
             generatedId // transactionId as externalReference
@@ -353,7 +584,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
             requestType: 'request_to_pay',
             status: 'SUCCESS',
             sanitizedRequest: {
-              amount: amount.toString(),
+              amount: serverAmount.toString(),
               from: phoneNumber,
               description,
               external_reference: generatedId
@@ -371,7 +602,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
             requestType: 'request_to_pay',
             status: 'FAILED',
             sanitizedRequest: {
-              amount: amount.toString(),
+              amount: serverAmount.toString(),
               from: phoneNumber,
               external_reference: generatedId
             },
@@ -392,7 +623,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     schoolId,
     userId: context.auth.uid,
     studentId: studentId || null,
-    amount,
+    amount: serverAmount,
     type,
     installment: installment || null,
     provider,
@@ -405,7 +636,16 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     idempotencyKey,
     mode,
     createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp()
+    updatedAt: FieldValue.serverTimestamp(),
+    academicYear,
+    paymentType: type,
+    operatorUid: context.auth.uid,
+    grossExpectedAmount,
+    discountAmount,
+    netExpectedAmount,
+    discountId: discountId || null,
+    remainingAmountBeforePayment: remainingAmount,
+    requestedAmount: serverAmount
   };
 
   await transactionRef.set(transactionData);
