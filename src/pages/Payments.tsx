@@ -248,13 +248,27 @@ const Payments: React.FC = () => {
     if (!currentPayment.studentId || isSaving) return;
 
     if (paymentMethod === 'mobile_money') {
-      if (!parentPhone || parentPhone.length < 9 || !parentPhone.startsWith('237') || !/^\d+$/.test(parentPhone)) {
-        alert("Veuillez entrer un numéro de téléphone valide (ex: 237677000000, commence par 237, uniquement des chiffres).");
+      let normalizedPhone = (parentPhone || '').replace(/\s+/g, '');
+      if (normalizedPhone.startsWith('+')) {
+        normalizedPhone = normalizedPhone.substring(1);
+      } else if (normalizedPhone.startsWith('00')) {
+        normalizedPhone = normalizedPhone.substring(2);
+      }
+
+      if (!/^237\d{9}$/.test(normalizedPhone)) {
+        alert("Numéro invalide. Saisissez +237 suivi des 9 chiffres, 00237 suivi des 9 chiffres, ou directement 237 suivi des 9 chiffres.");
         return;
       }
       setIsProcessingMoMo(true);
       
       try {
+        const academicYear = db.school?.academicYear;
+        if (typeof academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(academicYear)) {
+          alert("L'année académique de l'école est invalide ou manquante (format attendu YYYY-YYYY).");
+          setIsProcessingMoMo(false);
+          return;
+        }
+
         const initiatePayment = httpsCallable(functions, 'initiatePayment');
         let provider = db.school?.paymentSettings?.activeProvider;
         if (provider !== 'campay' && provider !== 'flutterwave') {
@@ -268,7 +282,8 @@ const Payments: React.FC = () => {
           type: currentPayment.type,
           installment: currentPayment.installment,
           provider,
-          phoneNumber: parentPhone
+          phoneNumber: normalizedPhone,
+          academicYear
         };
         
         const result = await initiatePayment(payload);
