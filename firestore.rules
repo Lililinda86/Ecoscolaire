@@ -484,14 +484,29 @@ service cloud.firestore {
       allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
     }
 
-    // --- VALIDATION REQUESTS ---
     match /validation_requests/{reqId} {
       // N'importe quel membre du staff peut créer une requête
       allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId);
       // Tout le staff peut lire les requêtes de son école
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       // Seuls les approbateurs peuvent modifier/résoudre
-      allow update, delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId);
+      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector())
+                    && hasSchoolAccess(resource.data.schoolId)
+                    && resource.data.status == 'pending'
+                    && (
+                      (request.resource.data.status == 'approved'
+                       && request.resource.data.approvedBy == request.auth.uid
+                       && request.resource.data.approvedAt == request.time
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'approvedBy', 'approvedAt'])
+                      ) ||
+                      (request.resource.data.status == 'rejected'
+                       && request.resource.data.rejectedBy == request.auth.uid
+                       && request.resource.data.rejectedAt == request.time
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectedBy', 'rejectedAt'])
+                      )
+                    )
+                    && (resource.data.requesterId != request.auth.uid || isAdminOrOwner() || isDirector());
+      allow delete: if false;
     }
 
     // --- NOTIFICATIONS ---
