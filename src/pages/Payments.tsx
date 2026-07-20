@@ -30,6 +30,11 @@ const getErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
+const formatIsoDateFr = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+};
+
 const findSnapshotReceiptForPayment = (
   payment: Payment,
   receipts?: ReceiptLike[]
@@ -979,8 +984,8 @@ const Payments: React.FC = () => {
             </table>
           </div>
         )}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse' }}>
             <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
               <tr>
                 <th style={{ padding: '1rem', textAlign: 'left' }}>Date</th>
@@ -1058,8 +1063,8 @@ const Payments: React.FC = () => {
       )}
 
       {activeTab === 'depenses' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '750px', borderCollapse: 'collapse' }}>
             <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
               <tr>
                 <th style={{ padding: '1rem', textAlign: 'left' }}>Date</th>
@@ -1081,7 +1086,7 @@ const Payments: React.FC = () => {
                     <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--danger)' }}>
                       - {e.amount.toLocaleString('fr-FR')} FCFA
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                    <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeleteExpense(e.id)} title="Annuler">
                           <Trash2 size={14} />
                         </button>
@@ -1102,14 +1107,14 @@ const Payments: React.FC = () => {
              <button className={bilanType === 'uniforms' ? '' : 'secondary'} onClick={() => setBilanType('uniforms')} style={{ padding: '0.5rem 1rem' }}>Tenues & Autres</button>
           </div>
           
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <div style={{ padding: '1rem', background: '#eef2ff', color: 'var(--primary-color)', borderBottom: '1px solid var(--border-color)' }}>
               <h3 style={{ margin: 0 }}>
                 {bilanType === 'tuition' ? 'Suivi de la Scolarité' : bilanType === 'transport' ? 'Suivi du Transport' : 'Suivi des Tenues'}
               </h3>
             </div>
             
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse' }}>
               <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
                 <tr>
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Élève</th>
@@ -1174,7 +1179,7 @@ const Payments: React.FC = () => {
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {totalExpected === 0 ? '-' : (totalBalance <= 0 ? 'Soldé ✓' : totalBalance.toLocaleString('fr-FR') + ' FCFA')}
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {totalBalance > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
                             <button onClick={() => handleWhatsAppClick(s, totalBalance, 'scolarité')} style={{ background: isSchoolSuspended ? '#a1a1aa' : '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: isSchoolSuspended ? 'not-allowed' : 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp" disabled={isSchoolSuspended}>📱 WhatsApp</button>
                           ) : null}
@@ -1200,7 +1205,7 @@ const Payments: React.FC = () => {
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {expected === 0 ? '-' : (reste <= 0 ? 'Soldé ✓' : `${reste.toLocaleString('fr-FR')} FCFA`)}
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
                             <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (transport)')} style={{ background: isSchoolSuspended ? '#a1a1aa' : '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: isSchoolSuspended ? 'not-allowed' : 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp" disabled={isSchoolSuspended}>📱 WhatsApp</button>
                           ) : null}
@@ -1226,7 +1231,7 @@ const Payments: React.FC = () => {
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {expected === 0 ? '-' : (reste <= 0 ? 'Soldé ✓' : `${reste.toLocaleString('fr-FR')} FCFA`)}
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
                             <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (tenues)')} style={{ background: '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp">📱 WhatsApp</button>
                           ) : null}
@@ -1260,6 +1265,7 @@ const Payments: React.FC = () => {
                  <>
                    <div className="print-area">
                      <SchoolDocumentHeader school={currentSchool} documentTitle="Brouillard de Clôture (Tiroir Caisse)" />
+                     <div style={{ fontSize: '1rem', color: '#555', marginTop: '0.5rem', fontWeight: 500 }}>Date de clôture : {formatIsoDateFr(today)}</div>
                      <h3 style={{ margin: 0, color: '#f57f17', fontSize: '1.2rem', marginTop: '1rem' }}>Montant Total devant se trouver physiquement dans la caisse</h3>
                      <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#f57f17', margin: '1rem 0' }}>
                        {expectedCash.toLocaleString('fr-FR')} <span style={{ fontSize: '1.5rem' }}>FCFA</span>

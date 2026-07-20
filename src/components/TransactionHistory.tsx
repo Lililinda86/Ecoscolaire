@@ -38,6 +38,22 @@ type TransactionLike = {
   [key: string]: unknown;
 };
 
+const maskPhoneNumber = (phone?: string) => {
+  const digits = String(phone ?? '').replace(/\D/g, '');
+
+  if (!digits) return '-';
+  if (digits.length <= 3) return '*'.repeat(digits.length);
+  if (digits.length <= 6) {
+    return '*'.repeat(digits.length - 2) + digits.slice(-2);
+  }
+
+  return (
+    digits.slice(0, 3) +
+    '*'.repeat(digits.length - 6) +
+    digits.slice(-3)
+  );
+};
+
 interface TransactionHistoryProps {
   transactions: TransactionLike[];
   students: Student[];
@@ -224,7 +240,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                     </td>
                     <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{tx.id}</td>
                     <td style={{ padding: '1rem', fontWeight: 500 }}>{student?.name || 'Inconnu'}</td>
-                    <td style={{ padding: '1rem' }}>{tx.phoneNumber || '-'}</td>
+                    <td style={{ padding: '1rem' }}>{maskPhoneNumber(tx.phoneNumber)}</td>
                     <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{tx.amount?.toLocaleString('fr-FR')} FCFA</td>
                     <td style={{ padding: '1rem', display: 'flex', justifyContent: 'center' }}>{getStatusBadge(tx.status)}</td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
@@ -285,7 +301,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Téléphone</span>
-                <div>{selectedTx.phoneNumber || '-'}</div>
+                <div>{maskPhoneNumber(selectedTx.phoneNumber)}</div>
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Créé le</span>
