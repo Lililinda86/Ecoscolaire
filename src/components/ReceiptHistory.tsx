@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Download, Printer, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, Printer, Search, FileText, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import ReceiptPDFTemplate from './ReceiptPDFTemplate';
@@ -23,6 +23,202 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
   const printRef = useRef<HTMLDivElement>(null);
   const [activeReceipt, setActiveReceipt] = useState<ReceiptLike | null>(null);
   const [expandedReceiptId, setExpandedReceiptId] = useState<string | null>(null);
+  const [selectedContactPhone, setSelectedContactPhone] = useState<string>('');
+  const [isPopupBlocked, setIsPopupBlocked] = useState<boolean>(false);
+
+  const [preparedWhatsAppShare, setPreparedWhatsAppShare] = useState<{
+    receipt: ReceiptLike;
+    receiptFile: File;
+    pdf: jsPDF;
+    filename: string;
+    messageText: string;
+    mode: 'native' | 'fallback';
+    options: { label: string; phone: string }[];
+  } | null>(null);
+
+  const normalizePhone = (phone: string | undefined): string | null => {
+    if (!phone) return null;
+    const trimmed = phone.trim();
+    const plusCount = (trimmed.match(/\+/g) || []).length;
+    if (plusCount > 1) return null;
+    if (plusCount === 1 && !trimmed.startsWith('+')) return null;
+
+    const cleaned = trimmed.replace(/[\s\-()]/g, '');
+    let digits = cleaned;
+
+    if (digits.startsWith('+')) {
+      if (digits.startsWith('+237')) {
+        digits = digits.slice(4);
+      } else {
+        return null;
+      }
+    } else if (digits.startsWith('00237')) {
+      digits = digits.slice(5);
+    } else if (digits.startsWith('237')) {
+      if (digits.length === 12) {
+        digits = digits.slice(3);
+      }
+    }
+
+    if (/^\d{9}$/.test(digits)) {
+      return `237${digits}`;
+    }
+    return null;
+  };
+
+  const handleCancelShare = () => {
+    setPreparedWhatsAppShare(null);
+    setSelectedContactPhone('');
+    setIsPopupBlocked(false);
+    setIsGenerating(null);
+    setActiveReceipt(null);
+  };
+
+  const handleNativeShareClick = async () => {
+    if (!preparedWhatsAppShare) return;
+    try {
+      await navigator.share({
+        files: [preparedWhatsAppShare.receiptFile],
+        title: `Reçu ${preparedWhatsAppShare.receipt.receiptNumber || ''}`,
+        text: preparedWhatsAppShare.messageText
+      });
+      handleCancelShare();
+    } catch (shareErr) {
+      const isAbort = shareErr instanceof Error && shareErr.name === 'AbortError';
+      if (isAbort) {
+        console.log("Partage natif annulé.");
+        handleCancelShare();
+        return;
+      }
+      console.error("Erreur partage natif", shareErr);
+      alert("Erreur lors de l'ouverture du partage.");
+    }
+  };
+
+  const handleFallbackShareClick = () => {
+    if (!preparedWhatsAppShare) return;
+    const phoneToUse = selectedContactPhone || (preparedWhatsAppShare.options[0] ? preparedWhatsAppShare.options[0].phone : '');
+    if (!phoneToUse) return;
+
+    preparedWhatsAppShare.pdf.save(preparedWhatsAppShare.filename);
+    const encodedMessage = encodeURIComponent(preparedWhatsAppShare.messageText);
+    const waUrl = `https://wa.me/${phoneToUse}?text=${encodedMessage}`;
+    const opened = window.open(waUrl, '_blank');
+
+    if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+      setIsPopupBlocked(true);
+    } else {
+      alert(
+        "Le reçu a été téléchargé. Dans WhatsApp, joignez manuellement le fichier PDF téléchargé avant l’envoi."
+      );
+      handleCancelShare();
+    }
+  };
+
+  const handleOpenWhatsAppInCurrentTab = () => {
+    if (!preparedWhatsAppShare) return;
+    const phoneToUse = selectedContactPhone || (preparedWhatsAppShare.options[0] ? preparedWhatsAppShare.options[0].phone : '');
+    if (!phoneToUse) return;
+    const encodedMessage = encodeURIComponent(preparedWhatsAppShare.messageText);
+    const waUrl = `https://wa.me/${phoneToUse}?text=${encodedMessage}`;
+    window.location.assign(waUrl);
+  };
+
+  const handleWhatsAppClick = async (receipt: ReceiptLike) => {
+    setIsGenerating(receipt.id ?? null);
+    setActiveReceipt(receipt);
+
+    try {
+      // Wait for React rendering using double requestAnimationFrame
+      await new Promise<void>(resolve => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      });
+
+      if (!printRef.current) throw new Error("Template ref not found");
+
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      const pdfBlob = pdf.output('blob');
+      const displayModel = buildReceiptDisplayModel(receipt, students, classes, db.payments);
+
+      const dateStr = displayModel.date.replace(/\//g, '').replace(/[\s:]/g, '_');
+      const cleanName = displayModel.studentName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\s]+/g, '_')
+        .replace(/[\\/:*?"<>|]/g, '');
+      const filename = `recu-${displayModel.receiptNumber}-${cleanName}-${dateStr}.pdf`.toLowerCase();
+
+      const receiptFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+      const messageText = `Bonjour,\n\nVeuillez trouver le reçu de paiement n° ${displayModel.receiptNumber} concernant ${displayModel.studentName}, d’un montant de ${displayModel.amount.toLocaleString('fr-FR')} FCFA.\n\nCordialement,\n${school?.name || 'EcoScolaire'}`;
+
+      const canNativeShare = typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [receiptFile] });
+
+      const student = students.find(s => s.id === receipt.studentId);
+      const options: { label: string; phone: string }[] = [];
+      if (student) {
+        const seen = new Set<string>();
+        const addOpt = (label: string, rawPhone: string | undefined) => {
+          const norm = normalizePhone(rawPhone);
+          if (norm && !seen.has(norm)) {
+            seen.add(norm);
+            options.push({ label, phone: norm });
+          }
+        };
+
+        addOpt('Parent', student.parentPhone);
+        addOpt('Mère', student.motherPhone);
+        addOpt('Père', student.fatherPhone);
+        addOpt('Tuteur', student.guardianPhone);
+      }
+
+      if (canNativeShare) {
+        setPreparedWhatsAppShare({
+          receipt,
+          receiptFile,
+          pdf,
+          filename,
+          messageText,
+          mode: 'native',
+          options
+        });
+      } else {
+        if (options.length > 0) {
+          setSelectedContactPhone(options[0].phone);
+        }
+        setPreparedWhatsAppShare({
+          receipt,
+          receiptFile,
+          pdf,
+          filename,
+          messageText,
+          mode: 'fallback',
+          options
+        });
+      }
+    } catch (err) {
+      console.error("Erreur lors de la génération du partage", err);
+      alert("Erreur lors de la préparation du partage du reçu.");
+      setIsGenerating(null);
+    }
+  };
 
   const filteredReceipts = receipts
     .filter(r => {
@@ -198,6 +394,17 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                             <Printer size={14} />
                             Imprimer
                           </button>
+                          <button
+                            className="secondary"
+                            id={`wa-btn-${displayModel.id}`}
+                            style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => handleWhatsAppClick(receipt)}
+                            disabled={isGenerating === displayModel.id || displayModel.receiptNumber === 'En attente'}
+                            title="Envoyer par WhatsApp"
+                          >
+                            <Send size={14} />
+                            {isGenerating === displayModel.id ? 'Préparation...' : 'Envoyer par WhatsApp'}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -270,6 +477,160 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
           </tbody>
         </table>
       </div>
+
+      {preparedWhatsAppShare && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="card" style={{ width: '450px', padding: '1.5rem', margin: '1rem', background: '#fff', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Partager le reçu</h3>
+
+            {preparedWhatsAppShare.mode === 'native' ? (
+              <>
+                <p style={{ fontSize: '0.95rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                  Le menu de partage de votre téléphone va s’ouvrir. Choisissez WhatsApp, puis sélectionnez le parent destinataire.
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={handleCancelShare}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={handleNativeShareClick}
+                  >
+                    Ouvrir le partage
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {preparedWhatsAppShare.options.length === 0 ? (
+                  <>
+                    <p style={{ fontSize: '0.95rem', color: 'var(--danger)', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                      Aucun numéro WhatsApp valide n’est enregistré pour cet élève.
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={handleCancelShare}
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {isPopupBlocked ? (
+                      <>
+                        <p style={{ fontSize: '0.95rem', color: 'var(--danger)', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                          Le reçu a été téléchargé, mais WhatsApp a été bloqué par le navigateur.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={handleCancelShare}
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            type="button"
+                            className="primary"
+                            onClick={handleOpenWhatsAppInCurrentTab}
+                          >
+                            Ouvrir WhatsApp dans cet onglet
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {preparedWhatsAppShare.options.length === 1 ? (
+                          <div style={{ marginBottom: '1.5rem' }}>
+                            <p style={{ fontSize: '0.95rem', marginBottom: '1rem', lineHeight: '1.5' }}>
+                              Le reçu va être partagé avec le parent.
+                            </p>
+                            <div style={{ padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '4px', background: '#f8fafc', fontWeight: 'bold' }}>
+                              {preparedWhatsAppShare.options[0].label} ({preparedWhatsAppShare.options[0].phone})
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ marginBottom: '1.5rem' }}>
+                            <p style={{ fontSize: '0.95rem', marginBottom: '1rem', lineHeight: '1.5' }}>
+                              Plusieurs numéros WhatsApp valides ont été trouvés pour cet élève. Veuillez en choisir un :
+                            </p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                              {preparedWhatsAppShare.options.map((opt, i) => (
+                                <label
+                                  key={`${opt.label}-${i}`}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.75rem',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    background: '#f8fafc'
+                                  }}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="selectedContact"
+                                    checked={selectedContactPhone === opt.phone}
+                                    value={opt.phone}
+                                    onChange={() => setSelectedContactPhone(opt.phone)}
+                                    id={`contact-opt-${i}`}
+                                  />
+                                  <div>
+                                    <span style={{ fontWeight: 'bold' }}>{opt.label}</span>
+                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({opt.phone})</span>
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={handleCancelShare}
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            type="button"
+                            className="primary"
+                            onClick={handleFallbackShareClick}
+                          >
+                            Télécharger et ouvrir WhatsApp
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
