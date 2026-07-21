@@ -1852,9 +1852,9 @@ const Payments: React.FC = () => {
                   <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
                     <tr>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Date</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Encaissements Cash</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Sorties Cash</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Net du jour</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Encaissements espèces</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Dépenses espèces</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Résultat net du jour</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Solde Ouverture</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Solde Théorique</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Montant Compté</th>
@@ -1864,89 +1864,124 @@ const Payments: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedDates.map(dateStr => {
-                      const existingClosure = cashClosures.find(c => c.date === dateStr);
+                    {(() => {
+                      let totalEncaissementsPeriode = 0;
+                      let totalDepensesPeriode = 0;
 
-                      let cashReceived = 0;
-                      let cashExpenses = 0;
-                      let openingBalanceText = '—';
-                      let theoreticalBalanceText = '—';
-                      let countedBalanceText = '—';
-                      let discrepancyText = '—';
-                      let isClosed = false;
-                      let hasDiscrepancy = false;
+                      const rows = sortedDates.map(dateStr => {
+                        const existingClosure = cashClosures.find(c => c.date === dateStr);
 
-                      if (existingClosure) {
-                        isClosed = true;
-                        cashReceived = existingClosure.cashReceived;
-                        cashExpenses = existingClosure.cashExpenses;
-                        openingBalanceText = `${existingClosure.openingBalance.toLocaleString('fr-FR')} FCFA`;
-                        theoreticalBalanceText = `${existingClosure.theoreticalBalance.toLocaleString('fr-FR')} FCFA`;
-                        countedBalanceText = `${existingClosure.countedBalance.toLocaleString('fr-FR')} FCFA`;
-                        discrepancyText = `${existingClosure.discrepancy.toLocaleString('fr-FR')} FCFA`;
-                        hasDiscrepancy = existingClosure.discrepancy !== 0;
-                      } else {
-                        const pList = (db.payments || []).filter(p => p.date === dateStr && isCashPaymentForSchool(p, currentSchool?.id || ''));
-                        const eList = (db.expenses || []).filter(e => e.date === dateStr && String(e.schoolId || '') === currentSchool?.id);
-                        cashReceived = pList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                        cashExpenses = eList.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-                      }
+                        let cashReceived = 0;
+                        let cashExpenses = 0;
+                        let openingBalanceText = '—';
+                        let theoreticalBalanceText = '—';
+                        let countedBalanceText = '—';
+                        let discrepancyText = '—';
+                        let isClosed = false;
+                        let hasDiscrepancy = false;
 
-                      const netDuJour = cashReceived - cashExpenses;
+                        if (existingClosure) {
+                          isClosed = true;
+                          cashReceived = existingClosure.cashReceived;
+                          cashExpenses = existingClosure.cashExpenses;
+                          openingBalanceText = `${existingClosure.openingBalance.toLocaleString('fr-FR')} FCFA`;
+                          theoreticalBalanceText = `${existingClosure.theoreticalBalance.toLocaleString('fr-FR')} FCFA`;
+                          countedBalanceText = `${existingClosure.countedBalance.toLocaleString('fr-FR')} FCFA`;
+                          discrepancyText = `${existingClosure.discrepancy.toLocaleString('fr-FR')} FCFA`;
+                          hasDiscrepancy = existingClosure.discrepancy !== 0;
+                        } else {
+                          const pList = (db.payments || []).filter(p => p.date === dateStr && isCashPaymentForSchool(p, currentSchool?.id || ''));
+                          const eList = (db.expenses || []).filter(e => e.date === dateStr && String(e.schoolId || '') === currentSchool?.id);
+                          cashReceived = pList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                          cashExpenses = eList.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                        }
+
+                        totalEncaissementsPeriode += cashReceived;
+                        totalDepensesPeriode += cashExpenses;
+
+                        const netDuJour = cashReceived - cashExpenses;
+
+                        return (
+                          <tr key={dateStr} style={{ borderBottom: '1px solid var(--border-color)', background: selectedClosureDate === dateStr ? '#f0f9ff' : undefined }}>
+                            <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatIsoDateFr(dateStr)}</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--success)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                              +{cashReceived.toLocaleString('fr-FR')} FCFA
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--danger)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                              -{cashExpenses.toLocaleString('fr-FR')} FCFA
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: netDuJour >= 0 ? '#0369a1' : 'var(--danger)', whiteSpace: 'nowrap' }}>
+                              {netDuJour > 0 ? '+' : ''}{netDuJour.toLocaleString('fr-FR')} FCFA
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>{openingBalanceText}</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 500, whiteSpace: 'nowrap' }}>{theoreticalBalanceText}</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{countedBalanceText}</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: !isClosed ? 'inherit' : (hasDiscrepancy ? 'var(--danger)' : 'var(--success)'), whiteSpace: 'nowrap' }}>
+                              {discrepancyText}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              {isClosed ? (
+                                hasDiscrepancy ? (
+                                  <span style={{ padding: '0.2rem 0.5rem', background: '#fee2e2', color: '#dc2626', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                    Clôturé avec écart
+                                  </span>
+                                ) : (
+                                  <span style={{ padding: '0.2rem 0.5rem', background: '#dcfce7', color: '#16a34a', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                    Clôturé
+                                  </span>
+                                )
+                              ) : (
+                                <span style={{ padding: '0.2rem 0.5rem', background: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                  Non clôturé
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <button
+                                className="secondary"
+                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}
+                                onClick={() => {
+                                  setSelectedClosureDate(dateStr);
+                                  const el = document.getElementById('brouillard-day-section');
+                                  if (el) {
+                                    el.scrollIntoView({ behavior: 'smooth' });
+                                  }
+                                }}
+                              >
+                                🔍 Inspecter
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      });
+
+                      const resultatNetPeriode = totalEncaissementsPeriode - totalDepensesPeriode;
+                      const netPeriodeColor = resultatNetPeriode > 0 ? '#16a34a' : (resultatNetPeriode < 0 ? '#dc2626' : 'inherit');
 
                       return (
-                        <tr key={dateStr} style={{ borderBottom: '1px solid var(--border-color)', background: selectedClosureDate === dateStr ? '#f0f9ff' : undefined }}>
-                          <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatIsoDateFr(dateStr)}</td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--success)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                            +{cashReceived.toLocaleString('fr-FR')} FCFA
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--danger)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                            -{cashExpenses.toLocaleString('fr-FR')} FCFA
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: netDuJour >= 0 ? '#0369a1' : 'var(--danger)', whiteSpace: 'nowrap' }}>
-                            {netDuJour > 0 ? '+' : ''}{netDuJour.toLocaleString('fr-FR')} FCFA
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>{openingBalanceText}</td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 500, whiteSpace: 'nowrap' }}>{theoreticalBalanceText}</td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{countedBalanceText}</td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: !isClosed ? 'inherit' : (hasDiscrepancy ? 'var(--danger)' : 'var(--success)'), whiteSpace: 'nowrap' }}>
-                            {discrepancyText}
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            {isClosed ? (
-                              hasDiscrepancy ? (
-                                <span style={{ padding: '0.2rem 0.5rem', background: '#fee2e2', color: '#dc2626', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                  Clôturé avec écart
-                                </span>
-                              ) : (
-                                <span style={{ padding: '0.2rem 0.5rem', background: '#dcfce7', color: '#16a34a', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                  Clôturé
-                                </span>
-                              )
-                            ) : (
-                              <span style={{ padding: '0.2rem 0.5rem', background: '#fef3c7', color: '#b45309', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                Non clôturé
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <button
-                              className="secondary"
-                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}
-                              onClick={() => {
-                                setSelectedClosureDate(dateStr);
-                                const el = document.getElementById('brouillard-day-section');
-                                if (el) {
-                                  el.scrollIntoView({ behavior: 'smooth' });
-                                }
-                              }}
-                            >
-                              🔍 Inspecter
-                            </button>
-                          </td>
-                        </tr>
+                        <>
+                          {rows}
+                          <tr style={{ background: '#f1f5f9', borderTop: '2px solid var(--border-color)', fontWeight: 'bold' }}>
+                            <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Total de la période</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--success)', whiteSpace: 'nowrap' }}>
+                              +{totalEncaissementsPeriode.toLocaleString('fr-FR')} FCFA
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--danger)', whiteSpace: 'nowrap' }}>
+                              -{totalDepensesPeriode.toLocaleString('fr-FR')} FCFA
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: netPeriodeColor, whiteSpace: 'nowrap' }}>
+                              {resultatNetPeriode > 0 ? '+' : ''}{resultatNetPeriode.toLocaleString('fr-FR')} FCFA
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Période</td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}></td>
+                          </tr>
+                        </>
                       );
-                    })}
+                    })()}
                   </tbody>
                 </table>
               );
@@ -1955,9 +1990,9 @@ const Payments: React.FC = () => {
             <div style={{ padding: '1rem', background: '#f8fafc', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
               <strong>📌 Légende des indicateurs :</strong>
               <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0 }}>
-                <li><strong>Solde global cumulé :</strong> Tous les mouvements cash enregistrés dans l'école, dépenses déduites.</li>
-                <li><strong>Net du jour :</strong> Encaissements cash moins sorties cash de la date spécifique.</li>
-                <li><strong>Solde théorique :</strong> Solde d'ouverture plus encaissements cash moins sorties cash de la journée.</li>
+                <li><strong>Solde global cumulé :</strong> Tous les mouvements en espèces enregistrés dans l'école, dépenses déduites.</li>
+                <li><strong>Résultat net du jour :</strong> Encaissements espèces moins dépenses espèces de la date spécifique.</li>
+                <li><strong>Solde théorique :</strong> Solde d'ouverture plus encaissements espèces moins dépenses espèces de la journée.</li>
                 <li><strong>Montant compté :</strong> Somme physique réellement dénombrée dans le tiroir de caisse lors de la clôture.</li>
               </ul>
             </div>
