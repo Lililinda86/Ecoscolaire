@@ -122,6 +122,18 @@ service cloud.firestore {
       return hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
     }
 
+    function hasValidStudentClass(studentData) {
+      let classPath = /databases/$(database)/documents/classes/$(studentData.classId);
+      return studentData.classId is string
+        && studentData.classId.size() > 0
+        && exists(classPath)
+        && get(classPath).data.schoolId == studentData.schoolId
+        && (
+          !('isActive' in get(classPath).data)
+          || get(classPath).data.isActive != false
+        );
+    }
+
     function canCreateStudentWithinLimits(schoolId) {
       let school = get(/databases/$(database)/documents/schools/$(schoolId)).data;
       let isInternal = school.get('isInternalSchool', false) == true;
@@ -293,11 +305,22 @@ service cloud.firestore {
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
       );
-      // Création par Owner, Director, Secretary AVEC limite
-      allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId) && canCreateStudentWithinLimits(request.resource.data.schoolId);
+      // Création par Owner, Director, Secretary AVEC limite et validation stricte de classe
+      allow create: if isAuthenticated() 
+                    && isActive() 
+                    && canManagePedagogy(request.resource.data.schoolId) 
+                    && canCreateStudentWithinLimits(request.resource.data.schoolId)
+                    && hasValidStudentClass(request.resource.data);
       // Update
       allow update: if isAuthenticated() && isActive() && (
-        canManagePedagogy(request.resource.data.schoolId) ||
+        (
+          canManagePedagogy(request.resource.data.schoolId) 
+          && request.resource.data.schoolId == resource.data.schoolId
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
+            || hasValidStudentClass(request.resource.data)
+          )
+        ) ||
         isAccountantRegistrationFeeUpdate() ||
         isAccountantTuitionUpdate() ||
         isAccountantTransportUpdate()
@@ -314,7 +337,9 @@ service cloud.firestore {
     // --- CLASSES & SUBJECTS ---
     match /classes/{classId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId;
+      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId);
     }
     match /subjects/{subjectId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);

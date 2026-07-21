@@ -74,8 +74,54 @@ const Students: React.FC = () => {
 
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
-  // Derive a sorted list once for mapping
-  const sortedClasses = sortClasses(db.classes);
+  // Helper pour déduire le libellé du cycle
+  const getCycleLabel = (cls: { cycle?: string; level?: string; name: string }) => {
+    const c = cls.cycle || cls.level;
+    if (!c) {
+      const n = cls.name.toLowerCase();
+      if (n.includes('maternelle') || n.includes('nursery') || n.includes('pré-')) return 'Maternelle';
+      if (n.includes('6') || n.includes('5') || n.includes('4') || n.includes('3') || n.includes('form') || n.includes('seconde') || n.includes('première') || n.includes('terminale') || n.includes('sixth')) return 'Secondaire';
+      return 'Primaire';
+    }
+    if (c === 'nursery' || c === 'preschool' || c === 'maternelle') return 'Maternelle';
+    if (c === 'primary' || c === 'primaire') return 'Primaire';
+    if (c === 'secondary' || c === 'secondaire') return 'Secondaire';
+    return 'Primaire';
+  };
+
+  // Helper unique de qualification d'une classe sélectionnable pour un élève (CAS A - Section 3 & 5)
+  const isSelectableClassForStudent = (
+    classItem: unknown,
+    school: typeof currentSchool,
+    studentSection?: string
+  ): boolean => {
+    if (!classItem || typeof classItem !== 'object' || !school) return false;
+    const cls = classItem as Record<string, unknown>;
+
+    // 1. Id non vide
+    const id = typeof cls.id === 'string' ? cls.id.trim() : '';
+    if (!id) return false;
+
+    // 2. schoolId strictement égal à currentSchool.id
+    const sId = typeof cls.schoolId === 'string' ? cls.schoolId.trim() : String(cls.schoolId || '');
+    if (sId !== school.id) return false;
+
+    // 3. Actives uniquement : isActive !== false
+    if (cls.isActive === false) return false;
+
+    // 4. Compatibilité linguistique si spécifiée (type ou section)
+    const classType = typeof cls.type === 'string' ? cls.type : (typeof cls.section === 'string' ? cls.section : undefined);
+    if (studentSection && classType && classType !== studentSection) return false;
+
+    return true;
+  };
+
+  // Liste dérivée unique des classes sélectionnables pour l'école
+  const schoolClasses = (db.classes || []).filter(c => isSelectableClassForStudent(c, currentSchool, currentStudent.section));
+
+  // Déduplication par ID
+  const uniqueSchoolClasses = Array.from(new Map(schoolClasses.map(c => [c.id, c])).values());
+  const sortedClasses = sortClasses(uniqueSchoolClasses as unknown as import('../types').ClassSection[]);
 
   const filteredStudents = db.students.filter(student => {
     const matchSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -166,6 +212,13 @@ const Students: React.FC = () => {
     
     if (!currentStudent.classId) {
       alert("Veuillez choisir une classe !");
+      return;
+    }
+
+    // Validation préalable côté frontend (Section 6)
+    const selectedClassItem = db.classes.find(c => c.id === currentStudent.classId);
+    if (!isSelectableClassForStudent(selectedClassItem, currentSchool, currentStudent.section)) {
+      alert("La classe sélectionnée n’est plus active ou ne correspond pas à cette école et à cette année académique. Sélectionnez une autre classe.");
       return;
     }
 
@@ -888,7 +941,7 @@ const Students: React.FC = () => {
                   value={currentStudent.classId || ''} 
                   onChange={e => {
                     const cId = e.target.value;
-                    const matchedClass = db.classes.find(c => c.id === cId);
+                    const matchedClass = sortedClasses.find(c => c.id === cId);
                     if (matchedClass) {
                       const fees = getDefaultFeesForClass(matchedClass.name, currentStudent.section || 'francophone');
                       setCurrentStudent(prev => ({
@@ -904,10 +957,25 @@ const Students: React.FC = () => {
                     }
                   }}
                 >
-                  <option value="">-- Choisir une classe --</option>
-                  {sortedClasses.filter(c => c.type === currentStudent.section).map(c => (
-                    <option key={c.id} value={c.id}>{c.name.replace(/m[èe]re/gi, 'Maternelle')}</option>
-                  ))}
+                  {sortedClasses.filter(c => !c.type || c.type === currentStudent.section).length === 0 ? (
+                    <option value="" disabled>
+                      Aucune classe active n’est disponible pour cette école et cette année académique. Demandez au directeur ou au fondateur de créer ou d’activer les classes avant l’inscription.
+                    </option>
+                  ) : (
+                    <>
+                      <option value="">-- Choisir une classe --</option>
+                      {sortedClasses.filter(c => !c.type || c.type === currentStudent.section).map(c => {
+                        const cycle = getCycleLabel(c);
+                        const specialty = c.specialtyId ? ` — ${c.specialtyId}` : '';
+                        const sec = c.type ? ` (${c.type})` : '';
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {cycle} — {c.name}{sec}{specialty}
+                          </option>
+                        );
+                      })}
+                    </>
+                  )}
                 </select>
               </div>
             </div>
