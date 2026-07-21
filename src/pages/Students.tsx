@@ -269,27 +269,12 @@ const Students: React.FC = () => {
           parentName: finalStudent.parentName,
           parentEmails: finalStudent.parentEmails,
           parentPhone: finalStudent.parentPhone,
-          feeT1: finalStudent.feeT1,
-          feeT2: finalStudent.feeT2,
-          feeT3: finalStudent.feeT3,
-          feeTransport: finalStudent.feeTransport,
-          feeUniforms: finalStudent.feeUniforms,
           address: finalStudent.address,
           emergencyContact: finalStudent.emergencyContact,
           allergies: finalStudent.allergies,
           medicalConditions: finalStudent.medicalConditions,
           studentStatus: finalStudent.studentStatus,
-          registrationYear: finalStudent.registrationYear,
-          registrationFeeExpected: finalStudent.registrationFeeExpected,
-          registrationFeePaid: finalStudent.registrationFeePaid,
-          registrationFeeStatus: finalStudent.registrationFeeStatus,
-          usesTransport: finalStudent.usesTransport,
-          transportNeighborhood: finalStudent.transportNeighborhood,
-          transportPickupPoint: finalStudent.transportPickupPoint,
-          transportMonthlyFee: finalStudent.transportMonthlyFee,
-          transportFleet: finalStudent.transportFleet,
-          transportStatus: finalStudent.transportStatus,
-          transportPaid: finalStudent.transportPaid,
+          registrationYear: finalStudent.registrationYear
         };
         const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
         await updateDoc(studentRef, patchData);
