@@ -74,18 +74,24 @@ const Students: React.FC = () => {
 
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
-  // Helper pour déduire le libellé du cycle
+  // Helper pour déduire le libellé du cycle (Section 6 P0-35)
   const getCycleLabel = (cls: { cycle?: string; level?: string; name: string }) => {
     const c = cls.cycle || cls.level;
-    if (!c) {
-      const n = cls.name.toLowerCase();
-      if (n.includes('maternelle') || n.includes('nursery') || n.includes('pré-')) return 'Maternelle';
-      if (n.includes('6') || n.includes('5') || n.includes('4') || n.includes('3') || n.includes('form') || n.includes('seconde') || n.includes('première') || n.includes('terminale') || n.includes('sixth')) return 'Secondaire';
-      return 'Primaire';
-    }
     if (c === 'nursery' || c === 'preschool' || c === 'maternelle') return 'Maternelle';
     if (c === 'primary' || c === 'primaire') return 'Primaire';
     if (c === 'secondary' || c === 'secondaire') return 'Secondaire';
+
+    // Fallback rigoureux par nom exact ou pattern
+    const n = cls.name.toLowerCase().trim();
+    if (n.includes('maternelle') || n.includes('nursery') || n.includes('pré-') || n.includes('petite section') || n.includes('moyenne section') || n.includes('grande section')) {
+      return 'Maternelle';
+    }
+    if (n.startsWith('class ') || n === 'sil' || n === 'cp' || n === 'ce1' || n === 'ce2' || n === 'cm1' || n === 'cm2') {
+      return 'Primaire';
+    }
+    if (n.startsWith('form ') || n.includes('sixth') || n.includes('6e') || n.includes('6ème') || n.includes('5e') || n.includes('5ème') || n.includes('4e') || n.includes('4ème') || n.includes('3e') || n.includes('3ème') || n.includes('seconde') || n.includes('2nde') || n.includes('première') || n.includes('1re') || n.includes('terminale')) {
+      return 'Secondaire';
+    }
     return 'Primaire';
   };
 
@@ -959,21 +965,37 @@ const Students: React.FC = () => {
                 >
                   {sortedClasses.filter(c => !c.type || c.type === currentStudent.section).length === 0 ? (
                     <option value="" disabled>
-                      Aucune classe active n’est disponible pour cette école et cette année académique. Demandez au directeur ou au fondateur de créer ou d’activer les classes avant l’inscription.
+                      Aucune classe active n’est disponible pour cette école. Demandez au directeur ou au fondateur de compléter les classes avant l’inscription.
                     </option>
                   ) : (
                     <>
                       <option value="">-- Choisir une classe --</option>
-                      {sortedClasses.filter(c => !c.type || c.type === currentStudent.section).map(c => {
-                        const cycle = getCycleLabel(c);
-                        const specialty = c.specialtyId ? ` — ${c.specialtyId}` : '';
-                        const sec = c.type ? ` (${c.type})` : '';
-                        return (
-                          <option key={c.id} value={c.id}>
-                            {cycle} — {c.name}{sec}{specialty}
-                          </option>
-                        );
-                      })}
+                      {Object.entries(
+                        sortedClasses
+                          .filter(c => !c.type || c.type === currentStudent.section)
+                          .reduce((acc, c) => {
+                            const cycle = getCycleLabel(c);
+                            const sec = (c.type || c.section || 'francophone') === 'francophone' ? 'Francophone' : 'Anglophone';
+                            const cycleKey = sec === 'Francophone'
+                              ? (cycle === 'Maternelle' ? 'Maternelle' : cycle === 'Primaire' ? 'Primaire' : 'Secondaire')
+                              : (cycle === 'Maternelle' ? 'Nursery' : cycle === 'Primaire' ? 'Primary' : 'Secondary');
+                            const key = `${sec} — ${cycleKey}`;
+                            if (!acc[key]) acc[key] = [];
+                            acc[key].push(c);
+                            return acc;
+                          }, {} as Record<string, typeof sortedClasses>)
+                      ).map(([groupName, classesInGroup]) => (
+                        <optgroup key={groupName} label={groupName}>
+                          {classesInGroup.map(c => {
+                            const specialty = c.specialtyId ? ` — ${c.specialtyId}` : '';
+                            return (
+                              <option key={c.id} value={c.id}>
+                                {c.name}{specialty}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      ))}
                     </>
                   )}
                 </select>
