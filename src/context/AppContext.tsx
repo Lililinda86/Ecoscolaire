@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Database, DatabasePatch } from '../db/storage';
 import { defaultDB } from '../db/storage';
-import type { User, School, Student, Payment } from '../types';
+import type { User, School, Student, Payment, Expense } from '../types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 
@@ -186,9 +186,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const loadedDb: Database = { ...defaultDB };
         const collectionsToFetch: (keyof Database)[] = [
           'classes', 'students', 'staff', 'buses', 'inventory', 
-          'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
+          'grades', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'technicalSpecialties', 'busRoutes', 'fuelExpenses', 'maintenances',
-          'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts'
+          'breakdowns', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts'
         ];
 
         console.log("================ DIAGNOSTIC AppContext ===============");
@@ -311,7 +311,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         setIsFirestoreConnected(true);
         setFirestoreError(null);
-        setDb(loadedDb);
+        setDb(prevDb => ({
+          ...loadedDb,
+          payments: prevDb ? prevDb.payments : loadedDb.payments,
+          expenses: prevDb ? prevDb.expenses : loadedDb.expenses
+        }));
         setLastSyncDate(new Date());
         setLoading(false);
 
@@ -326,6 +330,107 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     fetchData();
   }, [firebaseUser, supervisionSchoolId]);
+
+  // 2b. Realtime Financial Subscriptions (payments & expenses)
+  useEffect(() => {
+    let cancelled = false;
+    let unsubPayments: (() => void) | null = null;
+    let unsubExpenses: (() => void) | null = null;
+
+    const targetSchoolId = supervisionSchoolId || currentUser?.schoolId;
+
+    // Réinitialisation immédiate lors du changement d'école / déconnexion (AVANT les early returns)
+    setDb(prevDb => {
+      if (!prevDb) return prevDb;
+      return {
+        ...prevDb,
+        payments: [],
+        expenses: []
+      };
+    });
+
+    if (!firebaseUser || !targetSchoolId) {
+      return () => {
+        cancelled = true;
+        if (unsubPayments) unsubPayments();
+        if (unsubExpenses) unsubExpenses();
+      };
+    }
+
+    const initListeners = async () => {
+      try {
+        const { db: firestoreDb } = await import('../db/firebase');
+        if (cancelled) return;
+
+        const { collection, query, where, onSnapshot } = await import('firebase/firestore');
+        if (cancelled) return;
+
+        const paymentsQ = query(
+          collection(firestoreDb, 'payments'),
+          where('schoolId', '==', targetSchoolId)
+        );
+
+        unsubPayments = onSnapshot(paymentsQ, (snapshot) => {
+          if (cancelled) return;
+          const paymentsList: Payment[] = [];
+          snapshot.forEach((docSnap) => {
+            paymentsList.push({ id: docSnap.id, ...docSnap.data() } as Payment);
+          });
+          setDb(prevDb => {
+            const current = prevDb || defaultDB;
+            return { ...current, payments: paymentsList };
+          });
+        }, (err) => {
+          if (cancelled) return;
+          console.warn("❌ [AppContext] Erreur listener payments:", err);
+          setDb(prevDb => prevDb ? { ...prevDb, payments: [] } : prevDb);
+        });
+
+        if (cancelled) {
+          unsubPayments();
+          return;
+        }
+
+        const expensesQ = query(
+          collection(firestoreDb, 'expenses'),
+          where('schoolId', '==', targetSchoolId)
+        );
+
+        unsubExpenses = onSnapshot(expensesQ, (snapshot) => {
+          if (cancelled) return;
+          const expensesList: Expense[] = [];
+          snapshot.forEach((docSnap) => {
+            expensesList.push({ id: docSnap.id, ...docSnap.data() } as Expense);
+          });
+          setDb(prevDb => {
+            const current = prevDb || defaultDB;
+            return { ...current, expenses: expensesList };
+          });
+        }, (err) => {
+          if (cancelled) return;
+          console.warn("❌ [AppContext] Erreur listener expenses:", err);
+          setDb(prevDb => prevDb ? { ...prevDb, expenses: [] } : prevDb);
+        });
+
+        if (cancelled) {
+          unsubExpenses();
+          return;
+        }
+
+      } catch (e) {
+        if (cancelled) return;
+        console.warn("❌ [AppContext] Erreur initialisation listeners financiers:", e);
+      }
+    };
+
+    initListeners();
+
+    return () => {
+      cancelled = true;
+      if (unsubPayments) unsubPayments();
+      if (unsubExpenses) unsubExpenses();
+    };
+  }, [firebaseUser, supervisionSchoolId, currentUser?.schoolId]);
 
   const saveDB = async (newDb: Database) => {
     if (!db || !currentUser) return;
