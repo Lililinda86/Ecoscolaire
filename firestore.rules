@@ -532,5 +532,11 @@ service cloud.firestore {
       allow read, update, delete: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId);
     }
+
+    // --- CASH CLOSURES ---
+    match /cashClosures/{closureId} {
+      allow get, list: if isAuthenticated() && isActive() && (isSuperAdmin() || (resource.data.schoolId == getUserSchoolId() && (isOwner() || isDirector() || isSecretary() || isAccountant())));
+      allow create, update, delete: if false;
+    }
   }
 }

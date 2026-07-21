@@ -513,3 +513,21 @@ export interface TuitionDiscountSlot {
   discountId: string;
   createdAt: DateLike;
 }
+
+export interface CashClosure {
+  id: string;
+  schoolId: string;
+  academicYear: string;
+  date: string;
+  openingBalance: number;
+  cashReceived: number;
+  cashExpenses: number;
+  theoreticalBalance: number;
+  countedBalance: number;
+  discrepancy: number;
+  notes: string;
+  status: 'closed';
+  closedBy: string;
+  closedByName?: string;
+  closedAt: DateLike;
+}

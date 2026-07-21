@@ -2836,4 +2836,185 @@ export const approveTuitionDiscount = functions.https.onCall(async (data, contex
   });
 });
 
+const getAfricaDoualaDateStr = (dateObj = new Date()): string => {
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Africa/Douala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(dateObj);
+
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+};
+
+export const closeCashDrawer = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+
+  const { schoolId, academicYear, date, openingBalance, countedBalance, notes } = data || {};
+
+  if (typeof schoolId !== 'string' || !schoolId.trim()) {
+    throw new functions.https.HttpsError('invalid-argument', 'schoolId is required.');
+  }
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new functions.https.HttpsError('invalid-argument', 'date is invalid (expected YYYY-MM-DD).');
+  }
+
+  const [yrStr, moStr, dyStr] = date.split('-');
+  const yr = Number(yrStr);
+  const mo = Number(moStr);
+  const dy = Number(dyStr);
+  const parsedDate = new Date(Date.UTC(yr, mo - 1, dy));
+  if (parsedDate.getUTCFullYear() !== yr || parsedDate.getUTCMonth() !== mo - 1 || parsedDate.getUTCDate() !== dy) {
+    throw new functions.https.HttpsError('invalid-argument', 'date does not exist.');
+  }
+
+  const todayDouala = getAfricaDoualaDateStr();
+  if (date > todayDouala) {
+    throw new functions.https.HttpsError('invalid-argument', 'La clôture d\'une date future est interdite.');
+  }
+
+  if (typeof openingBalance !== 'number' || !Number.isSafeInteger(openingBalance) || openingBalance < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'openingBalance must be a non-negative integer.');
+  }
+  if (typeof countedBalance !== 'number' || !Number.isSafeInteger(countedBalance) || countedBalance < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'countedBalance must be a non-negative integer.');
+  }
+
+  const cleanNotes = typeof notes === 'string' ? notes.trim() : '';
+
+  const db = admin.firestore();
+  const uid = context.auth.uid;
+
+  const userSnap = await db.collection('users').doc(uid).get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'User profile not found.');
+  }
+  const userData = userSnap.data() || {};
+  const isActive = userData.active === true || userData.isActive === true;
+  if (!isActive) {
+    throw new functions.https.HttpsError('permission-denied', 'User account is inactive.');
+  }
+
+  const role = userData.role;
+  const allowedRoles = ['secretary', 'accountant', 'owner', 'director', 'superAdmin'];
+  if (!allowedRoles.includes(role)) {
+    throw new functions.https.HttpsError('permission-denied', 'User role is not authorized to close cash drawer.');
+  }
+
+  if (role !== 'superAdmin' && userData.schoolId !== schoolId) {
+    throw new functions.https.HttpsError('permission-denied', 'User schoolId does not match target school.');
+  }
+
+  const schoolSnap = await db.collection('schools').doc(schoolId).get();
+  if (!schoolSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'School not found.');
+  }
+  const schoolData = schoolSnap.data() || {};
+  const officialAcademicYear =
+    typeof schoolData.academicYear === 'string'
+      ? schoolData.academicYear.trim()
+      : '';
+
+  if (!/^\d{4}-\d{4}$/.test(officialAcademicYear)) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'School academic year is missing or invalid.'
+    );
+  }
+
+  if (
+    academicYear !== undefined &&
+    academicYear !== officialAcademicYear
+  ) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'academicYear does not match school record.'
+    );
+  }
+
+  const closureId = `${schoolId}__${date}`;
+  const closureRef = db.collection('cashClosures').doc(closureId);
+
+  return await db.runTransaction(async (transaction) => {
+    const existingSnap = await transaction.get(closureRef);
+    if (existingSnap.exists) {
+      throw new functions.https.HttpsError('already-exists', 'La caisse pour cette date a déjà été clôturée.');
+    }
+
+    const paymentsQuery = db.collection('payments')
+      .where('schoolId', '==', schoolId)
+      .where('date', '==', date);
+    const paymentsSnap = await transaction.get(paymentsQuery);
+
+    let cashReceived = 0;
+    paymentsSnap.forEach(docSnap => {
+      const p = docSnap.data();
+      if (p) {
+        const method = p.method ? String(p.method).toLowerCase() : 'cash';
+        const status = p.status ? String(p.status).toLowerCase() : 'completed';
+        const excludedStatuses = ['pending', 'failed', 'cancelled', 'canceled', 'refunded', 'reversed'];
+        if (method === 'cash' && !excludedStatuses.includes(status)) {
+          const amt = Number(p.amount) || 0;
+          if (Number.isSafeInteger(amt) && amt > 0) {
+            cashReceived += amt;
+          }
+        }
+      }
+    });
+
+    const expensesQuery = db.collection('expenses')
+      .where('schoolId', '==', schoolId)
+      .where('date', '==', date);
+    const expensesSnap = await transaction.get(expensesQuery);
+
+    let cashExpenses = 0;
+    expensesSnap.forEach(docSnap => {
+      const e = docSnap.data();
+      if (e) {
+        const amt = Number(e.amount) || 0;
+        if (Number.isSafeInteger(amt) && amt > 0) {
+          cashExpenses += amt;
+        }
+      }
+    });
+
+    const theoreticalBalance = openingBalance + cashReceived - cashExpenses;
+    const discrepancy = countedBalance - theoreticalBalance;
+
+    if (discrepancy !== 0 && !cleanNotes) {
+      throw new functions.https.HttpsError('invalid-argument', 'Une observation est obligatoire en cas d\'écart de caisse.');
+    }
+
+    const closedByName = userData.name || userData.displayName || userData.email || uid;
+
+    const closureDoc = {
+      id: closureId,
+      schoolId,
+      academicYear: officialAcademicYear,
+      date,
+      openingBalance,
+      cashReceived,
+      cashExpenses,
+      theoreticalBalance,
+      countedBalance,
+      discrepancy,
+      notes: cleanNotes,
+      status: 'closed',
+      closedBy: uid,
+      closedByName,
+      closedAt: FieldValue.serverTimestamp()
+    };
+
+    transaction.set(closureRef, closureDoc);
+
+    return {
+      success: true,
+      closureId
+    };
+  });
+});
+
 export { sweepZombieImportJobs } from './studentImportSweeper';
