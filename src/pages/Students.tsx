@@ -6,7 +6,6 @@ import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClas
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
-import { resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName, getDisplayClassName } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
@@ -48,13 +47,13 @@ const Students: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [, setRefresh] = useState(0);
   const { db, safeMergeDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
-  
+
   const currentCountDisplay = currentSchool?.studentCount ?? db.students.length;
   const limitReached = isStudentLimitReached(currentSchool, currentCountDisplay);
   const limitLabel = getStudentLimitLabel(currentSchool, currentCountDisplay);
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
   const [parentEmailsInput, setParentEmailsInput] = useState('');
-  
+
   const [inviteModalStudent, setInviteModalStudent] = useState<Student | null>(null);
   const [inviteEmailTarget, setInviteEmailTarget] = useState<string>('');
   const [generatedInviteLink, setGeneratedInviteLink] = useState<string>('');
@@ -69,6 +68,21 @@ const Students: React.FC = () => {
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [previewStudents, setPreviewStudents] = useState<Student[] | null>(null);
 
+  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [stepValidationError, setStepValidationError] = useState<string | null>(null);
+  const [isConfirmAbandonOpen, setIsConfirmAbandonOpen] = useState(false);
+  const [initialSnapshot, setInitialSnapshot] = useState<string>('');
+
+  const requestCloseStudentModal = () => {
+    if (isSaving) return;
+    const currentSnap = JSON.stringify({ currentStudent, parentEmailsInput });
+    if (currentSnap !== initialSnapshot) {
+      setIsConfirmAbandonOpen(true);
+    } else {
+      setModalOpen(false);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [sectionFilter, setSectionFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
@@ -144,9 +158,14 @@ const Students: React.FC = () => {
   });
 
   const handleOpenModal = (student?: Student) => {
+    setCurrentStep(1);
+    setStepValidationError(null);
+    let initStudent: Partial<Student>;
+    let initEmails = '';
+
     if (student) {
       setIsEditing(true);
-      setCurrentStudent({
+      initStudent = {
         ...student,
         studentStatus: student.studentStatus || 'nouveau',
         registrationYear: student.registrationYear || '2026-2027',
@@ -157,17 +176,22 @@ const Students: React.FC = () => {
         transportMonthlyFee: student.transportMonthlyFee ?? 0,
         transportStatus: student.transportStatus || 'none',
         transportPaid: student.transportPaid ?? 0
-      });
-      setParentEmailsInput((student.parentEmails || []).join(', '));
+      };
+      initEmails = (student.parentEmails || []).join(', ');
+      setCurrentStudent(initStudent);
+      setParentEmailsInput(initEmails);
     } else {
-      setCurrentStudent({ 
-        id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '', 
-        studentStatus: 'nouveau', registrationYear: '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0, 
-        registrationFeeStatus: 'unpaid', usesTransport: false, transportMonthlyFee: 0, transportStatus: 'none', transportPaid: 0 
-      });
+      initStudent = {
+        id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '',
+        studentStatus: 'nouveau', registrationYear: '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0,
+        registrationFeeStatus: 'unpaid', usesTransport: false, transportMonthlyFee: 0, transportStatus: 'none', transportPaid: 0
+      };
+      initEmails = '';
+      setCurrentStudent(initStudent);
       setIsEditing(false);
-      setParentEmailsInput('');
+      setParentEmailsInput(initEmails);
     }
+    setInitialSnapshot(JSON.stringify({ currentStudent: initStudent, parentEmailsInput: initEmails }));
     setModalOpen(true);
   };
 
@@ -187,7 +211,7 @@ const Students: React.FC = () => {
 
     try {
       const inviteId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       const invitation = {
         id: inviteId,
         schoolId: currentSchool.id,
@@ -203,7 +227,7 @@ const Students: React.FC = () => {
       };
 
       await setDoc(doc(firestoreDb, 'parent_invitations', inviteId), invitation, { merge: true });
-      
+
       const link = `${window.location.origin}/#/parent-signup?inviteId=${inviteId}`;
       setGeneratedInviteLink(link);
       logAuditAction({
@@ -222,7 +246,7 @@ const Students: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
-    
+
     if (!currentStudent.classId) {
       alert("Veuillez choisir une classe !");
       return;
@@ -240,8 +264,8 @@ const Students: React.FC = () => {
       const normalizedEmails = normalizeParentEmails(parentEmailsInput);
       const parentPhone = currentStudent.parentPhone ? (normalizeCameroonPhoneNumber(currentStudent.parentPhone) || currentStudent.parentPhone) : '';
       const matricule = currentStudent.matricule ? currentStudent.matricule.trim() : `MAT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const finalStudent = { 
-        ...currentStudent, 
+      const finalStudent = {
+        ...currentStudent,
         parentEmails: normalizedEmails,
         parentPhone,
         matricule
@@ -278,24 +302,24 @@ const Students: React.FC = () => {
         };
         const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
         await updateDoc(studentRef, patchData);
-        
+
         // Mutate local state for UI update
         const idx = db.students.findIndex(s => s.id === finalStudent.id);
         if (idx !== -1) db.students[idx] = finalStudent;
-        
+
       } else {
         if (!currentSchool) throw new Error("École non définie.");
         const studentId = finalStudent.id || crypto.randomUUID();
         finalStudent.id = studentId;
         const studentRef = doc(firestoreDb, 'students', studentId);
-        
+
         const currentCountDisplay = currentSchool.studentCount ?? db.students.length;
         if (isStudentLimitReached(currentSchool, currentCountDisplay)) {
           throw new Error("QUOTA_EXCEEDED");
         }
-        
+
         await setDoc(studentRef, finalStudent, { merge: true });
-        
+
         // Mutate local state
         db.students.push(finalStudent);
         currentSchool.studentCount = (currentSchool.studentCount || 0) + 1;
@@ -334,21 +358,21 @@ const Students: React.FC = () => {
 
   const handleDelete = async (student: Student) => {
     if (!currentUser || !currentSchool) return;
-    
+
     if (confirm(t('delete') + ' cet élève ?')) {
       const canDeleteDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
-      
+
       try {
         if (canDeleteDirectly) {
           const studentRef = doc(firestoreDb, 'students', student.id);
           await deleteDoc(studentRef);
-          
+
           // Mutate local state
           const idx = db.students.findIndex(s => s.id === student.id);
           if (idx !== -1) db.students.splice(idx, 1);
           currentSchool.studentCount = Math.max(0, (currentSchool.studentCount || 0) - 1);
           setRefresh(r => r + 1);
-          
+
           alert("Élève supprimé avec succès.");
           logAuditAction({
             action: 'DELETE_STUDENT',
@@ -371,13 +395,13 @@ const Students: React.FC = () => {
             status: 'pending' as const,
             createdAt: new Date().toISOString()
           };
-          
+
           await setDoc(doc(firestoreDb, 'validation_requests', requestId), reqData, { merge: true });
-          
+
           if (!db.validation_requests) db.validation_requests = [];
           db.validation_requests.push(reqData);
           setRefresh(r => r + 1);
-          
+
           alert("Demande de suppression envoyée pour validation (Directeur / Super Admin).");
         }
       } catch (err: unknown) {
@@ -399,10 +423,7 @@ const Students: React.FC = () => {
   };
 
   const handleDeleteAll = () => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer TOUS les élèves de la base de données ? Cette action est irréversible.')) {
-      const newDb = { ...db, students: [] };
-      safeMergeDB(newDb);
-    }
+    alert("Fonction temporairement indisponible pour protéger les données.");
   };
 
   const handleImportSubmit = async (e: React.FormEvent) => {
@@ -473,7 +494,7 @@ const Students: React.FC = () => {
           const nom = getVal(['NOM']);
           const prenom = getVal(['PRENOM']);
           const fullName = getVal(['NOMS ET PRENOMS', 'NOM ET PRENOM']) || (nom ? `${nom} ${prenom}`.trim() : '');
-          
+
           if (!fullName) {
             errorsLog.push(`Ligne ${i + 1} : Nom ou prénom manquant.`);
             continue;
@@ -536,7 +557,7 @@ const Students: React.FC = () => {
           const regPaid = parseFloat(getVal(['INSCRIPTION_PAYEE', 'DROIT INSCRIPTION PAYE'])) || 0;
           const tuitionExpected = parseFloat(getVal(['SCOLARITE_ANNUELLE', 'PENSION ATTENDUE', 'TUITION'])) || 0;
           const tuitionPaid = parseFloat(getVal(['PENSION PAYEE'])) || 0;
-          
+
           const t1 = parseFloat(getVal(['TRANCHE_1', 'TRANCHE 1'])) || 0;
           const t2 = parseFloat(getVal(['TRANCHE_2', 'TRANCHE 2'])) || 0;
           const t3 = parseFloat(getVal(['TRANCHE_3', 'TRANCHE 3'])) || 0;
@@ -552,22 +573,22 @@ const Students: React.FC = () => {
             parentName: getVal(['TUTEUR', 'PARENT', 'NOMS DES PARENTS', 'NOM_PARENT']) || 'Inconnu',
             parentPhone: normalizedPhone || '',
             address: getVal(['ADRESSE', 'QUARTIER', 'ADRESSE_PARENT']) || '',
-            
+
             // Paramètres financiers enrichis
             registrationFeeExpected: regExpected,
             registrationFeePaid: regPaid,
             registrationFeeStatus: regPaid >= regExpected ? 'paid' : (regPaid > 0 ? 'partial' : 'unpaid'),
-            
+
             tuitionExpected: tuitionExpected || (t1 + t2 + t3),
             tuitionPaid: tuitionPaid,
             tuitionStatus: tuitionPaid >= (tuitionExpected || (t1 + t2 + t3)) ? 'paid' : (tuitionPaid > 0 ? 'partial' : 'unpaid'),
-            
+
             feeT1: t1,
             feeT2: t2,
             feeT3: t3,
             feeTransport: parseFloat(getVal(['TRANSPORT'])) || 0,
             feeUniforms: parseFloat(getVal(['TENUE_GRATUITE'])) || 0,
-            
+
             rawClassName: classeNameRaw,
             detectedClassName: detectedClassName,
             parentEmails: normalizedEmails
@@ -611,11 +632,11 @@ const Students: React.FC = () => {
   const exportInscriptionsCSV = () => {
     const rows = [
       [
-        'ID', 'Nom', 'Sexe', 'Date de naissance', 'Section', 'Classe', 
+        'ID', 'Nom', 'Sexe', 'Date de naissance', 'Section', 'Classe',
         'Statut élève', 'Année scolaire', 'Nom parent / tuteur', 'Téléphone parent', 'Email parent',
         'Droit inscription attendu', 'Droit inscription payé', 'Statut droit inscription',
         'Pension attendue', 'Pension payée', 'Statut pension',
-        'Utilise transport', 'Quartier transport', 'Point de ramassage transport', 
+        'Utilise transport', 'Quartier transport', 'Point de ramassage transport',
         'Flotte / Bus transport', 'Tarif mensuel transport', 'Transport payé', 'Statut transport'
       ]
     ];
@@ -623,7 +644,7 @@ const Students: React.FC = () => {
     filteredStudents.forEach(student => {
       const className = db.classes.find(c => c.id === student.classId)?.name || student.rawClassName || 'Inconnue';
       const parentEmail = (student.parentEmails || [])[0] || '';
-      
+
       const escapeCsv = (str: string | number | boolean | undefined | null) => {
         if (str === null || str === undefined) return '';
         const s = String(str);
@@ -694,8 +715,8 @@ const Students: React.FC = () => {
     const paidReg = student.registrationFeePaid ?? 0;
     const remainingReg = Math.max(expectedReg - paidReg, 0);
 
-    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0 
-      ? student.tuitionExpected 
+    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0
+      ? student.tuitionExpected
       : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
     const paidTuition = student.tuitionPaid ?? 0;
     const remainingTuition = Math.max(expectedTuition - paidTuition, 0);
@@ -714,8 +735,8 @@ const Students: React.FC = () => {
     const paidReg = student.registrationFeePaid ?? 0;
     const remainingReg = Math.max(expectedReg - paidReg, 0);
 
-    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0 
-      ? student.tuitionExpected 
+    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0
+      ? student.tuitionExpected
       : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
     const paidTuition = student.tuitionPaid ?? 0;
     const remainingTuition = Math.max(expectedTuition - paidTuition, 0);
@@ -726,7 +747,7 @@ const Students: React.FC = () => {
     if (remainingReg === 0 && remainingTuition === 0 && !transportOwed) return;
 
     let message = `Bonjour Madame/Monsieur,\n\nNous vous contactons au sujet du dossier scolaire de ${student.name} pour l'année 2026-2027.\n\nÀ ce jour, le solde à régulariser est le suivant :\n`;
-    
+
     if (remainingReg > 0) {
       message += `- Droit d'inscription : ${remainingReg.toLocaleString('fr-FR')} FCFA\n`;
     }
@@ -761,25 +782,78 @@ const Students: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <h1 style={{ margin: 0 }}>{t('students', 'Élèves')}</h1>
           <div style={{ padding: '0.4rem 0.8rem', background: limitReached ? '#fee2e2' : '#eef2ff', color: limitReached ? '#dc2626' : '#4338ca', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 500 }}>
-            Capacité SaaS : {limitLabel} (Synchronisé avec le serveur)
+            {filteredStudents.length} {filteredStudents.length <= 1 ? 'élève inscrit' : 'élèves inscrits'} — Capacité SaaS : {limitLabel}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <button className="secondary" onClick={() => window.print()}>
-            <Printer size={18} /> Imprimer la liste
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended} aria-label="Ajouter un élève">
+            <Plus size={18} /> {t('add', 'Ajouter un élève')}
           </button>
-          <button className="secondary" onClick={handleDeleteAll} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={isSchoolSuspended}>
-            <Trash2 size={18} /> Vider la liste
-          </button>
-          <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended}>
+          <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended} aria-label="Importer depuis Excel">
             <FileSpreadsheet size={18} /> Importer Excel
           </button>
-          <button className="secondary" onClick={exportInscriptionsCSV} disabled={isSchoolSuspended || filteredStudents.length === 0}>
+          <button className="secondary" onClick={exportInscriptionsCSV} disabled={isSchoolSuspended || filteredStudents.length === 0} aria-label="Exporter les inscriptions">
             <FileSpreadsheet size={18} /> Exporter inscriptions
           </button>
-          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
-            <Plus size={18} /> {t('add', 'Ajouter')}
+          <button className="secondary" onClick={() => window.print()} aria-label="Imprimer la liste">
+            <Printer size={18} /> Imprimer
           </button>
+
+          {/* Menu secondaire d'actions dangereuses */}
+          {['superAdmin', 'owner', 'director'].includes(currentUser?.role || '') && (
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setIsMoreActionsOpen(prev => !prev)}
+                aria-expanded={isMoreActionsOpen}
+                aria-controls="more-actions-menu"
+                aria-label="Autres actions"
+                style={{ fontSize: '0.9rem' }}
+              >
+                Autres actions ▾
+              </button>
+              {isMoreActionsOpen && (
+                <div
+                  id="more-actions-menu"
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '110%',
+                    background: '#fff',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    zIndex: 20,
+                    minWidth: '180px',
+                    padding: '0.5rem'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { setIsMoreActionsOpen(false); handleDeleteAll(); }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--danger)',
+                      padding: '0.5rem 0.75rem',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    disabled={isSchoolSuspended}
+                    aria-label="Vider la liste des élèves"
+                  >
+                    <Trash2 size={16} /> Vider la liste
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -788,27 +862,39 @@ const Students: React.FC = () => {
            <SchoolDocumentHeader school={currentSchool} documentTitle="Liste des Élèves" />
         </div>
         <style>{`@media print { .print-area-header { display: block !important; } }`}</style>
-        
+
         <div className="no-print" style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', background: '#f8f9fa' }}>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <input 
-              type="text" 
-              placeholder="Rechercher un élève..." 
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Rechercher un élève, matricule, classe, tuteur..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              style={{ minWidth: '250px', flex: 1 }}
+              style={{ minWidth: '280px', flex: 1 }}
+              aria-label="Rechercher un élève"
             />
-            <select value={sectionFilter} onChange={e => {setSectionFilter(e.target.value); setClassFilter('all');}}>
+            <select value={sectionFilter} onChange={e => {setSectionFilter(e.target.value); setClassFilter('all');}} aria-label="Filtrer par section">
               <option value="all">Toutes les sections</option>
               <option value="francophone">Francophone</option>
               <option value="anglophone">Anglophone</option>
             </select>
-            <select value={classFilter} onChange={e => setClassFilter(e.target.value)}>
+            <select value={classFilter} onChange={e => setClassFilter(e.target.value)} aria-label="Filtrer par classe">
               <option value="all">Toutes les classes</option>
               {db.classes.filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
                  <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            {(searchTerm !== '' || sectionFilter !== 'all' || classFilter !== 'all') && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => { setSearchTerm(''); setSectionFilter('all'); setClassFilter('all'); }}
+                style={{ fontSize: '0.85rem' }}
+                aria-label="Réinitialiser les filtres"
+              >
+                Réinitialiser les filtres
+              </button>
+            )}
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -827,8 +913,14 @@ const Students: React.FC = () => {
             <tbody>
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Aucun élève trouvé
+                  <td colSpan={7} style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {db.students.length === 0
+                      ? 'Aucun élève n’est encore inscrit dans cet établissement.'
+                      : (searchTerm !== ''
+                          ? 'Aucun élève trouvé pour cette recherche.'
+                          : 'Aucun élève ne correspond aux filtres sélectionnés.'
+                        )
+                    }
                   </td>
                 </tr>
               ) : (
@@ -853,11 +945,11 @@ const Students: React.FC = () => {
                       <button className="secondary" onClick={() => handleOpenInviteModal(student)} style={{ marginRight: '0.5rem', color: 'var(--primary)' }} title="Inviter le parent" disabled={isSchoolSuspended}>
                         <Send size={16} />
                       </button>
-                      <button 
-                        className="secondary" 
-                        onClick={() => handleWhatsAppReminder(student)} 
-                        style={{ marginRight: '0.5rem', color: '#25D366', borderColor: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? '#25D366' : undefined, opacity: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 1 : 0.5 }} 
-                        title="Relancer par WhatsApp (Droit d'inscription, Pension, Transport)" 
+                      <button
+                        className="secondary"
+                        onClick={() => handleWhatsAppReminder(student)}
+                        style={{ marginRight: '0.5rem', color: '#25D366', borderColor: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? '#25D366' : undefined, opacity: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 1 : 0.5 }}
+                        title="Relancer par WhatsApp (Droit d'inscription, Pension, Transport)"
                         disabled={isSchoolSuspended || !needsReminder(student) || !formatPhoneForWhatsApp(student.parentPhone)}
                       >
                         <MessageSquare size={16} />
@@ -877,314 +969,333 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title={isEditing ? t('edit', 'Modifier') : t('add', 'Ajouter')}>
-        <form onSubmit={handleSave}>
-          {/* Section 1 : Informations Personnelles */}
-          <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>👤 1. Informations Personnelles</h4>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Matricule</label>
-                <input value={currentStudent.matricule || ''} onChange={e => setCurrentStudent({...currentStudent, matricule: e.target.value})} placeholder="Ex: MAT-001" />
-              </div>
-              <div className="form-group" style={{ flex: 2 }}>
-                <label>{t('name', 'Nom')}</label>
-                <input required value={currentStudent.name || ''} onChange={e => setCurrentStudent({...currentStudent, name: e.target.value})} placeholder="Ex: Dupont Jean" />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Sexe</label>
-                <select value={currentStudent.gender} onChange={e => setCurrentStudent({...currentStudent, gender: e.target.value as 'M'|'F'})}>
-                  <option value="M">Masculin</option>
-                  <option value="F">Féminin</option>
-                </select>
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Date de Naissance</label>
-                <input type="date" required value={currentStudent.dob || ''} onChange={e => setCurrentStudent({...currentStudent, dob: e.target.value})} />
-              </div>
+      <Modal isOpen={isModalOpen} onClose={requestCloseStudentModal} title={isEditing ? t('edit', 'Modifier l’élève') : t('add', 'Ajouter un élève')}>
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', maxHeight: '75vh' }}>
+          {/* Header Step Indicator */}
+          <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary-color)' }}>
+              Étape {currentStep} sur 4 : {
+                currentStep === 1 ? '👤 Identité' :
+                currentStep === 2 ? '🏫 Scolarité' :
+                currentStep === 3 ? '📞 Responsable Légal' : '🩺 Compléments & Santé'
+              }
+            </span>
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              {[1, 2, 3, 4].map(s => (
+                <div
+                  key={s}
+                  style={{
+                    width: '24px',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: s === currentStep ? 'var(--primary-color)' : s < currentStep ? '#818cf8' : '#cbd5e1'
+                  }}
+                />
+              ))}
             </div>
           </div>
 
-          {/* Section 2 : Inscription Scolaire & Tarifs */}
-          <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>🏫 2. Classe & Frais de Scolarité</h4>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>{t('section', 'Section')}</label>
-                <select 
-                  value={currentStudent.section} 
-                  onChange={e => {
-                    const newSection = e.target.value as SectionType;
-                    setCurrentStudent(prev => ({ 
-                      ...prev, 
-                      section: newSection, 
-                      classId: '', 
-                      feeT1: 0, 
-                      feeT2: 0, 
-                      feeT3: 0, 
-                      registrationFeeExpected: 15000 
-                    }));
-                  }}
-                >
-                  <option value="francophone">Francophone</option>
-                  <option value="anglophone">Anglophone</option>
-                </select>
+          {/* Step Content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+            {stepValidationError && (
+              <div role="alert" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: '#fee2e2', color: '#b91c1c', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 500 }}>
+                ⚠️ {stepValidationError}
               </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Classe</label>
-                <select 
-                  required
-                  value={currentStudent.classId || ''} 
-                  onChange={e => {
-                    const cId = e.target.value;
-                    const matchedClass = sortedClasses.find(c => c.id === cId);
-                    if (matchedClass) {
-                      const fees = getDefaultFeesForClass(matchedClass.name, currentStudent.section || 'francophone');
-                      setCurrentStudent(prev => ({
-                        ...prev,
-                        classId: cId,
-                        feeT1: fees.t1,
-                        feeT2: fees.t2,
-                        feeT3: fees.t3,
-                        registrationFeeExpected: fees.registration,
-                      }));
-                    } else {
-                      setCurrentStudent(prev => ({ ...prev, classId: cId }));
-                    }
-                  }}
-                >
-                  {sortedClasses.filter(c => !c.type || c.type === currentStudent.section).length === 0 ? (
-                    <option value="" disabled>
-                      Aucune classe active n’est disponible pour cette école. Demandez au directeur ou au fondateur de compléter les classes avant l’inscription.
-                    </option>
-                  ) : (
-                    <>
+            )}
+            {currentStep === 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>Matricule <span style={{ fontSize: '0.8rem', color: '#64748b' }}>(Facultatif)</span></label>
+                    <input
+                      value={currentStudent.matricule || ''}
+                      onChange={e => setCurrentStudent({...currentStudent, matricule: e.target.value})}
+                      placeholder="Laisser vide pour générer automatiquement"
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: '2 1 300px' }}>
+                    <label>{t('name', 'Nom complet (Nom & Prénom)')} <span style={{ color: 'red' }}>*</span></label>
+                    <input
+                      required
+                      value={currentStudent.name || ''}
+                      onChange={e => setCurrentStudent({...currentStudent, name: e.target.value})}
+                      placeholder="Ex: N’GONO Mballa Élise"
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>Sexe <span style={{ color: 'red' }}>*</span></label>
+                    <select value={currentStudent.gender} onChange={e => setCurrentStudent({...currentStudent, gender: e.target.value as 'M'|'F'})}>
+                      <option value="M">Masculin</option>
+                      <option value="F">Féminin</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>Date de Naissance <span style={{ color: 'red' }}>*</span></label>
+                    <input
+                      type="date"
+                      required
+                      value={currentStudent.dob || ''}
+                      onChange={e => setCurrentStudent({...currentStudent, dob: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>{t('section', 'Section')} <span style={{ color: 'red' }}>*</span></label>
+                    <select
+                      value={currentStudent.section}
+                      onChange={e => {
+                        const newSection = e.target.value as SectionType;
+                        setCurrentStudent(prev => ({
+                          ...prev,
+                          section: newSection,
+                          classId: '',
+                          feeT1: 0,
+                          feeT2: 0,
+                          feeT3: 0,
+                          registrationFeeExpected: 15000
+                        }));
+                      }}
+                    >
+                      <option value="francophone">Francophone</option>
+                      <option value="anglophone">Anglophone</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: '2 1 300px' }}>
+                    <label>Classe <span style={{ color: 'red' }}>*</span></label>
+                    <select
+                      required
+                      value={currentStudent.classId || ''}
+                      onChange={e => {
+                        const cId = e.target.value;
+                        const matchedClass = sortedClasses.find(c => c.id === cId);
+                        if (matchedClass) {
+                          const fees = getDefaultFeesForClass(matchedClass.name, currentStudent.section || 'francophone');
+                          setCurrentStudent(prev => ({
+                            ...prev,
+                            classId: cId,
+                            feeT1: fees.t1,
+                            feeT2: fees.t2,
+                            feeT3: fees.t3,
+                            registrationFeeExpected: fees.registration,
+                          }));
+                        } else {
+                          setCurrentStudent(prev => ({ ...prev, classId: cId }));
+                        }
+                      }}
+                    >
                       <option value="">-- Choisir une classe --</option>
                       {Object.entries(
                         sortedClasses
                           .filter(c => !c.type || c.type === currentStudent.section)
                           .reduce((acc, c) => {
-                            const cycle = getCycleLabel(c);
-                            const sec = (c.type || c.section || 'francophone') === 'francophone' ? 'Francophone' : 'Anglophone';
-                            const eduRes = resolveEducationType(c.educationType, c.specialtyId);
-
-                            let key = '';
-                            if (sec === 'Francophone') {
-                              const cycleKey = cycle === 'Maternelle' ? 'Maternelle' : cycle === 'Primaire' ? 'Primaire' : 'Secondaire';
-                              const typeKey = eduRes.value === 'technical' ? 'Technique' : eduRes.value === 'unknown' ? 'Type à vérifier' : 'Général';
-                              key = `Francophone — ${cycleKey} — ${typeKey}`;
-                            } else {
-                              const cycleKey = cycle === 'Maternelle' ? 'Nursery' : cycle === 'Primaire' ? 'Primary' : 'Secondary';
-                              const typeKey = eduRes.value === 'technical' ? 'Technical' : eduRes.value === 'unknown' ? 'Type to verify' : 'General';
-                              key = `Anglophone — ${cycleKey} — ${typeKey}`;
-                            }
-
-                            if (!acc[key]) acc[key] = [];
-                            acc[key].push(c);
+                            const cycleLabel = getCycleLabel(c);
+                            if (!acc[cycleLabel]) acc[cycleLabel] = [];
+                            acc[cycleLabel].push(c);
                             return acc;
                           }, {} as Record<string, typeof sortedClasses>)
-                      ).map(([groupName, classesInGroup]) => (
-                        <optgroup key={groupName} label={groupName}>
-                          {classesInGroup.map(c => {
-                            const eduRes = resolveEducationType(c.educationType, c.specialtyId);
-                            const eduText = getEducationTypeDisplayLabel(eduRes.value, c.type || c.section);
-                            const specRes = getSpecialtyName(
-                              c.specialtyId,
-                              db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>,
-                              currentSchool?.id,
-                              c.type || c.section
-                            );
-                            const specText = specRes.name ? ` — ${specRes.name}` : '';
-                            const isInactiveCurrent = c.isActive === false && c.id === currentStudent.classId;
-                            const inactiveLabel = isInactiveCurrent ? ' (Inactive — classe actuelle)' : '';
+                      ).map(([cycle, classes]) => (
+                        <optgroup key={cycle} label={`--- ${cycle.toUpperCase()} ---`}>
+                          {classes.map(c => {
+                            const isInactiveCurrent = currentClassObj && c.id === currentClassObj.id && c.isActive === false;
                             return (
                               <option key={c.id} value={c.id}>
-                                {getDisplayClassName(c.name)} — {eduText}{specText}{inactiveLabel}
+                                {c.name} {isInactiveCurrent ? '(Inactive - Classe Actuelle)' : ''}
                               </option>
                             );
                           })}
                         </optgroup>
                       ))}
-                    </>
-                  )}
-                </select>
-              </div>
-            </div>
-          </div>
+                    </select>
+                  </div>
+                </div>
 
-          {/* Section 3 : Contacts & Parents */}
-          <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>📞 3. Parents / Tuteurs</h4>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>{t('parent_name', 'Nom du Tuteur')}</label>
-                <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} placeholder="Ex: Paul Dupont" />
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>Statut Élève</label>
+                    <select value={currentStudent.studentStatus || 'nouveau'} onChange={e => setCurrentStudent({...currentStudent, studentStatus: e.target.value as 'nouveau' | 'ancien'})}>
+                      <option value="nouveau">Nouveau</option>
+                      <option value="ancien">Ancien</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>Année Scolaire</label>
+                    <input value={currentStudent.registrationYear || '2026-2027'} onChange={e => setCurrentStudent({...currentStudent, registrationYear: e.target.value})} />
+                  </div>
+                </div>
               </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Contact (Téléphone)</label>
-                <input value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} placeholder="Normalisé automatiquement" />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Emails des parents (séparés par des virgules)</label>
-                <input 
-                  value={parentEmailsInput} 
-                  onChange={e => setParentEmailsInput(e.target.value)} 
-                  placeholder="parent1@example.com, parent2@example.com" 
-                />
-              </div>
-            </div>
-          </div>
+            )}
 
-          {/* Section 4 : Frais Annexes & Services */}
-          <div>
-            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>💼 4. Frais Détaillés & Services</h4>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Scolarité Tranche 1 (FCFA)</label>
-              <input type="number" min="0" step="1" value={currentStudent.feeT1 ?? ''} onChange={e => setCurrentStudent({...currentStudent, feeT1: parseInt(e.target.value) || 0})} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Scolarité Tranche 2 (FCFA)</label>
-              <input type="number" min="0" step="1" value={currentStudent.feeT2 ?? ''} onChange={e => setCurrentStudent({...currentStudent, feeT2: parseInt(e.target.value) || 0})} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Scolarité Tranche 3 (FCFA)</label>
-              <input type="number" min="0" step="1" value={currentStudent.feeT3 ?? ''} onChange={e => setCurrentStudent({...currentStudent, feeT3: parseInt(e.target.value) || 0})} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Frais de Transport (Annuel)</label>
-              <input type="number" min="0" step="1" value={currentStudent.feeTransport ?? ''} onChange={e => setCurrentStudent({...currentStudent, feeTransport: parseInt(e.target.value) || 0})} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Frais de Tenues (Uniformes)</label>
-              <input type="number" min="0" step="1" value={currentStudent.feeUniforms ?? ''} onChange={e => setCurrentStudent({...currentStudent, feeUniforms: parseInt(e.target.value) || 0})} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Adresse d'habitation</label>
-              <input value={currentStudent.address || ''} onChange={e => setCurrentStudent({...currentStudent, address: e.target.value})} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Contact d'Urgence</label>
-              <input value={currentStudent.emergencyContact || ''} onChange={e => setCurrentStudent({...currentStudent, emergencyContact: e.target.value})} placeholder="Numéro en cas d'urgence" />
-            </div>
-          </div>
-          
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label style={{ color: '#0369a1' }}>Statut Élève</label>
-              <select value={currentStudent.studentStatus || 'nouveau'} onChange={e => setCurrentStudent({...currentStudent, studentStatus: e.target.value as 'nouveau' | 'ancien'})}>
-                <option value="nouveau">Nouveau</option>
-                <option value="ancien">Ancien</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label style={{ color: '#0369a1' }}>Année Scolaire (Inscription)</label>
-              <input value={currentStudent.registrationYear || '2026-2027'} onChange={e => setCurrentStudent({...currentStudent, registrationYear: e.target.value})} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem', padding: '0 1rem 1rem 1rem', background: '#f0f9ff', borderRadius: '0 0 8px 8px', border: '1px solid #bae6fd', borderTop: 'none', marginBottom: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label style={{ color: '#0369a1' }}>Droit d'inscription attendu</label>
-              <input type="number" min="0" step="1" value={currentStudent.registrationFeeExpected ?? 15000} onChange={e => setCurrentStudent({...currentStudent, registrationFeeExpected: parseInt(e.target.value) || 0})} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label style={{ color: '#0369a1' }}>Montant payé (Inscription)</label>
-              <input type="number" min="0" step="1" value={currentStudent.registrationFeePaid ?? 0} onChange={e => setCurrentStudent({...currentStudent, registrationFeePaid: parseInt(e.target.value) || 0})} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label style={{ color: '#0369a1' }}>Statut Inscription</label>
-              <input disabled value={
-                (currentStudent.registrationFeePaid ?? 0) >= (currentStudent.registrationFeeExpected ?? 15000) ? 'Payé' :
-                (currentStudent.registrationFeePaid ?? 0) > 0 ? 'Partiel' : 'Non payé'
-              } style={{ backgroundColor: '#e0f2fe', fontWeight: 'bold', color: '#0369a1' }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: '#f5f3ff', borderRadius: '8px', border: '1px solid #ddd6fe', marginBottom: '1rem' }}>
-            <div style={{ width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                <h4 style={{ margin: 0, color: '#4c1d95' }}>Transport Scolaire</h4>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: '#4c1d95' }}>
-                  <input type="checkbox" checked={currentStudent.usesTransport || false} onChange={e => setCurrentStudent({...currentStudent, usesTransport: e.target.checked})} />
-                  L'élève utilise le transport
-                </label>
+            {currentStep === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1 1 250px' }}>
+                    <label>{t('parent_name', 'Nom du Tuteur')} <span style={{ color: 'red' }}>*</span></label>
+                    <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} placeholder="Ex: Paul Dupont" />
+                  </div>
+                  <div className="form-group" style={{ flex: '1 1 250px' }}>
+                    <label>Contact (Téléphone)</label>
+                    <input value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} placeholder="Ex: +237650336558" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Emails des parents (séparés par des virgules)</label>
+                  <input
+                    value={parentEmailsInput}
+                    onChange={e => setParentEmailsInput(e.target.value)}
+                    placeholder="parent1@example.com, parent2@example.com"
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1 1 250px' }}>
+                    <label>Adresse d'habitation</label>
+                    <input value={currentStudent.address || ''} onChange={e => setCurrentStudent({...currentStudent, address: e.target.value})} placeholder="Ex: Akwa, Douala" />
+                  </div>
+                  <div className="form-group" style={{ flex: '1 1 250px' }}>
+                    <label>Contact d'Urgence</label>
+                    <input value={currentStudent.emergencyContact || ''} onChange={e => setCurrentStudent({...currentStudent, emergencyContact: e.target.value})} placeholder="Numéro en cas d'urgence" />
+                  </div>
+                </div>
               </div>
-              
-              {currentStudent.usesTransport && (
-                <>
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label style={{ color: '#5b21b6' }}>Quartier</label>
-                      <input value={currentStudent.transportNeighborhood || ''} onChange={e => setCurrentStudent({...currentStudent, transportNeighborhood: e.target.value})} placeholder="Ex: Akwa" />
+            )}
+
+            {currentStep === 4 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Santé */}
+                <div style={{ padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#92400e', fontSize: '0.95rem' }}>🩺 Santé & Remarques Médicales</h4>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label style={{ color: '#92400e' }}>Allergies</label>
+                      <textarea
+                        value={currentStudent.allergies || ''}
+                        onChange={e => setCurrentStudent({...currentStudent, allergies: e.target.value})}
+                        placeholder="Ex: Arachides, Pénicilline..."
+                        rows={2}
+                        style={{ width: '100%', borderColor: '#fcd34d' }}
+                      />
                     </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label style={{ color: '#5b21b6' }}>Point de ramassage</label>
-                      <input value={currentStudent.transportPickupPoint || ''} onChange={e => setCurrentStudent({...currentStudent, transportPickupPoint: e.target.value})} placeholder="Ex: Carrefour Ndokoti" />
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label style={{ color: '#5b21b6' }}>Flotte / Bus</label>
-                      <input value={currentStudent.transportFleet || ''} onChange={e => setCurrentStudent({...currentStudent, transportFleet: e.target.value})} placeholder="Ex: Bus A" />
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label style={{ color: '#92400e' }}>Conditions Médicales</label>
+                      <textarea
+                        value={currentStudent.medicalConditions || ''}
+                        onChange={e => setCurrentStudent({...currentStudent, medicalConditions: e.target.value})}
+                        placeholder="Ex: Asthme, Diabète..."
+                        rows={2}
+                        style={{ width: '100%', borderColor: '#fcd34d' }}
+                      />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label style={{ color: '#5b21b6' }}>Tarif Mensuel (FCFA)</label>
-                      <input type="number" min="0" step="1" value={currentStudent.transportMonthlyFee ?? 0} onChange={e => setCurrentStudent({...currentStudent, transportMonthlyFee: parseInt(e.target.value) || 0})} />
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label style={{ color: '#5b21b6' }}>Statut Transport</label>
-                      <select value={currentStudent.transportStatus || 'none'} onChange={e => setCurrentStudent({...currentStudent, transportStatus: e.target.value as 'none'|'active'|'suspended'})}>
-                        <option value="none">Aucun</option>
-                        <option value="active">Actif</option>
-                        <option value="suspended">Suspendu</option>
-                      </select>
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label style={{ color: '#5b21b6' }}>Total Payé</label>
-                      <input type="number" disabled value={currentStudent.transportPaid ?? 0} style={{ backgroundColor: '#ede9fe' }} />
+                </div>
+
+                {/* Synthèse financière et Transport */}
+                {isEditing ? (
+                  <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#475569', fontSize: '0.95rem' }}>💼 Synthèse Financière & Transport (Lecture Seule)</h4>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 0.75rem 0' }}>
+                      Ces informations sont gérées de manière autonome dans les modules <strong>Paiements</strong> et <strong>Bus scolaires</strong>.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
+                      <div>Inscr. Attendue: <strong>{(currentStudent.registrationFeeExpected || 15000).toLocaleString('fr-FR')} FCFA</strong></div>
+                      <div>Inscr. Payée: <strong>{(currentStudent.registrationFeePaid || 0).toLocaleString('fr-FR')} FCFA</strong></div>
+                      <div>Statut Inscr.: <strong>{currentStudent.registrationFeeStatus || 'unpaid'}</strong></div>
+                      <div>Transport: <strong>{currentStudent.usesTransport ? 'Actif' : 'Non utilisé'}</strong></div>
                     </div>
                   </div>
-                </>
+                ) : (
+                  <div style={{ padding: '1rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#0369a1', fontSize: '0.95rem' }}>💼 Droits d’Inscription Initiaux</h4>
+                    <p style={{ fontSize: '0.8rem', color: '#0369a1', margin: '0 0 0.75rem 0' }}>
+                      Les encaissements réels sont enregistrés et reçus générés dans le module <strong>Paiements</strong>.
+                    </p>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div className="form-group" style={{ flex: '1 1 150px' }}>
+                        <label style={{ color: '#0369a1' }}>Droit attendu</label>
+                        <input type="number" readOnly disabled value={currentStudent.registrationFeeExpected ?? 15000} style={{ backgroundColor: '#e0f2fe' }} />
+                      </div>
+                      <div className="form-group" style={{ flex: '1 1 150px' }}>
+                        <label style={{ color: '#0369a1' }}>Statut Initial</label>
+                        <input type="text" readOnly disabled value="Non payé (À régulariser en caisse)" style={{ backgroundColor: '#e0f2fe', fontWeight: 500 }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Sticky Modal Footer */}
+          <div style={{ padding: '0.75rem 1rem', background: '#fff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button type="button" className="secondary" onClick={requestCloseStudentModal} disabled={isSaving}>
+              {t('cancel', 'Annuler')}
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {currentStep > 1 && (
+                <button type="button" className="secondary" onClick={() => setCurrentStep(s => Math.max(s - 1, 1))} disabled={isSaving}>
+                  Précédent
+                </button>
+              )}
+              {currentStep < 4 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStepValidationError(null);
+                    if (currentStep === 1 && (!currentStudent.name || !currentStudent.dob)) {
+                      setStepValidationError('Veuillez remplir le nom complet et la date de naissance.');
+                      return;
+                    }
+                    if (currentStep === 2 && !currentStudent.classId) {
+                      setStepValidationError('Veuillez sélectionner une classe.');
+                      return;
+                    }
+                    if (currentStep === 3 && !currentStudent.parentName) {
+                      setStepValidationError('Veuillez renseigner le nom du tuteur.');
+                      return;
+                    }
+                    setCurrentStep(s => Math.min(s + 1, 4));
+                  }}
+                >
+                  Suivant
+                </button>
+              ) : (
+                <button type="submit" disabled={isSaving}>
+                  {isSaving ? 'Enregistrement...' : t('save', 'Enregistrer')}
+                </button>
               )}
             </div>
           </div>
-
-          <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label style={{ color: '#92400e' }}>Allergies (Santé)</label>
-              <textarea 
-                value={currentStudent.allergies || ''} 
-                onChange={e => setCurrentStudent({...currentStudent, allergies: e.target.value})} 
-                placeholder="Ex: Arachides, Pénicilline..."
-                rows={2}
-                style={{ width: '100%', borderColor: '#fcd34d' }}
-              />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label style={{ color: '#92400e' }}>Conditions Médicales Particulières</label>
-              <textarea 
-                value={currentStudent.medicalConditions || ''} 
-                onChange={e => setCurrentStudent({...currentStudent, medicalConditions: e.target.value})} 
-                placeholder="Ex: Asthme, Diabète..."
-                rows={2}
-                style={{ width: '100%', borderColor: '#fcd34d' }}
-              />
-            </div>
-          </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isSaving}>{t('cancel', 'Annuler')}</button>
-            <button type="submit" disabled={isSaving}>{isSaving ? 'Enregistrement...' : t('save', 'Enregistrer')}</button>
-          </div>
         </form>
+      </Modal>
+
+      {/* Abandon Confirmation Modal */}
+      <Modal isOpen={isConfirmAbandonOpen} onClose={() => setIsConfirmAbandonOpen(false)} title="Abandonner les modifications ?">
+        <div style={{ padding: '1rem 0' }}>
+          <p style={{ margin: '0 0 1.5rem 0', color: 'var(--text-color)' }}>
+            Les informations saisies ne seront pas enregistrées.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button type="button" className="secondary" onClick={() => setIsConfirmAbandonOpen(false)}>
+              Continuer la saisie
+            </button>
+            <button
+              type="button"
+              style={{ background: 'var(--danger)', borderColor: 'var(--danger)', color: '#fff' }}
+              onClick={() => {
+                setIsConfirmAbandonOpen(false);
+                setModalOpen(false);
+              }}
+            >
+              Abandonner
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Excel Import Modal */}
@@ -1214,7 +1325,7 @@ const Students: React.FC = () => {
                     'Bonamoussadi', '', 'Non', '', '', '', ''
                   ]
                 ];
-                
+
                 const activeClasses = db.classes.filter(c => c.isActive !== false);
                 const wsDataClasses = [
                   ['nom', 'section', 'cycle', 'educationType', 'levelOrder'],
@@ -1237,11 +1348,11 @@ const Students: React.FC = () => {
                 const wsEleves = XLSX.utils.aoa_to_sheet(wsDataEleves);
                 const wsClasses = XLSX.utils.aoa_to_sheet(wsDataClasses);
                 const wsBareme = XLSX.utils.aoa_to_sheet(wsDataBareme);
-                
+
                 XLSX.utils.book_append_sheet(wb, wsEleves, 'Eleves');
                 XLSX.utils.book_append_sheet(wb, wsClasses, 'Classes_Autorisees');
                 XLSX.utils.book_append_sheet(wb, wsBareme, 'Bareme_Frais');
-                
+
                 XLSX.writeFile(wb, 'Modele_Import_Eleves.xlsx');
               }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary-color)', fontSize: '0.85rem' }}>
                 📥 Télécharger le modèle d'import élèves (.xlsx)
@@ -1292,7 +1403,7 @@ const Students: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                 <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0 }}>
@@ -1330,7 +1441,7 @@ const Students: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
               <button type="button" className="secondary" onClick={() => { setPreviewStudents(null); setImportReport(null); }}>Retour</button>
               <button type="button" onClick={handleConfirmImport} disabled={previewStudents.length === 0} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>Confirmer l'importation</button>
@@ -1345,7 +1456,7 @@ const Students: React.FC = () => {
             <p style={{ marginBottom: '1rem' }}>
               Générer une invitation sécurisée pour que le parent de <strong>{inviteModalStudent.name}</strong> puisse accéder au portail.
             </p>
-            
+
             {(!inviteModalStudent.parentEmails || inviteModalStudent.parentEmails.length === 0) ? (
               <div style={{ padding: '1rem', background: '#fee2e2', color: '#b91c1c', borderRadius: '4px', marginBottom: '1rem' }}>
                 Cet élève n'a aucun email parent renseigné. Veuillez d'abord modifier sa fiche.
@@ -1353,8 +1464,8 @@ const Students: React.FC = () => {
             ) : (
               <div style={{ marginBottom: '1rem' }}>
                 <label>Sélectionnez l'email à inviter :</label>
-                <select 
-                  value={inviteEmailTarget} 
+                <select
+                  value={inviteEmailTarget}
                   onChange={(e) => setInviteEmailTarget(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', marginTop: '0.5rem' }}
                 >
@@ -1366,7 +1477,7 @@ const Students: React.FC = () => {
             )}
 
             {!generatedInviteLink ? (
-              <button 
+              <button
                 onClick={generateInviteLink}
                 disabled={!inviteEmailTarget}
                 style={{ width: '100%', padding: '0.75rem', background: 'var(--primary)', color: 'white', borderRadius: '4px', border: 'none', cursor: inviteEmailTarget ? 'pointer' : 'not-allowed' }}
@@ -1376,14 +1487,14 @@ const Students: React.FC = () => {
             ) : (
               <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
                 <p style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>Lien généré avec succès !</p>
-                <input 
-                  type="text" 
-                  readOnly 
-                  value={generatedInviteLink} 
-                  style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }} 
+                <input
+                  type="text"
+                  readOnly
+                  value={generatedInviteLink}
+                  style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
                 />
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button 
+                  <button
                     onClick={() => {
                       navigator.clipboard.writeText(generatedInviteLink);
                       alert('Lien copié dans le presse-papier !');
@@ -1392,7 +1503,7 @@ const Students: React.FC = () => {
                   >
                     <Copy size={16} /> Copier
                   </button>
-                  <a 
+                  <a
                     href={`https://wa.me/?text=${encodeURIComponent(`Bonjour, voici votre lien pour suivre la scolarité de ${inviteModalStudent.name}. Cliquez ici : ${generatedInviteLink}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
