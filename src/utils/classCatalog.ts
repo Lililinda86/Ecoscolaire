@@ -35,11 +35,11 @@ export function resolveEducationType(
   if (educationType === 'technical') {
     return { value: 'technical', isAnomaly: false };
   }
+  if (specialtyId && specialtyId.trim()) {
+    return { value: 'technical', isAnomaly: educationType === 'general' };
+  }
   if (educationType === 'general') {
     return { value: 'general', isAnomaly: false };
-  }
-  if (specialtyId && specialtyId.trim()) {
-    return { value: 'unknown', isAnomaly: true };
   }
   return { value: 'general', isAnomaly: false };
 }
@@ -60,7 +60,7 @@ export function getEducationTypeDisplayLabel(
 
 export function getSpecialtyName(
   specialtyId?: string,
-  technicalSpecialties?: Array<{ id: string; schoolId?: string; name: string }>,
+  technicalSpecialties?: Array<{ id: string; schoolId?: string; name: string; isActive?: boolean }>,
   currentSchoolId?: string,
   section?: string
 ): { name: string | null; isUnavailable: boolean } {
@@ -75,7 +75,7 @@ export function getSpecialtyName(
     const found = technicalSpecialties.find(
       s => s.id === specialtyId.trim() && String(s.schoolId || '') === currentSchoolId
     );
-    if (found && found.name) {
+    if (found && found.name && found.isActive !== false) {
       return { name: found.name, isUnavailable: false };
     }
   }

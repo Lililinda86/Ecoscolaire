@@ -6,6 +6,7 @@ import { DEFAULT_CLASS_LEVELS } from '../constants/defaultClasses';
 import { buildStandardClassDocumentId, buildTechnicalSpecialtyDocumentId, buildTechnicalClassDocumentId, resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName, getDisplayClassName, normalizeTechnicalSpecialtyName, getTechnicalSpecialtyCanonicalKey, resolveClassActiveStatus } from '../utils/classCatalog';
 import type { ClassSection, TechnicalSpecialty } from '../types';
 import Modal from '../components/Modal';
+import { ClassSearchPicker } from '../components/classes/ClassSearchPicker';
 
 const getCycleLabel = (cls: { cycle?: string; level?: string; name: string }): string => {
   const c = cls.cycle || cls.level;
@@ -51,40 +52,96 @@ const Classes: React.FC = () => {
   const [targetStatusClass, setTargetStatusClass] = useState<ClassSection | null>(null);
   const [statusSubmitting, setStatusSubmitting] = useState<boolean>(false);
 
+  // Message d'état visuel (toast notification)
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Utilisation de useMemo pour optimiser la réactivité et la performance
+  const schoolClasses = React.useMemo(() => {
+    return (db.classes || []).filter(c => currentSchool && String(c.schoolId || '') === currentSchool.id);
+  }, [db.classes, currentSchool]);
+
+  const generalClassesCount = React.useMemo(() => {
+    return schoolClasses.filter(c => resolveEducationType(c.educationType, c.specialtyId).value === 'general').length;
+  }, [schoolClasses]);
+
+  const technicalClassesCount = React.useMemo(() => {
+    return schoolClasses.filter(c => resolveEducationType(c.educationType, c.specialtyId).value === 'technical').length;
+  }, [schoolClasses]);
+
+  const activeClassesCount = React.useMemo(() => {
+    return schoolClasses.filter(c => resolveClassActiveStatus(c)).length;
+  }, [schoolClasses]);
+
+  const inactiveClassesCount = React.useMemo(() => {
+    return schoolClasses.length - activeClassesCount;
+  }, [schoolClasses, activeClassesCount]);
+
+  const filteredClasses = React.useMemo(() => {
+    return schoolClasses.filter(c => {
+      // Filtre par recherche
+      const specName = c.specialtyId ? (getSpecialtyName(c.specialtyId, db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>, currentSchool?.id, c.type || c.section).name || '') : '';
+      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (c.type && c.type.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                            specName.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Filtre par cycle
+      const cycleLabel = getCycleLabel(c);
+      const matchesCycle = cycleFilter === 'all' || cycleLabel === cycleFilter;
+
+      // Filtre par statut
+      const isActive = resolveClassActiveStatus(c);
+      const matchesStatus = statusFilter === 'all' ||
+                            (statusFilter === 'active' && isActive) ||
+                            (statusFilter === 'inactive' && !isActive);
+
+      // Filtre par type d'enseignement
+      const eduTypeRes = resolveEducationType(c.educationType, c.specialtyId);
+      const matchesEducationType = educationTypeFilter === 'all' ||
+                                   (educationTypeFilter === 'general' && eduTypeRes.value === 'general') ||
+                                   (educationTypeFilter === 'technical' && eduTypeRes.value === 'technical');
+
+      return matchesSearch && matchesCycle && matchesStatus && matchesEducationType;
+    });
+  }, [schoolClasses, searchTerm, cycleFilter, statusFilter, educationTypeFilter, db.technicalSpecialties, currentSchool?.id]);
+
+  // Conservation de la sélection : effacé uniquement si la classe n'existe plus dans schoolClasses
+  React.useEffect(() => {
+    if (selectedClassId && !schoolClasses.some(c => c.id === selectedClassId)) {
+      setSelectedClassId('');
+    }
+  }, [schoolClasses, selectedClassId]);
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
   const canManage = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
   const isSecretary = currentUser.role === 'secretary';
 
-  // Filtre strict du schoolId : String(classItem.schoolId || '') === currentSchool?.id
-  const schoolClasses = (db.classes || []).filter(c => currentSchool && String(c.schoolId || '') === currentSchool.id);
+  const showToast = (msg: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(msg);
+    toastTimerRef.current = setTimeout(() => {
+      setToastMessage(null);
+      toastTimerRef.current = null;
+    }, 4000);
+  };
 
-  const activeClassesCount = schoolClasses.filter(c => resolveClassActiveStatus(c)).length;
-  const inactiveClassesCount = schoolClasses.length - activeClassesCount;
-
-  const filteredClasses = schoolClasses.filter(c => {
-    // Filtre par recherche
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (c.type && c.type.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    // Filtre par cycle
-    const cycleLabel = getCycleLabel(c);
-    const matchesCycle = cycleFilter === 'all' || cycleLabel === cycleFilter;
-
-    // Filtre par statut
-    const isActive = resolveClassActiveStatus(c);
-    const matchesStatus = statusFilter === 'all' || 
-                          (statusFilter === 'active' && isActive) || 
-                          (statusFilter === 'inactive' && !isActive);
-
-    // Filtre par type d'enseignement (Section 4 & 5 P0-36B)
-    const eduTypeRes = resolveEducationType(c.educationType, c.specialtyId);
-    const matchesEducationType = educationTypeFilter === 'all' ||
-                                 (educationTypeFilter === 'general' && eduTypeRes.value === 'general') ||
-                                 (educationTypeFilter === 'technical' && eduTypeRes.value === 'technical');
-
-    return matchesSearch && matchesCycle && matchesStatus && matchesEducationType;
-  });
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setCycleFilter('all');
+    setStatusFilter('all');
+    setEducationTypeFilter('all');
+  };
 
   const handleOpenStatusModal = (cls: ClassSection) => {
     setTargetStatusClass(cls);
@@ -123,11 +180,11 @@ const Classes: React.FC = () => {
       updateLocalState({ classes: updatedClasses });
       setIsStatusModalOpen(false);
       setTargetStatusClass(null);
-      alert(`La classe a été ${newIsActive ? 'réactivée' : 'désactivée'} avec succès !`);
+      showToast(newIsActive ? 'Classe activée avec succès' : 'Classe désactivée avec succès');
     } catch (err: unknown) {
       console.error("Erreur lors de la modification du statut de la classe :", err);
       const message = err instanceof Error ? err.message : "Une erreur s'est produite lors du changement de statut.";
-      alert(message);
+      showToast(`Erreur : ${message}`);
     } finally {
       setStatusSubmitting(false);
     }
@@ -223,46 +280,7 @@ const Classes: React.FC = () => {
     }
   };
 
-  // Regroupement par Section, Cycle et Type d'enseignement pour l'affichage structuré (Section 7 P0-36B)
-  const groupClasses = (classes: ClassSection[]) => {
-    const groups: Record<string, ClassSection[]> = {
-      'Francophone — Maternelle — Général': [],
-      'Francophone — Primaire — Général': [],
-      'Francophone — Secondaire — Général': [],
-      'Francophone — Secondaire — Technique': [],
-      'Francophone — Secondaire — Type à vérifier': [],
-      'Anglophone — Nursery — General': [],
-      'Anglophone — Primary — General': [],
-      'Anglophone — Secondary — General': [],
-      'Anglophone — Secondary — Technical': [],
-      'Anglophone — Secondary — Type to verify': []
-    };
 
-    classes.forEach(c => {
-      const section = (c.type || c.section || 'francophone') === 'francophone' ? 'Francophone' : 'Anglophone';
-      const cycle = getCycleLabel(c);
-      const eduTypeRes = resolveEducationType(c.educationType, c.specialtyId);
-
-      let groupKey = '';
-      if (section === 'Francophone') {
-        const cycleKey = cycle === 'Maternelle' ? 'Maternelle' : cycle === 'Primaire' ? 'Primaire' : 'Secondaire';
-        const typeKey = eduTypeRes.value === 'technical' ? 'Technique' : eduTypeRes.value === 'unknown' ? 'Type à vérifier' : 'Général';
-        groupKey = `Francophone — ${cycleKey} — ${typeKey}`;
-      } else {
-        const cycleKey = cycle === 'Maternelle' ? 'Nursery' : cycle === 'Primaire' ? 'Primary' : 'Secondary';
-        const typeKey = eduTypeRes.value === 'technical' ? 'Technical' : eduTypeRes.value === 'unknown' ? 'Type to verify' : 'General';
-        groupKey = `Anglophone — ${cycleKey} — ${typeKey}`;
-      }
-
-      if (groups[groupKey]) {
-        groups[groupKey].push(c);
-      } else {
-        groups['Francophone — Primaire — Général'].push(c);
-      }
-    });
-
-    return groups;
-  };
 
   // Pré-résolution des noms de spécialités pour le tri
   const resolvedSpecNames: Record<string, string> = {};
@@ -279,7 +297,6 @@ const Classes: React.FC = () => {
   });
 
   const sortedFilteredClasses = sortClasses(filteredClasses, resolvedSpecNames);
-  const groupedClasses = groupClasses(sortedFilteredClasses);
 
   const currentClass = schoolClasses.find(c => c.id === selectedClassId);
   const teachers = currentClass ? db.staff.filter(s => s.role === 'teacher' && s.assignedClassId === currentClass.id) : [];
@@ -553,10 +570,10 @@ const Classes: React.FC = () => {
         (!isCatalogueComplete || incoherentCycleClasses.length > 0) && (
           <div style={{ backgroundColor: '#fffbe6', border: '1px solid #ffe58f', color: '#873800', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {!isCatalogueComplete && (
-              <div>⚠️ <strong>Catalogue incomplet :</strong> {missingLevels.length} classe(s) standard manquante(s) dans votre école. Cliquez sur « Compléter les classes standard » pour les ajouter.</div>
+              <div>⚠️ <strong>Catalogue incomplet :</strong> {missingLevels.length === 1 ? '1 classe standard manquante' : `${missingLevels.length} classes standards manquantes`} dans votre école. Cliquez sur « Compléter les classes standard » pour les ajouter.</div>
             )}
             {incoherentCycleClasses.length > 0 && (
-              <div>⚠️ <strong>Anomalie de cycle :</strong> {incoherentCycleClasses.length} classe(s) possède(nt) un cycle incohérent (ex: Class 3-6 classées en secondaire).</div>
+              <div>⚠️ <strong>Anomalie de cycle :</strong> {incoherentCycleClasses.length === 1 ? '1 classe possède' : `${incoherentCycleClasses.length} classes possèdent`} un cycle incohérent (ex: Class 3-6 classées en secondaire).</div>
             )}
           </div>
         )
@@ -599,38 +616,54 @@ const Classes: React.FC = () => {
             <option value="inactive">Inactives uniquement</option>
           </select>
         </div>
+        {(searchTerm || cycleFilter !== 'all' || statusFilter !== 'all' || educationTypeFilter !== 'all') && (
+          <div style={{ flex: '0 0 auto', alignSelf: 'flex-end' }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={handleResetFilters}
+              style={{ fontSize: '0.85rem', padding: '0.5rem 0.85rem' }}
+            >
+              🔄 Réinitialiser les filtres
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Sélecteur de classe par optgroup */}
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          role={toastMessage.startsWith('Erreur') ? 'alert' : 'status'}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            backgroundColor: toastMessage.startsWith('Erreur') ? '#991b1b' : '#1e293b',
+            color: '#ffffff',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            fontSize: '0.9rem',
+            fontWeight: 500
+          }}
+        >
+          {toastMessage.startsWith('Erreur') ? '⚠️ ' : '✅ '}
+          {toastMessage}
+        </div>
+      )}
+
+      {/* Sélecteur de classe recherchable */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Sélectionner une classe à détailler :</label>
-        <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-          <option value="">-- Choisir une classe ({sortedFilteredClasses.length} disponible(s)) --</option>
-          {Object.entries(groupedClasses).map(([groupName, classesInGroup]) => {
-            if (classesInGroup.length === 0) return null;
-            return (
-              <optgroup key={groupName} label={groupName}>
-                {classesInGroup.map(c => {
-                  const count = db.students.filter(s => s.classId === c.id && String(s.schoolId || '') === currentSchool?.id).length;
-                  const statusLabel = c.isActive === false ? ' (Inactive)' : '';
-                  const displayName = getDisplayClassName(c.name);
-                  const specRes = getSpecialtyName(
-                    c.specialtyId,
-                    db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>,
-                    currentSchool?.id,
-                    c.type || c.section
-                  );
-                  const specText = specRes.name ? ` — ${specRes.name}` : '';
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {displayName}{specText}{statusLabel} — {count} élève(s)
-                    </option>
-                  );
-                })}
-              </optgroup>
-            );
-          })}
-        </select>
+        <ClassSearchPicker
+          classes={sortedFilteredClasses}
+          selectedClassId={selectedClassId}
+          onSelectClass={setSelectedClassId}
+          technicalSpecialties={db.technicalSpecialties as TechnicalSpecialty[]}
+          currentSchoolId={currentSchool?.id}
+          students={db.students}
+        />
         {canManage && (
           <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             💡 <em>L’enseignement technique se configure séparément pour ajouter des classes spécialisées.</em>
@@ -638,17 +671,25 @@ const Classes: React.FC = () => {
         )}
       </div>
 
-      {/* Résumé du catalogue (Section 11 P0-38) */}
-      <div style={{ marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-        📊 <strong>Résumé du catalogue :</strong> {schoolClasses.length} classe(s) au total — {activeClassesCount} active(s) — {inactiveClassesCount} inactive(s)
+      {/* Résumé du catalogue (Section 7 P0-39B) */}
+      <div style={{ marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500, display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <span>📊 <strong>Résumé du catalogue :</strong> {schoolClasses.length === 1 ? '1 classe' : `${schoolClasses.length} classes`}</span>
+        <span>• {activeClassesCount === 1 ? '1 active' : `${activeClassesCount} actives`}</span>
+        <span>• {inactiveClassesCount === 1 ? '1 inactive' : `${inactiveClassesCount} inactives`}</span>
+        <span>• {generalClassesCount === 1 ? '1 générale' : `${generalClassesCount} générales`}</span>
+        <span>• {technicalClassesCount === 1 ? '1 technique' : `${technicalClassesCount} techniques`}</span>
       </div>
 
-      {sortedFilteredClasses.length === 0 ? (
+      {schoolClasses.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+          Aucune classe n’est encore configurée pour cet établissement.
+        </div>
+      ) : sortedFilteredClasses.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
           {educationTypeFilter === 'technical' ? (
             <div>
               <p style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-color)', marginBottom: '0.5rem' }}>
-                Aucune classe technique configurée. L’enseignement technique se configure séparément par le directeur ou le fondateur.
+                Aucune classe technique configurée.
               </p>
               {canManage && (
                 <button
@@ -659,12 +700,20 @@ const Classes: React.FC = () => {
                 </button>
               )}
             </div>
-          ) : statusFilter === 'active' ? (
-            "Aucune classe active ne correspond aux filtres sélectionnés."
-          ) : statusFilter === 'inactive' ? (
-            "Aucune classe inactive ne correspond aux filtres sélectionnés."
+          ) : searchTerm ? (
+            <div>
+              <p style={{ marginBottom: '0.75rem' }}>Aucune classe trouvée pour cette recherche.</p>
+              <button type="button" className="secondary" onClick={handleResetFilters} style={{ fontSize: '0.85rem' }}>
+                Réinitialiser les filtres
+              </button>
+            </div>
           ) : (
-            "Aucune classe ne correspond aux critères de recherche."
+            <div>
+              <p style={{ marginBottom: '0.75rem' }}>Aucune classe ne correspond aux filtres sélectionnés.</p>
+              <button type="button" className="secondary" onClick={handleResetFilters} style={{ fontSize: '0.85rem' }}>
+                Réinitialiser les filtres
+              </button>
+            </div>
           )}
         </div>
       ) : currentClass ? (
@@ -741,7 +790,7 @@ const Classes: React.FC = () => {
           </div>
           {resolveEducationType(currentClass.educationType, currentClass.specialtyId).isAnomaly && canManage && (
             <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: '6px', fontSize: '0.85rem' }}>
-              ⚠️ <strong>Anomalie détectée :</strong> Cette classe possède une spécialité mais son type d'enseignement est indéterminé.
+              ⚠️ <strong>Certaines informations de cette classe doivent être vérifiées.</strong> (Cette classe possède une spécialité mais son type d'enseignement est indéterminé).
             </div>
           )}
           {(() => {
@@ -755,23 +804,27 @@ const Classes: React.FC = () => {
             if (specRes.isUnavailable && canManage) {
               return (
                 <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', borderRadius: '6px', fontSize: '0.85rem' }}>
-                  ⚠️ <strong>Alerte :</strong> La filière liée à cette classe est inactive ou non disponible.
+                  ⚠️ <strong>Certaines informations de cette classe doivent être vérifiées.</strong> (La filière liée à cette classe est inactive ou non disponible).
                 </div>
               );
             }
             return null;
           })()}
           
-          <h3 style={{ marginTop: '1.5rem', color: 'var(--primary-color)' }}>Enseignant(s) Titulaire(s)</h3>
+          <h3 style={{ marginTop: '1.5rem', color: 'var(--primary-color)' }}>
+            {teachers.length === 1 ? 'Enseignant titulaire' : 'Enseignants titulaires'}
+          </h3>
           <ul style={{ listStyleType: 'disc', paddingLeft: '1.5rem', marginBottom: '2rem' }}>
             {teachers.length > 0 ? (
               teachers.map(t => <li key={t.id} style={{ padding: '0.25rem 0' }}>{t.name}</li>)
             ) : (
-              <li style={{ color: 'var(--text-muted)' }}>Aucun enseignant assigné.</li>
+              <li style={{ color: 'var(--text-muted)' }}>Aucun enseignant titulaire assigné.</li>
             )}
           </ul>
           
-          <h3 style={{ marginTop: '1.5rem', color: 'var(--primary-color)' }}>Élèves inscrits ({students.length})</h3>
+          <h3 style={{ marginTop: '1.5rem', color: 'var(--primary-color)' }}>
+            Élèves inscrits ({students.length === 0 ? '0 élève' : students.length === 1 ? '1 élève' : `${students.length} élèves`})
+          </h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
               <thead>
@@ -788,7 +841,7 @@ const Classes: React.FC = () => {
                 {students.length === 0 ? (
                   <tr>
                     <td colSpan={canManage ? 6 : 5} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      Aucun élève dans cette classe.
+                      Aucun élève inscrit dans cette classe.
                     </td>
                   </tr>
                 ) : (
@@ -989,7 +1042,7 @@ const Classes: React.FC = () => {
                   {(() => {
                     const studentCount = db.students.filter(s => s.classId === targetStatusClass.id && String(s.schoolId || '') === currentSchool?.id).length;
                     if (studentCount > 0) {
-                      return `Cette classe contient ${studentCount} élève(s). Ils resteront inscrits dans cette classe, mais aucune nouvelle inscription ne sera autorisée tant qu’elle restera inactive.`;
+                      return `Cette classe contient ${studentCount === 1 ? '1 élève' : `${studentCount} élèves`}. Ils resteront inscrits dans cette classe, mais aucune nouvelle inscription ne sera autorisée tant qu’elle restera inactive.`;
                     }
                     return "Aucune nouvelle inscription ni reclassement vers cette classe ne sera autorisé tant qu’elle restera inactive.";
                   })()}
