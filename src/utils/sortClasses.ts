@@ -1,6 +1,10 @@
 import type { ClassSection } from '../types';
+import { resolveEducationType } from './classCatalog';
 
-export const sortClasses = (classes: ClassSection[]): ClassSection[] => {
+export const sortClasses = (
+  classes: ClassSection[],
+  resolvedSpecialtyNames?: Record<string, string>
+): ClassSection[] => {
   const fOrder = [
     'pré-maternelle', 'pre-maternelle',
     'petite section', 'maternelle 1',
@@ -17,10 +21,30 @@ export const sortClasses = (classes: ClassSection[]): ClassSection[] => {
     'form 1', 'form 2', 'form 3', 'form 4', 'form 5', 'lower sixth', 'upper sixth'
   ];
 
+  const getEduRank = (c: ClassSection): number => {
+    const res = resolveEducationType(c.educationType, c.specialtyId);
+    if (res.value === 'general') return 1;
+    if (res.value === 'technical') return 2;
+    return 3; // unknown / anomaly
+  };
+
+  const getSpecName = (c: ClassSection): string => {
+    if (resolvedSpecialtyNames && c.specialtyId && resolvedSpecialtyNames[c.specialtyId]) {
+      return resolvedSpecialtyNames[c.specialtyId];
+    }
+    return c.specialtyId || '';
+  };
+
   return [...classes].sort((a, b) => {
-    // 1. Si levelOrder est présent sur les deux éléments, on l'utilise directement
+    // 1. Si levelOrder est présent sur les deux éléments, on l'utilise
     if (a.levelOrder !== undefined && b.levelOrder !== undefined) {
-      return a.levelOrder - b.levelOrder;
+      if (a.levelOrder !== b.levelOrder) return a.levelOrder - b.levelOrder;
+
+      const aRank = getEduRank(a);
+      const bRank = getEduRank(b);
+      if (aRank !== bRank) return aRank - bRank;
+
+      return getSpecName(a).localeCompare(getSpecName(b));
     }
 
     // 2. Différencier francophone (-1) et anglophone (1)
@@ -38,7 +62,17 @@ export const sortClasses = (classes: ClassSection[]): ClassSection[] => {
     const aIndex = orderArray.indexOf(aName);
     const bIndex = orderArray.indexOf(bName);
 
-    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+    if (aIndex !== -1 && bIndex !== -1) {
+      if (aIndex !== bIndex) return aIndex - bIndex;
+
+      // 3. À niveau identique : general (1) -> technical (2) -> unknown (3)
+      const aRank = getEduRank(a);
+      const bRank = getEduRank(b);
+      if (aRank !== bRank) return aRank - bRank;
+
+      // 4. Si deux classes du même type : spécialité par ordre alphabétique du nom résolu
+      return getSpecName(a).localeCompare(getSpecName(b));
+    }
     if (aIndex !== -1) return -1;
     if (bIndex !== -1) return 1;
 

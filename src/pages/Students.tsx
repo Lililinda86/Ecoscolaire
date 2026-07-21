@@ -6,6 +6,7 @@ import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClas
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
+import { resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
@@ -976,10 +977,19 @@ const Students: React.FC = () => {
                           .reduce((acc, c) => {
                             const cycle = getCycleLabel(c);
                             const sec = (c.type || c.section || 'francophone') === 'francophone' ? 'Francophone' : 'Anglophone';
-                            const cycleKey = sec === 'Francophone'
-                              ? (cycle === 'Maternelle' ? 'Maternelle' : cycle === 'Primaire' ? 'Primaire' : 'Secondaire')
-                              : (cycle === 'Maternelle' ? 'Nursery' : cycle === 'Primaire' ? 'Primary' : 'Secondary');
-                            const key = `${sec} — ${cycleKey}`;
+                            const eduRes = resolveEducationType(c.educationType, c.specialtyId);
+
+                            let key = '';
+                            if (sec === 'Francophone') {
+                              const cycleKey = cycle === 'Maternelle' ? 'Maternelle' : cycle === 'Primaire' ? 'Primaire' : 'Secondaire';
+                              const typeKey = eduRes.value === 'technical' ? 'Technique' : eduRes.value === 'unknown' ? 'Type à vérifier' : 'Général';
+                              key = `Francophone — ${cycleKey} — ${typeKey}`;
+                            } else {
+                              const cycleKey = cycle === 'Maternelle' ? 'Nursery' : cycle === 'Primaire' ? 'Primary' : 'Secondary';
+                              const typeKey = eduRes.value === 'technical' ? 'Technical' : eduRes.value === 'unknown' ? 'Type to verify' : 'General';
+                              key = `Anglophone — ${cycleKey} — ${typeKey}`;
+                            }
+
                             if (!acc[key]) acc[key] = [];
                             acc[key].push(c);
                             return acc;
@@ -987,10 +997,18 @@ const Students: React.FC = () => {
                       ).map(([groupName, classesInGroup]) => (
                         <optgroup key={groupName} label={groupName}>
                           {classesInGroup.map(c => {
-                            const specialty = c.specialtyId ? ` — ${c.specialtyId}` : '';
+                            const eduRes = resolveEducationType(c.educationType, c.specialtyId);
+                            const eduText = getEducationTypeDisplayLabel(eduRes.value, c.type || c.section);
+                            const specRes = getSpecialtyName(
+                              c.specialtyId,
+                              db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>,
+                              currentSchool?.id,
+                              c.type || c.section
+                            );
+                            const specText = specRes.name ? ` — ${specRes.name}` : '';
                             return (
                               <option key={c.id} value={c.id}>
-                                {c.name}{specialty}
+                                {c.name} — {eduText}{specText}
                               </option>
                             );
                           })}

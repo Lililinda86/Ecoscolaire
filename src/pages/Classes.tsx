@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { sortClasses } from '../utils/sortClasses';
 import { DEFAULT_CLASS_LEVELS } from '../constants/defaultClasses';
-import { buildStandardClassDocumentId } from '../utils/classCatalog';
+import { buildStandardClassDocumentId, resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName } from '../utils/classCatalog';
 import type { ClassSection } from '../types';
 
 const getCycleLabel = (cls: { cycle?: string; level?: string; name: string }): string => {
@@ -34,6 +34,7 @@ const Classes: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [cycleFilter, setCycleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [educationTypeFilter, setEducationTypeFilter] = useState<string>('all');
 
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
@@ -58,14 +59,14 @@ const Classes: React.FC = () => {
                           (statusFilter === 'active' && isActive) || 
                           (statusFilter === 'inactive' && !isActive);
 
-    return matchesSearch && matchesCycle && matchesStatus;
+    // Filtre par type d'enseignement (Section 4 & 5 P0-36B)
+    const eduTypeRes = resolveEducationType(c.educationType, c.specialtyId);
+    const matchesEducationType = educationTypeFilter === 'all' ||
+                                 (educationTypeFilter === 'general' && eduTypeRes.value === 'general') ||
+                                 (educationTypeFilter === 'technical' && eduTypeRes.value === 'technical');
+
+    return matchesSearch && matchesCycle && matchesStatus && matchesEducationType;
   });
-
-  const sortedFilteredClasses = sortClasses(filteredClasses);
-
-  const currentClass = schoolClasses.find(c => c.id === selectedClassId);
-  const teachers = currentClass ? db.staff.filter(s => s.role === 'teacher' && s.assignedClassId === currentClass.id) : [];
-  const students = currentClass ? db.students.filter(s => s.classId === currentClass.id && String(s.schoolId || '') === currentSchool?.id) : [];
 
   // Détection des anomalies et classes manquantes pour l'aperçu et le bandeau d'alerte
   const canonicalLevels = DEFAULT_CLASS_LEVELS.filter(l => l.educationType === 'general');
@@ -157,34 +158,66 @@ const Classes: React.FC = () => {
     }
   };
 
-  // Regroupement par Section et Cycle pour l'affichage structuré
+  // Regroupement par Section, Cycle et Type d'enseignement pour l'affichage structuré (Section 7 P0-36B)
   const groupClasses = (classes: ClassSection[]) => {
     const groups: Record<string, ClassSection[]> = {
-      'Francophone — Maternelle': [],
-      'Francophone — Primaire': [],
-      'Francophone — Secondaire': [],
-      'Anglophone — Nursery': [],
-      'Anglophone — Primary': [],
-      'Anglophone — Secondary': []
+      'Francophone — Maternelle — Général': [],
+      'Francophone — Primaire — Général': [],
+      'Francophone — Secondaire — Général': [],
+      'Francophone — Secondaire — Technique': [],
+      'Francophone — Secondaire — Type à vérifier': [],
+      'Anglophone — Nursery — General': [],
+      'Anglophone — Primary — General': [],
+      'Anglophone — Secondary — General': [],
+      'Anglophone — Secondary — Technical': [],
+      'Anglophone — Secondary — Type to verify': []
     };
 
     classes.forEach(c => {
       const section = (c.type || c.section || 'francophone') === 'francophone' ? 'Francophone' : 'Anglophone';
       const cycle = getCycleLabel(c);
-      const cycleKey = section === 'Francophone' 
-        ? (cycle === 'Maternelle' ? 'Maternelle' : cycle === 'Primaire' ? 'Primaire' : 'Secondaire')
-        : (cycle === 'Maternelle' ? 'Nursery' : cycle === 'Primaire' ? 'Primary' : 'Secondary');
+      const eduTypeRes = resolveEducationType(c.educationType, c.specialtyId);
 
-      const groupKey = `${section} — ${cycleKey}`;
+      let groupKey = '';
+      if (section === 'Francophone') {
+        const cycleKey = cycle === 'Maternelle' ? 'Maternelle' : cycle === 'Primaire' ? 'Primaire' : 'Secondaire';
+        const typeKey = eduTypeRes.value === 'technical' ? 'Technique' : eduTypeRes.value === 'unknown' ? 'Type à vérifier' : 'Général';
+        groupKey = `Francophone — ${cycleKey} — ${typeKey}`;
+      } else {
+        const cycleKey = cycle === 'Maternelle' ? 'Nursery' : cycle === 'Primaire' ? 'Primary' : 'Secondary';
+        const typeKey = eduTypeRes.value === 'technical' ? 'Technical' : eduTypeRes.value === 'unknown' ? 'Type to verify' : 'General';
+        groupKey = `Anglophone — ${cycleKey} — ${typeKey}`;
+      }
+
       if (groups[groupKey]) {
         groups[groupKey].push(c);
       } else {
-        groups['Francophone — Primaire'].push(c);
+        groups['Francophone — Primaire — Général'].push(c);
       }
     });
 
     return groups;
   };
+
+  // Pré-résolution des noms de spécialités pour le tri
+  const resolvedSpecNames: Record<string, string> = {};
+  schoolClasses.forEach(c => {
+    if (c.specialtyId) {
+      const res = getSpecialtyName(
+        c.specialtyId,
+        db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>,
+        currentSchool?.id,
+        c.type || c.section
+      );
+      if (res.name) resolvedSpecNames[c.specialtyId] = res.name;
+    }
+  });
+
+  const sortedFilteredClasses = sortClasses(filteredClasses, resolvedSpecNames);
+
+  const currentClass = schoolClasses.find(c => c.id === selectedClassId);
+  const teachers = currentClass ? db.staff.filter(s => s.role === 'teacher' && s.assignedClassId === currentClass.id) : [];
+  const students = currentClass ? db.students.filter(s => s.classId === currentClass.id && String(s.schoolId || '') === currentSchool?.id) : [];
 
   const groupedClasses = groupClasses(sortedFilteredClasses);
 
@@ -242,6 +275,14 @@ const Classes: React.FC = () => {
           </select>
         </div>
         <div style={{ flex: '1 1 150px' }}>
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', fontWeight: 500 }}>Type d’enseignement :</label>
+          <select value={educationTypeFilter} onChange={e => setEducationTypeFilter(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+            <option value="all">Tous</option>
+            <option value="general">Général</option>
+            <option value="technical">Technique</option>
+          </select>
+        </div>
+        <div style={{ flex: '1 1 150px' }}>
           <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', fontWeight: 500 }}>Statut :</label>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
             <option value="all">Toutes</option>
@@ -263,10 +304,18 @@ const Classes: React.FC = () => {
                 {classesInGroup.map(c => {
                   const count = db.students.filter(s => s.classId === c.id && String(s.schoolId || '') === currentSchool?.id).length;
                   const statusLabel = c.isActive === false ? ' (Inactive)' : '';
-                  const specLabel = c.specialtyId ? ` [${c.specialtyId}]` : '';
+                  const eduRes = resolveEducationType(c.educationType, c.specialtyId);
+                  const eduText = getEducationTypeDisplayLabel(eduRes.value, c.type || c.section);
+                  const specRes = getSpecialtyName(
+                    c.specialtyId,
+                    db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>,
+                    currentSchool?.id,
+                    c.type || c.section
+                  );
+                  const specText = specRes.name ? ` — ${specRes.name}` : '';
                   return (
                     <option key={c.id} value={c.id}>
-                      {c.name}{specLabel}{statusLabel} — {count} élève(s)
+                      {c.name} — {eduText}{specText}{statusLabel} — {count} élève(s)
                     </option>
                   );
                 })}
@@ -274,6 +323,11 @@ const Classes: React.FC = () => {
             );
           })}
         </select>
+        {canManage && (
+          <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            💡 <em>L’enseignement technique se configure séparément pour ajouter des classes spécialisées.</em>
+          </div>
+        )}
       </div>
 
       {sortedFilteredClasses.length === 0 ? (
@@ -282,10 +336,47 @@ const Classes: React.FC = () => {
         </div>
       ) : currentClass ? (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            <h2>
-              {getCycleLabel(currentClass)} — {currentClass.name} <span style={{ fontSize: '0.8em', color: 'var(--text-muted)' }}>({currentClass.type || currentClass.section || 'Général'})</span>
-            </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>{currentClass.name}</h2>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <span style={{ padding: '0.2rem 0.6rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: '#e0e7ff', color: '#3730a3' }}>
+                  {(currentClass.type || currentClass.section || 'francophone') === 'francophone' ? 'Francophone' : 'Anglophone'}
+                </span>
+                <span style={{ padding: '0.2rem 0.6rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: '#f3e8ff', color: '#6b21a8' }}>
+                  {getCycleLabel(currentClass)}
+                </span>
+                {(() => {
+                  const eduRes = resolveEducationType(currentClass.educationType, currentClass.specialtyId);
+                  const eduText = getEducationTypeDisplayLabel(eduRes.value, currentClass.type || currentClass.section);
+                  const isAnomaly = eduRes.isAnomaly;
+                  const bg = isAnomaly ? '#fef2f2' : eduRes.value === 'technical' ? '#ffedd5' : '#e0f2fe';
+                  const fg = isAnomaly ? '#991b1b' : eduRes.value === 'technical' ? '#9a3412' : '#075985';
+                  return (
+                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: bg, color: fg }}>
+                      {eduText}
+                    </span>
+                  );
+                })()}
+                {(() => {
+                  if (!currentClass.specialtyId) return null;
+                  const specRes = getSpecialtyName(
+                    currentClass.specialtyId,
+                    db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>,
+                    currentSchool?.id,
+                    currentClass.type || currentClass.section
+                  );
+                  if (!specRes.name) return null;
+                  const bg = specRes.isUnavailable ? '#fee2e2' : '#fef3c7';
+                  const fg = specRes.isUnavailable ? '#991b1b' : '#92400e';
+                  return (
+                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: bg, color: fg }}>
+                      {specRes.name}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
             <span style={{ 
               padding: '0.25rem 0.75rem', 
               borderRadius: '12px', 
@@ -297,6 +388,11 @@ const Classes: React.FC = () => {
               {currentClass.isActive !== false ? 'Active' : 'Inactive'}
             </span>
           </div>
+          {resolveEducationType(currentClass.educationType, currentClass.specialtyId).isAnomaly && canManage && (
+            <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: '6px', fontSize: '0.85rem' }}>
+              ⚠️ <strong>Anomalie détectée :</strong> Cette classe possède une spécialité mais son type d'enseignement est indéterminé.
+            </div>
+          )}
           
           <h3 style={{ marginTop: '1.5rem', color: 'var(--primary-color)' }}>Enseignant(s) Titulaire(s)</h3>
           <ul style={{ listStyleType: 'disc', paddingLeft: '1.5rem', marginBottom: '2rem' }}>
