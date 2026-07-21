@@ -68,11 +68,21 @@ const Students: React.FC = () => {
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [previewStudents, setPreviewStudents] = useState<Student[] | null>(null);
 
+  const [noMedicalConditionConfirmed, setNoMedicalConditionConfirmed] = useState(false);
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [stepValidationError, setStepValidationError] = useState<string | null>(null);
   const [isConfirmAbandonOpen, setIsConfirmAbandonOpen] = useState(false);
   const [initialSnapshot, setInitialSnapshot] = useState<string>('');
+
+  const buildStudentDisplayName = (lastName?: string, firstName?: string): string => {
+    const l = (lastName || '').trim().replace(/\s+/g, ' ');
+    const f = (firstName || '').trim().replace(/\s+/g, ' ');
+    if (l && f) return `${l} ${f}`;
+    if (l) return l;
+    if (f) return f;
+    return '';
+  };
 
   const requestCloseStudentModal = () => {
     if (isSaving) return;
@@ -160,6 +170,7 @@ const Students: React.FC = () => {
   const handleOpenModal = (student?: Student) => {
     setCurrentStep(1);
     setStepValidationError(null);
+    setNoMedicalConditionConfirmed(false);
     let initStudent: Partial<Student>;
     let initEmails = '';
 
@@ -167,6 +178,16 @@ const Students: React.FC = () => {
       setIsEditing(true);
       initStudent = {
         ...student,
+        studentLastName: student.studentLastName || '',
+        studentFirstName: student.studentFirstName || '',
+        fatherName: student.fatherName || '',
+        fatherPhone: student.fatherPhone || '',
+        fatherProfession: student.fatherProfession || '',
+        motherName: student.motherName || '',
+        motherPhone: student.motherPhone || '',
+        motherProfession: student.motherProfession || '',
+        guardianRelationship: student.guardianRelationship || 'other',
+        guardianRelationshipDetails: student.guardianRelationshipDetails || '',
         studentStatus: student.studentStatus || 'nouveau',
         registrationYear: student.registrationYear || '2026-2027',
         registrationFeeExpected: student.registrationFeeExpected ?? 15000,
@@ -182,7 +203,9 @@ const Students: React.FC = () => {
       setParentEmailsInput(initEmails);
     } else {
       initStudent = {
-        id: crypto.randomUUID(), name: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '',
+        id: crypto.randomUUID(), name: '', studentLastName: '', studentFirstName: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '',
+        fatherName: '', fatherPhone: '', fatherProfession: '', motherName: '', motherPhone: '', motherProfession: '',
+        guardianRelationship: 'other', guardianRelationshipDetails: '',
         studentStatus: 'nouveau', registrationYear: '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0,
         registrationFeeStatus: 'unpaid', usesTransport: false, transportMonthlyFee: 0, transportStatus: 'none', transportPaid: 0
       };
@@ -246,6 +269,7 @@ const Students: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
+    if (currentStep !== 4) return;
 
     if (!currentStudent.classId) {
       alert("Veuillez choisir une classe !");
@@ -264,8 +288,12 @@ const Students: React.FC = () => {
       const normalizedEmails = normalizeParentEmails(parentEmailsInput);
       const parentPhone = currentStudent.parentPhone ? (normalizeCameroonPhoneNumber(currentStudent.parentPhone) || currentStudent.parentPhone) : '';
       const matricule = currentStudent.matricule ? currentStudent.matricule.trim() : `MAT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const computedName = buildStudentDisplayName(currentStudent.studentLastName, currentStudent.studentFirstName);
+      const finalName = computedName || currentStudent.name || '';
+
       const finalStudent = {
         ...currentStudent,
+        name: finalName,
         parentEmails: normalizedEmails,
         parentPhone,
         matricule
@@ -286,10 +314,21 @@ const Students: React.FC = () => {
         const rawPatchData = {
           matricule: finalStudent.matricule,
           name: finalStudent.name,
+          studentLastName: finalStudent.studentLastName,
+          studentFirstName: finalStudent.studentFirstName,
           gender: finalStudent.gender,
           dob: finalStudent.dob,
+          placeOfBirth: finalStudent.placeOfBirth,
           section: finalStudent.section,
           classId: finalStudent.classId,
+          fatherName: finalStudent.fatherName,
+          fatherPhone: finalStudent.fatherPhone,
+          fatherProfession: finalStudent.fatherProfession,
+          motherName: finalStudent.motherName,
+          motherPhone: finalStudent.motherPhone,
+          motherProfession: finalStudent.motherProfession,
+          guardianRelationship: finalStudent.guardianRelationship,
+          guardianRelationshipDetails: finalStudent.guardianRelationshipDetails,
           parentName: finalStudent.parentName,
           parentEmails: finalStudent.parentEmails,
           parentPhone: finalStudent.parentPhone,
@@ -1004,8 +1043,13 @@ const Students: React.FC = () => {
             )}
             {currentStep === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {isEditing && currentStudent.name && !currentStudent.studentLastName && !currentStudent.studentFirstName && (
+                  <div style={{ padding: '0.6rem 0.8rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '0.85rem', color: '#1e40af' }}>
+                    ℹ️ Ancienne fiche : le nom et le prénom n’ont pas encore été séparés.
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                  <div className="form-group" style={{ flex: '1 1 180px' }}>
                     <label>Matricule <span style={{ fontSize: '0.8rem', color: '#64748b' }}>(Facultatif)</span></label>
                     <input
                       value={currentStudent.matricule || ''}
@@ -1013,31 +1057,56 @@ const Students: React.FC = () => {
                       placeholder="Laisser vide pour générer automatiquement"
                     />
                   </div>
-                  <div className="form-group" style={{ flex: '2 1 300px' }}>
-                    <label>{t('name', 'Nom complet (Nom & Prénom)')} <span style={{ color: 'red' }}>*</span></label>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>Nom <span style={{ color: 'red' }}>*</span></label>
                     <input
                       required
-                      value={currentStudent.name || ''}
-                      onChange={e => setCurrentStudent({...currentStudent, name: e.target.value})}
-                      placeholder="Ex: N’GONO Mballa Élise"
+                      value={currentStudent.studentLastName || ''}
+                      onChange={e => {
+                        const l = e.target.value;
+                        const computed = buildStudentDisplayName(l, currentStudent.studentFirstName);
+                        setCurrentStudent({...currentStudent, studentLastName: l, name: computed || currentStudent.name || ''});
+                      }}
+                      placeholder="Ex: N’GONO"
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label>Prénom(s) <span style={{ color: 'red' }}>*</span></label>
+                    <input
+                      required
+                      value={currentStudent.studentFirstName || ''}
+                      onChange={e => {
+                        const f = e.target.value;
+                        const computed = buildStudentDisplayName(currentStudent.studentLastName, f);
+                        setCurrentStudent({...currentStudent, studentFirstName: f, name: computed || currentStudent.name || ''});
+                      }}
+                      placeholder="Ex: Mballa Élise"
                     />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                  <div className="form-group" style={{ flex: '1 1 180px' }}>
                     <label>Sexe <span style={{ color: 'red' }}>*</span></label>
                     <select value={currentStudent.gender} onChange={e => setCurrentStudent({...currentStudent, gender: e.target.value as 'M'|'F'})}>
                       <option value="M">Masculin</option>
                       <option value="F">Féminin</option>
                     </select>
                   </div>
-                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                  <div className="form-group" style={{ flex: '1 1 180px' }}>
                     <label>Date de Naissance <span style={{ color: 'red' }}>*</span></label>
                     <input
                       type="date"
                       required
                       value={currentStudent.dob || ''}
                       onChange={e => setCurrentStudent({...currentStudent, dob: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: '1 1 180px' }}>
+                    <label>Lieu de Naissance</label>
+                    <input
+                      value={currentStudent.placeOfBirth || ''}
+                      onChange={e => setCurrentStudent({...currentStudent, placeOfBirth: e.target.value})}
+                      placeholder="Ex: Yaoundé"
                     />
                   </div>
                 </div>
@@ -1134,33 +1203,117 @@ const Students: React.FC = () => {
             )}
 
             {currentStep === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ flex: '1 1 250px' }}>
-                    <label>{t('parent_name', 'Nom du Tuteur')} <span style={{ color: 'red' }}>*</span></label>
-                    <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} placeholder="Ex: Paul Dupont" />
-                  </div>
-                  <div className="form-group" style={{ flex: '1 1 250px' }}>
-                    <label>Contact (Téléphone)</label>
-                    <input value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} placeholder="Ex: +237650336558" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Section Père */}
+                <div style={{ padding: '0.85rem 1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#334155', fontSize: '0.9rem' }}>👨‍👦 Informations du Père (Facultatif)</h4>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label>Nom & Prénom du Père</label>
+                      <input value={currentStudent.fatherName || ''} onChange={e => setCurrentStudent({...currentStudent, fatherName: e.target.value})} placeholder="Ex: N’GONO Paul" />
+                    </div>
+                    <div className="form-group" style={{ flex: '1 1 180px' }}>
+                      <label>Téléphone du Père</label>
+                      <input value={currentStudent.fatherPhone || ''} onChange={e => setCurrentStudent({...currentStudent, fatherPhone: e.target.value})} placeholder="Ex: +237650336558" />
+                    </div>
+                    <div className="form-group" style={{ flex: '1 1 180px' }}>
+                      <label>Profession du Père</label>
+                      <input value={currentStudent.fatherProfession || ''} onChange={e => setCurrentStudent({...currentStudent, fatherProfession: e.target.value})} placeholder="Ex: Enseignant" />
+                    </div>
                   </div>
                 </div>
-                <div className="form-group">
-                  <label>Emails des parents (séparés par des virgules)</label>
-                  <input
-                    value={parentEmailsInput}
-                    onChange={e => setParentEmailsInput(e.target.value)}
-                    placeholder="parent1@example.com, parent2@example.com"
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ flex: '1 1 250px' }}>
-                    <label>Adresse d'habitation</label>
-                    <input value={currentStudent.address || ''} onChange={e => setCurrentStudent({...currentStudent, address: e.target.value})} placeholder="Ex: Akwa, Douala" />
+
+                {/* Section Mère */}
+                <div style={{ padding: '0.85rem 1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#334155', fontSize: '0.9rem' }}>👩‍👦 Informations de la Mère (Facultatif)</h4>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label>Nom & Prénom de la Mère</label>
+                      <input value={currentStudent.motherName || ''} onChange={e => setCurrentStudent({...currentStudent, motherName: e.target.value})} placeholder="Ex: EBOA Marie" />
+                    </div>
+                    <div className="form-group" style={{ flex: '1 1 180px' }}>
+                      <label>Téléphone de la Mère</label>
+                      <input value={currentStudent.motherPhone || ''} onChange={e => setCurrentStudent({...currentStudent, motherPhone: e.target.value})} placeholder="Ex: +237690112233" />
+                    </div>
+                    <div className="form-group" style={{ flex: '1 1 180px' }}>
+                      <label>Profession de la Mère</label>
+                      <input value={currentStudent.motherProfession || ''} onChange={e => setCurrentStudent({...currentStudent, motherProfession: e.target.value})} placeholder="Ex: Comptable" />
+                    </div>
                   </div>
-                  <div className="form-group" style={{ flex: '1 1 250px' }}>
-                    <label>Contact d'Urgence</label>
-                    <input value={currentStudent.emergencyContact || ''} onChange={e => setCurrentStudent({...currentStudent, emergencyContact: e.target.value})} placeholder="Numéro en cas d'urgence" />
+                </div>
+
+                {/* Section Responsable Légal */}
+                <div style={{ padding: '0.85rem 1rem', background: '#eef2ff', borderRadius: '8px', border: '1px solid #c7d2fe' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#3730a3', fontSize: '0.9rem' }}>🏠 Responsable Légal Principal (Obligatoire)</h4>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label>Définir le responsable principal</label>
+                      <select
+                        value={currentStudent.guardianRelationship || 'other'}
+                        onChange={e => {
+                          const rel = e.target.value as 'father' | 'mother' | 'other';
+                          let pName = currentStudent.parentName || '';
+                          let pPhone = currentStudent.parentPhone || '';
+
+                          if (rel === 'father' && currentStudent.fatherName) {
+                            pName = currentStudent.fatherName;
+                            if (currentStudent.fatherPhone) pPhone = currentStudent.fatherPhone;
+                          } else if (rel === 'mother' && currentStudent.motherName) {
+                            pName = currentStudent.motherName;
+                            if (currentStudent.motherPhone) pPhone = currentStudent.motherPhone;
+                          }
+
+                          setCurrentStudent(prev => ({
+                            ...prev,
+                            guardianRelationship: rel,
+                            parentName: pName,
+                            parentPhone: pPhone
+                          }));
+                        }}
+                      >
+                        <option value="father">Père</option>
+                        <option value="mother">Mère</option>
+                        <option value="other">Autre (Tuteur / Mandataire)</option>
+                      </select>
+                    </div>
+                    {currentStudent.guardianRelationship === 'other' && (
+                      <div className="form-group" style={{ flex: '1 1 200px' }}>
+                        <label>Préciser le lien de parenté</label>
+                        <input
+                          value={currentStudent.guardianRelationshipDetails || ''}
+                          onChange={e => setCurrentStudent({...currentStudent, guardianRelationshipDetails: e.target.value})}
+                          placeholder="Ex: Oncle, Tante, Grand-parent..."
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label>Nom du Responsable <span style={{ color: 'red' }}>*</span></label>
+                      <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} placeholder="Ex: Paul Dupont" />
+                    </div>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label>Contact (Téléphone) <span style={{ color: 'red' }}>*</span></label>
+                      <input required value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} placeholder="Ex: +237650336558" />
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                    <label>Emails des parents (séparés par des virgules)</label>
+                    <input
+                      value={parentEmailsInput}
+                      onChange={e => setParentEmailsInput(e.target.value)}
+                      placeholder="parent1@example.com, parent2@example.com"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label>Adresse d'habitation</label>
+                      <input value={currentStudent.address || ''} onChange={e => setCurrentStudent({...currentStudent, address: e.target.value})} placeholder="Ex: Akwa, Douala" />
+                    </div>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label>Contact d'Urgence</label>
+                      <input value={currentStudent.emergencyContact || ''} onChange={e => setCurrentStudent({...currentStudent, emergencyContact: e.target.value})} placeholder="Numéro en cas d'urgence" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1171,7 +1324,7 @@ const Students: React.FC = () => {
                 {/* Santé */}
                 <div style={{ padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#92400e', fontSize: '0.95rem' }}>🩺 Santé & Remarques Médicales</h4>
-                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                     <div className="form-group" style={{ flex: '1 1 200px' }}>
                       <label style={{ color: '#92400e' }}>Allergies</label>
                       <textarea
@@ -1193,6 +1346,25 @@ const Students: React.FC = () => {
                       />
                     </div>
                   </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: '#78350f' }}>
+                    <input
+                      type="checkbox"
+                      checked={noMedicalConditionConfirmed}
+                      onChange={e => setNoMedicalConditionConfirmed(e.target.checked)}
+                    />
+                    Aucune allergie ou condition médicale connue à signaler
+                  </label>
+                </div>
+
+                {/* Récapitulatif compact */}
+                <div style={{ padding: '0.85rem 1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#475569', fontSize: '0.9rem' }}>📋 Récapitulatif du Dossier Élève</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', color: '#334155' }}>
+                    <div>Nom complet: <strong>{buildStudentDisplayName(currentStudent.studentLastName, currentStudent.studentFirstName) || currentStudent.name || '-'}</strong></div>
+                    <div>Sexe / DOB: <strong>{currentStudent.gender} ({currentStudent.dob || '-'})</strong></div>
+                    <div>Classe: <strong>{db.classes.find(c => c.id === currentStudent.classId)?.name || 'Non sélectionnée'}</strong></div>
+                    <div>Responsable: <strong>{currentStudent.parentName || '-'} ({currentStudent.parentPhone || '-'})</strong></div>
+                  </div>
                 </div>
 
                 {/* Synthèse financière et Transport */}
@@ -1200,7 +1372,7 @@ const Students: React.FC = () => {
                   <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <h4 style={{ margin: '0 0 0.5rem 0', color: '#475569', fontSize: '0.95rem' }}>💼 Synthèse Financière & Transport (Lecture Seule)</h4>
                     <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 0.75rem 0' }}>
-                      Ces informations sont gérées de manière autonome dans les modules <strong>Paiements</strong> et <strong>Bus scolaires</strong>.
+                      Gestion autonome dans les modules <strong>Paiements</strong> et <strong>Bus scolaires</strong>.
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
                       <div>Inscr. Attendue: <strong>{(currentStudent.registrationFeeExpected || 15000).toLocaleString('fr-FR')} FCFA</strong></div>
@@ -1247,17 +1419,37 @@ const Students: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setStepValidationError(null);
-                    if (currentStep === 1 && (!currentStudent.name || !currentStudent.dob)) {
-                      setStepValidationError('Veuillez remplir le nom complet et la date de naissance.');
-                      return;
+                    if (currentStep === 1) {
+                      if (!currentStudent.studentLastName && !currentStudent.name) {
+                        setStepValidationError('Veuillez renseigner le nom.');
+                        return;
+                      }
+                      if (!currentStudent.studentFirstName && !currentStudent.name) {
+                        setStepValidationError('Veuillez renseigner le ou les prénoms.');
+                        return;
+                      }
+                      if (!currentStudent.dob) {
+                        setStepValidationError('Veuillez renseigner la date de naissance.');
+                        return;
+                      }
+                      if (new Date(currentStudent.dob) > new Date()) {
+                        setStepValidationError('La date de naissance ne peut pas être dans le futur.');
+                        return;
+                      }
                     }
                     if (currentStep === 2 && !currentStudent.classId) {
                       setStepValidationError('Veuillez sélectionner une classe.');
                       return;
                     }
-                    if (currentStep === 3 && !currentStudent.parentName) {
-                      setStepValidationError('Veuillez renseigner le nom du tuteur.');
-                      return;
+                    if (currentStep === 3) {
+                      if (!currentStudent.parentName) {
+                        setStepValidationError('Veuillez renseigner le nom du responsable légal.');
+                        return;
+                      }
+                      if (!currentStudent.parentPhone) {
+                        setStepValidationError('Veuillez renseigner le téléphone du responsable légal.');
+                        return;
+                      }
                     }
                     setCurrentStep(s => Math.min(s + 1, 4));
                   }}
@@ -1265,7 +1457,19 @@ const Students: React.FC = () => {
                   Suivant
                 </button>
               ) : (
-                <button type="submit" disabled={isSaving}>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  onClick={(e) => {
+                    setStepValidationError(null);
+                    const hasAllergies = Boolean((currentStudent.allergies || '').trim());
+                    const hasMedical = Boolean((currentStudent.medicalConditions || '').trim());
+                    if (!hasAllergies && !hasMedical && !noMedicalConditionConfirmed) {
+                      e.preventDefault();
+                      setStepValidationError('Veuillez renseigner les informations médicales ou confirmer qu’aucune condition connue n’est à signaler.');
+                    }
+                  }}
+                >
                   {isSaving ? 'Enregistrement...' : t('save', 'Enregistrer')}
                 </button>
               )}

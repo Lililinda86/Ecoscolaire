@@ -198,17 +198,27 @@ export interface Student {
   // --- Structured student identity ---
   studentLastName?: string;
   studentFirstName?: string;
+  placeOfBirth?: string;
 
   // --- Structured parents / guardians ---
+  fatherName?: string;
+  fatherPhone?: string;
+  fatherProfession?: string;
+
+  motherName?: string;
+  motherPhone?: string;
+  motherProfession?: string;
+
+  guardianRelationship?: 'father' | 'mother' | 'other';
+  guardianRelationshipDetails?: string;
+
   motherLastName?: string;
   motherFirstName?: string;
-  motherPhone?: string;
   motherEmail?: string;
   motherWhatsapp?: boolean;
 
   fatherLastName?: string;
   fatherFirstName?: string;
-  fatherPhone?: string;
   fatherEmail?: string;
   fatherWhatsapp?: boolean;
 
