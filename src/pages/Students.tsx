@@ -124,10 +124,16 @@ const Students: React.FC = () => {
   };
 
   // Liste dérivée unique des classes sélectionnables pour l'école
-  const schoolClasses = (db.classes || []).filter(c => isSelectableClassForStudent(c, currentSchool, currentStudent.section));
+  const currentClassObj = currentStudent.classId ? db.classes.find(c => c.id === currentStudent.classId) : null;
+  const rawSchoolClasses = (db.classes || []).filter(c => {
+    if (currentClassObj && c.id === currentClassObj.id && String(c.schoolId || '') === currentSchool?.id) {
+      return true;
+    }
+    return isSelectableClassForStudent(c, currentSchool, currentStudent.section);
+  });
 
   // Déduplication par ID
-  const uniqueSchoolClasses = Array.from(new Map(schoolClasses.map(c => [c.id, c])).values());
+  const uniqueSchoolClasses = Array.from(new Map(rawSchoolClasses.map(c => [c.id, c])).values());
   const sortedClasses = sortClasses(uniqueSchoolClasses as unknown as import('../types').ClassSection[]);
 
   const filteredStudents = db.students.filter(student => {
@@ -1006,9 +1012,11 @@ const Students: React.FC = () => {
                               c.type || c.section
                             );
                             const specText = specRes.name ? ` — ${specRes.name}` : '';
+                            const isInactiveCurrent = c.isActive === false && c.id === currentStudent.classId;
+                            const inactiveLabel = isInactiveCurrent ? ' (Inactive — classe actuelle)' : '';
                             return (
                               <option key={c.id} value={c.id}>
-                                {getDisplayClassName(c.name)} — {eduText}{specText}
+                                {getDisplayClassName(c.name)} — {eduText}{specText}{inactiveLabel}
                               </option>
                             );
                           })}

@@ -149,3 +149,8 @@ export function getDisplayClassName(name: string): string {
 
   return trimmed;
 }
+
+export function resolveClassActiveStatus(cls?: { isActive?: boolean } | null): boolean {
+  if (!cls) return false;
+  return cls.isActive !== false;
+}

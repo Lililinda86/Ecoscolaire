@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { sortClasses } from '../utils/sortClasses';
 import { DEFAULT_CLASS_LEVELS } from '../constants/defaultClasses';
-import { buildStandardClassDocumentId, buildTechnicalSpecialtyDocumentId, buildTechnicalClassDocumentId, resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName, getDisplayClassName, normalizeTechnicalSpecialtyName, getTechnicalSpecialtyCanonicalKey } from '../utils/classCatalog';
+import { buildStandardClassDocumentId, buildTechnicalSpecialtyDocumentId, buildTechnicalClassDocumentId, resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName, getDisplayClassName, normalizeTechnicalSpecialtyName, getTechnicalSpecialtyCanonicalKey, resolveClassActiveStatus } from '../utils/classCatalog';
 import type { ClassSection, TechnicalSpecialty } from '../types';
 import Modal from '../components/Modal';
 
@@ -28,7 +28,7 @@ const getCycleLabel = (cls: { cycle?: string; level?: string; name: string }): s
 };
 
 const Classes: React.FC = () => {
-  const { db, safeMergeDB, updateLocalState, currentUser, currentSchool } = useAppContext();
+  const { db, updateLocalState, currentUser, currentSchool } = useAppContext();
   const { t } = useI18n();
   
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -46,6 +46,11 @@ const Classes: React.FC = () => {
   const [selectedLevelIds, setSelectedLevelIds] = useState<string[]>([]);
   const [techSubmitting, setTechSubmitting] = useState<boolean>(false);
 
+  // State pour le modal d'activation / désactivation de classe (P0-38)
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
+  const [targetStatusClass, setTargetStatusClass] = useState<ClassSection | null>(null);
+  const [statusSubmitting, setStatusSubmitting] = useState<boolean>(false);
+
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
 
   const canManage = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
@@ -53,6 +58,9 @@ const Classes: React.FC = () => {
 
   // Filtre strict du schoolId : String(classItem.schoolId || '') === currentSchool?.id
   const schoolClasses = (db.classes || []).filter(c => currentSchool && String(c.schoolId || '') === currentSchool.id);
+
+  const activeClassesCount = schoolClasses.filter(c => resolveClassActiveStatus(c)).length;
+  const inactiveClassesCount = schoolClasses.length - activeClassesCount;
 
   const filteredClasses = schoolClasses.filter(c => {
     // Filtre par recherche
@@ -64,7 +72,7 @@ const Classes: React.FC = () => {
     const matchesCycle = cycleFilter === 'all' || cycleLabel === cycleFilter;
 
     // Filtre par statut
-    const isActive = c.isActive !== false;
+    const isActive = resolveClassActiveStatus(c);
     const matchesStatus = statusFilter === 'all' || 
                           (statusFilter === 'active' && isActive) || 
                           (statusFilter === 'inactive' && !isActive);
@@ -77,6 +85,53 @@ const Classes: React.FC = () => {
 
     return matchesSearch && matchesCycle && matchesStatus && matchesEducationType;
   });
+
+  const handleOpenStatusModal = (cls: ClassSection) => {
+    setTargetStatusClass(cls);
+    setIsStatusModalOpen(true);
+  };
+
+  const handleToggleClassStatus = async () => {
+    if (!canManage || !currentSchool || !targetStatusClass) return;
+
+    const newIsActive = targetStatusClass.isActive === false ? true : false;
+    try {
+      setStatusSubmitting(true);
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { runTransaction, doc } = await import('firebase/firestore');
+
+      await runTransaction(firestoreDb, async (transaction) => {
+        const classRef = doc(firestoreDb, 'classes', targetStatusClass.id);
+        const snap = await transaction.get(classRef);
+
+        if (!snap.exists()) {
+          throw new Error("La classe à modifier n'existe plus dans la base de données.");
+        }
+
+        const data = snap.data();
+        if (String(data.schoolId || '') !== currentSchool.id) {
+          throw new Error("La classe n'appartient pas à votre établissement.");
+        }
+
+        transaction.update(classRef, { isActive: newIsActive });
+      });
+
+      const updatedClasses = db.classes.map(c =>
+        c.id === targetStatusClass.id ? { ...c, isActive: newIsActive } : c
+      );
+
+      updateLocalState({ classes: updatedClasses });
+      setIsStatusModalOpen(false);
+      setTargetStatusClass(null);
+      alert(`La classe a été ${newIsActive ? 'réactivée' : 'désactivée'} avec succès !`);
+    } catch (err: unknown) {
+      console.error("Erreur lors de la modification du statut de la classe :", err);
+      const message = err instanceof Error ? err.message : "Une erreur s'est produite lors du changement de statut.";
+      alert(message);
+    } finally {
+      setStatusSubmitting(false);
+    }
+  };
 
   // Détection des anomalies et classes manquantes pour l'aperçu et le bandeau d'alerte
   const canonicalLevels = DEFAULT_CLASS_LEVELS.filter(l => l.educationType === 'general');
@@ -163,8 +218,8 @@ const Classes: React.FC = () => {
     const newDb = { ...db };
     const studentIndex = newDb.students.findIndex(s => s.id === studentId);
     if (studentIndex >= 0) {
-      newDb.students[studentIndex].classId = newClassId;
-      safeMergeDB(newDb);
+      const updatedStudents = newDb.students.map((s, idx) => idx === studentIndex ? { ...s, classId: newClassId } : s);
+      updateLocalState({ students: updatedStudents });
     }
   };
 
@@ -583,6 +638,11 @@ const Classes: React.FC = () => {
         )}
       </div>
 
+      {/* Résumé du catalogue (Section 11 P0-38) */}
+      <div style={{ marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+        📊 <strong>Résumé du catalogue :</strong> {schoolClasses.length} classe(s) au total — {activeClassesCount} active(s) — {inactiveClassesCount} inactive(s)
+      </div>
+
       {sortedFilteredClasses.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
           {educationTypeFilter === 'technical' ? (
@@ -599,6 +659,10 @@ const Classes: React.FC = () => {
                 </button>
               )}
             </div>
+          ) : statusFilter === 'active' ? (
+            "Aucune classe active ne correspond aux filtres sélectionnés."
+          ) : statusFilter === 'inactive' ? (
+            "Aucune classe inactive ne correspond aux filtres sélectionnés."
           ) : (
             "Aucune classe ne correspond aux critères de recherche."
           )}
@@ -646,22 +710,57 @@ const Classes: React.FC = () => {
                 })()}
               </div>
             </div>
-            <span style={{ 
-              padding: '0.25rem 0.75rem', 
-              borderRadius: '12px', 
-              fontSize: '0.85rem', 
-              fontWeight: 600,
-              background: currentClass.isActive !== false ? '#d1fae5' : '#fee2e2',
-              color: currentClass.isActive !== false ? '#065f46' : '#991b1b'
-            }}>
-              {currentClass.isActive !== false ? 'Active' : 'Inactive'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <span style={{
+                padding: '0.25rem 0.75rem',
+                borderRadius: '12px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                background: resolveClassActiveStatus(currentClass) ? '#d1fae5' : '#fee2e2',
+                color: resolveClassActiveStatus(currentClass) ? '#065f46' : '#991b1b'
+              }}>
+                {resolveClassActiveStatus(currentClass) ? 'Active' : 'Inactive'}
+              </span>
+              {canManage && (
+                <button
+                  type="button"
+                  className={resolveClassActiveStatus(currentClass) ? "secondary" : "primary"}
+                  onClick={() => handleOpenStatusModal(currentClass)}
+                  style={{
+                    fontSize: '0.85rem',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '6px',
+                    borderColor: resolveClassActiveStatus(currentClass) ? '#dc2626' : undefined,
+                    color: resolveClassActiveStatus(currentClass) ? '#dc2626' : undefined
+                  }}
+                >
+                  {resolveClassActiveStatus(currentClass) ? 'Désactiver la classe' : 'Activer la classe'}
+                </button>
+              )}
+            </div>
           </div>
           {resolveEducationType(currentClass.educationType, currentClass.specialtyId).isAnomaly && canManage && (
             <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: '6px', fontSize: '0.85rem' }}>
               ⚠️ <strong>Anomalie détectée :</strong> Cette classe possède une spécialité mais son type d'enseignement est indéterminé.
             </div>
           )}
+          {(() => {
+            if (!currentClass.specialtyId) return null;
+            const specRes = getSpecialtyName(
+              currentClass.specialtyId,
+              db.technicalSpecialties as Array<{ id: string; schoolId?: string; name: string }>,
+              currentSchool?.id,
+              currentClass.type || currentClass.section
+            );
+            if (specRes.isUnavailable && canManage) {
+              return (
+                <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', borderRadius: '6px', fontSize: '0.85rem' }}>
+                  ⚠️ <strong>Alerte :</strong> La filière liée à cette classe est inactive ou non disponible.
+                </div>
+              );
+            }
+            return null;
+          })()}
           
           <h3 style={{ marginTop: '1.5rem', color: 'var(--primary-color)' }}>Enseignant(s) Titulaire(s)</h3>
           <ul style={{ listStyleType: 'disc', paddingLeft: '1.5rem', marginBottom: '2rem' }}>
@@ -860,6 +959,78 @@ const Classes: React.FC = () => {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Modal de Confirmation d'Activation / Désactivation de Classe (P0-38) */}
+      {canManage && targetStatusClass && (
+        <Modal
+          isOpen={isStatusModalOpen}
+          onClose={() => {
+            if (!statusSubmitting) {
+              setIsStatusModalOpen(false);
+              setTargetStatusClass(null);
+            }
+          }}
+          title={targetStatusClass.isActive === false ? "Réactiver cette classe ?" : "Désactiver cette classe ?"}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>
+              {targetStatusClass.isActive === false ? (
+                <>
+                  Voulez-vous réactiver la classe <strong>{getDisplayClassName(targetStatusClass.name)}</strong> ({resolveEducationType(targetStatusClass.educationType, targetStatusClass.specialtyId).value === 'technical' ? 'Enseignement technique' : 'Enseignement général'}) ?
+                  <br /><br />
+                  Cette classe redeviendra disponible pour les nouvelles inscriptions et les reclassements d’élèves.
+                </>
+              ) : (
+                <>
+                  Voulez-vous désactiver la classe <strong>{getDisplayClassName(targetStatusClass.name)}</strong> ({resolveEducationType(targetStatusClass.educationType, targetStatusClass.specialtyId).value === 'technical' ? 'Enseignement technique' : 'Enseignement général'}) ?
+                  <br /><br />
+                  {(() => {
+                    const studentCount = db.students.filter(s => s.classId === targetStatusClass.id && String(s.schoolId || '') === currentSchool?.id).length;
+                    if (studentCount > 0) {
+                      return `Cette classe contient ${studentCount} élève(s). Ils resteront inscrits dans cette classe, mais aucune nouvelle inscription ne sera autorisée tant qu’elle restera inactive.`;
+                    }
+                    return "Aucune nouvelle inscription ni reclassement vers cette classe ne sera autorisé tant qu’elle restera inactive.";
+                  })()}
+                </>
+              )}
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setIsStatusModalOpen(false);
+                  setTargetStatusClass(null);
+                }}
+                disabled={statusSubmitting}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleClassStatus}
+                disabled={statusSubmitting}
+                style={{
+                  background: targetStatusClass.isActive === false ? '#10b981' : '#dc2626',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {statusSubmitting
+                  ? 'Mise à jour...'
+                  : targetStatusClass.isActive === false
+                    ? 'Activer la classe'
+                    : 'Désactiver la classe'}
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
