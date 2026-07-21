@@ -46,6 +46,131 @@ const formatDateLike = (val: unknown): string => {
   return 'N/A';
 };
 
+const getAfricaDoualaDateStr = (dateObj = new Date()): string => {
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Africa/Douala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(dateObj);
+
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+};
+
+const isCashPaymentForSchool = (
+  payment: unknown,
+  schoolId: string
+): boolean => {
+  if (!payment || typeof payment !== 'object' || !schoolId) return false;
+
+  const value = payment as {
+    schoolId?: unknown;
+    method?: unknown;
+    status?: unknown;
+    amount?: unknown;
+  };
+
+  if (String(value.schoolId || '') !== schoolId) return false;
+
+  const method = value.method
+    ? String(value.method).toLowerCase()
+    : 'cash';
+
+  const status = value.status
+    ? String(value.status).toLowerCase()
+    : 'completed';
+
+  const excludedStatuses = [
+    'pending',
+    'failed',
+    'cancelled',
+    'canceled',
+    'refunded',
+    'reversed'
+  ];
+
+  if (method !== 'cash' || excludedStatuses.includes(status)) {
+    return false;
+  }
+
+  const amount = Number(value.amount);
+
+  return Number.isSafeInteger(amount) && amount > 0;
+};
+
+const formatClosureAuthor = (cl: CashClosure, currentUser?: { id?: string; name?: string; displayName?: string; email?: string; role?: string } | null): { name: string; role?: string } => {
+  let name = '';
+  let role = '';
+
+  if (cl.closedByName && cl.closedByName.trim()) {
+    name = cl.closedByName.trim();
+  } else if (currentUser && currentUser.id === cl.closedBy) {
+    name = currentUser.name || currentUser.displayName || currentUser.email || '';
+    if (currentUser.role) {
+      role = currentUser.role;
+    }
+  }
+
+  if (!name) {
+    if (cl.closedBy && cl.closedBy.trim()) {
+      name = cl.closedBy.trim().length > 12 ? `${cl.closedBy.trim().substring(0, 8)}...` : cl.closedBy.trim();
+    } else {
+      name = 'Auteur inconnu';
+    }
+  }
+
+  const roleMap: Record<string, string> = {
+    owner: 'Fondateur',
+    director: 'Directeur',
+    secretary: 'Secrétaire',
+    accountant: 'Comptable',
+    superAdmin: 'Super Admin'
+  };
+
+  return {
+    name,
+    role: role ? (roleMap[role] || role) : undefined
+  };
+};
+
+const formatClosureDateTime = (val: unknown): string => {
+  if (!val) return 'N/A';
+  let d: Date | null = null;
+  if (typeof val === 'object' && val !== null) {
+    const valObj = val as { toDate?: () => Date; seconds?: number };
+    if (typeof valObj.toDate === 'function') {
+      try {
+        d = valObj.toDate();
+      } catch {
+        d = null;
+      }
+    } else if (typeof valObj.seconds === 'number') {
+      d = new Date(valObj.seconds * 1000);
+    }
+  }
+  if (!d && (typeof val === 'string' || typeof val === 'number' || val instanceof Date)) {
+    d = new Date(val);
+  }
+  if (!d || isNaN(d.getTime())) return 'N/A';
+
+  const dateFormatter = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Africa/Douala',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+
+  const timeFormatter = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Africa/Douala',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  return `${dateFormatter.format(d)} à ${timeFormatter.format(d)}`;
+};
+
 const findSnapshotReceiptForPayment = (
   payment: Payment,
   receipts?: ReceiptLike[]
@@ -201,7 +326,7 @@ const Payments: React.FC = () => {
   const [receiptToPrint, setReceiptToPrint] = useState<Payment | null>(null);
 
   // --- State pour Clôtures de Caisse ---
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getAfricaDoualaDateStr();
   const [cashClosures, setCashClosures] = useState<CashClosure[]>([]);
   const [selectedClosureDate, setSelectedClosureDate] = useState<string>(todayStr);
   const [openingBalanceInput, setOpeningBalanceInput] = useState<number | ''>(0);
@@ -209,6 +334,8 @@ const Payments: React.FC = () => {
   const [notesInput, setNotesInput] = useState<string>('');
   const [isSubmittingClosure, setIsSubmittingClosure] = useState<boolean>(false);
   const [closureToPrint, setClosureToPrint] = useState<CashClosure | null>(null);
+  const [synthesisStartDate, setSynthesisStartDate] = useState<string>(() => `${todayStr.substring(0, 7)}-01`);
+  const [synthesisEndDate, setSynthesisEndDate] = useState<string>(todayStr);
 
   useEffect(() => {
     if (!currentSchool?.id) return;
@@ -257,10 +384,10 @@ const Payments: React.FC = () => {
     }
 
     const cashIn = db.payments
-      .filter(p => p.date === selectedClosureDate && (p.method === 'cash' || !p.method))
+      .filter(p => p.date === selectedClosureDate && isCashPaymentForSchool(p, currentSchool?.id || ''))
       .reduce((sum, p) => sum + p.amount, 0);
     const cashOut = (db.expenses || [])
-      .filter(e => e.date === selectedClosureDate)
+      .filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id)
       .reduce((sum, e) => sum + e.amount, 0);
     const theoretical = opening + cashIn - cashOut;
     const disc = counted - theoretical;
@@ -926,9 +1053,9 @@ const Payments: React.FC = () => {
   };
   const feeDetails = getFeeDetails();
 
-  const totalCashReceived = db.payments.filter(p => p.method === 'cash' || !p.method).reduce((sum, p) => sum + p.amount, 0);
-  const totalMoMoReceived = db.payments.filter(p => p.method === 'mobile_money').reduce((sum, p) => sum + p.amount, 0);
-  const totalExpenses = (db.expenses || []).reduce((sum, e) => sum + e.amount, 0);
+  const totalCashReceived = db.payments.filter(p => isCashPaymentForSchool(p, currentSchool?.id || '')).reduce((sum, p) => sum + p.amount, 0);
+  const totalMoMoReceived = db.payments.filter(p => p.method === 'mobile_money' && String(p.schoolId || '') === currentSchool?.id).reduce((sum, p) => sum + p.amount, 0);
+  const totalExpenses = (db.expenses || []).filter(e => String(e.schoolId || '') === currentSchool?.id).reduce((sum, e) => sum + e.amount, 0);
 
   const soldeTiroirCaisse = totalCashReceived - totalExpenses;
 
@@ -1056,9 +1183,9 @@ const Payments: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ background: '#111827', color: '#fff', border: '1px solid #374151', padding: '1.5rem' }}>
-          <h3 style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>💵 Espèces (Tiroir Physique)</h3>
+          <h3 style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>💵 Solde global cumulé de caisse</h3>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', fontWeight: 'bold' }}>{soldeTiroirCaisse.toLocaleString('fr-FR')} FCFA</p>
-          <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.5rem' }}>Dépenses déduites</div>
+          <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.5rem' }}>Tous les mouvements cash enregistrés, dépenses déduites</div>
         </div>
         <div className="card" style={{ background: 'var(--primary-color)', color: '#fff', border: '1px solid #4f46e5', padding: '1.5rem' }}>
           <h3 style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>📱 Compte Mobile Money</h3>
@@ -1430,8 +1557,8 @@ const Payments: React.FC = () => {
       )}
 
       {activeTab === 'brouillard' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div className="card">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card" id="brouillard-day-section" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
               <h2 style={{ color: 'var(--warning)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Lock size={22} /> Clôture & Brouillard de Caisse
@@ -1457,8 +1584,6 @@ const Payments: React.FC = () => {
               const archivedClosure = cashClosures.find(c => c.date === selectedClosureDate);
 
               if (archivedClosure) {
-                const closureDateFormatted = formatDateLike(archivedClosure.closedAt);
-
                 return (
                   <div style={{ padding: '1.5rem', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #86efac' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
@@ -1481,15 +1606,20 @@ const Payments: React.FC = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', margin: '1.5rem 0', background: '#fff', padding: '1rem', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
                       <div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Statut</span>
-                        <div style={{ fontWeight: 'bold', color: '#15803d' }}>CLÔTURÉ DÉFINITIVEMENT</div>
+                        <div style={{ fontWeight: 'bold', color: archivedClosure.discrepancy === 0 ? '#15803d' : '#dc2626' }}>
+                          {archivedClosure.discrepancy === 0 ? 'CLÔTURÉ DÉFINITIVEMENT' : 'CLÔTURÉ AVEC ÉCART'}
+                        </div>
                       </div>
                       <div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Clôturé par</span>
-                        <div style={{ fontWeight: 500 }}>{archivedClosure.closedByName || archivedClosure.closedBy}</div>
+                        <div style={{ fontWeight: 500 }}>{formatClosureAuthor(archivedClosure, currentUser).name}</div>
+                        {formatClosureAuthor(archivedClosure, currentUser).role && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatClosureAuthor(archivedClosure, currentUser).role}</div>
+                        )}
                       </div>
                       <div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Date & Heure</span>
-                        <div style={{ fontWeight: 500 }}>{closureDateFormatted}</div>
+                        <div style={{ fontWeight: 500 }}>{formatClosureDateTime(archivedClosure.closedAt)}</div>
                       </div>
                     </div>
 
@@ -1532,8 +1662,8 @@ const Payments: React.FC = () => {
                 );
               }
 
-              const cashPaymentsDate = db.payments.filter(p => p.date === selectedClosureDate && (p.method === 'cash' || !p.method));
-              const expensesDate = (db.expenses || []).filter(e => e.date === selectedClosureDate);
+              const cashPaymentsDate = db.payments.filter(p => p.date === selectedClosureDate && isCashPaymentForSchool(p, currentSchool?.id || ''));
+              const expensesDate = (db.expenses || []).filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id);
               const cashIn = cashPaymentsDate.reduce((sum, p) => sum + p.amount, 0);
               const cashOut = expensesDate.reduce((sum, e) => sum + e.amount, 0);
 
@@ -1594,11 +1724,14 @@ const Payments: React.FC = () => {
 
                     <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', border: '1px solid #fbc02d', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                       <div>
-                        <h4 style={{ margin: '0 0 1rem 0', color: '#f57f17' }}>Aperçu Théorique du Tiroir</h4>
+                        <h4 style={{ margin: '0 0 0.25rem 0', color: '#f57f17' }}>Aperçu Théorique du Tiroir</h4>
+                        <div style={{ fontSize: '0.75rem', color: '#854d0e', marginBottom: '1rem', lineHeight: '1.4' }}>
+                          Solde théorique de la journée sélectionnée. Ce montant concerne uniquement la date sélectionnée. Il peut être différent du solde global cumulé affiché en haut.
+                        </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.95rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Solde Ouverture :</span>
+                            <span>Solde Ouverture (Donnée Manuelle) :</span>
                             <strong>{opening.toLocaleString('fr-FR')} FCFA</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
@@ -1611,11 +1744,11 @@ const Payments: React.FC = () => {
                           </div>
                           <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '0.5rem 0' }} />
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                            <span>= Solde Théorique :</span>
+                            <span>= Solde Théorique de la journée sélectionnée :</span>
                             <span style={{ color: '#f57f17' }}>{theoretical.toLocaleString('fr-FR')} FCFA</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 'bold', marginTop: '0.5rem' }}>
-                            <span>Montant Compté :</span>
+                            <span>Montant Compté (Donnée Manuelle) :</span>
                             <span style={{ color: 'var(--primary-color)' }}>{counted.toLocaleString('fr-FR')} FCFA</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 'bold', padding: '0.5rem', background: disc === 0 ? '#f0fdf4' : '#fee2e2', borderRadius: '4px', marginTop: '0.5rem' }}>
@@ -1641,6 +1774,195 @@ const Payments: React.FC = () => {
             })()}
           </div>
 
+          {/* --- SYNTHÈSE JOURNALIÈRE DE CAISSE --- */}
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+            <div style={{ padding: '1.25rem', background: '#f8fafc', borderBottom: '1px solid var(--border-color)', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  📊 Synthèse journalière de caisse
+                </h3>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  Aperçu des mouvements cash et statut de clôture par date
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>Du :</label>
+                  <input
+                    type="date"
+                    max={todayStr}
+                    value={synthesisStartDate}
+                    onChange={e => setSynthesisStartDate(e.target.value)}
+                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>Au :</label>
+                  <input
+                    type="date"
+                    max={todayStr}
+                    value={synthesisEndDate}
+                    onChange={e => setSynthesisEndDate(e.target.value)}
+                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {synthesisStartDate > synthesisEndDate ? (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--danger)', background: '#fee2e2' }}>
+                ⚠️ La date de début ne peut pas être supérieure à la date de fin.
+              </div>
+            ) : (() => {
+              const dateSet = new Set<string>();
+
+              (db.payments || []).forEach(p => {
+                if (isCashPaymentForSchool(p, currentSchool?.id || '') && p.date) {
+                  if (p.date >= synthesisStartDate && p.date <= synthesisEndDate) {
+                    dateSet.add(p.date);
+                  }
+                }
+              });
+
+              (db.expenses || []).forEach(e => {
+                if (e.date && String(e.schoolId || '') === currentSchool?.id && e.date >= synthesisStartDate && e.date <= synthesisEndDate) {
+                  dateSet.add(e.date);
+                }
+              });
+
+              cashClosures.forEach(c => {
+                if (c.date && c.date >= synthesisStartDate && c.date <= synthesisEndDate) {
+                  dateSet.add(c.date);
+                }
+              });
+
+              const sortedDates = Array.from(dateSet).sort((a, b) => b.localeCompare(a));
+
+              if (sortedDates.length === 0) {
+                return (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Aucun mouvement de caisse pour la période sélectionnée.
+                  </div>
+                );
+              }
+
+              return (
+                <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
+                  <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
+                    <tr>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Date</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Encaissements Cash</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Sorties Cash</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Net du jour</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Solde Ouverture</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Solde Théorique</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Montant Compté</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Écart</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Statut</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedDates.map(dateStr => {
+                      const existingClosure = cashClosures.find(c => c.date === dateStr);
+
+                      let cashReceived = 0;
+                      let cashExpenses = 0;
+                      let openingBalanceText = '—';
+                      let theoreticalBalanceText = '—';
+                      let countedBalanceText = '—';
+                      let discrepancyText = '—';
+                      let isClosed = false;
+                      let hasDiscrepancy = false;
+
+                      if (existingClosure) {
+                        isClosed = true;
+                        cashReceived = existingClosure.cashReceived;
+                        cashExpenses = existingClosure.cashExpenses;
+                        openingBalanceText = `${existingClosure.openingBalance.toLocaleString('fr-FR')} FCFA`;
+                        theoreticalBalanceText = `${existingClosure.theoreticalBalance.toLocaleString('fr-FR')} FCFA`;
+                        countedBalanceText = `${existingClosure.countedBalance.toLocaleString('fr-FR')} FCFA`;
+                        discrepancyText = `${existingClosure.discrepancy.toLocaleString('fr-FR')} FCFA`;
+                        hasDiscrepancy = existingClosure.discrepancy !== 0;
+                      } else {
+                        const pList = (db.payments || []).filter(p => p.date === dateStr && isCashPaymentForSchool(p, currentSchool?.id || ''));
+                        const eList = (db.expenses || []).filter(e => e.date === dateStr && String(e.schoolId || '') === currentSchool?.id);
+                        cashReceived = pList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                        cashExpenses = eList.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                      }
+
+                      const netDuJour = cashReceived - cashExpenses;
+
+                      return (
+                        <tr key={dateStr} style={{ borderBottom: '1px solid var(--border-color)', background: selectedClosureDate === dateStr ? '#f0f9ff' : undefined }}>
+                          <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatIsoDateFr(dateStr)}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--success)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                            +{cashReceived.toLocaleString('fr-FR')} FCFA
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--danger)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                            -{cashExpenses.toLocaleString('fr-FR')} FCFA
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: netDuJour >= 0 ? '#0369a1' : 'var(--danger)', whiteSpace: 'nowrap' }}>
+                            {netDuJour > 0 ? '+' : ''}{netDuJour.toLocaleString('fr-FR')} FCFA
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>{openingBalanceText}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 500, whiteSpace: 'nowrap' }}>{theoreticalBalanceText}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{countedBalanceText}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: !isClosed ? 'inherit' : (hasDiscrepancy ? 'var(--danger)' : 'var(--success)'), whiteSpace: 'nowrap' }}>
+                            {discrepancyText}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            {isClosed ? (
+                              hasDiscrepancy ? (
+                                <span style={{ padding: '0.2rem 0.5rem', background: '#fee2e2', color: '#dc2626', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                  Clôturé avec écart
+                                </span>
+                              ) : (
+                                <span style={{ padding: '0.2rem 0.5rem', background: '#dcfce7', color: '#16a34a', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                  Clôturé
+                                </span>
+                              )
+                            ) : (
+                              <span style={{ padding: '0.2rem 0.5rem', background: '#fef3c7', color: '#b45309', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                Non clôturé
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <button
+                              className="secondary"
+                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}
+                              onClick={() => {
+                                setSelectedClosureDate(dateStr);
+                                const el = document.getElementById('brouillard-day-section');
+                                if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth' });
+                                }
+                              }}
+                            >
+                              🔍 Inspecter
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
+
+            <div style={{ padding: '1rem', background: '#f8fafc', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+              <strong>📌 Légende des indicateurs :</strong>
+              <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0 }}>
+                <li><strong>Solde global cumulé :</strong> Tous les mouvements cash enregistrés dans l'école, dépenses déduites.</li>
+                <li><strong>Net du jour :</strong> Encaissements cash moins sorties cash de la date spécifique.</li>
+                <li><strong>Solde théorique :</strong> Solde d'ouverture plus encaissements cash moins sorties cash de la journée.</li>
+                <li><strong>Montant compté :</strong> Somme physique réellement dénombrée dans le tiroir de caisse lors de la clôture.</li>
+              </ul>
+            </div>
+          </div>
+
           <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <div style={{ padding: '1rem', background: '#f8fafc', borderBottom: '1px solid var(--border-color)' }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1648,55 +1970,77 @@ const Payments: React.FC = () => {
               </h3>
             </div>
 
-            <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
               <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
                 <tr>
-                  <th style={{ padding: '1rem', textAlign: 'left' }}>Date</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>Ouverture</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>Cash Entré</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>Cash Sorti</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>Théorique</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>Compté</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>Écart</th>
-                  <th style={{ padding: '1rem', textAlign: 'left' }}>Clôturé par</th>
-                  <th style={{ padding: '1rem', textAlign: 'center' }}>Action</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Date</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Solde ouverture</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Encaissements espèces</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Dépenses espèces</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Solde théorique</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Montant compté</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Écart</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Statut</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Clôturé par / le</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {cashClosures.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                       Aucune clôture enregistrée pour cette école
                     </td>
                   </tr>
                 ) : (
-                  cashClosures.sort((a, b) => b.date.localeCompare(a.date)).map(cl => (
-                    <tr key={cl.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '1rem', fontWeight: 'bold' }}>{formatIsoDateFr(cl.date)}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right' }}>{cl.openingBalance.toLocaleString('fr-FR')} FCFA</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--success)' }}>+{cl.cashReceived.toLocaleString('fr-FR')} FCFA</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--danger)' }}>-{cl.cashExpenses.toLocaleString('fr-FR')} FCFA</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 500 }}>{cl.theoreticalBalance.toLocaleString('fr-FR')} FCFA</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{cl.countedBalance.toLocaleString('fr-FR')} FCFA</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: cl.discrepancy === 0 ? 'var(--success)' : 'var(--danger)' }}>
-                        {cl.discrepancy.toLocaleString('fr-FR')} FCFA
-                      </td>
-                      <td style={{ padding: '1rem' }}>{cl.closedByName || cl.closedBy}</td>
-                      <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button
-                          className="secondary"
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                          onClick={() => {
-                            setClosureToPrint(cl);
-                            setTimeout(() => window.print(), 100);
-                          }}
-                          title="Réimprimer le document de clôture"
-                        >
-                          🖨️ Réimprimer
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  cashClosures.sort((a, b) => b.date.localeCompare(a.date)).map(cl => {
+                    const authorInfo = formatClosureAuthor(cl, currentUser);
+                    const closureDateTime = formatClosureDateTime(cl.closedAt);
+                    const isDiscrepant = cl.discrepancy !== 0;
+
+                    return (
+                      <tr key={cl.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{formatIsoDateFr(cl.date)}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>{cl.openingBalance.toLocaleString('fr-FR')} FCFA</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--success)', fontWeight: 500, whiteSpace: 'nowrap' }}>+{cl.cashReceived.toLocaleString('fr-FR')} FCFA</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--danger)', fontWeight: 500, whiteSpace: 'nowrap' }}>-{cl.cashExpenses.toLocaleString('fr-FR')} FCFA</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 500, whiteSpace: 'nowrap' }}>{cl.theoreticalBalance.toLocaleString('fr-FR')} FCFA</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{cl.countedBalance.toLocaleString('fr-FR')} FCFA</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: !isDiscrepant ? 'var(--success)' : 'var(--danger)', whiteSpace: 'nowrap' }}>
+                          {cl.discrepancy.toLocaleString('fr-FR')} FCFA
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          {isDiscrepant ? (
+                            <span style={{ padding: '0.2rem 0.5rem', background: '#fee2e2', color: '#dc2626', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                              Clôturé avec écart
+                            </span>
+                          ) : (
+                            <span style={{ padding: '0.2rem 0.5rem', background: '#dcfce7', color: '#16a34a', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                              Clôturé
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>
+                          <div style={{ fontWeight: 'bold' }}>{authorInfo.name}</div>
+                          {authorInfo.role && <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{authorInfo.role}</div>}
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Le {closureDateTime}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <button
+                            className="secondary"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                            onClick={() => {
+                              setClosureToPrint(cl);
+                              setTimeout(() => window.print(), 100);
+                            }}
+                            title="Réimprimer le document de clôture"
+                          >
+                            🖨️ Réimprimer
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
