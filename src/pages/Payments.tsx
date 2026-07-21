@@ -1735,11 +1735,11 @@ const Payments: React.FC = () => {
                             <strong>{opening.toLocaleString('fr-FR')} FCFA</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
-                            <span>+ Encaissements Cash ({cashPaymentsDate.length}) :</span>
+                            <span>+ Encaissements espèces ({cashPaymentsDate.length}) :</span>
                             <strong>+{cashIn.toLocaleString('fr-FR')} FCFA</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--danger)' }}>
-                            <span>- Sorties Cash ({expensesDate.length}) :</span>
+                            <span>- Dépenses espèces ({expensesDate.length}) :</span>
                             <strong>-{cashOut.toLocaleString('fr-FR')} FCFA</strong>
                           </div>
                           <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '0.5rem 0' }} />
@@ -1860,7 +1860,7 @@ const Payments: React.FC = () => {
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Montant Compté</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Écart</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Statut</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Action</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', position: 'sticky', right: 0, background: 'var(--bg-color)', zIndex: 1, whiteSpace: 'nowrap' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1936,7 +1936,7 @@ const Payments: React.FC = () => {
                                 </span>
                               )}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', position: 'sticky', right: 0, background: selectedClosureDate === dateStr ? '#f0f9ff' : '#fff', zIndex: 1, whiteSpace: 'nowrap' }}>
                               <button
                                 className="secondary"
                                 style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}
@@ -1977,7 +1977,7 @@ const Payments: React.FC = () => {
                             <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
                             <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
                             <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Période</td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}></td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', position: 'sticky', right: 0, background: '#f1f5f9', zIndex: 1, whiteSpace: 'nowrap' }}></td>
                           </tr>
                         </>
                       );
