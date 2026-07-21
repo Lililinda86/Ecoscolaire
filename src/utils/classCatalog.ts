@@ -82,3 +82,70 @@ export function getSpecialtyName(
 
   return { name: unavailableLabel, isUnavailable: true };
 }
+
+export function normalizeTechnicalSpecialtyName(name: string): string {
+  const nfc = (name || '').normalize('NFC');
+  const trimmed = nfc.trim();
+  return trimmed.replace(/\s+/g, ' ');
+}
+
+export function getTechnicalSpecialtyCanonicalKey(name: string): string {
+  return normalizeTechnicalSpecialtyName(name).toLocaleLowerCase('fr-FR');
+}
+
+export function buildTechnicalSpecialtyDocumentId(
+  schoolId: string,
+  normalizedNameOrCode: string
+): string {
+  const cleanSchoolId = (schoolId || '').trim();
+  const canonicalKey = getTechnicalSpecialtyCanonicalKey(normalizedNameOrCode);
+  const encoded = encodeURIComponent(canonicalKey);
+
+  if (!cleanSchoolId) {
+    throw new Error('schoolId requis pour créer une filière technique.');
+  }
+  if (!canonicalKey) {
+    throw new Error('Nom de filière invalide.');
+  }
+  if (cleanSchoolId.includes('/') || canonicalKey.includes('/') || encoded.includes('/')) {
+    throw new Error('Identifiant de filière invalide.');
+  }
+
+  return `${cleanSchoolId}__spec__${encoded}`;
+}
+
+export function buildTechnicalClassDocumentId(
+  schoolId: string,
+  catalogLevelId: string,
+  specialtyId: string
+): string {
+  const cleanSchoolId = (schoolId || '').trim();
+  const cleanCatalogLevelId = (catalogLevelId || '').trim();
+  const cleanSpecialtyId = (specialtyId || '').trim();
+
+  if (!cleanSchoolId) {
+    throw new Error('schoolId requis pour créer une classe technique.');
+  }
+  if (!cleanCatalogLevelId) {
+    throw new Error('catalogLevelId requis pour créer une classe technique.');
+  }
+  if (!cleanSpecialtyId) {
+    throw new Error('specialtyId requis pour créer une classe technique.');
+  }
+  if (cleanSchoolId.includes('/') || cleanCatalogLevelId.includes('/') || cleanSpecialtyId.includes('/')) {
+    throw new Error('Identifiant de classe technique invalide.');
+  }
+
+  return `${cleanSchoolId}__${cleanCatalogLevelId}__technical__${encodeURIComponent(cleanSpecialtyId)}`;
+}
+
+export function getDisplayClassName(name: string): string {
+  const trimmed = (name || '').trim();
+  const lower = trimmed.toLowerCase();
+
+  if (lower === 'maternelle 1') return 'Petite Section';
+  if (lower === 'maternelle 2') return 'Moyenne Section';
+  if (lower === 'maternelle 3') return 'Grande Section';
+
+  return trimmed;
+}

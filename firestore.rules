@@ -334,11 +334,55 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
     }
 
+    function hasNonEmptySpecialtyId(classData) {
+      return 'specialtyId' in classData
+        && classData.specialtyId is string
+        && classData.specialtyId.size() > 0;
+    }
+
+    function hasValidTechnicalSpecialty(classData) {
+      let specialtyPath = /databases/$(database)/documents/technicalSpecialties/$(classData.specialtyId);
+      return classData.educationType == 'technical'
+        && hasNonEmptySpecialtyId(classData)
+        && exists(specialtyPath)
+        && get(specialtyPath).data.schoolId == classData.schoolId
+        && (
+          !('isActive' in get(specialtyPath).data)
+          || get(specialtyPath).data.isActive != false
+        );
+    }
+
+    function isValidClassPayload(classData) {
+      return (
+        'educationType' in classData
+        && classData.educationType == 'technical'
+        && hasValidTechnicalSpecialty(classData)
+      ) || (
+        (
+          !('educationType' in classData)
+          || classData.educationType == 'general'
+        )
+        && !hasNonEmptySpecialtyId(classData)
+      );
+    }
+
     // --- CLASSES & SUBJECTS ---
     match /classes/{classId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId);
-      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId;
+      allow create: if isAuthenticated()
+        && isActive()
+        && (isAdminOrOwner() || isDirector())
+        && hasSchoolAccess(request.resource.data.schoolId)
+        && isValidClassPayload(request.resource.data);
+      allow update: if isAuthenticated()
+        && isActive()
+        && (isAdminOrOwner() || isDirector())
+        && hasSchoolAccess(resource.data.schoolId)
+        && request.resource.data.schoolId == resource.data.schoolId
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['educationType', 'specialtyId'])
+          || isValidClassPayload(request.resource.data)
+        );
       allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId);
     }
     match /subjects/{subjectId} {
@@ -353,17 +397,28 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && isActive()
         && request.resource.data.schoolId is string
-        && canManagePedagogy(request.resource.data.schoolId);
+        && hasSchoolAccess(request.resource.data.schoolId)
+        && (isAdminOrOwner() || isDirector())
+        && request.resource.data.id is string
+        && request.resource.data.id == specialtyId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive == true;
 
       allow update: if isAuthenticated()
         && isActive()
-        && request.resource.data.schoolId is string
+        && hasSchoolAccess(resource.data.schoolId)
         && request.resource.data.schoolId == resource.data.schoolId
-        && canManagePedagogy(resource.data.schoolId);
+        && (isAdminOrOwner() || isDirector())
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id'])
+        && (!('id' in resource.data) || (('id' in request.resource.data) && request.resource.data.id == resource.data.id && request.resource.data.id == specialtyId))
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive is bool;
 
-      allow delete: if isAuthenticated()
-        && isActive()
-        && canManagePedagogy(resource.data.schoolId);
+      allow delete: if false;
     }
 
     // --- STUDENT IMPORT JOBS ---

@@ -6,7 +6,7 @@ import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClas
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
-import { resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName } from '../utils/classCatalog';
+import { resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName, getDisplayClassName } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
@@ -1008,7 +1008,7 @@ const Students: React.FC = () => {
                             const specText = specRes.name ? ` — ${specRes.name}` : '';
                             return (
                               <option key={c.id} value={c.id}>
-                                {c.name} — {eduText}{specText}
+                                {getDisplayClassName(c.name)} — {eduText}{specText}
                               </option>
                             );
                           })}
