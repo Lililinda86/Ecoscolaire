@@ -766,71 +766,137 @@ const Students: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const formatPhoneForWhatsApp = (phone?: string) => {
-    if (!phone) return '';
-    let cleaned = phone.replace(/[^0-9]/g, '');
-    if (cleaned.startsWith('00237')) {
-      cleaned = '237' + cleaned.substring(5);
-    } else if (cleaned.startsWith('237')) {
-      // keep it
-    } else if (cleaned.length === 9 && (cleaned.startsWith('6') || cleaned.startsWith('2'))) {
-      cleaned = '237' + cleaned;
+  const normalizeWhatsAppPhone = (rawPhone?: string): string | null => {
+    if (!rawPhone) return null;
+    const trimmed = rawPhone.trim();
+    if (!trimmed) return null;
+
+    const compact = trimmed.replace(/[\s\-().]/g, '');
+    const hadPlusPrefix = compact.startsWith('+');
+    const hadInternationalAccessPrefix = compact.startsWith('00');
+
+    let digits = compact;
+    if (hadPlusPrefix) {
+      digits = compact.slice(1);
+    } else if (hadInternationalAccessPrefix) {
+      digits = compact.slice(2);
     }
-    return cleaned.length >= 9 ? cleaned : '';
+
+    // Refuser si digits contient autre chose que des chiffres
+    if (!/^\d+$/.test(digits)) {
+      return null;
+    }
+
+    // A. Mobile camerounais local
+    // - exactement neuf chiffres
+    // - commence par 6
+    // - préfixer 237
+    if (digits.length === 9 && digits.startsWith('6') && !hadPlusPrefix && !hadInternationalAccessPrefix) {
+      return '237' + digits;
+    }
+
+    // B. Numéro camerounais international
+    // - format exact 2376XXXXXXXX
+    // - douze chiffres au total
+    // - accepter avec +237, 00237 ou 237
+    if (digits.length === 12 && digits.startsWith('2376')) {
+      return digits;
+    }
+
+    // C. Autre numéro international
+    // - doit avoir été explicitement fourni avec + ou 00
+    // - format E.164: /^[1-9]\d{7,14}$/
+    if ((hadPlusPrefix || hadInternationalAccessPrefix) && /^[1-9]\d{7,14}$/.test(digits)) {
+      // S'assurer que si c'est du Cameroun, c'est obligatoirement du type Cameroun international (2376...)
+      if (digits.startsWith('237') && !digits.startsWith('2376')) {
+        return null;
+      }
+      return digits;
+    }
+
+    // D. Rejeter tout le reste
+    return null;
   };
 
-  const needsReminder = (student: Student) => {
-    const expectedReg = student.registrationFeeExpected ?? 15000;
-    const paidReg = student.registrationFeePaid ?? 0;
-    const remainingReg = Math.max(expectedReg - paidReg, 0);
-
-    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0
-      ? student.tuitionExpected
-      : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
-    const paidTuition = student.tuitionPaid ?? 0;
-    const remainingTuition = Math.max(expectedTuition - paidTuition, 0);
-
-    const expectedTransport = student.transportMonthlyFee || student.feeTransport || 0;
-    const transportOwed = student.usesTransport && expectedTransport > 0 && (student.transportPaid || 0) < expectedTransport;
-
-    return remainingReg > 0 || remainingTuition > 0 || transportOwed;
+  type WhatsAppPhoneResult = {
+    rawPhone: string;
+    normalizedPhone: string | null;
+    source: 'guardian' | 'father' | 'mother' | null;
+    reason?: 'missing' | 'invalid';
   };
 
-  const handleWhatsAppReminder = (student: Student) => {
-    const phone = formatPhoneForWhatsApp(student.parentPhone);
-    if (!phone) return;
-
-    const expectedReg = student.registrationFeeExpected ?? 15000;
-    const paidReg = student.registrationFeePaid ?? 0;
-    const remainingReg = Math.max(expectedReg - paidReg, 0);
-
-    const expectedTuition = student.tuitionExpected && student.tuitionExpected > 0
-      ? student.tuitionExpected
-      : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
-    const paidTuition = student.tuitionPaid ?? 0;
-    const remainingTuition = Math.max(expectedTuition - paidTuition, 0);
-
-    const expectedTransport = student.transportMonthlyFee || student.feeTransport || 0;
-    const transportOwed = student.usesTransport && expectedTransport > 0 && (student.transportPaid || 0) < expectedTransport;
-
-    if (remainingReg === 0 && remainingTuition === 0 && !transportOwed) return;
-
-    let message = `Bonjour Madame/Monsieur,\n\nNous vous contactons au sujet du dossier scolaire de ${student.name} pour l'année 2026-2027.\n\nÀ ce jour, le solde à régulariser est le suivant :\n`;
-
-    if (remainingReg > 0) {
-      message += `- Droit d'inscription : ${remainingReg.toLocaleString('fr-FR')} FCFA\n`;
-    }
-    if (remainingTuition > 0) {
-      message += `- Pension scolaire : ${remainingTuition.toLocaleString('fr-FR')} FCFA\n`;
-    }
-    if (transportOwed) {
-      message += `- Transport : à régulariser\n`;
+  const getStudentWhatsAppPhone = (student: Student): WhatsAppPhoneResult => {
+    // 1. Normaliser parentPhone
+    const parentNormalized = normalizeWhatsAppPhone(student.parentPhone);
+    if (parentNormalized) {
+      return {
+        rawPhone: student.parentPhone || '',
+        normalizedPhone: parentNormalized,
+        source: 'guardian'
+      };
     }
 
-    message += `\nNous vous invitons à vous rapprocher de l'administration afin de régulariser la situation ou convenir d'un échéancier si nécessaire.\n\nCordialement,\nAdministration ITALO`;
+    // Si parentPhone est absent OU invalide :
+    // Vérifier les tuteurs si guardianRelationship correspond
+    if (student.guardianRelationship === 'father') {
+      const fatherNormalized = normalizeWhatsAppPhone(student.fatherPhone);
+      if (fatherNormalized) {
+        return {
+          rawPhone: student.fatherPhone || '',
+          normalizedPhone: fatherNormalized,
+          source: 'father'
+        };
+      }
+    } else if (student.guardianRelationship === 'mother') {
+      const motherNormalized = normalizeWhatsAppPhone(student.motherPhone);
+      if (motherNormalized) {
+        return {
+          rawPhone: student.motherPhone || '',
+          normalizedPhone: motherNormalized,
+          source: 'mother'
+        };
+      }
+    }
 
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+    // Déterminer la raison
+    // Y a-t-il au moins un candidat autorisé renseigné ?
+    const hasParentPhone = !!(student.parentPhone && student.parentPhone.trim());
+    const hasFatherAuth = student.guardianRelationship === 'father' && !!(student.fatherPhone && student.fatherPhone.trim());
+    const hasMotherAuth = student.guardianRelationship === 'mother' && !!(student.motherPhone && student.motherPhone.trim());
+
+    if (hasParentPhone || hasFatherAuth || hasMotherAuth) {
+      // Au moins un renseigné mais tous invalides
+      const activeRaw = hasParentPhone
+        ? student.parentPhone
+        : (hasFatherAuth ? student.fatherPhone : student.motherPhone);
+      return {
+        rawPhone: activeRaw || '',
+        normalizedPhone: null,
+        source: null,
+        reason: 'invalid'
+      };
+    }
+
+    return {
+      rawPhone: '',
+      normalizedPhone: null,
+      source: null,
+      reason: 'missing'
+    };
+  };
+
+  const handleWhatsAppContact = (student: Student) => {
+    const phoneInfo = getStudentWhatsAppPhone(student);
+    if (!phoneInfo.normalizedPhone) return;
+
+    const schoolReference = currentSchool?.name?.trim()
+      ? `l’établissement ${currentSchool.name.trim()}`
+      : 'votre établissement';
+
+    const message = `Bonjour, nous vous contactons au sujet de l’élève ${student.name}. Merci de vous rapprocher de ${schoolReference}.`;
+
+    const url = `https://wa.me/${phoneInfo.normalizedPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -1105,14 +1171,50 @@ const Students: React.FC = () => {
                             >
                               <Send size={14} aria-hidden="true" /> Inviter le responsable
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => { setOpenRowMenuId(null); handleWhatsAppReminder(student); }}
-                              disabled={!needsReminder(student) || !formatPhoneForWhatsApp(student.parentPhone)}
-                              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 'pointer' : 'not-allowed', opacity: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 1 : 0.5, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#25D366' }}
-                            >
-                              <MessageSquare size={14} aria-hidden="true" /> Relancer par WhatsApp
-                            </button>
+                            {(() => {
+                              const phoneInfo = getStudentWhatsAppPhone(student);
+                              const isEnabled = !isSchoolSuspended && !!phoneInfo.normalizedPhone;
+                              const reasonText = isSchoolSuspended
+                                ? 'Établissement suspendu'
+                                : (phoneInfo.reason === 'missing'
+                                    ? 'Aucun numéro renseigné'
+                                    : (phoneInfo.reason === 'invalid'
+                                        ? 'Numéro incomplet — corriger dans Modifier l’élève'
+                                        : ''
+                                      )
+                                  );
+                              return (
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setOpenRowMenuId(null); handleWhatsAppContact(student); }}
+                                    disabled={!isEnabled}
+                                    title={reasonText}
+                                    style={{
+                                      width: '100%',
+                                      textAlign: 'left',
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: '0.5rem 0.75rem',
+                                      cursor: isEnabled ? 'pointer' : 'not-allowed',
+                                      opacity: isEnabled ? 1 : 0.5,
+                                      fontSize: '0.85rem',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem',
+                                      color: isEnabled ? '#25D366' : 'var(--text-muted)'
+                                    }}
+                                  >
+                                    <MessageSquare size={14} aria-hidden="true" /> Contacter par WhatsApp
+                                  </button>
+                                  {!isEnabled && reasonText && (
+                                    <div style={{ padding: '0 0.75rem 0.35rem 2rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                      {reasonText}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             <button
                               type="button"
                               disabled
