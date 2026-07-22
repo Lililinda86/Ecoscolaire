@@ -10,6 +10,7 @@ import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
+import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
 import { db as firestoreDb } from '../db/firebase';
 import { doc, setDoc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
 
@@ -407,6 +408,12 @@ const Students: React.FC = () => {
       getStudentSchoolingStatus(student) === schoolingStatusFilter;
     return matchSearch && matchSection && matchClass && matchStatus && matchSchoolingStatus;
   });
+
+  const exportableStudents = filteredStudents.filter(
+    student =>
+      Boolean(currentSchool?.id) &&
+      student.schoolId === currentSchool?.id
+  );
 
   const handleOpenModal = (student?: Student) => {
     setCurrentStep(1);
@@ -1260,68 +1267,93 @@ const Students: React.FC = () => {
   };
 
   const exportInscriptionsCSV = () => {
-    const rows = [
-      [
+    if (!canManageStudents) {
+      alert("Action refusée : Permissions insuffisantes.");
+      return;
+    }
+    if (!currentSchool?.id) {
+      alert("Aucune école active sélectionnée.");
+      return;
+    }
+    if (exportableStudents.length === 0) {
+      alert("Aucune inscription à exporter.");
+      return;
+    }
+
+    try {
+      const headers = [
         'Matricule', 'Nom', 'Prénom(s)', 'Nom complet', 'Sexe', 'Date de naissance', 'Lieu de naissance', 'Section', 'Classe',
         'Statut élève', 'Année scolaire', 'Père', 'Tél Père', 'Profession Père', 'Mère', 'Tél Mère', 'Profession Mère', 'Responsable légal', 'Relation', 'Téléphone responsable', 'Email parent',
         'Adresse', 'Contact urgence', 'Statut scolaire', 'Date de départ', 'Motif de départ'
-      ]
-    ];
+      ];
 
-    filteredStudents.forEach(student => {
-      const className = db.classes.find(c => c.id === student.classId)?.name || student.rawClassName || 'Inconnue';
-      const parentEmail = (student.parentEmails || [])[0] || '';
+      const rows = [
+        headers.map(h => escapeCsvCell(h))
+      ];
 
-      const escapeCsv = (str: string | number | boolean | undefined | null) => {
-        if (str === null || str === undefined) return '';
-        const s = String(str);
-        if (s.includes(';') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
-          return `"${s.replace(/"/g, '""')}"`;
+      exportableStudents.forEach(student => {
+        const classObj = db.classes.find(c => c.id === student.classId && c.schoolId === currentSchool.id);
+        const className = classObj ? classObj.name : 'Classe introuvable';
+        const parentEmail = (student.parentEmails || [])[0] || '';
+        const exportedRegistrationYear = student.registrationYear?.trim() || '';
+
+        rows.push([
+          escapeCsvCell(student.matricule || '-'),
+          escapeCsvCell(student.studentLastName || ''),
+          escapeCsvCell(student.studentFirstName || ''),
+          escapeCsvCell(student.name),
+          escapeCsvCell(student.gender),
+          escapeCsvCell(student.dob),
+          escapeCsvCell(student.placeOfBirth || ''),
+          escapeCsvCell(student.section),
+          escapeCsvCell(className),
+          escapeCsvCell(getStudentStatusLabel(student.studentStatus)),
+          escapeCsvCell(exportedRegistrationYear),
+          escapeCsvCell(student.fatherName || ''),
+          escapeCsvCell(student.fatherPhone || ''),
+          escapeCsvCell(student.fatherProfession || ''),
+          escapeCsvCell(student.motherName || ''),
+          escapeCsvCell(student.motherPhone || ''),
+          escapeCsvCell(student.motherProfession || ''),
+          escapeCsvCell(student.parentName),
+          escapeCsvCell(getGuardianRelationshipLabel(student.guardianRelationship)),
+          escapeCsvCell(student.parentPhone),
+          escapeCsvCell(parentEmail),
+          escapeCsvCell(student.address || ''),
+          escapeCsvCell(student.emergencyContact || ''),
+          escapeCsvCell(getStudentSchoolingStatus(student) === 'inactive' ? 'Inactif' : 'Actif'),
+          escapeCsvCell(student.departureDate || ''),
+          escapeCsvCell(getDepartureReasonLabel(student.departureReason))
+        ]);
+      });
+
+      const csvContent = '\uFEFFsep=;\n' + rows.map(e => e.join(";")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+      let url: string | null = null;
+      let link: HTMLAnchorElement | null = null;
+      const isItalo = currentSchool?.name?.toLowerCase().includes('italo');
+      const sanitizedYear = sanitizeCsvFilenameSegment(currentSchool?.academicYear);
+      const suffix = sanitizedYear ? `-${sanitizedYear}` : '';
+      const filename = isItalo ? `italo-inscriptions${suffix}.csv` : `inscriptions${suffix}.csv`;
+
+      try {
+        url = URL.createObjectURL(blob);
+        link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+      } finally {
+        link?.remove();
+        if (url) {
+          URL.revokeObjectURL(url);
         }
-        return s;
-      };
-
-      rows.push([
-        escapeCsv(student.matricule || '-'),
-        escapeCsv(student.studentLastName || ''),
-        escapeCsv(student.studentFirstName || ''),
-        escapeCsv(student.name),
-        escapeCsv(student.gender),
-        escapeCsv(student.dob),
-        escapeCsv(student.placeOfBirth || ''),
-        escapeCsv(student.section),
-        escapeCsv(className),
-        escapeCsv(student.studentStatus || 'nouveau'),
-        escapeCsv(student.registrationYear || '2026-2027'),
-        escapeCsv(student.fatherName || ''),
-        escapeCsv(student.fatherPhone || ''),
-        escapeCsv(student.fatherProfession || ''),
-        escapeCsv(student.motherName || ''),
-        escapeCsv(student.motherPhone || ''),
-        escapeCsv(student.motherProfession || ''),
-        escapeCsv(student.parentName),
-        escapeCsv(student.guardianRelationship || 'other'),
-        escapeCsv(student.parentPhone),
-        escapeCsv(parentEmail),
-        escapeCsv(student.address || ''),
-        escapeCsv(student.emergencyContact || ''),
-        escapeCsv(getStudentSchoolingStatus(student) === 'inactive' ? 'Inactif' : 'Actif'),
-        escapeCsv(student.departureDate || ''),
-        escapeCsv(getDepartureReasonLabel(student.departureReason))
-      ]);
-    });
-
-    const csvContent = '\uFEFFsep=;\n' + rows.map(e => e.join(";")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    const isItalo = currentSchool?.name?.toLowerCase().includes('italo');
-    link.setAttribute("download", isItalo ? 'italo-inscriptions-2026-2027.csv' : 'inscriptions-2026-2027.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Une erreur est survenue lors de la génération de l'export.");
+    }
   };
 
   const normalizeWhatsAppPhone = (rawPhone?: string): string | null => {
@@ -1493,7 +1525,7 @@ const Students: React.FC = () => {
               </button>
             </>
           )}
-          <button className="secondary" onClick={exportInscriptionsCSV} disabled={isSchoolSuspended || filteredStudents.length === 0} aria-label="Exporter les inscriptions">
+          <button className="secondary" onClick={exportInscriptionsCSV} disabled={isSchoolSuspended || exportableStudents.length === 0} aria-label="Exporter les inscriptions">
             <FileSpreadsheet size={18} /> Exporter inscriptions
           </button>
           <button className="secondary" onClick={() => window.print()} aria-label="Imprimer la liste">
