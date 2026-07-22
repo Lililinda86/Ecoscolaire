@@ -100,8 +100,27 @@ const Students: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sectionFilter, setSectionFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
+  React.useEffect(() => {
+    if (!openRowMenuId) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenRowMenuId(null);
+    };
+    const handleClickOutside = () => setOpenRowMenuId(null);
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('click', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('click', handleClickOutside);
+    };
+  }, [openRowMenuId]);
+
+  const effectiveRole = typeof currentUser?.role === 'string' ? currentUser.role.trim() : '';
+  const canManageStudents = ['superAdmin', 'owner', 'director', 'secretary'].includes(effectiveRole);
+
+  if (!currentUser) return null;
 
   // Helper pour déduire le libellé du cycle (Section 6 P0-35)
   const getCycleLabel = (cls: { cycle?: string; level?: string; name: string }) => {
@@ -165,10 +184,23 @@ const Students: React.FC = () => {
   const sortedClasses = sortClasses(uniqueSchoolClasses as unknown as import('../types').ClassSection[]);
 
   const filteredStudents = db.students.filter(student => {
-    const matchSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase().trim();
+    const className = (db.classes.find(c => c.id === student.classId)?.name || '').toLowerCase();
+    const matchSearch = !term ||
+      (student.name || '').toLowerCase().includes(term) ||
+      (student.studentLastName || '').toLowerCase().includes(term) ||
+      (student.studentFirstName || '').toLowerCase().includes(term) ||
+      (student.matricule || '').toLowerCase().includes(term) ||
+      className.includes(term) ||
+      (student.parentName || '').toLowerCase().includes(term) ||
+      (student.fatherName || '').toLowerCase().includes(term) ||
+      (student.motherName || '').toLowerCase().includes(term) ||
+      (student.parentPhone || '').includes(term);
+
     const matchSection = sectionFilter === 'all' || student.section === sectionFilter;
     const matchClass = classFilter === 'all' || student.classId === classFilter;
-    return matchSearch && matchSection && matchClass;
+    const matchStatus = statusFilter === 'all' || (student.studentStatus || 'nouveau') === statusFilter;
+    return matchSearch && matchSection && matchClass && matchStatus;
   });
 
   const handleOpenModal = (student?: Student) => {
@@ -675,12 +707,9 @@ const Students: React.FC = () => {
   const exportInscriptionsCSV = () => {
     const rows = [
       [
-        'ID', 'Nom', 'Sexe', 'Date de naissance', 'Section', 'Classe',
-        'Statut élève', 'Année scolaire', 'Nom parent / tuteur', 'Téléphone parent', 'Email parent',
-        'Droit inscription attendu', 'Droit inscription payé', 'Statut droit inscription',
-        'Pension attendue', 'Pension payée', 'Statut pension',
-        'Utilise transport', 'Quartier transport', 'Point de ramassage transport',
-        'Flotte / Bus transport', 'Tarif mensuel transport', 'Transport payé', 'Statut transport'
+        'Matricule', 'Nom', 'Prénom(s)', 'Nom complet', 'Sexe', 'Date de naissance', 'Lieu de naissance', 'Section', 'Classe',
+        'Statut élève', 'Année scolaire', 'Père', 'Tél Père', 'Profession Père', 'Mère', 'Tél Mère', 'Profession Mère', 'Responsable légal', 'Relation', 'Téléphone responsable', 'Email parent',
+        'Adresse', 'Contact urgence'
       ]
     ];
 
@@ -697,33 +726,30 @@ const Students: React.FC = () => {
         return s;
       };
 
-      const expectedTuition = (student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0);
-
       rows.push([
-        escapeCsv(student.id),
+        escapeCsv(student.matricule || '-'),
+        escapeCsv(student.studentLastName || ''),
+        escapeCsv(student.studentFirstName || ''),
         escapeCsv(student.name),
         escapeCsv(student.gender),
         escapeCsv(student.dob),
+        escapeCsv(student.placeOfBirth || ''),
         escapeCsv(student.section),
         escapeCsv(className),
         escapeCsv(student.studentStatus || 'nouveau'),
         escapeCsv(student.registrationYear || '2026-2027'),
+        escapeCsv(student.fatherName || ''),
+        escapeCsv(student.fatherPhone || ''),
+        escapeCsv(student.fatherProfession || ''),
+        escapeCsv(student.motherName || ''),
+        escapeCsv(student.motherPhone || ''),
+        escapeCsv(student.motherProfession || ''),
         escapeCsv(student.parentName),
+        escapeCsv(student.guardianRelationship || 'other'),
         escapeCsv(student.parentPhone),
         escapeCsv(parentEmail),
-        escapeCsv(student.registrationFeeExpected ?? 15000),
-        escapeCsv(student.registrationFeePaid ?? 0),
-        escapeCsv(student.registrationFeeStatus || 'unpaid'),
-        escapeCsv(expectedTuition),
-        escapeCsv(student.tuitionPaid ?? 0),
-        escapeCsv(student.tuitionStatus || 'unpaid'),
-        escapeCsv(student.usesTransport ? 'Oui' : 'Non'),
-        escapeCsv(student.transportNeighborhood),
-        escapeCsv(student.transportPickupPoint),
-        escapeCsv(student.transportFleet),
-        escapeCsv(student.transportMonthlyFee ?? 0),
-        escapeCsv(student.transportPaid ?? 0),
-        escapeCsv(student.transportStatus || 'none')
+        escapeCsv(student.address || ''),
+        escapeCsv(student.emergencyContact || '')
       ]);
     });
 
@@ -822,19 +848,27 @@ const Students: React.FC = () => {
         `}
       </style>
       <div className="page-header no-print">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>{t('students', 'Élèves')}</h1>
           <div style={{ padding: '0.4rem 0.8rem', background: limitReached ? '#fee2e2' : '#eef2ff', color: limitReached ? '#dc2626' : '#4338ca', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 500 }}>
-            {filteredStudents.length} {filteredStudents.length <= 1 ? 'élève inscrit' : 'élèves inscrits'} — Capacité SaaS : {limitLabel}
+            {filteredStudents.length} {filteredStudents.length <= 1 ? 'élève inscrit' : 'élèves inscrits'}
+            {currentSchool?.isInternalSchool || currentSchool?.subscriptionPlan === 'premium'
+              ? ' · Offre Premium illimitée'
+              : ` sur ${getStudentLimit(currentSchool)} (${limitLabel})`
+            }
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended} aria-label="Ajouter un élève">
-            <Plus size={18} /> {t('add', 'Ajouter un élève')}
-          </button>
-          <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended} aria-label="Importer depuis Excel">
-            <FileSpreadsheet size={18} /> Importer Excel
-          </button>
+          {canManageStudents && (
+            <>
+              <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended} aria-label="Ajouter un élève">
+                <Plus size={18} /> {t('add', 'Ajouter un élève')}
+              </button>
+              <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended} aria-label="Importer depuis Excel">
+                <FileSpreadsheet size={18} /> Importer Excel
+              </button>
+            </>
+          )}
           <button className="secondary" onClick={exportInscriptionsCSV} disabled={isSchoolSuspended || filteredStudents.length === 0} aria-label="Exporter les inscriptions">
             <FileSpreadsheet size={18} /> Exporter inscriptions
           </button>
@@ -900,7 +934,7 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      <div className="card print-area" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card print-area" style={{ padding: 0 }}>
         <div style={{ padding: '2rem 2rem 0 2rem', display: 'none' }} className="print-area-header">
            <SchoolDocumentHeader school={currentSchool} documentTitle="Liste des Élèves" />
         </div>
@@ -927,11 +961,16 @@ const Students: React.FC = () => {
                  <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            {(searchTerm !== '' || sectionFilter !== 'all' || classFilter !== 'all') && (
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrer par statut">
+              <option value="all">Tous les statuts</option>
+              <option value="nouveau">Nouveau</option>
+              <option value="ancien">Ancien</option>
+            </select>
+            {(searchTerm !== '' || sectionFilter !== 'all' || classFilter !== 'all' || statusFilter !== 'all') && (
               <button
                 type="button"
                 className="secondary"
-                onClick={() => { setSearchTerm(''); setSectionFilter('all'); setClassFilter('all'); }}
+                onClick={() => { setSearchTerm(''); setSectionFilter('all'); setClassFilter('all'); setStatusFilter('all'); }}
                 style={{ fontSize: '0.85rem' }}
                 aria-label="Réinitialiser les filtres"
               >
@@ -942,15 +981,15 @@ const Students: React.FC = () => {
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
+            <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 5 }}>
               <tr>
-                <th style={{ padding: '1rem', textAlign: 'left' }}>Matricule</th>
-                <th style={{ padding: '1rem', textAlign: 'left' }}>{t('name', 'Nom')}</th>
-                <th style={{ padding: '1rem', textAlign: 'left' }}>Classe (Section)</th>
-                <th style={{ padding: '1rem', textAlign: 'left' }}>{t('parent_name', 'Tuteur / Parent')}</th>
-                <th style={{ padding: '1rem', textAlign: 'left' }}>Contact</th>
-                <th style={{ padding: '1rem', textAlign: 'left' }}>Adresse</th>
-                <th className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+                <th scope="col" style={{ padding: '1rem', textAlign: 'left' }}>Matricule</th>
+                <th scope="col" style={{ padding: '1rem', textAlign: 'left' }}>{t('name', 'Nom')}</th>
+                <th scope="col" style={{ padding: '1rem', textAlign: 'left' }}>Classe (Section)</th>
+                <th scope="col" style={{ padding: '1rem', textAlign: 'left' }}>{t('parent_name', 'Tuteur / Parent')}</th>
+                <th scope="col" style={{ padding: '1rem', textAlign: 'left' }}>Contact</th>
+                <th scope="col" style={{ padding: '1rem', textAlign: 'left' }}>Statut</th>
+                <th scope="col" className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -983,26 +1022,109 @@ const Students: React.FC = () => {
                     </td>
                     <td style={{ padding: '1rem' }}>{student.parentName}</td>
                     <td style={{ padding: '1rem' }}>{student.parentPhone || '-'}</td>
-                    <td style={{ padding: '1rem' }}>{student.address || '-'}</td>
-                    <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
-                      <button className="secondary" onClick={() => handleOpenInviteModal(student)} style={{ marginRight: '0.5rem', color: 'var(--primary)' }} title="Inviter le parent" disabled={isSchoolSuspended}>
-                        <Send size={16} />
-                      </button>
-                      <button
-                        className="secondary"
-                        onClick={() => handleWhatsAppReminder(student)}
-                        style={{ marginRight: '0.5rem', color: '#25D366', borderColor: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? '#25D366' : undefined, opacity: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 1 : 0.5 }}
-                        title="Relancer par WhatsApp (Droit d'inscription, Pension, Transport)"
-                        disabled={isSchoolSuspended || !needsReminder(student) || !formatPhoneForWhatsApp(student.parentPhone)}
-                      >
-                        <MessageSquare size={16} />
-                      </button>
-                      <button className="secondary" onClick={() => handleOpenModal(student)} style={{ marginRight: '0.5rem' }} title="Modifier" disabled={isSchoolSuspended}>
-                        <Edit2 size={16} />
-                      </button>
-                      <button className="secondary" onClick={() => handleDelete(student)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} title="Supprimer (Soumis à validation)" disabled={isSchoolSuspended}>
-                        <Trash2 size={16} />
-                      </button>
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        background: student.studentStatus === 'ancien' ? '#e2e8f0' : '#dcfce7',
+                        color: student.studentStatus === 'ancien' ? '#475569' : '#15803d'
+                      }}>
+                        {student.studentStatus === 'ancien' ? 'Ancien' : student.studentStatus === 'nouveau' ? 'Nouveau' : (student.studentStatus ? String(student.studentStatus) : 'Non renseigné')}
+                      </span>
+                    </td>
+                    <td className="no-print" style={{ padding: '1rem', textAlign: 'right', position: 'relative' }}>
+                      <div style={{ display: 'inline-block', position: 'relative' }}>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenRowMenuId(prev => (prev === student.id ? null : student.id));
+                          }}
+                          aria-expanded={openRowMenuId === student.id}
+                          aria-controls={`student-menu-${student.id}`}
+                          aria-label={`Actions pour ${student.name}`}
+                          disabled={isSchoolSuspended}
+                          style={{ fontSize: '0.85rem', padding: '0.35rem 0.65rem' }}
+                        >
+                          Actions ▾
+                        </button>
+                        {openRowMenuId === student.id && (
+                          <div
+                            id={`student-menu-${student.id}`}
+                            style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: '110%',
+                              background: '#fff',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                              zIndex: 30,
+                              minWidth: '210px',
+                              padding: '0.35rem 0',
+                              textAlign: 'left'
+                            }}
+                          >
+                            {canManageStudents && (
+                              <button
+                                type="button"
+                                data-action="edit-student"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenRowMenuId(null);
+                                  handleOpenModal(student);
+                                }}
+                                disabled={isSchoolSuspended}
+                                style={{
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  padding: '0.5rem 0.75rem',
+                                  cursor: isSchoolSuspended ? 'not-allowed' : 'pointer',
+                                  fontSize: '0.85rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem',
+                                  color: 'var(--text-primary, #1f2937)',
+                                  opacity: isSchoolSuspended ? 0.55 : 1
+                                }}
+                              >
+                                <Edit2 size={14} aria-hidden="true" style={{ color: 'inherit' }} />
+                                Modifier l’élève
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => { setOpenRowMenuId(null); handleOpenInviteModal(student); }}
+                              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}
+                            >
+                              <Send size={14} aria-hidden="true" /> Inviter le responsable
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setOpenRowMenuId(null); handleWhatsAppReminder(student); }}
+                              disabled={!needsReminder(student) || !formatPhoneForWhatsApp(student.parentPhone)}
+                              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 'pointer' : 'not-allowed', opacity: needsReminder(student) && formatPhoneForWhatsApp(student.parentPhone) ? 1 : 0.5, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#25D366' }}
+                            >
+                              <MessageSquare size={14} aria-hidden="true" /> Relancer par WhatsApp
+                            </button>
+                            <button
+                              type="button"
+                              disabled
+                              onClick={() => handleDelete(student)}
+                              title="Utilisez un statut d’archivage lorsqu’il sera disponible."
+                              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: 'not-allowed', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                            >
+                              <Trash2 size={14} aria-hidden="true" /> Suppression définitive indisponible
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
