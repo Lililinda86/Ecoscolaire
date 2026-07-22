@@ -84,13 +84,17 @@ const Students: React.FC = () => {
     return '';
   };
 
+  const forceCloseStudentModal = () => {
+    setModalOpen(false);
+  };
+
   const requestCloseStudentModal = () => {
     if (isSaving) return;
     const currentSnap = JSON.stringify({ currentStudent, parentEmailsInput });
     if (currentSnap !== initialSnapshot) {
       setIsConfirmAbandonOpen(true);
     } else {
-      setModalOpen(false);
+      forceCloseStudentModal();
     }
   };
   const [searchTerm, setSearchTerm] = useState('');
@@ -365,7 +369,7 @@ const Students: React.FC = () => {
       }
 
       setRefresh(r => r + 1);
-      setModalOpen(false);
+      forceCloseStudentModal();
 
       logAuditAction({
         action: isEditing ? 'UPDATE_STUDENT' : 'CREATE_STUDENT',
@@ -1008,7 +1012,13 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={requestCloseStudentModal} title={isEditing ? t('edit', 'Modifier l’élève') : t('add', 'Ajouter un élève')}>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={requestCloseStudentModal}
+        title={isEditing ? t('edit', 'Modifier l’élève') : t('add', 'Ajouter un élève')}
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+      >
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', maxHeight: '75vh' }}>
           {/* Header Step Indicator */}
           <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1326,31 +1336,46 @@ const Students: React.FC = () => {
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#92400e', fontSize: '0.95rem' }}>🩺 Santé & Remarques Médicales</h4>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                     <div className="form-group" style={{ flex: '1 1 200px' }}>
-                      <label style={{ color: '#92400e' }}>Allergies</label>
+                      <label htmlFor="student-allergies-input" style={{ color: '#92400e', fontWeight: 500 }}>Allergies</label>
                       <textarea
+                        id="student-allergies-input"
                         value={currentStudent.allergies || ''}
-                        onChange={e => setCurrentStudent({...currentStudent, allergies: e.target.value})}
+                        disabled={isSaving}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val.trim()) setNoMedicalConditionConfirmed(false);
+                          setCurrentStudent(prev => ({ ...prev, allergies: val }));
+                        }}
                         placeholder="Ex: Arachides, Pénicilline..."
                         rows={2}
                         style={{ width: '100%', borderColor: '#fcd34d' }}
                       />
                     </div>
                     <div className="form-group" style={{ flex: '1 1 200px' }}>
-                      <label style={{ color: '#92400e' }}>Conditions Médicales</label>
+                      <label htmlFor="student-medical-conditions-input" style={{ color: '#92400e', fontWeight: 500 }}>Conditions Médicales</label>
                       <textarea
+                        id="student-medical-conditions-input"
                         value={currentStudent.medicalConditions || ''}
-                        onChange={e => setCurrentStudent({...currentStudent, medicalConditions: e.target.value})}
+                        disabled={isSaving}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val.trim()) setNoMedicalConditionConfirmed(false);
+                          setCurrentStudent(prev => ({ ...prev, medicalConditions: val }));
+                        }}
                         placeholder="Ex: Asthme, Diabète..."
                         rows={2}
                         style={{ width: '100%', borderColor: '#fcd34d' }}
                       />
                     </div>
                   </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: '#78350f' }}>
+                  <label htmlFor="student-no-medical-condition-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: isSaving ? 'not-allowed' : 'pointer', fontSize: '0.85rem', color: '#78350f' }}>
                     <input
+                      id="student-no-medical-condition-checkbox"
                       type="checkbox"
+                      disabled={isSaving}
                       checked={noMedicalConditionConfirmed}
                       onChange={e => setNoMedicalConditionConfirmed(e.target.checked)}
+                      style={{ width: 'auto', cursor: isSaving ? 'not-allowed' : 'pointer' }}
                     />
                     Aucune allergie ou condition médicale connue à signaler
                   </label>
@@ -1417,7 +1442,9 @@ const Students: React.FC = () => {
               {currentStep < 4 ? (
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setStepValidationError(null);
                     if (currentStep === 1) {
                       if (!currentStudent.studentLastName && !currentStudent.name) {
@@ -1467,6 +1494,10 @@ const Students: React.FC = () => {
                     if (!hasAllergies && !hasMedical && !noMedicalConditionConfirmed) {
                       e.preventDefault();
                       setStepValidationError('Veuillez renseigner les informations médicales ou confirmer qu’aucune condition connue n’est à signaler.');
+                      setTimeout(() => {
+                        const el = document.getElementById('student-allergies-input');
+                        if (el) el.focus();
+                      }, 50);
                     }
                   }}
                 >
@@ -1479,7 +1510,13 @@ const Students: React.FC = () => {
       </Modal>
 
       {/* Abandon Confirmation Modal */}
-      <Modal isOpen={isConfirmAbandonOpen} onClose={() => setIsConfirmAbandonOpen(false)} title="Abandonner les modifications ?">
+      <Modal
+        isOpen={isConfirmAbandonOpen}
+        onClose={() => setIsConfirmAbandonOpen(false)}
+        title="Abandonner les modifications ?"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+      >
         <div style={{ padding: '1rem 0' }}>
           <p style={{ margin: '0 0 1.5rem 0', color: 'var(--text-color)' }}>
             Les informations saisies ne seront pas enregistrées.
@@ -1493,7 +1530,7 @@ const Students: React.FC = () => {
               style={{ background: 'var(--danger)', borderColor: 'var(--danger)', color: '#fff' }}
               onClick={() => {
                 setIsConfirmAbandonOpen(false);
-                setModalOpen(false);
+                forceCloseStudentModal();
               }}
             >
               Abandonner
