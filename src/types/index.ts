@@ -195,6 +195,15 @@ export interface Student {
   transportStatus?: 'none' | 'active' | 'suspended';
   transportPaid?: number;
 
+  schoolingStatus?: 'active' | 'inactive';
+  departureReason?: 'school_change' | 'graduated' | 'withdrawn' | 'other';
+  departureDate?: string;
+  departureNote?: string;
+  deactivatedAt?: DateLike;
+  deactivatedBy?: string;
+  reactivatedAt?: DateLike;
+  reactivatedBy?: string;
+
   // --- Structured student identity ---
   studentLastName?: string;
   studentFirstName?: string;

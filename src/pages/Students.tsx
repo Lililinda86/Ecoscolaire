@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -46,7 +46,7 @@ const Students: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [, setRefresh] = useState(0);
-  const { db, safeMergeDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, safeMergeDB, updateStudentLocal, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
 
   const currentCountDisplay = currentSchool?.studentCount ?? db.students.length;
   const limitReached = isStudentLimitReached(currentSchool, currentCountDisplay);
@@ -101,6 +101,30 @@ const Students: React.FC = () => {
   const [sectionFilter, setSectionFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  type SchoolingStatusFilter = 'active' | 'inactive' | 'all';
+  const [schoolingStatusFilter, setSchoolingStatusFilter] = useState<SchoolingStatusFilter>('active');
+
+  const [selectedStudentForStatus, setSelectedStudentForStatus] = useState<Student | null>(null);
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
+  const [departureReason, setDepartureReason] = useState<'school_change' | 'graduated' | 'withdrawn' | 'other' | ''>('');
+  const [departureDate, setDepartureDate] = useState('');
+  const [departureNote, setDepartureNote] = useState('');
+  const [isStatusSaving, setIsStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const getStudentSchoolingStatus = (student: Student): 'active' | 'inactive' => {
+    return student.schoolingStatus ?? 'active';
+  };
+
+  const getDepartureReasonLabel = (reason?: string): string => {
+    if (reason === 'school_change') return 'Changement d’établissement';
+    if (reason === 'graduated') return 'Fin de cycle';
+    if (reason === 'withdrawn') return 'Retrait de l’élève';
+    if (reason === 'other') return 'Autre';
+    return '';
+  };
+
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -119,6 +143,7 @@ const Students: React.FC = () => {
 
   const effectiveRole = typeof currentUser?.role === 'string' ? currentUser.role.trim() : '';
   const canManageStudents = ['superAdmin', 'owner', 'director', 'secretary'].includes(effectiveRole);
+  const canChangeSchoolingStatus = ['superAdmin', 'owner', 'director'].includes(effectiveRole);
 
   if (!currentUser) return null;
 
@@ -200,7 +225,9 @@ const Students: React.FC = () => {
     const matchSection = sectionFilter === 'all' || student.section === sectionFilter;
     const matchClass = classFilter === 'all' || student.classId === classFilter;
     const matchStatus = statusFilter === 'all' || (student.studentStatus || 'nouveau') === statusFilter;
-    return matchSearch && matchSection && matchClass && matchStatus;
+    const matchSchoolingStatus = schoolingStatusFilter === 'all' ||
+      getStudentSchoolingStatus(student) === schoolingStatusFilter;
+    return matchSearch && matchSection && matchClass && matchStatus && matchSchoolingStatus;
   });
 
   const handleOpenModal = (student?: Student) => {
@@ -428,6 +455,149 @@ const Students: React.FC = () => {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!canChangeSchoolingStatus) {
+      setStatusError("Action refusée : Permissions insuffisantes.");
+      return;
+    }
+    if (!currentSchool?.id || !selectedStudentForStatus?.id) {
+      setStatusError("Action impossible : École ou élève manquant.");
+      return;
+    }
+    if (selectedStudentForStatus.schoolId !== currentSchool.id) {
+      setStatusError("Action impossible : L'élève n'appartient pas à l'école active.");
+      return;
+    }
+    if (getStudentSchoolingStatus(selectedStudentForStatus) !== 'active') {
+      setStatusError("Action impossible : L'élève est déjà inactif.");
+      return;
+    }
+    if (!departureReason) {
+      setStatusError("Veuillez sélectionner un motif de départ.");
+      return;
+    }
+    if (!departureDate) {
+      setStatusError("Veuillez sélectionner une date de départ.");
+      return;
+    }
+    if (!currentUser?.id) {
+      setStatusError("Action impossible : Identifiant utilisateur introuvable.");
+      return;
+    }
+
+    const targetId = selectedStudentForStatus.id;
+    const targetName = selectedStudentForStatus.name;
+    const actorId = currentUser.id;
+
+    setIsStatusSaving(true);
+    setStatusError(null);
+
+    try {
+      const studentRef = doc(firestoreDb, 'students', targetId);
+      const patchData = {
+        schoolingStatus: 'inactive' as const,
+        departureReason,
+        departureDate,
+        departureNote: departureNote.trim(),
+        deactivatedAt: serverTimestamp(),
+        deactivatedBy: actorId
+      };
+
+      await updateDoc(studentRef, patchData);
+
+      updateStudentLocal(targetId, {
+        schoolingStatus: 'inactive',
+        departureReason,
+        departureDate,
+        departureNote: departureNote.trim(),
+        deactivatedBy: actorId
+      });
+
+      setIsDeactivateModalOpen(false);
+      setSelectedStudentForStatus(null);
+      setDepartureNote('');
+      setDepartureDate('');
+      setDepartureReason('');
+
+      logAuditAction({
+        action: 'DEACTIVATE_STUDENT',
+        targetType: 'STUDENT',
+        targetId,
+        targetName
+      });
+
+      alert("Élève désactivé avec succès.");
+    } catch (err: unknown) {
+      console.error(err);
+      setStatusError(getErrorMessage(err));
+    } finally {
+      setIsStatusSaving(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (!canChangeSchoolingStatus) {
+      setStatusError("Action refusée : Permissions insuffisantes.");
+      return;
+    }
+    if (!currentSchool?.id || !selectedStudentForStatus?.id) {
+      setStatusError("Action impossible : École ou élève manquant.");
+      return;
+    }
+    if (selectedStudentForStatus.schoolId !== currentSchool.id) {
+      setStatusError("Action impossible : L'élève n'appartient pas à l'école active.");
+      return;
+    }
+    if (getStudentSchoolingStatus(selectedStudentForStatus) !== 'inactive') {
+      setStatusError("Action impossible : L'élève est déjà actif.");
+      return;
+    }
+    if (!currentUser?.id) {
+      setStatusError("Action impossible : Identifiant utilisateur introuvable.");
+      return;
+    }
+
+    const targetId = selectedStudentForStatus.id;
+    const targetName = selectedStudentForStatus.name;
+    const actorId = currentUser.id;
+
+    setIsStatusSaving(true);
+    setStatusError(null);
+
+    try {
+      const studentRef = doc(firestoreDb, 'students', targetId);
+      const patchData = {
+        schoolingStatus: 'active' as const,
+        reactivatedAt: serverTimestamp(),
+        reactivatedBy: actorId
+      };
+
+      await updateDoc(studentRef, patchData);
+
+      updateStudentLocal(targetId, {
+        schoolingStatus: 'active',
+        reactivatedBy: actorId
+      });
+
+      setIsReactivateModalOpen(false);
+      setSelectedStudentForStatus(null);
+
+      logAuditAction({
+        action: 'REACTIVATE_STUDENT',
+        targetType: 'STUDENT',
+        targetId,
+        targetName
+      });
+
+      alert("Élève réactivé avec succès.");
+    } catch (err: unknown) {
+      console.error(err);
+      setStatusError(getErrorMessage(err));
+    } finally {
+      setIsStatusSaving(false);
     }
   };
 
@@ -709,7 +879,7 @@ const Students: React.FC = () => {
       [
         'Matricule', 'Nom', 'Prénom(s)', 'Nom complet', 'Sexe', 'Date de naissance', 'Lieu de naissance', 'Section', 'Classe',
         'Statut élève', 'Année scolaire', 'Père', 'Tél Père', 'Profession Père', 'Mère', 'Tél Mère', 'Profession Mère', 'Responsable légal', 'Relation', 'Téléphone responsable', 'Email parent',
-        'Adresse', 'Contact urgence'
+        'Adresse', 'Contact urgence', 'Statut scolaire', 'Date de départ', 'Motif de départ'
       ]
     ];
 
@@ -749,7 +919,10 @@ const Students: React.FC = () => {
         escapeCsv(student.parentPhone),
         escapeCsv(parentEmail),
         escapeCsv(student.address || ''),
-        escapeCsv(student.emergencyContact || '')
+        escapeCsv(student.emergencyContact || ''),
+        escapeCsv(getStudentSchoolingStatus(student) === 'inactive' ? 'Inactif' : 'Actif'),
+        escapeCsv(student.departureDate || ''),
+        escapeCsv(getDepartureReasonLabel(student.departureReason))
       ]);
     });
 
@@ -1032,11 +1205,16 @@ const Students: React.FC = () => {
               <option value="nouveau">Nouveau</option>
               <option value="ancien">Ancien</option>
             </select>
-            {(searchTerm !== '' || sectionFilter !== 'all' || classFilter !== 'all' || statusFilter !== 'all') && (
+            <select value={schoolingStatusFilter} onChange={e => setSchoolingStatusFilter(e.target.value as SchoolingStatusFilter)} aria-label="Situation scolaire">
+              <option value="active">Actifs</option>
+              <option value="inactive">Inactifs</option>
+              <option value="all">Tous</option>
+            </select>
+            {(searchTerm !== '' || sectionFilter !== 'all' || classFilter !== 'all' || statusFilter !== 'all' || schoolingStatusFilter !== 'active') && (
               <button
                 type="button"
                 className="secondary"
-                onClick={() => { setSearchTerm(''); setSectionFilter('all'); setClassFilter('all'); setStatusFilter('all'); }}
+                onClick={() => { setSearchTerm(''); setSectionFilter('all'); setClassFilter('all'); setStatusFilter('all'); setSchoolingStatusFilter('active'); }}
                 style={{ fontSize: '0.85rem' }}
                 aria-label="Réinitialiser les filtres"
               >
@@ -1066,7 +1244,16 @@ const Students: React.FC = () => {
                       ? 'Aucun élève n’est encore inscrit dans cet établissement.'
                       : (searchTerm !== ''
                           ? 'Aucun élève trouvé pour cette recherche.'
-                          : 'Aucun élève ne correspond aux filtres sélectionnés.'
+                          : (sectionFilter !== 'all' || classFilter !== 'all' || statusFilter !== 'all'
+                              ? 'Aucun élève ne correspond aux filtres sélectionnés.'
+                              : (schoolingStatusFilter === 'active'
+                                  ? 'Aucun élève actif trouvé.'
+                                  : (schoolingStatusFilter === 'inactive'
+                                      ? 'Aucun ancien élève trouvé.'
+                                      : 'Aucun élève trouvé.'
+                                    )
+                                )
+                            )
                         )
                     }
                   </td>
@@ -1089,16 +1276,38 @@ const Students: React.FC = () => {
                     <td style={{ padding: '1rem' }}>{student.parentName}</td>
                     <td style={{ padding: '1rem' }}>{student.parentPhone || '-'}</td>
                     <td style={{ padding: '1rem' }}>
-                      <span style={{
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '12px',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        background: student.studentStatus === 'ancien' ? '#e2e8f0' : '#dcfce7',
-                        color: student.studentStatus === 'ancien' ? '#475569' : '#15803d'
-                      }}>
-                        {student.studentStatus === 'ancien' ? 'Ancien' : student.studentStatus === 'nouveau' ? 'Nouveau' : (student.studentStatus ? String(student.studentStatus) : 'Non renseigné')}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+                        <span style={{
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '12px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          background: student.studentStatus === 'ancien' ? '#e2e8f0' : '#dcfce7',
+                          color: student.studentStatus === 'ancien' ? '#475569' : '#15803d'
+                        }}>
+                          {student.studentStatus === 'ancien' ? 'Ancien' : student.studentStatus === 'nouveau' ? 'Nouveau' : (student.studentStatus ? String(student.studentStatus) : 'Non renseigné')}
+                        </span>
+                        {(() => {
+                          const isInactive = getStudentSchoolingStatus(student) === 'inactive';
+                          return (
+                            <span style={{
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '12px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              background: isInactive ? '#fee2e2' : '#e0f2fe',
+                              color: isInactive ? '#991b1b' : '#0369a1'
+                            }}>
+                              {isInactive ? 'Inactif' : 'Actif'}
+                            </span>
+                          );
+                        })()}
+                        {getStudentSchoolingStatus(student) === 'inactive' && student.departureReason && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            ({getDepartureReasonLabel(student.departureReason)})
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="no-print" style={{ padding: '1rem', textAlign: 'right', position: 'relative' }}>
                       <div style={{ display: 'inline-block', position: 'relative' }}>
@@ -1164,13 +1373,77 @@ const Students: React.FC = () => {
                                 Modifier l’élève
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => { setOpenRowMenuId(null); handleOpenInviteModal(student); }}
-                              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}
-                            >
-                              <Send size={14} aria-hidden="true" /> Inviter le responsable
-                            </button>
+                            {canChangeSchoolingStatus && (
+                              getStudentSchoolingStatus(student) === 'active' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenRowMenuId(null);
+                                    setSelectedStudentForStatus(student);
+                                    setDepartureReason('');
+                                    setDepartureDate(new Date().toISOString().split('T')[0]);
+                                    setDepartureNote('');
+                                    setStatusError(null);
+                                    setIsDeactivateModalOpen(true);
+                                  }}
+                                  disabled={isSchoolSuspended}
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '0.5rem 0.75rem',
+                                    cursor: isSchoolSuspended ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    color: 'var(--danger)',
+                                    opacity: isSchoolSuspended ? 0.55 : 1
+                                  }}
+                                >
+                                  <Trash2 size={14} aria-hidden="true" style={{ color: 'inherit' }} />
+                                  Désactiver l’élève
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenRowMenuId(null);
+                                    setSelectedStudentForStatus(student);
+                                    setStatusError(null);
+                                    setIsReactivateModalOpen(true);
+                                  }}
+                                  disabled={isSchoolSuspended}
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '0.5rem 0.75rem',
+                                    cursor: isSchoolSuspended ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    color: 'var(--success)',
+                                    opacity: isSchoolSuspended ? 0.55 : 1
+                                  }}
+                                >
+                                  <Plus size={14} aria-hidden="true" style={{ color: 'inherit' }} />
+                                  Réactiver l’élève
+                                </button>
+                              )
+                            )}
+                            {getStudentSchoolingStatus(student) !== 'inactive' && (
+                              <button
+                                type="button"
+                                onClick={() => { setOpenRowMenuId(null); handleOpenInviteModal(student); }}
+                                style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}
+                              >
+                                <Send size={14} aria-hidden="true" /> Inviter le responsable
+                              </button>
+                            )}
                             {(() => {
                               const phoneInfo = getStudentWhatsAppPhone(student);
                               const isEnabled = !isSchoolSuspended && !!phoneInfo.normalizedPhone;
@@ -1981,6 +2254,138 @@ const Students: React.FC = () => {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Deactivation Modal */}
+      <Modal
+        isOpen={isDeactivateModalOpen}
+        onClose={() => {
+          setIsDeactivateModalOpen(false);
+          setSelectedStudentForStatus(null);
+          setDepartureNote('');
+          setDepartureDate('');
+          setDepartureReason('');
+          setStatusError(null);
+        }}
+        title="Désactiver l’élève"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+      >
+        <div style={{ padding: '1rem' }}>
+          <p style={{ marginBottom: '1.25rem', color: 'var(--text-muted)' }}>
+            Le dossier et l’historique de cet élève seront conservés. L’élève pourra être réactivé ultérieurement.
+          </p>
+          {statusError && (
+            <div style={{ padding: '0.75rem', background: '#fee2e2', color: '#b91c1c', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+              {statusError}
+            </div>
+          )}
+          <form onSubmit={(e) => { e.preventDefault(); handleDeactivate(); }}>
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Motif de départ *</label>
+              <select
+                value={departureReason}
+                onChange={(e) => setDepartureReason(e.target.value as 'school_change' | 'graduated' | 'withdrawn' | 'other' | '')}
+                required
+                style={{ width: '100%', padding: '0.5rem' }}
+              >
+                <option value="">Sélectionner un motif</option>
+                <option value="school_change">Changement d’établissement</option>
+                <option value="graduated">Fin de cycle</option>
+                <option value="withdrawn">Retrait de l’élève</option>
+                <option value="other">Autre</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Date de départ *</label>
+              <input
+                type="date"
+                value={departureDate}
+                onChange={(e) => setDepartureDate(e.target.value)}
+                required
+                style={{ width: '100%', padding: '0.5rem' }}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Commentaire (facultatif)</label>
+              <textarea
+                value={departureNote}
+                onChange={(e) => setDepartureNote(e.target.value)}
+                style={{ width: '100%', padding: '0.5rem', minHeight: '80px', resize: 'vertical' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={isStatusSaving}
+                onClick={() => {
+                  setIsDeactivateModalOpen(false);
+                  setSelectedStudentForStatus(null);
+                  setDepartureNote('');
+                  setDepartureDate('');
+                  setDepartureReason('');
+                  setStatusError(null);
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={isStatusSaving || !departureReason || !departureDate}
+                style={{ background: 'var(--danger)', borderColor: 'var(--danger)', color: 'white' }}
+              >
+                {isStatusSaving ? 'Enregistrement...' : 'Confirmer la désactivation'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      {/* Reactivation Modal */}
+      <Modal
+        isOpen={isReactivateModalOpen}
+        onClose={() => {
+          setIsReactivateModalOpen(false);
+          setSelectedStudentForStatus(null);
+          setStatusError(null);
+        }}
+        title="Réactiver l’élève"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+      >
+        <div style={{ padding: '1rem' }}>
+          <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+            L’élève réapparaîtra dans la liste des élèves actifs. Son historique sera conservé.
+          </p>
+          {statusError && (
+            <div style={{ padding: '0.75rem', background: '#fee2e2', color: '#b91c1c', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+              {statusError}
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+            <button
+              type="button"
+              className="secondary"
+              disabled={isStatusSaving}
+              onClick={() => {
+                setIsReactivateModalOpen(false);
+                setSelectedStudentForStatus(null);
+                setStatusError(null);
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={isStatusSaving}
+              onClick={handleReactivate}
+              style={{ background: 'var(--success)', borderColor: 'var(--success)', color: 'white' }}
+            >
+              {isStatusSaving ? 'Enregistrement...' : 'Confirmer la réactivation'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
     </div>

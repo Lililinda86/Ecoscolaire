@@ -47,9 +47,20 @@ const getErrorCode = (error: unknown): string | undefined => {
   return undefined;
 };
 
+export type StudentLocalStatusPatch = Partial<Pick<
+  Student,
+  | 'schoolingStatus'
+  | 'departureReason'
+  | 'departureDate'
+  | 'departureNote'
+  | 'deactivatedBy'
+  | 'reactivatedBy'
+>>;
+
 interface AppContextProps {
   db: Database | null;
   updateLocalState: (patch: Partial<Database>) => void;
+  updateStudentLocal: (studentId: string, patch: StudentLocalStatusPatch) => void;
   patchLocalEntities: (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => void;
   saveDB: (newDb: Database) => Promise<void>;
   safeMergeDB: (newDb: Database) => Promise<void>;
@@ -744,6 +755,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDb(prev => prev ? { ...prev, ...patch } : null);
   };
 
+  const updateStudentLocal = (
+    studentId: string,
+    patch: StudentLocalStatusPatch
+  ) => {
+    setDb(previousDb => {
+      if (!previousDb || !currentSchool?.id) {
+        return previousDb;
+      }
+
+      const currentStudent = previousDb.students.find(
+        student => student.id === studentId
+      );
+
+      if (
+        !currentStudent ||
+        currentStudent.schoolId !== currentSchool.id
+      ) {
+        return previousDb;
+      }
+
+      return {
+        ...previousDb,
+        students: previousDb.students.map(student =>
+          student.id === studentId
+            ? { ...student, ...patch }
+            : student
+        )
+      };
+    });
+  };
+
   const patchLocalEntities = (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => {
     setDb(prev => {
       if (!prev) return prev;
@@ -778,7 +820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      db, updateLocalState, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool,
+      db, updateLocalState, updateStudentLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool,
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended
