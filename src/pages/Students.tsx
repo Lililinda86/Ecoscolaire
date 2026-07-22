@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -40,13 +40,191 @@ const getErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
+const normalizeForComparison = (str: string): string => {
+  return (str || '')
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, ' ');
+};
+
+const normalizeImportedBirthDate = (rawValue: unknown): string | null => {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
+  }
+
+  let year = 0;
+  let month = 0;
+  let day = 0;
+
+  if (rawValue instanceof Date) {
+    year = rawValue.getFullYear();
+    month = rawValue.getMonth() + 1;
+    day = rawValue.getDate();
+  } else if (typeof rawValue === 'number') {
+    if (rawValue <= 0) return null;
+    try {
+      const parsed = XLSX.SSF.parse_date_code(Math.floor(rawValue));
+      if (!parsed) return null;
+      year = parsed.y;
+      month = parsed.m;
+      day = parsed.d;
+    } catch {
+      return null;
+    }
+  } else if (typeof rawValue === 'string') {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return null;
+
+    // YYYY-MM-DD
+    const ymdMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymdMatch) {
+      year = Number(ymdMatch[1]);
+      month = Number(ymdMatch[2]);
+      day = Number(ymdMatch[3]);
+    } else {
+      // DD-MM-YYYY or DD/MM/YYYY
+      const dmyMatch = trimmed.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+      if (dmyMatch) {
+        year = Number(dmyMatch[3]);
+        month = Number(dmyMatch[2]);
+        day = Number(dmyMatch[1]);
+      } else {
+        return null;
+      }
+    }
+  } else {
+    return null;
+  }
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    return null;
+  }
+  if (month < 1 || month > 12) {
+    return null;
+  }
+  if (day < 1 || day > 31) {
+    return null;
+  }
+
+  // Strict Calendar Validation
+  const testDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    testDate.getUTCFullYear() !== year ||
+    testDate.getUTCMonth() !== month - 1 ||
+    testDate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  const paddedMonth = String(month).padStart(2, '0');
+  const paddedDay = String(day).padStart(2, '0');
+  const isoStr = `${year}-${paddedMonth}-${paddedDay}`;
+
+  // Today check in YYYY-MM-DD
+  const today = new Date();
+  const localYear = today.getFullYear();
+  const localMonth = String(today.getMonth() + 1).padStart(2, '0');
+  const localDay = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${localYear}-${localMonth}-${localDay}`;
+
+  if (isoStr > todayStr) {
+    return null;
+  }
+
+  return isoStr;
+};
+
+const toImportedStudentPayload = (student: Student, schoolId: string): Student => {
+  if (!student.studentLastName?.trim()) {
+    throw new Error("Nom de l'élève obligatoire");
+  }
+  if (!student.studentFirstName?.trim()) {
+    throw new Error("Prénom de l'élève obligatoire");
+  }
+  if (!student.gender) {
+    throw new Error("Sexe de l'élève obligatoire");
+  }
+  if (student.gender !== 'M' && student.gender !== 'F') {
+    throw new Error("Sexe de l'élève invalide");
+  }
+  const validatedDob = normalizeImportedBirthDate(student.dob);
+  if (!validatedDob) {
+    throw new Error("Date de naissance invalide ou absente");
+  }
+  if (!student.section) {
+    throw new Error("Section scolaire invalide ou absente");
+  }
+  if (student.section !== 'francophone' && student.section !== 'anglophone') {
+    throw new Error("Section scolaire invalide ou absente");
+  }
+  if (!student.classId) {
+    throw new Error("Classe de l'élève obligatoire");
+  }
+  if (!student.parentName?.trim()) {
+    throw new Error("Nom du responsable légal obligatoire");
+  }
+
+  const normalizedLastName = student.studentLastName.trim().replace(/\s+/g, ' ');
+  const normalizedFirstName = student.studentFirstName.trim().replace(/\s+/g, ' ');
+  const normalizedName = `${normalizedLastName} ${normalizedFirstName}`
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  const normalizedMatricule = student.matricule?.trim();
+  const finalMatricule = normalizedMatricule && normalizedMatricule !== '-'
+    ? normalizedMatricule
+    : '-';
+
+  const payload: Student = {
+    id: student.id,
+    schoolId,
+    schoolingStatus: 'active',
+    matricule: finalMatricule,
+    studentLastName: normalizedLastName,
+    studentFirstName: normalizedFirstName,
+    name: normalizedName,
+    gender: student.gender,
+    dob: student.dob.trim(),
+    section: student.section,
+    classId: student.classId,
+    studentStatus: 'nouveau',
+    parentName: student.parentName.trim()
+  };
+
+  if (student.parentPhone?.trim()) {
+    payload.parentPhone = student.parentPhone.trim();
+  }
+
+  let cleanedEmails: string[] | undefined;
+  if (student.parentEmails && student.parentEmails.length > 0) {
+    const trimmed = student.parentEmails
+      .map(email => email?.trim())
+      .filter(email => email !== undefined && email !== '');
+    const unique = Array.from(new Set(trimmed));
+    if (unique.length > 0) {
+      cleanedEmails = unique;
+    }
+  }
+  if (cleanedEmails) {
+    payload.parentEmails = cleanedEmails;
+  }
+
+  if (student.address?.trim()) {
+    payload.address = student.address.trim();
+  }
+
+  return payload;
+};
+
 const Students: React.FC = () => {
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [, setRefresh] = useState(0);
-  const { db, safeMergeDB, updateStudentLocal, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, addStudentsLocal, updateStudentLocal, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
 
   const currentCountDisplay = currentSchool?.studentCount ?? db.students.length;
   const limitReached = isStudentLimitReached(currentSchool, currentCountDisplay);
@@ -677,15 +855,23 @@ const Students: React.FC = () => {
       alert("Veuillez choisir un fichier Excel.");
       return;
     }
+    if (!currentSchool?.id || !currentUser?.id) {
+      alert("Action impossible : École ou utilisateur introuvable.");
+      return;
+    }
+    if (!canManageStudents) {
+      alert("Action refusée : Permissions insuffisantes.");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'binary', cellDates: false });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const rawRows: unknown[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        const rawRows: unknown[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true, defval: '' });
 
         let headerRowIndex = -1;
         let headers: string[] = [];
@@ -736,12 +922,54 @@ const Students: React.FC = () => {
             return '';
           };
 
+          const getRawVal = (keywords: string[]) => {
+            for (const key of Object.keys(row)) {
+              const upperKey = key.toUpperCase();
+              if (keywords.some(kw => upperKey.includes(kw))) {
+                if (row[key] !== undefined && row[key] !== '') {
+                  return row[key];
+                }
+              }
+            }
+            return undefined;
+          };
+
           const nom = getVal(['NOM']);
           const prenom = getVal(['PRENOM']);
-          const fullName = getVal(['NOMS ET PRENOMS', 'NOM ET PRENOM']) || (nom ? `${nom} ${prenom}`.trim() : '');
+          const normalizedLastName = nom.trim().replace(/\s+/g, ' ');
+          const normalizedFirstName = prenom.trim().replace(/\s+/g, ' ');
 
-          if (!fullName) {
-            errorsLog.push(`Ligne ${i + 1} : Nom ou prénom manquant.`);
+          if (!normalizedLastName) {
+            errorsLog.push(`Ligne ${i + 1} : Nom de l'élève obligatoire.`);
+            continue;
+          }
+
+          if (!normalizedFirstName) {
+            errorsLog.push(`Ligne ${i + 1} : Prénom de l'élève obligatoire.`);
+            continue;
+          }
+
+          const fullName = [normalizedLastName, normalizedFirstName].filter(Boolean).join(' ');
+
+          // Validation Sexe
+          const rawGender = getVal(['SEXE', 'GENRE']).toUpperCase().trim();
+          let gender: 'M' | 'F' | '' = '';
+          if (['M', 'MASCULIN', 'GARÇON', 'GARCON'].includes(rawGender)) {
+            gender = 'M';
+          } else if (['F', 'FÉMININ', 'FEMININ', 'FILLE'].includes(rawGender)) {
+            gender = 'F';
+          }
+
+          if (!gender) {
+            errorsLog.push(`Ligne ${i + 1} : Sexe de l'élève obligatoire ou non reconnu ("${rawGender}").`);
+            continue;
+          }
+
+          // Validation Date de naissance
+          const rawDob = getRawVal(['DATE DE NAISSANCE', 'DATE', 'DOB']);
+          const normalizedDob = normalizeImportedBirthDate(rawDob);
+          if (!normalizedDob) {
+            errorsLog.push(`Ligne ${i + 1} : Date de naissance absente, invalide ou future.`);
             continue;
           }
 
@@ -750,7 +978,7 @@ const Students: React.FC = () => {
           const parentEmailsStr = getVal(['EMAIL PARENT', 'EMAILS PARENTS', 'EMAIL PARENT 1', 'EMAILPARENT', 'PARENT EMAIL', 'EMAIL']);
           const normalizedEmails = normalizeParentEmails(parentEmailsStr);
 
-          // Validation classe prédéfinie
+          // Validation classe prédéfinie et section
           let classId = '';
           let finalSection: 'francophone' | 'anglophone' | '' = '';
           let detectedClassName = '';
@@ -758,21 +986,36 @@ const Students: React.FC = () => {
           if (classeNameRaw) {
             const match = normalizeClassName(classeNameRaw);
             if (match) {
-              const matchedClasses = db.classes.filter(c => c.name.toLowerCase() === match.matchedName.toLowerCase() && c.type === match.section);
-              if (matchedClasses.length > 0) {
+              const matchedClasses = db.classes.filter(c =>
+                c.schoolId === currentSchool.id &&
+                (c.isActive === undefined || c.isActive !== false) &&
+                c.name.toLowerCase() === match.matchedName.toLowerCase() &&
+                c.type === match.section
+              );
+              if (matchedClasses.length === 1) {
                 classId = matchedClasses[0].id;
                 finalSection = matchedClasses[0].type;
                 detectedClassName = matchedClasses[0].name;
+
+                // Validation cohérence section
+                if (!finalSection || (finalSection !== 'francophone' && finalSection !== 'anglophone')) {
+                  errorsLog.push(`Ligne ${i + 1} : Section de la classe "${classeNameRaw}" absente ou incohérente.`);
+                  continue;
+                }
+                const importSection = getVal(['SECTION'])?.toLowerCase();
+                if (importSection && importSection !== finalSection) {
+                  errorsLog.push(`Ligne ${i + 1} : Section contradictoire pour la classe "${classeNameRaw}" (Excel: "${importSection}", Classe: "${finalSection}").`);
+                  continue;
+                }
+              } else if (matchedClasses.length > 1) {
+                errorsLog.push(`Ligne ${i + 1} : Correspondance de classe ambiguë pour "${classeNameRaw}".`);
+                continue;
               } else {
-                errorsLog.push(`Ligne ${i + 1} : Classe "${classeNameRaw}" reconnue comme "${match.matchedName}" mais pas encore créée dans l'école.`);
+                errorsLog.push(`Ligne ${i + 1} : Classe "${classeNameRaw}" reconnue comme "${match.matchedName}" mais inactive ou absente de cette école.`);
+                continue;
               }
             } else {
-              // Tentative de suggestion
-              if (classeNameRaw.toUpperCase().includes('FROM')) {
-                errorsLog.push(`Ligne ${i + 1} : Classe "${classeNameRaw}" inconnue. Suggestion : "Form 1" ou "Form 2".`);
-              } else {
-                errorsLog.push(`Ligne ${i + 1} : Classe "${classeNameRaw}" inconnue dans le référentiel.`);
-              }
+              errorsLog.push(`Ligne ${i + 1} : Format de classe "${classeNameRaw}" invalide.`);
               continue;
             }
           } else {
@@ -780,63 +1023,92 @@ const Students: React.FC = () => {
             continue;
           }
 
+          // Validation Responsable (parentName) - CAS A
+          const rawParentName = getVal(['TUTEUR', 'PARENT', 'NOMS DES PARENTS', 'NOM_PARENT']);
+          if (!rawParentName || !rawParentName.trim()) {
+            errorsLog.push(`Ligne ${i + 1} : Nom du responsable légal obligatoire.`);
+            continue;
+          }
+          const parentName = rawParentName.trim().replace(/\s+/g, ' ');
+
           // Validation Téléphone parent
           const rawPhone = getVal(['CONTACT', 'TÉLÉPHONE', 'TELEPHONE', 'TEL', 'PHONE', 'TELEPHONE_PARENT']);
+          if (!rawPhone || !rawPhone.trim()) {
+            errorsLog.push(`Ligne ${i + 1} : Téléphone du responsable légal obligatoire.`);
+            continue;
+          }
           const normalizedPhone = normalizeCameroonPhoneNumber(rawPhone);
-          if (rawPhone && !normalizedPhone) {
+          if (!normalizedPhone) {
             errorsLog.push(`Ligne ${i + 1} : Téléphone parent "${rawPhone}" invalide.`);
             continue;
           }
 
-          // Détection doublon local / existant dans l'année scolaire
-          const isDuplicate = db.students.some(s => s.name.toLowerCase() === fullName.toLowerCase() && s.classId === classId) ||
-                              newStudents.some(s => s.name.toLowerCase() === fullName.toLowerCase() && s.classId === classId);
-          if (isDuplicate) {
+          // Détection doublons
+          const isValidMatricule = (m: string | undefined): boolean => {
+            if (!m) return false;
+            const cleaned = m.trim();
+            return cleaned !== '' && cleaned !== '-';
+          };
+
+          const isMatriculeDuplicateInFile = isValidMatricule(matricule) && newStudents.some(s => isValidMatricule(s.matricule) && normalizeForComparison(s.matricule!) === normalizeForComparison(matricule!));
+          const isMatriculeDuplicateInDb = isValidMatricule(matricule) && db.students.some(s => s.schoolId === currentSchool.id && isValidMatricule(s.matricule) && normalizeForComparison(s.matricule!) === normalizeForComparison(matricule!));
+
+          const isDuplicateIdentityInFile = newStudents.some(s =>
+            normalizeForComparison(s.studentLastName || '') === normalizeForComparison(normalizedLastName) &&
+            normalizeForComparison(s.studentFirstName || '') === normalizeForComparison(normalizedFirstName) &&
+            normalizeForComparison(s.dob) === normalizeForComparison(normalizedDob) &&
+            s.classId === classId
+          );
+
+          const isDuplicateIdentityInDb = db.students.some(s =>
+            s.schoolId === currentSchool.id &&
+            normalizeForComparison(s.studentLastName || s.name) === normalizeForComparison(normalizedLastName) &&
+            normalizeForComparison(s.studentFirstName || '') === normalizeForComparison(normalizedFirstName) &&
+            normalizeForComparison(s.dob) === normalizeForComparison(normalizedDob) &&
+            s.classId === classId
+          );
+
+          if (isMatriculeDuplicateInFile || isMatriculeDuplicateInDb) {
             duplicateCount++;
-            errorsLog.push(`Ligne ${i + 1} : Doublon détecté pour l'élève "${fullName}".`);
+            errorsLog.push(`Ligne ${i + 1} : Doublon matricule détecté pour "${matricule}".`);
             continue;
           }
 
-          // Extraction des colonnes financières optionnelles
-          const regExpected = parseFloat(getVal(['INSCRIPTION_ATTENDUE', 'DROIT INSCRIPTION ATTENDU', 'REGISTRATION'])) || 15000;
-          const regPaid = parseFloat(getVal(['INSCRIPTION_PAYEE', 'DROIT INSCRIPTION PAYE'])) || 0;
-          const tuitionExpected = parseFloat(getVal(['SCOLARITE_ANNUELLE', 'PENSION ATTENDUE', 'TUITION'])) || 0;
-          const tuitionPaid = parseFloat(getVal(['PENSION PAYEE'])) || 0;
+          if (isDuplicateIdentityInFile || isDuplicateIdentityInDb) {
+            duplicateCount++;
+            errorsLog.push(`Ligne ${i + 1} : Doublon d'identité détecté pour l'élève "${fullName}".`);
+            continue;
+          }
 
-          const t1 = parseFloat(getVal(['TRANCHE_1', 'TRANCHE 1'])) || 0;
-          const t2 = parseFloat(getVal(['TRANCHE_2', 'TRANCHE 2'])) || 0;
-          const t3 = parseFloat(getVal(['TRANCHE_3', 'TRANCHE 3'])) || 0;
+          const normalizedMatricule = matricule?.trim();
+          const finalMatricule = normalizedMatricule && normalizedMatricule !== '-'
+            ? normalizedMatricule
+            : '-';
+
+          // Construction explicite champ par champ du payload Student
+          const studentPayload: Student = {
+            id: crypto.randomUUID(),
+            schoolId: currentSchool.id,
+            schoolingStatus: 'active',
+            matricule: finalMatricule,
+            studentLastName: normalizedLastName,
+            studentFirstName: normalizedFirstName,
+            name: fullName,
+            gender: gender,
+            dob: normalizedDob,
+            section: finalSection,
+            classId: classId,
+            studentStatus: 'nouveau',
+            parentName: parentName,
+            parentPhone: normalizedPhone,
+            parentEmails: normalizedEmails,
+            address: getVal(['ADRESSE', 'QUARTIER', 'ADRESSE_PARENT']) || ''
+          };
 
           newStudents.push({
-            id: crypto.randomUUID(),
-            matricule: matricule || '-',
-            name: fullName,
-            gender: getVal(['SEXE', 'GENRE']).toUpperCase().startsWith('F') ? 'F' : 'M',
-            dob: getVal(['DATE DE NAISSANCE', 'DATE', 'DOB']),
-            section: finalSection || importSection,
-            classId: classId,
-            parentName: getVal(['TUTEUR', 'PARENT', 'NOMS DES PARENTS', 'NOM_PARENT']) || 'Inconnu',
-            parentPhone: normalizedPhone || '',
-            address: getVal(['ADRESSE', 'QUARTIER', 'ADRESSE_PARENT']) || '',
-
-            // Paramètres financiers enrichis
-            registrationFeeExpected: regExpected,
-            registrationFeePaid: regPaid,
-            registrationFeeStatus: regPaid >= regExpected ? 'paid' : (regPaid > 0 ? 'partial' : 'unpaid'),
-
-            tuitionExpected: tuitionExpected || (t1 + t2 + t3),
-            tuitionPaid: tuitionPaid,
-            tuitionStatus: tuitionPaid >= (tuitionExpected || (t1 + t2 + t3)) ? 'paid' : (tuitionPaid > 0 ? 'partial' : 'unpaid'),
-
-            feeT1: t1,
-            feeT2: t2,
-            feeT3: t3,
-            feeTransport: parseFloat(getVal(['TRANSPORT'])) || 0,
-            feeUniforms: parseFloat(getVal(['TENUE_GRATUITE'])) || 0,
-
+            ...studentPayload,
             rawClassName: classeNameRaw,
-            detectedClassName: detectedClassName,
-            parentEmails: normalizedEmails
+            detectedClassName: detectedClassName
           });
         }
 
@@ -856,21 +1128,134 @@ const Students: React.FC = () => {
     reader.readAsBinaryString(excelFile);
   };
 
-  const handleConfirmImport = () => {
-    if (previewStudents) {
-      // SaaS Limit Check for import
-      const remainingSlots = getStudentLimit(currentSchool) - db.students.length;
-      if (previewStudents.length > remainingSlots) {
-        alert(`L'import dépasse votre limite SaaS. Places restantes : ${remainingSlots}. Éditez votre fichier pour ne pas dépasser la limite.`);
-        return;
+  const handleConfirmImport = async () => {
+    if (!previewStudents || previewStudents.length === 0) return;
+
+    if (!currentSchool?.id || !currentUser?.id) {
+      alert("Erreur : École active ou utilisateur non connecté.");
+      return;
+    }
+    if (!canManageStudents) {
+      alert("Action refusée : Permissions insuffisantes.");
+      return;
+    }
+
+    if (previewStudents.length > 450) {
+      alert("Le lot d'importation dépasse la limite de 450 élèves. Veuillez diviser votre fichier.");
+      return;
+    }
+
+    // Quota Check
+    const remainingSlots = getStudentLimit(currentSchool) - db.students.length;
+    if (previewStudents.length > remainingSlots) {
+      alert(`L'import dépasse votre limite SaaS. Places restantes : ${remainingSlots}. Éditez votre fichier pour ne pas dépasser la limite.`);
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const persistedStudents: Student[] = [];
+
+      for (const student of previewStudents) {
+        const importedPayload = toImportedStudentPayload(student, currentSchool.id);
+        persistedStudents.push(importedPayload);
       }
 
-      safeMergeDB({ ...db, students: [...db.students, ...previewStudents] });
+      // Contrôle de sécurité exhaustif de tout le lot avant d'initier le batch
+      for (const student of persistedStudents) {
+        if (!student.id) {
+          throw new Error("Violation de sécurité : ID élève manquant.");
+        }
+        if (student.schoolId !== currentSchool.id) {
+          throw new Error("Violation de sécurité : Un élève ciblant une autre école a été détecté dans le lot.");
+        }
+        if (!student.studentLastName?.trim()) {
+          throw new Error("Erreur de données : Le nom de l'élève est obligatoire.");
+        }
+        if (!student.studentFirstName?.trim()) {
+          throw new Error("Erreur de données : Le prénom de l'élève est obligatoire.");
+        }
+        const expectedName = `${student.studentLastName.trim()} ${student.studentFirstName.trim()}`.trim().replace(/\s+/g, ' ');
+        if (student.name !== expectedName) {
+          throw new Error("Erreur de données : Cohérence du nom complet invalide.");
+        }
+        if (student.gender !== 'M' && student.gender !== 'F') {
+          throw new Error("Erreur de données : Sexe de l'élève invalide.");
+        }
+        if (!student.dob || !/^\d{4}-\d{2}-\d{2}$/.test(student.dob)) {
+          throw new Error("Erreur de données : Format de date de naissance invalide.");
+        }
+        const dDate = new Date(student.dob);
+        if (isNaN(dDate.getTime()) || dDate > new Date()) {
+          throw new Error("Erreur de données : Date de naissance invalide ou dans le futur.");
+        }
+        if (student.section !== 'francophone' && student.section !== 'anglophone') {
+          throw new Error("Erreur de données : Section scolaire invalide.");
+        }
+        if (!student.classId) {
+          throw new Error("Erreur de données : La classe de l'élève est obligatoire.");
+        }
+        const cls = db.classes.find(c => c.id === student.classId);
+        if (!cls || cls.schoolId !== currentSchool.id || cls.isActive === false || cls.type !== student.section) {
+          throw new Error("Erreur de données : Classe non trouvée, inactive ou incohérente avec la section.");
+        }
+
+        // Données financières interdites
+        const financialFields = [
+          "registrationFeeExpected", "registrationFeePaid", "registrationFeeStatus",
+          "tuitionExpected", "tuitionPaid", "tuitionStatus",
+          "feeT1", "feeT2", "feeT3", "feeTransport", "feeUniforms"
+        ];
+        for (const f of financialFields) {
+          if ((student as unknown as Record<string, unknown>)[f] !== undefined) {
+            throw new Error(`Violation de sécurité : Donnée financière "${f}" interdite dans l'importation.`);
+          }
+        }
+
+        // Données médicales interdites
+        if (student.allergies !== undefined || student.medicalConditions !== undefined) {
+          throw new Error("Violation de sécurité : Donnée médicale interdite dans l'importation.");
+        }
+
+        // Données de transport interdites
+        if (student.usesTransport !== undefined || student.transportMonthlyFee !== undefined) {
+          throw new Error("Violation de sécurité : Donnée de transport interdite dans l'importation.");
+        }
+
+        // Données de départ interdites
+        if (student.departureReason !== undefined || student.departureDate !== undefined) {
+          throw new Error("Violation de sécurité : Donnée de départ/désactivation interdite dans l'importation.");
+        }
+
+        // Aucune valeur undefined autorisée
+        for (const [key, value] of Object.entries(student)) {
+          if (value === undefined) {
+            throw new Error(`Erreur d'intégrité : Propriété "${key}" à undefined détectée.`);
+          }
+        }
+      }
+
+      const batch = writeBatch(firestoreDb);
+
+      for (const student of persistedStudents) {
+        const studentRef = doc(firestoreDb, 'students', student.id);
+        batch.set(studentRef, student);
+      }
+
+      await batch.commit();
+
+      addStudentsLocal(persistedStudents);
       setPreviewStudents(null);
       setImportReport(null);
       setImportModalOpen(false);
       setExcelFile(null);
       alert("Importation finalisée avec succès !");
+    } catch (err: unknown) {
+      console.error(err);
+      alert("Erreur lors de l'enregistrement du lot. Zéro élève n'a été importé. Détails : " + getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
     }
   };
 

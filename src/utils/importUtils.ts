@@ -70,14 +70,20 @@ export function normalizeClassName(rawName: string): { matchedName: string; matc
     'CM2': 'CM2',
     '6E': '6e',
     '6EME': '6e',
+    '6E TECHNIQUE': '6e technique',
     '6EME TECHNIQUE': '6e technique',
     '5E': '5e',
     '5EME': '5e',
+    '5E TECHNIQUE': '5e technique',
     '5EME TECHNIQUE': '5e technique',
     '4E': '4e',
     '4EME': '4e',
+    '4E TECHNIQUE': '4e technique',
+    '4EME TECHNIQUE': '4e technique',
     '3E': '3e',
     '3EME': '3e',
+    '3E TECHNIQUE': '3e technique',
+    '3EME TECHNIQUE': '3e technique',
     '2NDE': '2nde',
     'SECONDE': '2nde',
     '1RE': '1re',
@@ -102,8 +108,8 @@ export function normalizeClassName(rawName: string): { matchedName: string; matc
     'CM 2': { target: 'CM2', suggestion: 'CM2' },
     'SIL A': { target: 'SIL', suggestion: 'SIL' },
     'CP A': { target: 'CP', suggestion: 'CP' },
-    '6EME TECH': { target: '6ème technique', suggestion: '6ème technique' },
-    '5EME TECH': { target: '5ème technique', suggestion: '5ème technique' }
+    '6EME TECH': { target: '6e technique', suggestion: '6e technique' },
+    '5EME TECH': { target: '5e technique', suggestion: '5e technique' }
   };
 
   if (corrections[normalized]) {

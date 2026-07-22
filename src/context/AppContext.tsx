@@ -61,6 +61,7 @@ interface AppContextProps {
   db: Database | null;
   updateLocalState: (patch: Partial<Database>) => void;
   updateStudentLocal: (studentId: string, patch: StudentLocalStatusPatch) => void;
+  addStudentsLocal: (studentsToAdd: Student[]) => void;
   patchLocalEntities: (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => void;
   saveDB: (newDb: Database) => Promise<void>;
   safeMergeDB: (newDb: Database) => Promise<void>;
@@ -786,6 +787,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const addStudentsLocal = (studentsToAdd: Student[]) => {
+    setDb(previousDb => {
+      if (!previousDb || !currentSchool?.id) {
+        return previousDb;
+      }
+
+      const safeStudents = studentsToAdd.filter(
+        student => student.schoolId === currentSchool.id
+      );
+
+      if (safeStudents.length !== studentsToAdd.length) {
+        return previousDb;
+      }
+
+      const existingIds = new Set(
+        previousDb.students.map(student => student.id)
+      );
+
+      const newStudents = safeStudents.filter(
+        student => !existingIds.has(student.id)
+      );
+
+      if (newStudents.length === 0) {
+        return previousDb;
+      }
+
+      return {
+        ...previousDb,
+        students: [...previousDb.students, ...newStudents]
+      };
+    });
+  };
+
   const patchLocalEntities = (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => {
     setDb(prev => {
       if (!prev) return prev;
@@ -820,7 +854,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      db, updateLocalState, updateStudentLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool,
+      db, updateLocalState, updateStudentLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool,
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended
