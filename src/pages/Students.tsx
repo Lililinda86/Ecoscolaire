@@ -248,7 +248,6 @@ const Students: React.FC = () => {
   const [previewStudents, setPreviewStudents] = useState<Student[] | null>(null);
 
   const [noMedicalConditionConfirmed, setNoMedicalConditionConfirmed] = useState(false);
-  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [stepValidationError, setStepValidationError] = useState<string | null>(null);
   const [isConfirmAbandonOpen, setIsConfirmAbandonOpen] = useState(false);
@@ -850,10 +849,6 @@ const Students: React.FC = () => {
         }
       }
     }
-  };
-
-  const handleDeleteAll = () => {
-    alert("Fonction temporairement indisponible pour protéger les données.");
   };
 
   const handleImportSubmit = async (e: React.FormEvent) => {
@@ -1531,62 +1526,6 @@ const Students: React.FC = () => {
           <button className="secondary" onClick={() => window.print()} aria-label="Imprimer la liste">
             <Printer size={18} /> Imprimer
           </button>
-
-          {/* Menu secondaire d'actions dangereuses */}
-          {['superAdmin', 'owner', 'director'].includes(currentUser?.role || '') && (
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setIsMoreActionsOpen(prev => !prev)}
-                aria-expanded={isMoreActionsOpen}
-                aria-controls="more-actions-menu"
-                aria-label="Autres actions"
-                style={{ fontSize: '0.9rem' }}
-              >
-                Autres actions ▾
-              </button>
-              {isMoreActionsOpen && (
-                <div
-                  id="more-actions-menu"
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: '110%',
-                    background: '#fff',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    zIndex: 20,
-                    minWidth: '180px',
-                    padding: '0.5rem'
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => { setIsMoreActionsOpen(false); handleDeleteAll(); }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--danger)',
-                      padding: '0.5rem 0.75rem',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                    disabled={isSchoolSuspended}
-                    aria-label="Vider la liste des élèves"
-                  >
-                    <Trash2 size={16} /> Vider la liste
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
