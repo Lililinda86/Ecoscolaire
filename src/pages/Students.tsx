@@ -223,6 +223,7 @@ const Students: React.FC = () => {
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingStudentOriginal, setEditingStudentOriginal] = useState<Student | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [, setRefresh] = useState(0);
   const { db, addStudentsLocal, updateStudentLocal, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
@@ -423,6 +424,7 @@ const Students: React.FC = () => {
 
     if (student) {
       setIsEditing(true);
+      setEditingStudentOriginal(student);
       initStudent = {
         ...student,
         studentLastName: student.studentLastName || '',
@@ -459,6 +461,7 @@ const Students: React.FC = () => {
       initEmails = '';
       setCurrentStudent(initStudent);
       setIsEditing(false);
+      setEditingStudentOriginal(null);
       setParentEmailsInput(initEmails);
     }
     setInitialSnapshot(JSON.stringify({ currentStudent: initStudent, parentEmailsInput: initEmails }));
@@ -558,6 +561,22 @@ const Students: React.FC = () => {
 
       if (isEditing && finalStudent.id) {
         const studentRef = doc(firestoreDb, 'students', finalStudent.id);
+        const getPatchValue = <K extends keyof Student>(
+          key: K,
+          defaultValue: Student[K]
+        ): Student[K] | undefined => {
+          const originalValue = editingStudentOriginal ? editingStudentOriginal[key] : undefined;
+          const currentValue = finalStudent[key];
+
+          if (originalValue === undefined) {
+            if (currentValue === defaultValue || currentValue === '' || currentValue === undefined) {
+              return undefined;
+            }
+            return currentValue;
+          }
+          return currentValue;
+        };
+
         const rawPatchData = {
           matricule: finalStudent.matricule,
           name: finalStudent.name,
@@ -574,8 +593,8 @@ const Students: React.FC = () => {
           motherName: finalStudent.motherName,
           motherPhone: finalStudent.motherPhone,
           motherProfession: finalStudent.motherProfession,
-          guardianRelationship: finalStudent.guardianRelationship,
-          guardianRelationshipDetails: finalStudent.guardianRelationshipDetails,
+          guardianRelationship: getPatchValue('guardianRelationship', 'other'),
+          guardianRelationshipDetails: getPatchValue('guardianRelationshipDetails', ''),
           parentName: finalStudent.parentName,
           parentEmails: finalStudent.parentEmails,
           parentPhone: finalStudent.parentPhone,
@@ -583,15 +602,19 @@ const Students: React.FC = () => {
           emergencyContact: finalStudent.emergencyContact,
           allergies: finalStudent.allergies,
           medicalConditions: finalStudent.medicalConditions,
-          studentStatus: finalStudent.studentStatus,
-          registrationYear: finalStudent.registrationYear
+          studentStatus: getPatchValue('studentStatus', 'nouveau'),
+          registrationYear: getPatchValue('registrationYear', '2026-2027')
         };
         const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
         await updateDoc(studentRef, patchData);
 
         // Mutate local state for UI update
+        const updatedLocalStudent = {
+          ...editingStudentOriginal,
+          ...patchData
+        } as Student;
         const idx = db.students.findIndex(s => s.id === finalStudent.id);
-        if (idx !== -1) db.students[idx] = finalStudent;
+        if (idx !== -1) db.students[idx] = updatedLocalStudent;
 
       } else {
         if (!currentSchool) throw new Error("École non définie.");
