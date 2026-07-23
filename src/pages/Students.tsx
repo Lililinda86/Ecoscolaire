@@ -12,7 +12,7 @@ import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '..
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -811,21 +811,38 @@ const Students: React.FC = () => {
   const handleDelete = async (student: Student) => {
     if (!currentUser || !currentSchool) return;
 
-    if (confirm(t('delete') + ' cet élève ?')) {
+    if (confirm("Retirer cet élève de la liste des élèves actifs ?")) {
       const canDeleteDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
 
       try {
         if (canDeleteDirectly) {
           const studentRef = doc(firestoreDb, 'students', student.id);
-          await deleteDoc(studentRef);
+          const patchData = {
+            schoolingStatus: 'inactive' as const,
+            departureReason: 'withdrawn' as const,
+            departureDate: new Date().toISOString().split('T')[0],
+            departureNote: 'Retiré des élèves actifs',
+            deactivatedAt: serverTimestamp(),
+            deactivatedBy: currentUser.id
+          };
+          await updateDoc(studentRef, patchData);
 
           // Mutate local state
           const idx = db.students.findIndex(s => s.id === student.id);
-          if (idx !== -1) db.students.splice(idx, 1);
-          currentSchool.studentCount = Math.max(0, (currentSchool.studentCount || 0) - 1);
+          if (idx !== -1) {
+            db.students[idx] = {
+              ...db.students[idx],
+              schoolingStatus: 'inactive',
+              departureReason: 'withdrawn',
+              departureDate: patchData.departureDate,
+              departureNote: patchData.departureNote,
+              deactivatedAt: new Date().toISOString(),
+              deactivatedBy: currentUser.id
+            };
+          }
           setRefresh(r => r + 1);
 
-          alert("Élève supprimé avec succès.");
+          alert("Élève désactivé avec succès.");
           logAuditAction({
             action: 'DELETE_STUDENT',
             targetType: 'STUDENT',
@@ -843,7 +860,15 @@ const Students: React.FC = () => {
             actionType: 'DELETE_STUDENT' as const,
             targetCollection: 'students',
             targetDocumentId: student.id,
-            proposedData: student,
+            proposedData: {
+              ...student,
+              schoolingStatus: 'inactive',
+              departureReason: 'withdrawn',
+              departureDate: new Date().toISOString().split('T')[0],
+              departureNote: 'Retiré des élèves actifs (Demande)',
+              deactivatedAt: new Date().toISOString(),
+              deactivatedBy: currentUser.id
+            },
             status: 'pending' as const,
             createdAt: new Date().toISOString()
           };
@@ -854,7 +879,7 @@ const Students: React.FC = () => {
           db.validation_requests.push(reqData);
           setRefresh(r => r + 1);
 
-          alert("Demande de suppression envoyée pour validation (Directeur / Super Admin).");
+          alert("Demande de désactivation envoyée pour validation.");
         }
       } catch (err: unknown) {
         const code = getErrorCode(err);
@@ -1867,15 +1892,30 @@ const Students: React.FC = () => {
                                 </div>
                               );
                             })()}
-                            <button
-                              type="button"
-                              disabled
-                              onClick={() => handleDelete(student)}
-                              title="Utilisez un statut d’archivage lorsqu’il sera disponible."
-                              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: 'not-allowed', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                            >
-                              <Trash2 size={14} aria-hidden="true" /> Suppression définitive indisponible
-                            </button>
+                            {getStudentSchoolingStatus(student) === 'active' && (
+                              <button
+                                type="button"
+                                onClick={() => { setOpenRowMenuId(null); handleDelete(student); }}
+                                disabled={isSchoolSuspended}
+                                title="Retirer cet élève de la liste des élèves actifs."
+                                style={{
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: '0.5rem 0.75rem',
+                                  cursor: isSchoolSuspended ? 'not-allowed' : 'pointer',
+                                  fontSize: '0.85rem',
+                                  color: 'var(--danger)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem',
+                                  opacity: isSchoolSuspended ? 0.55 : 1
+                                }}
+                              >
+                                <Trash2 size={14} aria-hidden="true" style={{ color: 'inherit' }} /> Retirer des élèves actifs
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

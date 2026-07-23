@@ -148,10 +148,20 @@ const ValidationDashboard: React.FC = () => {
       } else {
         // Fallback for other action types
         const newDb = { ...db };
-        let targetArray = ((newDb as Record<string, unknown>)[req.targetCollection] as ValidationEntity[]) || [];
+        const targetArray = ((newDb as Record<string, unknown>)[req.targetCollection] as ValidationEntity[]) || [];
 
         if (req.actionType === 'DELETE_STUDENT') {
-          targetArray = targetArray.filter((i: ValidationEntity) => i.id !== req.targetDocumentId);
+          const index = targetArray.findIndex((i: ValidationEntity) => i.id === req.targetDocumentId);
+          if (index >= 0) {
+            targetArray[index] = {
+              ...targetArray[index],
+              ...(req.proposedData as Record<string, unknown>),
+              schoolingStatus: 'inactive',
+              departureReason: 'withdrawn',
+              departureDate: new Date().toISOString().split('T')[0],
+              departureNote: 'Retiré des élèves actifs (Demande approuvée)'
+            };
+          }
         } else {
           const index = targetArray.findIndex((i: ValidationEntity) => i.id === req.targetDocumentId);
           if (index >= 0) {

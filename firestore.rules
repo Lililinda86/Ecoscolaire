@@ -325,8 +325,8 @@ service cloud.firestore {
         isAccountantTuitionUpdate() ||
         isAccountantTransportUpdate()
       );
-      // Delete (Demande validation dans le client, mais ici la vraie suppression requiert owner)
-      allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
+      // Delete (Désactivé physiquement pour la sécurité des données)
+      allow delete: if false;
     }
 
     match /parents/{parentId} {
