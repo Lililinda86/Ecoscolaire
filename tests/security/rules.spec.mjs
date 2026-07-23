@@ -175,6 +175,7 @@ describe('Technical Specialties Security Rules', () => {
     const context = testEnv.authenticatedContext('owner-A');
     await assertSucceeds(
       setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-new'), {
+        id: 'spec-new',
         schoolId: SCHOOL_A_ID,
         name: "Électricité",
         code: "ELEC",
@@ -237,13 +238,13 @@ describe('Technical Specialties Security Rules', () => {
     );
   });
 
-  it('Suppression autorisée pour canManagePedagogy dans la même école', async () => {
+  it('Suppression interdite même pour canManagePedagogy dans sa propre école', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'), { schoolId: SCHOOL_A_ID, name: "Électricité", code: "ELEC", isActive: true });
       await setDoc(doc(context.firestore(), 'users', 'owner-A'), { role: 'owner', schoolId: SCHOOL_A_ID, active: true });
     });
     const context = testEnv.authenticatedContext('owner-A');
-    await assertSucceeds(
+    await assertFails(
       deleteDoc(doc(context.firestore(), 'technicalSpecialties', 'spec-1'))
     );
   });
