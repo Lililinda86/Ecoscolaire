@@ -79,6 +79,19 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId', 'schoolIds']);
     }
 
+    function isUpdatingStudentActiveStatusFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'schoolingStatus',
+        'departureReason',
+        'departureDate',
+        'departureNote',
+        'deactivatedAt',
+        'deactivatedBy',
+        'reactivatedAt',
+        'reactivatedBy'
+      ]);
+    }
+
     // --- Rôles ---
     function isSuperAdmin() {
       return getRole() == 'superAdmin';
@@ -313,17 +326,20 @@ service cloud.firestore {
                     && hasValidStudentClass(request.resource.data);
       // Update
       allow update: if isAuthenticated() && isActive() && (
-        (
-          canManagePedagogy(request.resource.data.schoolId) 
-          && request.resource.data.schoolId == resource.data.schoolId
-          && (
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
-            || hasValidStudentClass(request.resource.data)
-          )
-        ) ||
-        isAccountantRegistrationFeeUpdate() ||
-        isAccountantTuitionUpdate() ||
-        isAccountantTransportUpdate()
+        !(isSecretary() && isUpdatingStudentActiveStatusFields())
+        && (
+          (
+            canManagePedagogy(request.resource.data.schoolId) 
+            && request.resource.data.schoolId == resource.data.schoolId
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
+              || hasValidStudentClass(request.resource.data)
+            )
+          ) ||
+          isAccountantRegistrationFeeUpdate() ||
+          isAccountantTuitionUpdate() ||
+          isAccountantTransportUpdate()
+        )
       );
       // Delete (Désactivé physiquement pour la sécurité des données)
       allow delete: if false;
@@ -583,13 +599,15 @@ service cloud.firestore {
 
     match /validation_requests/{reqId} {
       // N'importe quel membre du staff peut créer une requête
-      allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId)
+                    && !(isSecretary() && request.resource.data.actionType == 'DELETE_STUDENT');
       // Tout le staff peut lire les requêtes de son école
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       // Seuls les approbateurs peuvent modifier/résoudre
       allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector())
                     && hasSchoolAccess(resource.data.schoolId)
                     && resource.data.status == 'pending'
+                    && !(isSecretary() && (resource.data.actionType == 'DELETE_STUDENT' || request.resource.data.actionType == 'DELETE_STUDENT'))
                     && (
                       (request.resource.data.status == 'approved'
                        && request.resource.data.approvedBy == request.auth.uid

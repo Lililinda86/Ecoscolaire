@@ -322,7 +322,9 @@ const Students: React.FC = () => {
 
   const effectiveRole = typeof currentUser?.role === 'string' ? currentUser.role.trim() : '';
   const canManageStudents = ['superAdmin', 'owner', 'director', 'secretary'].includes(effectiveRole);
-  const canChangeSchoolingStatus = ['superAdmin', 'owner', 'director'].includes(effectiveRole);
+  const canChangeStudentActiveStatus =
+    !!effectiveRole &&
+    ['superAdmin', 'owner', 'director'].includes(effectiveRole);
 
   if (!currentUser) return null;
 
@@ -666,7 +668,7 @@ const Students: React.FC = () => {
   };
 
   const handleDeactivate = async () => {
-    if (!canChangeSchoolingStatus) {
+    if (!canChangeStudentActiveStatus) {
       setStatusError("Action refusée : Permissions insuffisantes.");
       return;
     }
@@ -746,7 +748,7 @@ const Students: React.FC = () => {
   };
 
   const handleReactivate = async () => {
-    if (!canChangeSchoolingStatus) {
+    if (!canChangeStudentActiveStatus) {
       setStatusError("Action refusée : Permissions insuffisantes.");
       return;
     }
@@ -808,79 +810,49 @@ const Students: React.FC = () => {
     }
   };
 
-  const handleDelete = async (student: Student) => {
+  const handleDeactivateStudent = async (student: Student) => {
     if (!currentUser || !currentSchool) return;
 
-    if (confirm("Retirer cet élève de la liste des élèves actifs ?")) {
-      const canDeleteDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
+    if (!canChangeStudentActiveStatus) {
+      alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
+      return;
+    }
 
+    if (confirm("Retirer cet élève de la liste des élèves actifs ?")) {
       try {
-        if (canDeleteDirectly) {
-          const studentRef = doc(firestoreDb, 'students', student.id);
-          const patchData = {
-            schoolingStatus: 'inactive' as const,
-            departureReason: 'withdrawn' as const,
-            departureDate: new Date().toISOString().split('T')[0],
-            departureNote: 'Retiré des élèves actifs',
-            deactivatedAt: serverTimestamp(),
+        const studentRef = doc(firestoreDb, 'students', student.id);
+        const patchData = {
+          schoolingStatus: 'inactive' as const,
+          departureReason: 'withdrawn' as const,
+          departureDate: new Date().toISOString().split('T')[0],
+          departureNote: 'Retiré des élèves actifs',
+          deactivatedAt: serverTimestamp(),
+          deactivatedBy: currentUser.id
+        };
+        await updateDoc(studentRef, patchData);
+
+        // Mutate local state
+        const idx = db.students.findIndex(s => s.id === student.id);
+        if (idx !== -1) {
+          db.students[idx] = {
+            ...db.students[idx],
+            schoolingStatus: 'inactive',
+            departureReason: 'withdrawn',
+            departureDate: patchData.departureDate,
+            departureNote: patchData.departureNote,
+            deactivatedAt: new Date().toISOString(),
             deactivatedBy: currentUser.id
           };
-          await updateDoc(studentRef, patchData);
-
-          // Mutate local state
-          const idx = db.students.findIndex(s => s.id === student.id);
-          if (idx !== -1) {
-            db.students[idx] = {
-              ...db.students[idx],
-              schoolingStatus: 'inactive',
-              departureReason: 'withdrawn',
-              departureDate: patchData.departureDate,
-              departureNote: patchData.departureNote,
-              deactivatedAt: new Date().toISOString(),
-              deactivatedBy: currentUser.id
-            };
-          }
-          setRefresh(r => r + 1);
-
-          alert("Élève désactivé avec succès.");
-          logAuditAction({
-            action: 'DELETE_STUDENT',
-            targetType: 'STUDENT',
-            targetId: student.id,
-            targetName: student.name
-          });
-        } else {
-          // Créer une requête de validation
-          const requestId = crypto.randomUUID();
-          const reqData = {
-            id: requestId,
-            schoolId: currentSchool.id,
-            requesterId: currentUser.id,
-            requesterRole: currentUser.role,
-            actionType: 'DELETE_STUDENT' as const,
-            targetCollection: 'students',
-            targetDocumentId: student.id,
-            proposedData: {
-              ...student,
-              schoolingStatus: 'inactive',
-              departureReason: 'withdrawn',
-              departureDate: new Date().toISOString().split('T')[0],
-              departureNote: 'Retiré des élèves actifs (Demande)',
-              deactivatedAt: new Date().toISOString(),
-              deactivatedBy: currentUser.id
-            },
-            status: 'pending' as const,
-            createdAt: new Date().toISOString()
-          };
-
-          await setDoc(doc(firestoreDb, 'validation_requests', requestId), reqData, { merge: true });
-
-          if (!db.validation_requests) db.validation_requests = [];
-          db.validation_requests.push(reqData);
-          setRefresh(r => r + 1);
-
-          alert("Demande de désactivation envoyée pour validation.");
         }
+        setRefresh(r => r + 1);
+
+        alert("Élève désactivé avec succès.");
+        logAuditAction({
+          action: 'DELETE_STUDENT',
+          targetType: 'STUDENT',
+          targetId: student.id,
+          targetName: student.name
+        });
       } catch (err: unknown) {
         const code = getErrorCode(err);
         const message = getErrorMessage(err);
@@ -1777,7 +1749,7 @@ const Students: React.FC = () => {
                                 Modifier l’élève
                               </button>
                             )}
-                            {canChangeSchoolingStatus && (
+                            {canChangeStudentActiveStatus && (
                               getStudentSchoolingStatus(student) === 'active' ? (
                                 <button
                                   type="button"
@@ -1892,10 +1864,10 @@ const Students: React.FC = () => {
                                 </div>
                               );
                             })()}
-                            {getStudentSchoolingStatus(student) === 'active' && (
+                            {getStudentSchoolingStatus(student) === 'active' && canChangeStudentActiveStatus && (
                               <button
                                 type="button"
-                                onClick={() => { setOpenRowMenuId(null); handleDelete(student); }}
+                                onClick={() => { setOpenRowMenuId(null); handleDeactivateStudent(student); }}
                                 disabled={isSchoolSuspended}
                                 title="Retirer cet élève de la liste des élèves actifs."
                                 style={{
