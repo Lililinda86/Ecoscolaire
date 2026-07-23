@@ -20,69 +20,68 @@ export const SubjectTable: React.FC<SubjectTableProps> = ({
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left', background: 'rgba(0,0,0,0.015)' }}>
-            <th style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Code</th>
-            <th style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matière</th>
-            <th style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Section</th>
-            <th style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cycles</th>
-            <th style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catégorie</th>
-            <th style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Statut</th>
-            {canWrite && <th style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>}
+            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Code</th>
+            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matière</th>
+            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Section</th>
+            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cycles</th>
+            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catégorie</th>
+            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Statut</th>
+            {canWrite && <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>}
           </tr>
         </thead>
         <tbody>
           {filteredSubjects.map((s) => {
             const isActive = s.isActive !== false;
-            // Display exactly the stored case as per ÉTAPE 7
             const displayName = s.name;
             
             return (
               <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }}>
-                <td style={{ padding: '1rem 1.25rem', fontWeight: 'bold' }}>
+                <td style={{ padding: '0.65rem 1rem', fontWeight: 'bold' }}>
                   {s.code ? (
-                    <span style={{ background: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary-color)', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700 }}>
+                    <span style={{ background: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary-color)', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
                       {s.code}
                     </span>
                   ) : (
                     <span style={{ color: 'var(--text-muted)' }}>—</span>
                   )}
                 </td>
-                <td style={{ padding: '1rem 1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: s.color || '#4f46e5', boxShadow: 'inset 0 0 2px rgba(0,0,0,0.2)' }} />
+                <td style={{ padding: '0.65rem 1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: s.color || '#4f46e5', boxShadow: 'inset 0 0 2px rgba(0,0,0,0.15)' }} />
                     <div>
-                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem' }}>{displayName}</div>
-                      {s.shortName && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>({s.shortName})</div>}
+                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>{displayName}</div>
+                      {s.shortName && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({s.shortName})</div>}
                     </div>
                   </div>
                 </td>
-                <td style={{ padding: '1rem 1.25rem' }}>
+                <td style={{ padding: '0.65rem 1rem' }}>
                   {s.section === 'francophone' && (
-                    <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
                       FR — Francophone
                     </span>
                   )}
                   {s.section === 'anglophone' && (
-                    <span style={{ backgroundColor: '#fdf2f8', color: '#be185d', border: '1px solid #fbcfe8', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span style={{ backgroundColor: '#fdf2f8', color: '#be185d', border: '1px solid #fbcfe8', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
                       EN — Anglophone
                     </span>
                   )}
                   {(s.section === 'all' || !s.section) && (
-                    <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
                       FR / EN — Commune
                     </span>
                   )}
                 </td>
-                <td style={{ padding: '1rem 1.25rem' }}>
+                <td style={{ padding: '0.65rem 1rem' }}>
                   {s.cycles && s.cycles.length > 0 ? (
-                    <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>
                       {s.cycles.map((cyc) => (
                         <span
                           key={cyc}
                           style={{
-                            fontSize: '0.75rem',
+                            fontSize: '0.725rem',
                             background: 'rgba(79, 70, 229, 0.08)',
                             color: 'var(--primary-color)',
-                            padding: '0.2rem 0.5rem',
+                            padding: '0.15rem 0.4rem',
                             borderRadius: '6px',
                             fontWeight: 500
                           }}
@@ -92,45 +91,45 @@ export const SubjectTable: React.FC<SubjectTableProps> = ({
                       ))}
                     </div>
                   ) : (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>—</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>—</span>
                   )}
                 </td>
-                <td style={{ padding: '1rem 1.25rem', color: '#475569', fontSize: '0.9rem' }}>{s.category || '—'}</td>
-                <td style={{ padding: '1rem 1.25rem' }}>
+                <td style={{ padding: '0.65rem 1rem', color: '#475569', fontSize: '0.85rem' }}>{s.category || '—'}</td>
+                <td style={{ padding: '0.65rem 1rem' }}>
                   <span style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.35rem',
+                    gap: '0.3rem',
                     backgroundColor: isActive ? '#ecfdf5' : '#f8fafc',
                     color: isActive ? '#047857' : '#64748b',
                     border: isActive ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
-                    padding: '0.25rem 0.6rem',
+                    padding: '0.2rem 0.5rem',
                     borderRadius: '6px',
                     fontWeight: 600,
-                    fontSize: '0.8rem'
+                    fontSize: '0.75rem'
                   }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isActive ? '#10b981' : '#64748b' }} />
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: isActive ? '#10b981' : '#64748b' }} />
                     {isActive ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 {canWrite && (
-                  <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
+                  <td style={{ padding: '0.65rem 1rem', textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
                       <button
                         className="secondary"
-                        style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', display: 'flex', alignItems: 'center' }}
+                        style={{ padding: '0.35rem 0.5rem', borderRadius: '6px', display: 'flex', alignItems: 'center' }}
                         onClick={() => handleOpenEdit(s)}
                         title="Modifier"
                         aria-label="Modifier la matière"
                       >
-                        <Edit2 size={13} />
+                        <Edit2 size={12} />
                       </button>
                       <button
                         className="secondary"
                         style={{
-                          padding: '0.4rem 0.8rem',
+                          padding: '0.35rem 0.75rem',
                           borderRadius: '6px',
-                          fontSize: '0.8rem',
+                          fontSize: '0.75rem',
                           fontWeight: 600,
                           color: isActive ? '#ef4444' : '#10b981',
                           borderColor: isActive ? '#fecaca' : '#a7f3d0',

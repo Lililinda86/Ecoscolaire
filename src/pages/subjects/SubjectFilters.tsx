@@ -33,24 +33,40 @@ export const SubjectFilters: React.FC<SubjectFiltersProps> = ({
   handleResetFilters
 }) => {
   return (
-    <div className="card" style={{ marginBottom: '1.5rem', padding: '1.25rem', borderRadius: '12px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: 2, minWidth: '260px', position: 'relative' }}>
-          <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+    <div className="card" style={{ marginBottom: '1.25rem', padding: '0.85rem 1.25rem', borderRadius: '12px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ flex: 2, minWidth: '240px', position: 'relative' }}>
+          <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
             placeholder="Rechercher par nom ou code..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '2.5rem', width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)', height: '42px' }}
+            style={{ 
+              paddingLeft: '2.25rem', 
+              width: '100%', 
+              borderRadius: '8px', 
+              border: '2px solid var(--border-color)', 
+              height: '38px',
+              fontSize: '0.9rem',
+              backgroundColor: '#ffffff'
+            }}
           />
         </div>
 
-        <div style={{ flex: 1, minWidth: '160px' }}>
+        <div style={{ flex: 1, minWidth: '150px' }}>
           <select 
             value={statusFilter} 
             onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-            style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)', height: '42px', padding: '0.5rem' }}
+            style={{ 
+              width: '100%', 
+              borderRadius: '8px', 
+              border: '2px solid var(--border-color)', 
+              height: '38px', 
+              padding: '0 0.5rem',
+              fontSize: '0.9rem',
+              backgroundColor: '#ffffff'
+            }}
           >
             <option value="active">Actives uniquement</option>
             <option value="inactive">Inactives uniquement</option>
@@ -58,11 +74,19 @@ export const SubjectFilters: React.FC<SubjectFiltersProps> = ({
           </select>
         </div>
 
-        <div style={{ flex: 1, minWidth: '160px' }}>
+        <div style={{ flex: 1, minWidth: '150px' }}>
           <select 
             value={sectionFilter} 
             onChange={(e) => setSectionFilter(e.target.value as 'all' | 'francophone' | 'anglophone' | 'all-sections')}
-            style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)', height: '42px', padding: '0.5rem' }}
+            style={{ 
+              width: '100%', 
+              borderRadius: '8px', 
+              border: '2px solid var(--border-color)', 
+              height: '38px', 
+              padding: '0 0.5rem',
+              fontSize: '0.9rem',
+              backgroundColor: '#ffffff'
+            }}
           >
             <option value="all">Toutes les sections</option>
             <option value="francophone">Francophone</option>
@@ -71,11 +95,19 @@ export const SubjectFilters: React.FC<SubjectFiltersProps> = ({
           </select>
         </div>
 
-        <div style={{ flex: 1, minWidth: '160px' }}>
+        <div style={{ flex: 1, minWidth: '150px' }}>
           <select 
             value={cycleFilter} 
             onChange={(e) => setCycleFilter(e.target.value as 'all' | 'nursery' | 'primary' | 'secondary' | 'none')}
-            style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)', height: '42px', padding: '0.5rem' }}
+            style={{ 
+              width: '100%', 
+              borderRadius: '8px', 
+              border: '2px solid var(--border-color)', 
+              height: '38px', 
+              padding: '0 0.5rem',
+              fontSize: '0.9rem',
+              backgroundColor: '#ffffff'
+            }}
           >
             <option value="all">Tous les cycles</option>
             <option value="nursery">Maternelle / Nursery</option>
@@ -86,11 +118,19 @@ export const SubjectFilters: React.FC<SubjectFiltersProps> = ({
         </div>
 
         {categories.length > 0 && (
-          <div style={{ flex: 1, minWidth: '160px' }}>
+          <div style={{ flex: 1, minWidth: '150px' }}>
             <select 
               value={categoryFilter} 
               onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)', height: '42px', padding: '0.5rem' }}
+              style={{ 
+                width: '100%', 
+                borderRadius: '8px', 
+                border: '2px solid var(--border-color)', 
+                height: '38px', 
+                padding: '0 0.5rem',
+                fontSize: '0.9rem',
+                backgroundColor: '#ffffff'
+              }}
             >
               <option value="">Toutes les catégories</option>
               {categories.map((cat) => (
@@ -108,17 +148,17 @@ export const SubjectFilters: React.FC<SubjectFiltersProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.35rem',
               background: 'none',
               border: 'none',
               color: 'var(--primary-color)',
               cursor: 'pointer',
               fontWeight: 600,
-              fontSize: '0.9rem',
-              padding: '0.5rem'
+              fontSize: '0.85rem',
+              padding: '0.25rem 0.5rem'
             }}
           >
-            <RotateCcw size={16} /> Réinitialiser les filtres
+            <RotateCcw size={14} /> Réinitialiser
           </button>
         )}
       </div>

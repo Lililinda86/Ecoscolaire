@@ -445,34 +445,38 @@ const SubjectsProgram: React.FC = () => {
       {activeModuleTab === 'catalogue' && (
         <div>
           {/* Summary stats cards */}
-          <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             <div style={{ 
               flex: 1, 
               minWidth: '200px', 
               background: 'rgba(16, 185, 129, 0.05)', 
               border: '1px solid rgba(16, 185, 129, 0.2)', 
-              padding: '1.25rem', 
+              padding: '0.65rem 1.25rem', 
               borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.25rem'
+              justifyContent: 'center',
+              height: '92px',
+              boxSizing: 'border-box'
             }}>
-              <span style={{ color: '#047857', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Matières actives</span>
-              <strong style={{ fontSize: '2rem', color: '#065f46', fontWeight: 800 }}>{activeCount}</strong>
+              <span style={{ color: '#047857', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matières actives</span>
+              <strong style={{ fontSize: '1.85rem', color: '#065f46', fontWeight: 800, marginTop: '0.15rem' }}>{activeCount}</strong>
             </div>
             <div style={{ 
               flex: 1, 
               minWidth: '200px', 
               background: 'rgba(100, 116, 139, 0.05)', 
               border: '1px solid rgba(100, 116, 139, 0.2)', 
-              padding: '1.25rem', 
+              padding: '0.65rem 1.25rem', 
               borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.25rem'
+              justifyContent: 'center',
+              height: '92px',
+              boxSizing: 'border-box'
             }}>
-              <span style={{ color: '#475569', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }}>Matières inactives</span>
-              <strong style={{ fontSize: '2rem', color: '#1e293b', fontWeight: 800 }}>{inactiveCount}</strong>
+              <span style={{ color: '#475569', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matières inactives</span>
+              <strong style={{ fontSize: '1.85rem', color: '#1e293b', fontWeight: 800, marginTop: '0.15rem' }}>{inactiveCount}</strong>
             </div>
           </div>
 
