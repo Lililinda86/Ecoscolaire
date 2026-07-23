@@ -403,7 +403,34 @@ service cloud.firestore {
     }
     match /subjects/{subjectId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow create: if isAuthenticated()
+        && isActive()
+        && request.resource.data.schoolId is string
+        && hasSchoolAccess(request.resource.data.schoolId)
+        && (isAdminOrOwner() || isDirector())
+        && request.resource.data.id is string
+        && request.resource.data.id == subjectId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive == true
+        && request.resource.data.createdAt is string
+        && request.resource.data.createdBy is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string;
+      allow update: if isAuthenticated()
+        && isActive()
+        && hasSchoolAccess(resource.data.schoolId)
+        && request.resource.data.schoolId == resource.data.schoolId
+        && (isAdminOrOwner() || isDirector())
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'schoolId'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string;
+      allow delete: if false;
     }
     match /technicalSpecialties/{specialtyId} {
       allow read: if isAuthenticated()

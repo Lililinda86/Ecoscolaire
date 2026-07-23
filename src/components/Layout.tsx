@@ -77,6 +77,10 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                   )}
                   {['superAdmin', 'owner', 'director', 'teacher', 'secretary'].includes(currentUser.role) && (
                     <>
+                      <NavLink to="/subjects-program" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-subjects-program">
+                        <BookOpen size={20} />
+                        Matières & Programmes
+                      </NavLink>
                       <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-grades">
                         <ClipboardList size={20} />
                         Notes & Bulletins

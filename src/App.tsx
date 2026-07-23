@@ -15,6 +15,7 @@ import Settings from './pages/Settings';
 import Grades from './pages/Grades';
 import Payments from './pages/Payments';
 import Classes from './pages/Classes';
+import SubjectsProgram from './pages/SubjectsProgram';
 import Login from './pages/Login';
 import SuperAdmin from './pages/SuperAdmin';
 import ParentPortal from './pages/ParentPortal';
@@ -167,6 +168,7 @@ function App() {
         
         <Route path="/students" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><Students /></Layout></ProtectedRoute>} />
         <Route path="/classes" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><Classes /></Layout></ProtectedRoute>} />
+        <Route path="/subjects-program" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><SubjectsProgram /></Layout></ProtectedRoute>} />
         <Route path="/staff" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'superAdmin']}><Layout><Staff /></Layout></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><Attendance /></Layout></ProtectedRoute>} />
         <Route path="/buses" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'driver']}><Layout><Buses /></Layout></ProtectedRoute>} />

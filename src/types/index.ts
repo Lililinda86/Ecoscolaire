@@ -151,6 +151,18 @@ export interface Subject {
   id: string;
   schoolId?: string;
   name: string;
+  code?: string;
+  shortName?: string;
+  section?: 'francophone' | 'anglophone' | 'all';
+  cycles?: ('nursery' | 'primary' | 'secondary')[];
+  category?: string;
+  teachingLanguage?: string;
+  color?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface Student {

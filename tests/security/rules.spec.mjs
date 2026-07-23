@@ -385,3 +385,312 @@ describe('Student Active Status Security Rules', () => {
     );
   });
 });
+
+describe('Subjects Security Rules', () => {
+  const SCHOOL_ID = 'school-A';
+
+  beforeEach(async () => {
+    // Set up default users
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', 'superAdmin-1'), { role: 'superAdmin', active: true });
+      await setDoc(doc(ctx.firestore(), 'users', 'owner-1'), { role: 'owner', schoolId: SCHOOL_ID, active: true });
+      await setDoc(doc(ctx.firestore(), 'users', 'director-1'), { role: 'director', schoolId: SCHOOL_ID, active: true });
+      await setDoc(doc(ctx.firestore(), 'users', 'secretary-1'), { role: 'secretary', schoolId: SCHOOL_ID, active: true });
+      await setDoc(doc(ctx.firestore(), 'users', 'teacher-1'), { role: 'teacher', schoolId: SCHOOL_ID, active: true });
+    });
+  });
+
+  it('owner can create a subject in their school', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertSucceeds(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'owner-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('director can create a subject in their school', async () => {
+    const context = testEnv.authenticatedContext('director-1');
+    await assertSucceeds(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'director-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'director-1'
+      })
+    );
+  });
+
+  it('secretary cannot create a subject', async () => {
+    const context = testEnv.authenticatedContext('secretary-1');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'secretary-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'secretary-1'
+      })
+    );
+  });
+
+  it('teacher cannot create a subject', async () => {
+    const context = testEnv.authenticatedContext('teacher-1');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'teacher-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'teacher-1'
+      })
+    );
+  });
+
+  it('creation in another school is denied', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: 'other-school',
+        name: 'Mathématiques',
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'owner-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('changing schoolId is denied', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      updateDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        schoolId: 'other-school'
+      })
+    );
+  });
+
+  it('modification authorized by direction', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertSucceeds(
+      updateDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        name: 'Maths Sup',
+        updatedAt: '2026-07-23T19:05:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('physical delete is denied', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      deleteDoc(doc(context.firestore(), 'subjects', 'subj-1'))
+    );
+  });
+
+  it('creation without name is denied', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'owner-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('isActive must be a boolean', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: 'yes',
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'owner-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('superAdmin can create a subject in any school', async () => {
+    const context = testEnv.authenticatedContext('superAdmin-1');
+    await assertSucceeds(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'superAdmin-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'superAdmin-1'
+      })
+    );
+  });
+
+  it('cross-school read is denied', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: 'other-school',
+        name: 'Mathématiques',
+        isActive: true
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      getDoc(doc(context.firestore(), 'subjects', 'subj-1'))
+    );
+  });
+
+  it('id change is denied during update', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      updateDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-changed',
+        updatedAt: '2026-07-23T19:05:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('logical deactivate and reactivate are allowed', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    // Deactivate
+    await assertSucceeds(
+      updateDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        isActive: false,
+        updatedAt: '2026-07-23T19:05:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+    // Reactivate
+    await assertSucceeds(
+      updateDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        isActive: true,
+        updatedAt: '2026-07-23T19:06:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('creation without schoolId is denied', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        name: 'Mathématiques',
+        isActive: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'owner-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'owner-1'
+      })
+    );
+  });
+
+  it('creation without audit fields is denied', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      setDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques',
+        isActive: true
+      })
+    );
+  });
+
+  it('legacy subject without isActive remains readable', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        schoolId: SCHOOL_ID,
+        name: 'Mathématiques'
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertSucceeds(
+      getDoc(doc(context.firestore(), 'subjects', 'subj-1'))
+    );
+  });
+
+  it('legacy subject without schoolId is unreadable by owner', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'subjects', 'subj-1'), {
+        id: 'subj-1',
+        name: 'Mathématiques'
+      });
+    });
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(
+      getDoc(doc(context.firestore(), 'subjects', 'subj-1'))
+    );
+  });
+});

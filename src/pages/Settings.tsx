@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Edit2, Trash2, BookOpen } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
@@ -9,7 +10,7 @@ import type { School, EducationCycle } from '../types';
 
 const Settings: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
-  const [newSubject, setNewSubject] = useState('');
+  const navigate = useNavigate();
   const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as 'francophone' | 'anglophone' });
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
   const [currentClassId, setCurrentClassId] = useState('');
@@ -271,27 +272,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleAddSubject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSubject.trim()) return;
-    const newDb = { ...db, subjects: [...db.subjects, { id: crypto.randomUUID(), name: newSubject }] };
-    safeMergeDB(newDb);
-    setNewSubject('');
-  };
 
-  const handleDeleteSubject = (id: string) => {
-    if (!checkPin()) { alert("Code PIN incorrect."); return; }
-    if (confirm("Voulez-vous vraiment supprimer cette matière ?")) {
-      safeMergeDB({ ...db, subjects: db.subjects.filter(s => s.id !== id) });
-    }
-  };
-
-  const handleEditSubject = (id: string, oldName: string) => {
-    const name = prompt("Modifier le nom de la matière :", oldName);
-    if (name && name.trim()) {
-      safeMergeDB({ ...db, subjects: db.subjects.map(s => s.id === id ? { ...s, name: name.trim() } : s) });
-    }
-  };
 
   const checkPin = () => {
     const targetPin = db.school?.adminPin || '0000';
@@ -795,25 +776,12 @@ const Settings: React.FC = () => {
 
       <div className="card">
         <h2>Gestion des matières</h2>
-        <form onSubmit={handleAddSubject} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          <input required value={newSubject} onChange={e => setNewSubject(e.target.value)} placeholder="Nouvelle matière..." style={{ flex: 1 }} />
-          <button type="submit">Ajouter</button>
-        </form>
-
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>
-            {db.subjects.map(s => (
-              <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '0.75rem' }}>{s.name}</td>
-                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                  <button className="secondary" style={{ padding: '0.25rem 0.5rem', marginRight: '0.5rem' }} onClick={() => handleEditSubject(s.id, s.name)}><Edit2 size={14} /></button>
-                  <button className="secondary" style={{ padding: '0.25rem 0.5rem', color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleDeleteSubject(s.id)}><Trash2 size={14} /></button>
-                </td>
-              </tr>
-            ))}
-            {db.subjects.length === 0 && <tr><td colSpan={2} style={{ padding: '1rem', color: 'var(--text-muted)' }}>Aucune matière</td></tr>}
-          </tbody>
-        </table>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+          Le catalogue des matières est désormais géré depuis le module académique centralisé.
+        </p>
+        <button onClick={() => navigate('/subjects-program')}>
+          Ouvrir le catalogue des matières
+        </button>
       </div>
 
       <div className="card" style={{ marginTop: '2rem' }}>
