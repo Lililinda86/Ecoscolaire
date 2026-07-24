@@ -1,6 +1,14 @@
 import React, { useState, useRef, useEffect, useId } from 'react';
 import { getDisplayClassName, getSpecialtyName, resolveEducationType } from '../../utils/classCatalog';
 import type { ClassSection, TechnicalSpecialty } from '../../types';
+import { sortClasses } from '../../utils/sortClasses';
+import {
+  normalizeClassSection,
+  normalizeClassCycle,
+  getClassGroupDescriptor,
+  compareGroupDescriptors,
+  type ClassGroupDescriptor
+} from '../../utils/classClassification';
 
 export interface ClassSearchPickerProps {
   classes: ClassSection[];
@@ -107,10 +115,8 @@ export const ClassSearchPicker: React.FC<ClassSearchPickerProps> = ({
 
       const canonicalName = normalizeSearchTerm(c.name);
       const displayName = normalizeSearchTerm(getDisplayClassName(c.name));
-      const section = normalizeSearchTerm((c.type || c.section || 'francophone') === 'francophone' ? 'francophone' : 'anglophone');
-
-      const cycle = c.cycle || c.level || '';
-      const cycleNorm = normalizeSearchTerm(cycle);
+      const section = normalizeSearchTerm(normalizeClassSection(c));
+      const cycleNorm = normalizeSearchTerm(normalizeClassCycle(c));
 
       const eduRes = resolveEducationType(c.educationType, c.specialtyId);
       const eduNorm = normalizeSearchTerm(eduRes.value === 'technical' ? 'technique technical' : 'general general');
@@ -142,45 +148,31 @@ export const ClassSearchPicker: React.FC<ClassSearchPickerProps> = ({
 
   // Regroupement
   const grouped = React.useMemo(() => {
-    const groups: Record<string, ClassSection[]> = {
-      'Francophone — Maternelle — Général': [],
-      'Francophone — Primaire — Général': [],
-      'Francophone — Secondaire — Général': [],
-      'Francophone — Secondaire — Technique': [],
-      'Anglophone — Nursery — General': [],
-      'Anglophone — Primary — General': [],
-      'Anglophone — Secondary — General': [],
-      'Anglophone — Secondary — Technical': []
-    };
+    const groups: Record<string, ClassSection[]> = {};
+    const groupDescriptorsMap: Record<string, ClassGroupDescriptor> = {};
 
     filteredOptions.forEach(c => {
-      const section = (c.type || c.section || 'francophone') === 'francophone' ? 'Francophone' : 'Anglophone';
-      const cLower = (c.name || '').toLowerCase();
-      let cycleKey = 'Primaire';
-      if (cLower.includes('maternelle') || cLower.includes('nursery') || cLower.includes('petite section') || cLower.includes('moyenne section') || cLower.includes('grande section')) {
-        cycleKey = 'Maternelle';
-      } else if (cLower.includes('6e') || cLower.includes('5e') || cLower.includes('4e') || cLower.includes('3e') || cLower.includes('seconde') || cLower.includes('premiere') || cLower.includes('1re') || cLower.includes('terminale') || cLower.includes('form')) {
-        cycleKey = 'Secondaire';
+      const desc = getClassGroupDescriptor(c, technicalSpecialties, currentSchoolId);
+      if (!groups[desc.label]) {
+        groups[desc.label] = [];
+        groupDescriptorsMap[desc.label] = desc;
       }
-
-      const eduTypeRes = resolveEducationType(c.educationType, c.specialtyId);
-      const isTech = eduTypeRes.value === 'technical';
-
-      let key = '';
-      if (section === 'Francophone') {
-        key = `Francophone — ${cycleKey} — ${isTech ? 'Technique' : 'Général'}`;
-      } else {
-        const cycleEn = cycleKey === 'Maternelle' ? 'Nursery' : cycleKey === 'Primaire' ? 'Primary' : 'Secondary';
-        key = `Anglophone — ${cycleEn} — ${isTech ? 'Technical' : 'General'}`;
-      }
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(c);
+      groups[desc.label].push(c);
     });
 
-    // Supprimer les groupes vides
-    return Object.fromEntries(Object.entries(groups).filter(([, list]) => list.length > 0));
-  }, [filteredOptions]);
+    const sortedGroupLabels = Object.keys(groups).sort((a, b) => {
+      const descA = groupDescriptorsMap[a];
+      const descB = groupDescriptorsMap[b];
+      return compareGroupDescriptors(descA, descB);
+    });
+
+    const orderedGrouped: Record<string, ClassSection[]> = {};
+    sortedGroupLabels.forEach(label => {
+      orderedGrouped[label] = sortClasses(groups[label]);
+    });
+
+    return orderedGrouped;
+  }, [filteredOptions, technicalSpecialties, currentSchoolId]);
 
   // Liste à plat pour navigation clavier
   const flatOptions = React.useMemo(() => {
