@@ -135,6 +135,10 @@ service cloud.firestore {
       return hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
     }
 
+    function isAcademicProgramManager() {
+      return isSuperAdmin() || isOwner() || isDirector() || isSecretary();
+    }
+
     function hasValidStudentClass(studentData) {
       let classPath = /databases/$(database)/documents/classes/$(studentData.classId);
       return studentData.classId is string
@@ -407,7 +411,7 @@ service cloud.firestore {
         && isActive()
         && request.resource.data.schoolId is string
         && hasSchoolAccess(request.resource.data.schoolId)
-        && (isAdminOrOwner() || isDirector())
+        && isAcademicProgramManager()
         && request.resource.data.id is string
         && request.resource.data.id == subjectId
         && request.resource.data.name is string
@@ -422,7 +426,7 @@ service cloud.firestore {
         && isActive()
         && hasSchoolAccess(resource.data.schoolId)
         && request.resource.data.schoolId == resource.data.schoolId
-        && (isAdminOrOwner() || isDirector())
+        && isAcademicProgramManager()
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'schoolId'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
@@ -467,9 +471,9 @@ service cloud.firestore {
     match /classPrograms/{programId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
                   && (
-                    (isAdminOrOwner() || isDirector())
+                    isAcademicProgramManager()
                     || (
-                      (isSecretary() || isTeacher())
+                      isTeacher()
                       && resource.data.status == 'published'
                       && 'publishedRevisionId' in resource.data
                       && resource.data.publishedRevisionId is string
@@ -483,7 +487,7 @@ service cloud.firestore {
                     && request.resource.data.schoolId is string
                     && request.resource.data.schoolId.size() > 0
                     && hasSchoolAccess(request.resource.data.schoolId)
-                    && (isAdminOrOwner() || isDirector())
+                    && isAcademicProgramManager()
                     && request.resource.data.classId is string
                     && request.resource.data.classId.size() > 0
                     && request.resource.data.academicYearId is string
@@ -515,9 +519,9 @@ service cloud.firestore {
     match /classSubjects/{classSubjectId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
                   && (
-                    (isAdminOrOwner() || isDirector())
+                    isAcademicProgramManager()
                     || (
-                      (isSecretary() || isTeacher())
+                      isTeacher()
                       && exists(/databases/$(database)/documents/classPrograms/$(resource.data.programId))
                       && get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.schoolId == resource.data.schoolId
                       && 'publishedRevisionId' in get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data
@@ -527,7 +531,7 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isActive()
                     && request.resource.data.schoolId is string
                     && hasSchoolAccess(request.resource.data.schoolId)
-                    && (isAdminOrOwner() || isDirector())
+                    && isAcademicProgramManager()
                     && exists(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId))
                     && request.resource.data.schoolId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.schoolId
                     && request.resource.data.classId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.classId
@@ -575,7 +579,7 @@ service cloud.firestore {
                       'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
                     ]);
       allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
-                    && (isAdminOrOwner() || isDirector())
+                    && isAcademicProgramManager()
                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
                       'id', 'programId', 'schoolId', 'classId', 'academicYearId', 'subjectId',
                       'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',

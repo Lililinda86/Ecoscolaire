@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useClassProgram } from '../../../hooks/useClassProgram';
+import { canManageAcademicPrograms } from '../../../utils/academicPermissions';
 import { normalizeAcademicYearId } from '../../../utils/academicYear';
 import { normalizeClassCycle } from '../../../utils/classClassification';
 import { ClassProgramSelectors } from './ClassProgramSelectors';
@@ -90,8 +91,8 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
 
   if (!currentUser || !db) return null;
 
-  const isManager = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
-  const isReadOnlyRole = ['secretary', 'teacher'].includes(currentUser.role);
+  const isManager = canManageAcademicPrograms(currentUser.role);
+  const isReadOnlyRole = currentUser.role === 'teacher';
 
   // If academic year is not configured correctly
   if (!normalizedYear) {

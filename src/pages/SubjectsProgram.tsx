@@ -8,6 +8,7 @@ import { SubjectStatusDialog } from './subjects/SubjectStatusDialog';
 import { SubjectFormModal } from './subjects/SubjectFormModal';
 import { ClassProgramPanel } from './subjects/programs/ClassProgramPanel';
 import Modal from '../components/Modal';
+import { canManageAcademicPrograms } from '../utils/academicPermissions';
 
 const SubjectsProgram: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
@@ -97,7 +98,7 @@ const SubjectsProgram: React.FC = () => {
   };
 
   // Permissions check
-  const canWrite = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
+  const canWrite = canManageAcademicPrograms(currentUser.role);
   const canRead = ['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role);
 
   if (!canRead) {

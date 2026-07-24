@@ -30,10 +30,12 @@ export interface UseClassProgramResult {
 
 export type ClassProgramAccessMode = 'manager' | 'read-only' | 'forbidden';
 
+import { canManageAcademicPrograms } from '../utils/academicPermissions';
+
 export function getClassProgramAccessMode(role: string | undefined): ClassProgramAccessMode {
   if (!role) return 'forbidden';
-  if (['superAdmin', 'owner', 'director'].includes(role)) return 'manager';
-  if (['secretary', 'teacher'].includes(role)) return 'read-only';
+  if (canManageAcademicPrograms(role)) return 'manager';
+  if (role === 'teacher') return 'read-only';
   return 'forbidden';
 }
 
