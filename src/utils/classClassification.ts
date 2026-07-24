@@ -13,13 +13,33 @@ export interface ClassGroupDescriptor {
   key: string;
 }
 
-export function normalizeClassSection(cls: Partial<ClassSection>): NormalizedSection {
-  const sectionVal = cls.type || cls.section;
-  if (!sectionVal) return 'unknown';
-  const clean = sectionVal.toLowerCase().trim();
+export function normalizeSectionValue(value?: string): 'francophone' | 'anglophone' | 'unknown' {
+  if (!value) return 'unknown';
+  const clean = value.toLowerCase().trim();
   if (clean === 'francophone') return 'francophone';
   if (clean === 'anglophone') return 'anglophone';
   return 'unknown';
+}
+
+export function normalizeClassSection(cls: Partial<ClassSection>): NormalizedSection {
+  // 1. Examine type
+  const typeVal = normalizeSectionValue(cls.type);
+  if (typeVal !== 'unknown') return typeVal;
+
+  // 2. Examine section
+  const sectionVal = normalizeSectionValue(cls.section);
+  return sectionVal;
+}
+
+export function normalizeClassName(value?: string): string {
+  if (!value) return '';
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ') // Dash/underscore to single space
+    .replace(/\s+/g, ' ') // Multiple spaces to single space
+    .trim();
 }
 
 export function normalizeClassCycle(cls: Partial<ClassSection>): NormalizedCycle {
@@ -53,51 +73,53 @@ export function normalizeClassCycle(cls: Partial<ClassSection>): NormalizedCycle
 
   // 3. Fallback by name analysis (only if cycle and level are not recognized)
   if (!cls.name) return 'unknown';
-  const n = cls.name.toLowerCase().trim();
+  const n = normalizeClassName(cls.name);
+
+  // Exact names/regex for maternelle:
   if (
-    n.includes('maternelle') ||
-    n.includes('nursery') ||
-    n.includes('pré-') ||
-    n.includes('petite section') ||
-    n.includes('moyenne section') ||
-    n.includes('grande section') ||
-    n.includes('pre-maternelle') ||
-    n.includes('pre-nursery') ||
-    n.includes('pre_nursery')
+    n === 'preschool' ||
+    n === 'nursery' ||
+    n === 'maternelle' ||
+    n === 'pre nursery' ||
+    n === 'pre maternelle' ||
+    n === 'petite section' ||
+    n === 'moyenne section' ||
+    n === 'grande section' ||
+    /^(nursery|maternelle) [1-3]$/.test(n)
   ) {
     return 'maternelle';
   }
+
+  // Exact names/regex for primaire:
   if (
-    n.startsWith('class ') ||
     n === 'sil' ||
     n === 'cp' ||
     n === 'ce1' ||
     n === 'ce2' ||
     n === 'cm1' ||
     n === 'cm2' ||
-    n.includes('primary') ||
-    n.includes('primaire')
+    n === 'primary' ||
+    n === 'primaire' ||
+    /^class [1-6]$/.test(n)
   ) {
     return 'primaire';
   }
+
+  // Exact names/regex for secondaire:
   if (
-    n.startsWith('form ') ||
-    n.includes('sixth') ||
-    n.includes('6e') ||
-    n.includes('6ème') ||
-    n.includes('5e') ||
-    n.includes('5ème') ||
-    n.includes('4e') ||
-    n.includes('4ème') ||
-    n.includes('3e') ||
-    n.includes('3ème') ||
-    n.includes('seconde') ||
-    n.includes('2nde') ||
-    n.includes('première') ||
-    n.includes('1re') ||
-    n.includes('terminale') ||
-    n.includes('secondary') ||
-    n.includes('secondaire')
+    n === 'terminale' ||
+    n === 'seconde' ||
+    n === 'premiere' ||
+    n === 'secondary' ||
+    n === 'secondaire' ||
+    n === 'lower sixth' ||
+    n === 'upper sixth' ||
+    /^(6|5|4|3)e(me)?( technique)?$/.test(n) ||
+    /^(1|2)nd(e)?( technique)?$/.test(n) ||
+    /^1re( technique)?$/.test(n) ||
+    /^form [1-5]$/.test(n) ||
+    /^technical form [1-5]$/.test(n) ||
+    /^(lower|upper) sixth technical$/.test(n)
   ) {
     return 'secondaire';
   }
@@ -112,7 +134,8 @@ export function getClassGroupDescriptor(
 ): ClassGroupDescriptor {
   const section = normalizeClassSection(cls);
   const cycle = normalizeClassCycle(cls);
-  const teachingType = resolveEducationType(cls.educationType, cls.specialtyId).value;
+  const eduRes = resolveEducationType(cls.educationType, cls.specialtyId);
+  const teachingType = eduRes.value;
 
   let specialtyName = '';
   let label = 'AUTRES / À VÉRIFIER';
@@ -150,14 +173,22 @@ export function getClassGroupDescriptor(
       } else {
         label = `${sectionLabel} — ${cycleLabel} — ${typeLabel} (SPÉCIALITÉ À VÉRIFIER)`;
       }
-    } else {
+    } else if (teachingType === 'general') {
       const isAnglophone = section === 'anglophone';
       const typeLabel = isAnglophone ? 'GENERAL' : 'GÉNÉRAL';
+      label = `${sectionLabel} — ${cycleLabel} — ${typeLabel}`;
+    } else {
+      // Teaching type is unknown
+      const isAnglophone = section === 'anglophone';
+      const typeLabel = isAnglophone ? 'TYPE TO VERIFY' : 'TYPE À VÉRIFIER';
       label = `${sectionLabel} — ${cycleLabel} — ${typeLabel}`;
     }
   }
 
-  const key = `${section}__${cycle}__${teachingType}__${specialtyName}`;
+  // Ensure unique key for the "unknown/unverified" group too, avoiding duplicates
+  const key = section === 'unknown' || cycle === 'unknown'
+    ? 'unknown_group'
+    : `${section}__${cycle}__${teachingType}__${specialtyName}`;
 
   return {
     section,
