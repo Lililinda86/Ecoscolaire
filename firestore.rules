@@ -471,6 +471,12 @@ service cloud.firestore {
                     || (
                       (isSecretary() || isTeacher())
                       && resource.data.status == 'published'
+                      && 'publishedRevisionId' in resource.data
+                      && resource.data.publishedRevisionId is string
+                      && resource.data.publishedRevisionId != ""
+                      && 'publishedRevisionNumber' in resource.data
+                      && resource.data.publishedRevisionNumber is int
+                      && resource.data.publishedRevisionNumber >= 1
                     )
                   );
       allow create: if isAuthenticated() && isActive()

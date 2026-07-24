@@ -1052,9 +1052,10 @@ describe('Class Programs and Subjects Security Rules', () => {
       await assertFails(deleteDoc(doc(context.firestore(), 'classPrograms', docId)));
     });
 
-    it('secretary can read published ClassProgram but not draft', async () => {
+    it('secretary can read published ClassProgram but not draft or incomplete publications', async () => {
       const docIdDraft = `${SCHOOL_ID}__2026-2027__class-draft`;
       const docIdPub = `${SCHOOL_ID}__2026-2027__class-pub`;
+      const docIdIncomplete = `${SCHOOL_ID}__2026-2027__class-incomplete`;
 
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
         const firestore = ctx.firestore();
@@ -1080,10 +1081,21 @@ describe('Class Programs and Subjects Security Rules', () => {
           publishedRevisionNumber: 1,
           hasUnpublishedChanges: false
         });
+        await setDoc(doc(firestore, 'classPrograms', docIdIncomplete), {
+          id: docIdIncomplete,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          status: 'published',
+          draftRevisionId: 'rev-1',
+          draftRevisionNumber: 1,
+          hasUnpublishedChanges: true // missing publishedRevisionId and publishedRevisionNumber!
+        });
       });
 
       const context = testEnv.authenticatedContext('secretary-1');
       await assertFails(getDoc(doc(context.firestore(), 'classPrograms', docIdDraft)));
+      await assertFails(getDoc(doc(context.firestore(), 'classPrograms', docIdIncomplete)));
       await assertSucceeds(getDoc(doc(context.firestore(), 'classPrograms', docIdPub)));
     });
   });
@@ -1545,14 +1557,14 @@ describe('Class Programs and Subjects Security Rules', () => {
       await assertFails(getDocs(q));
     });
 
-    it('secretary query of classPrograms limited to published status is allowed', async () => {
+    it('secretary query of classPrograms limited to published status is denied', async () => {
       const context = testEnv.authenticatedContext('secretary-1');
       const q = query(
         collection(context.firestore(), 'classPrograms'),
         where('schoolId', '==', SCHOOL_ID),
         where('status', '==', 'published')
       );
-      await assertSucceeds(getDocs(q));
+      await assertFails(getDocs(q));
     });
 
     it('secretary query of classSubjects with programId and published revisionId is allowed', async () => {
