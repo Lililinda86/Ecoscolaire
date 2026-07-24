@@ -1,0 +1,255 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { ClassProgram, ClassSubject, ClassSection, GlobalRole, Subject } from '../types';
+import {
+  getClassProgramById,
+  getClassSubjectsByRevision,
+  ClassProgramServiceError
+} from '../services/classPrograms';
+import type { ClassProgramErrorType } from '../services/classPrograms';
+
+export interface UseClassProgramProps {
+  schoolId: string | undefined;
+  academicYearId: string | null;
+  selectedClass: ClassSection | null;
+  currentRole: GlobalRole | undefined;
+  requestedView: 'published' | 'draft';
+}
+
+export interface UseClassProgramResult {
+  status: 'idle' | 'loading' | 'success' | 'error' | 'forbidden';
+  program: ClassProgram | null;
+  subjects: ClassSubject[];
+  source: 'published' | 'draft' | 'legacy' | 'none';
+  visibleRevisionId: string | null;
+  hasPublishedVersion: boolean;
+  hasDraftVersion: boolean;
+  hasUnpublishedChanges: boolean;
+  errorCode: ClassProgramErrorType | 'LEGACY_MISSING' | null;
+  retry: () => void;
+}
+
+export type ClassProgramAccessMode = 'manager' | 'read-only' | 'forbidden';
+
+export function getClassProgramAccessMode(role: string | undefined): ClassProgramAccessMode {
+  if (!role) return 'forbidden';
+  if (['superAdmin', 'owner', 'director'].includes(role)) return 'manager';
+  if (['secretary', 'teacher'].includes(role)) return 'read-only';
+  return 'forbidden';
+}
+
+export function useClassProgram({
+  schoolId,
+  academicYearId,
+  selectedClass,
+  currentRole,
+  requestedView
+}: UseClassProgramProps): UseClassProgramResult {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'forbidden'>('idle');
+  const [program, setProgram] = useState<ClassProgram | null>(null);
+  const [subjects, setSubjects] = useState<ClassSubject[]>([]);
+  const [source, setSource] = useState<'published' | 'draft' | 'legacy' | 'none'>('none');
+  const [visibleRevisionId, setVisibleRevisionId] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<ClassProgramErrorType | 'LEGACY_MISSING' | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
+
+  const requestSeq = useRef<number>(0);
+
+  const retry = useCallback(() => {
+    setRetryTrigger((prev) => prev + 1);
+  }, []);
+
+  const classId = selectedClass?.id;
+  const legacySubjectsString = selectedClass?.subjects?.join(',') || '';
+
+  useEffect(() => {
+    // 1. Reset state immediately on inputs change to avoid displaying stale data
+    setStatus('idle');
+    setProgram(null);
+    setSubjects([]);
+    setSource('none');
+    setVisibleRevisionId(null);
+    setErrorCode(null);
+
+    // 2. Access control check
+    const accessMode = getClassProgramAccessMode(currentRole);
+    if (accessMode === 'forbidden') {
+      setStatus('forbidden');
+      return;
+    }
+
+    if (!schoolId || !academicYearId || !classId) {
+      return;
+    }
+
+    const currentSeq = ++requestSeq.current;
+    setStatus('loading');
+
+    const isManager = accessMode === 'manager';
+    const isReadOnlyRole = accessMode === 'read-only';
+
+    async function loadData() {
+      try {
+        // Fetch ClassProgram
+        let prog: ClassProgram;
+        try {
+          prog = await getClassProgramById(schoolId!, academicYearId!, classId!);
+        } catch (err: unknown) {
+          if (currentSeq !== requestSeq.current) return;
+
+          // If program is not found, attempt historical fallback
+          if (err instanceof ClassProgramServiceError && err.code === 'PROGRAM_NOT_FOUND') {
+            handleLegacyFallback(currentSeq);
+            return;
+          }
+          throw err;
+        }
+
+        if (currentSeq !== requestSeq.current) return;
+
+        // Resolve revision based on role and requestedView
+        let targetRevisionId: string | undefined;
+        let selectedSource: 'published' | 'draft' = 'published';
+
+        const hasPub = !!prog.publishedRevisionId && prog.publishedRevisionId !== '';
+
+        if (isReadOnlyRole) {
+          // Read-only role: must only see published version
+          if (!hasPub) {
+            // Not published yet, fall back to historical or fail
+            handleLegacyFallback(currentSeq);
+            return;
+          }
+          targetRevisionId = prog.publishedRevisionId;
+          selectedSource = 'published';
+        } else if (isManager) {
+          // Manager role: can see draft or published
+          if (requestedView === 'draft') {
+            targetRevisionId = prog.draftRevisionId;
+            selectedSource = 'draft';
+          } else {
+            if (!hasPub) {
+              // Switch to draft if no published revision exists
+              targetRevisionId = prog.draftRevisionId;
+              selectedSource = 'draft';
+            } else {
+              targetRevisionId = prog.publishedRevisionId;
+              selectedSource = 'published';
+            }
+          }
+        }
+
+        if (!targetRevisionId) {
+          throw new ClassProgramServiceError('REVISION_NOT_FOUND', 'Target revision is missing');
+        }
+
+        // Fetch subjects
+        const list = await getClassSubjectsByRevision(schoolId!, prog.id, targetRevisionId);
+        if (currentSeq !== requestSeq.current) return;
+
+        setProgram(prog);
+        setSubjects(list);
+        setSource(selectedSource);
+        setVisibleRevisionId(targetRevisionId);
+        setStatus('success');
+      } catch (err: unknown) {
+        if (currentSeq !== requestSeq.current) return;
+
+        console.error('Error in useClassProgram:', err);
+        const errObj = err as Record<string, unknown>;
+        setErrorCode((errObj?.code as ClassProgramErrorType) || 'FIRESTORE_ERROR');
+        setStatus('error');
+      }
+    }
+
+    // Helper for legacy class.subjects fallback resolution
+    function handleLegacyFallback(seq: number) {
+      if (seq !== requestSeq.current) return;
+
+      const legacySubjectIds = legacySubjectsString ? legacySubjectsString.split(',') : [];
+      if (legacySubjectIds.length === 0) {
+        setSource('none');
+        setStatus('success');
+        return;
+      }
+
+      setSource('legacy');
+      setStatus('success');
+    }
+
+    loadData();
+  }, [schoolId, academicYearId, classId, legacySubjectsString, currentRole, requestedView, retryTrigger]);
+
+  const hasPublishedVersion = !!program?.publishedRevisionId && program.publishedRevisionId !== '';
+  const hasDraftVersion = !!program?.draftRevisionId && program.draftRevisionId !== '';
+  const hasUnpublishedChanges = !!program?.hasUnpublishedChanges;
+
+  return {
+    status,
+    program,
+    subjects,
+    source,
+    visibleRevisionId,
+    hasPublishedVersion,
+    hasDraftVersion,
+    hasUnpublishedChanges,
+    errorCode,
+    retry
+  };
+}
+
+export interface ResolveLegacyClassSubjectsProps {
+  subjectIds: string[];
+  subjects: Subject[];
+  activeSchoolId: string | undefined;
+}
+
+export interface ResolvedLegacySubject {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  isMissing: boolean;
+}
+
+export function resolveLegacyClassSubjects({
+  subjectIds,
+  subjects,
+  activeSchoolId
+}: ResolveLegacyClassSubjectsProps): ResolvedLegacySubject[] {
+  if (!subjectIds) return [];
+
+  return subjectIds.map((id) => {
+    const matches = subjects.filter((s) => s.id === id);
+    if (matches.length === 0) {
+      return {
+        id,
+        code: '',
+        name: 'Matière historique introuvable',
+        isActive: false,
+        isMissing: true
+      };
+    }
+
+    const allowedMatches = matches.filter((s) => !s.schoolId || s.schoolId === activeSchoolId);
+    if (allowedMatches.length === 0) {
+      return {
+        id,
+        code: '',
+        name: 'Matière historique introuvable',
+        isActive: false,
+        isMissing: true
+      };
+    }
+
+    const schoolSpecific = allowedMatches.find((s) => s.schoolId === activeSchoolId);
+    const chosen = schoolSpecific || allowedMatches[0];
+
+    return {
+      id: chosen.id,
+      code: chosen.code || '',
+      name: chosen.name,
+      isActive: chosen.isActive !== false,
+      isMissing: false
+    };
+  });
+}

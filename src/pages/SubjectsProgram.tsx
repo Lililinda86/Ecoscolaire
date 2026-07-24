@@ -6,6 +6,7 @@ import { SubjectFilters } from './subjects/SubjectFilters';
 import { SubjectTable } from './subjects/SubjectTable';
 import { SubjectStatusDialog } from './subjects/SubjectStatusDialog';
 import { SubjectFormModal } from './subjects/SubjectFormModal';
+import { ClassProgramPanel } from './subjects/programs/ClassProgramPanel';
 
 const SubjectsProgram: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
@@ -413,16 +414,16 @@ const SubjectsProgram: React.FC = () => {
           style={{
             background: 'none',
             border: 'none',
-            color: 'var(--text-muted)',
+            borderBottom: activeModuleTab === 'program' ? '3px solid var(--primary-color)' : 'none',
+            color: activeModuleTab === 'program' ? 'var(--primary-color)' : 'var(--text-muted)',
+            fontWeight: 700,
             padding: '0.5rem 1.25rem',
-            cursor: 'not-allowed',
-            opacity: 0.5,
+            cursor: 'pointer',
             fontSize: '0.95rem'
           }}
-          disabled
-          title="Disponible dans le prochain lot"
+          onClick={() => setActiveModuleTab('program')}
         >
-          Programmes par classe (Bientôt)
+          Programmes par classe
         </button>
         <button
           className="tab-button"
@@ -558,6 +559,8 @@ const SubjectsProgram: React.FC = () => {
           )}
         </div>
       )}
+
+      {activeModuleTab === 'program' && <ClassProgramPanel />}
 
       {/* CREATE & EDIT FORM MODAL */}
       <SubjectFormModal
