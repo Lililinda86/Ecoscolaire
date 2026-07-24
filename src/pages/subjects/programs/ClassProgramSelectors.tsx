@@ -1,5 +1,13 @@
 import React from 'react';
-import type { ClassSection } from '../../../types';
+import type { ClassSection, TechnicalSpecialty } from '../../../types';
+import { sortClasses } from '../../../utils/sortClasses';
+import {
+  normalizeClassSection,
+  normalizeClassCycle,
+  getClassGroupDescriptor,
+  compareGroupDescriptors,
+  type ClassGroupDescriptor
+} from '../../../utils/classClassification';
 
 interface ClassProgramSelectorsProps {
   academicYearLabel: string;
@@ -10,6 +18,8 @@ interface ClassProgramSelectorsProps {
   selectedClassId: string;
   setSelectedClassId: (value: string) => void;
   classes: ClassSection[];
+  technicalSpecialties: TechnicalSpecialty[];
+  activeSchoolId: string;
 }
 
 export const ClassProgramSelectors: React.FC<ClassProgramSelectorsProps> = ({
@@ -20,39 +30,44 @@ export const ClassProgramSelectors: React.FC<ClassProgramSelectorsProps> = ({
   setCycleFilter,
   selectedClassId,
   setSelectedClassId,
-  classes
+  classes,
+  technicalSpecialties,
+  activeSchoolId
 }) => {
-  function normalizeCycle(cls: ClassSection): 'maternelle' | 'primaire' | 'secondaire' | 'unknown' {
-    const cycleVal = cls.cycle || cls.level;
-    if (!cycleVal) return 'unknown';
-    if (cycleVal === 'preschool' || cycleVal === 'nursery' || cycleVal === 'maternelle') {
-      return 'maternelle';
-    }
-    if (cycleVal === 'primary' || cycleVal === 'primaire') {
-      return 'primaire';
-    }
-    if (cycleVal === 'secondary' || cycleVal === 'secondaire') {
-      return 'secondaire';
-    }
-    return 'unknown';
-  }
-
   // Filter classes based on section & cycle selectors
   const filteredClasses = classes.filter((c) => {
-    // Section matching
-    const sectionVal = c.type || c.section;
+    const sectionVal = normalizeClassSection(c);
     const matchesSection =
       sectionFilter === 'all' ||
       (sectionFilter === 'francophone' && sectionVal === 'francophone') ||
       (sectionFilter === 'anglophone' && sectionVal === 'anglophone');
 
-    // Cycle matching
-    const normalized = normalizeCycle(c);
+    const cycleVal = normalizeClassCycle(c);
     const matchesCycle =
       cycleFilter === 'all' ||
-      normalized === cycleFilter;
+      cycleVal === cycleFilter;
 
     return matchesSection && matchesCycle;
+  });
+
+  const sortedClasses = sortClasses(filteredClasses);
+
+  const groupDescriptorsMap: Record<string, ClassGroupDescriptor> = {};
+  const groups: Record<string, ClassSection[]> = {};
+
+  sortedClasses.forEach((c) => {
+    const desc = getClassGroupDescriptor(c, technicalSpecialties, activeSchoolId);
+    if (!groups[desc.label]) {
+      groups[desc.label] = [];
+      groupDescriptorsMap[desc.label] = desc;
+    }
+    groups[desc.label].push(c);
+  });
+
+  const sortedGroupLabels = Object.keys(groups).sort((a, b) => {
+    const descA = groupDescriptorsMap[a];
+    const descB = groupDescriptorsMap[b];
+    return compareGroupDescriptors(descA, descB);
   });
 
   return (
@@ -160,11 +175,19 @@ export const ClassProgramSelectors: React.FC<ClassProgramSelectorsProps> = ({
           }}
         >
           <option value="">-- Sélectionner une classe --</option>
-          {filteredClasses.map((cls) => (
-            <option key={cls.id} value={cls.id}>
-              {cls.name}
-            </option>
-          ))}
+          {sortedGroupLabels.map((groupLabel) => {
+            const list = groups[groupLabel] || [];
+            if (list.length === 0) return null;
+            return (
+              <optgroup label={groupLabel} key={groupLabel}>
+                {list.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
         </select>
       </div>
     </div>

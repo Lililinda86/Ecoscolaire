@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useClassProgram } from '../../../hooks/useClassProgram';
 import { normalizeAcademicYearId } from '../../../utils/academicYear';
+import { normalizeClassCycle } from '../../../utils/classClassification';
 import { ClassProgramSelectors } from './ClassProgramSelectors';
 import { ClassProgramSummary } from './ClassProgramSummary';
 import { ClassProgramTable } from './ClassProgramTable';
 import { ClassProgramEmptyState } from './ClassProgramEmptyState';
+import type { TechnicalSpecialty } from '../../../types';
 
 export const ClassProgramPanel: React.FC = () => {
-  const { db, currentUser } = useAppContext();
+  const { db, currentUser, currentSchool } = useAppContext();
 
   // Filters state
   const [sectionFilter, setSectionFilter] = useState<'all' | 'francophone' | 'anglophone'>('all');
@@ -52,18 +54,8 @@ export const ClassProgramPanel: React.FC = () => {
     if (selectedClassId) {
       const currentClass = classes.find((c) => c.id === selectedClassId);
       if (currentClass) {
-        const cycleVal = currentClass.cycle || currentClass.level;
-        let matchesCycle = true;
-        if (value !== 'all') {
-          const isMaternelle = cycleVal === 'maternelle' || cycleVal === 'nursery' || cycleVal === 'preschool';
-          const isPrimaire = cycleVal === 'primaire' || cycleVal === 'primary';
-          const isSecondaire = cycleVal === 'secondaire' || cycleVal === 'secondary';
-          matchesCycle =
-            (value === 'maternelle' && isMaternelle) ||
-            (value === 'primaire' && isPrimaire) ||
-            (value === 'secondaire' && isSecondaire);
-        }
-        if (!matchesCycle) {
+        const normalized = normalizeClassCycle(currentClass);
+        if (value !== 'all' && normalized !== value) {
           setSelectedClassId('');
         }
       }
@@ -118,6 +110,8 @@ export const ClassProgramPanel: React.FC = () => {
         selectedClassId={selectedClassId}
         setSelectedClassId={handleClassSelect}
         classes={classes}
+        technicalSpecialties={(db?.technicalSpecialties || []) as TechnicalSpecialty[]}
+        activeSchoolId={currentSchool?.id || ''}
       />
 
       {/* 2. Loading, Forbidden, and Empty States resolution */}
