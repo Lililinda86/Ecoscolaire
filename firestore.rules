@@ -470,9 +470,7 @@ service cloud.firestore {
                     (isAdminOrOwner() || isDirector())
                     || (
                       (isSecretary() || isTeacher())
-                      && 'publishedRevisionId' in resource.data
-                      && resource.data.publishedRevisionId is string
-                      && resource.data.publishedRevisionId != ""
+                      && resource.data.status == 'published'
                     )
                   );
       allow create: if isAuthenticated() && isActive()
@@ -530,6 +528,7 @@ service cloud.firestore {
                     && request.resource.data.academicYearId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.academicYearId
                     && request.resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.draftRevisionId
                     && request.resource.data.revisionNumber == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.draftRevisionNumber
+                    && get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.hasUnpublishedChanges == true
                     && request.resource.data.subjectId is string
                     && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
                     && get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.schoolId == request.resource.data.schoolId
@@ -576,6 +575,9 @@ service cloud.firestore {
                       'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',
                       'createdAt', 'createdBy'
                     ])
+                    && resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.draftRevisionId
+                    && resource.data.revisionNumber == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.draftRevisionNumber
+                    && get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.hasUnpublishedChanges == true
                     && (
                       !('publishedRevisionId' in get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data)
                       || resource.data.revisionId != get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.publishedRevisionId
