@@ -7,12 +7,15 @@ import { SubjectTable } from './subjects/SubjectTable';
 import { SubjectStatusDialog } from './subjects/SubjectStatusDialog';
 import { SubjectFormModal } from './subjects/SubjectFormModal';
 import { ClassProgramPanel } from './subjects/programs/ClassProgramPanel';
+import Modal from '../components/Modal';
 
 const SubjectsProgram: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
 
   // Navigation tabs for the module (only Catalogue is active in Lot 1)
   const [activeModuleTab, setActiveModuleTab] = useState<'catalogue' | 'program' | 'assignment'>('catalogue');
+  const [isProgramDirty, setIsProgramDirty] = useState<boolean>(false);
+  const [pendingTabSwitch, setPendingTabSwitch] = useState<'catalogue' | 'program' | null>(null);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,6 +87,14 @@ const SubjectsProgram: React.FC = () => {
   if (!currentUser || !db) return null;
 
   const activeSchoolId = db.school?.id;
+
+  const handleTabSwitch = (tab: 'catalogue' | 'program') => {
+    if (activeModuleTab === 'program' && isProgramDirty && tab !== 'program') {
+      setPendingTabSwitch(tab);
+    } else {
+      setActiveModuleTab(tab);
+    }
+  };
 
   // Permissions check
   const canWrite = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
@@ -405,7 +416,7 @@ const SubjectsProgram: React.FC = () => {
             cursor: 'pointer',
             fontSize: '0.95rem'
           }}
-          onClick={() => setActiveModuleTab('catalogue')}
+          onClick={() => handleTabSwitch('catalogue')}
         >
           Catalogue des matières
         </button>
@@ -421,7 +432,7 @@ const SubjectsProgram: React.FC = () => {
             cursor: 'pointer',
             fontSize: '0.95rem'
           }}
-          onClick={() => setActiveModuleTab('program')}
+          onClick={() => handleTabSwitch('program')}
         >
           Programmes par classe
         </button>
@@ -560,7 +571,50 @@ const SubjectsProgram: React.FC = () => {
         </div>
       )}
 
-      {activeModuleTab === 'program' && <ClassProgramPanel />}
+      {activeModuleTab === 'program' && <ClassProgramPanel onDirtyChange={setIsProgramDirty} />}
+
+      {/* CONFIRMATION EXIT TAB MODAL */}
+      <Modal
+        isOpen={pendingTabSwitch !== null}
+        onClose={() => setPendingTabSwitch(null)}
+        title="Modifications non enregistrées"
+        closeOnBackdrop={false}
+      >
+        <div style={{ padding: '0.5rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
+            Vous avez des modifications en cours dans l'éditeur de programme qui seront perdues si vous changez d'onglet. Voulez-vous abandonner vos modifications ?
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button
+              onClick={() => setPendingTabSwitch(null)}
+              className="secondary"
+              style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}
+            >
+              Continuer l'édition
+            </button>
+            <button
+              onClick={() => {
+                if (pendingTabSwitch) {
+                  setActiveModuleTab(pendingTabSwitch);
+                }
+                setPendingTabSwitch(null);
+                setIsProgramDirty(false);
+              }}
+              style={{
+                backgroundColor: 'var(--danger)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Abandonner les modifications
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* CREATE & EDIT FORM MODAL */}
       <SubjectFormModal

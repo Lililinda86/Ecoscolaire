@@ -7,9 +7,10 @@ import { ClassProgramSelectors } from './ClassProgramSelectors';
 import { ClassProgramSummary } from './ClassProgramSummary';
 import { ClassProgramTable } from './ClassProgramTable';
 import { ClassProgramEmptyState } from './ClassProgramEmptyState';
+import { ClassProgramEditor } from './editor/ClassProgramEditor';
 import type { TechnicalSpecialty } from '../../../types';
 
-export const ClassProgramPanel: React.FC = () => {
+export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) => void }> = ({ onDirtyChange }) => {
   const { db, currentUser, currentSchool } = useAppContext();
 
   // Filters state
@@ -19,6 +20,9 @@ export const ClassProgramPanel: React.FC = () => {
 
   // Manager view switcher: 'published' | 'draft'
   const [requestedView, setRequestedView] = useState<'published' | 'draft'>('published');
+
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState<boolean>(false);
 
   const schoolId = db?.school?.id;
   const rawAcademicYear = db?.school?.academicYear || '';
@@ -30,10 +34,12 @@ export const ClassProgramPanel: React.FC = () => {
   const handleClassSelect = (classId: string) => {
     setSelectedClassId(classId);
     setRequestedView('published');
+    setIsEditing(false);
   };
 
   const handleSectionFilterChange = (value: 'all' | 'francophone' | 'anglophone') => {
     setSectionFilter(value);
+    setIsEditing(false);
     if (selectedClassId) {
       const currentClass = classes.find((c) => c.id === selectedClassId);
       if (currentClass) {
@@ -51,6 +57,7 @@ export const ClassProgramPanel: React.FC = () => {
 
   const handleCycleFilterChange = (value: 'all' | 'maternelle' | 'primaire' | 'secondaire') => {
     setCycleFilter(value);
+    setIsEditing(false);
     if (selectedClassId) {
       const currentClass = classes.find((c) => c.id === selectedClassId);
       if (currentClass) {
@@ -66,6 +73,7 @@ export const ClassProgramPanel: React.FC = () => {
   const {
     status,
     subjects,
+    program,
     source,
     hasPublishedVersion,
     hasDraftVersion,
@@ -115,11 +123,11 @@ export const ClassProgramPanel: React.FC = () => {
       />
 
       {/* 2. Loading, Forbidden, and Empty States resolution */}
-      {status === 'loading' && <ClassProgramEmptyState type="loading" />}
+      {!isEditing && status === 'loading' && <ClassProgramEmptyState type="loading" />}
 
-      {status === 'forbidden' && <ClassProgramEmptyState type="forbidden" />}
+      {!isEditing && status === 'forbidden' && <ClassProgramEmptyState type="forbidden" />}
 
-      {status === 'error' && (
+      {!isEditing && status === 'error' && (
         <ClassProgramEmptyState
           type="error"
           errorCode={errorCode}
@@ -127,11 +135,43 @@ export const ClassProgramPanel: React.FC = () => {
         />
       )}
 
-      {status === 'idle' && !selectedClassId && (
+      {!isEditing && status === 'idle' && !selectedClassId && (
         <ClassProgramEmptyState type="no-class-selected" />
       )}
 
-      {status === 'success' && (
+      {/* 3. Editor mode when requested */}
+      {isEditing && selectedClass && (
+        <div style={{
+          backgroundColor: 'var(--card-bg)',
+          padding: '1.5rem',
+          borderRadius: '12px',
+          border: '1px solid var(--border-color)',
+          boxSizing: 'border-box'
+        }}>
+          <ClassProgramEditor
+            initialProgram={program}
+            initialSubjects={subjects}
+            schoolId={schoolId || ''}
+            academicYearId={normalizedYear}
+            classId={selectedClassId}
+            userId={currentUser.id || ''}
+            userRole={currentUser.role}
+            catalogSubjects={db.subjects || []}
+            onClose={() => {
+              setIsEditing(false);
+              retry();
+            }}
+            onSaveSuccess={() => {
+              setIsEditing(false);
+              retry();
+            }}
+            onDirtyChange={onDirtyChange}
+          />
+        </div>
+      )}
+
+      {/* 4. Reading Mode view */}
+      {!isEditing && status === 'success' && (
         <>
           {/* Header metadata row */}
           <div style={{
@@ -238,61 +278,108 @@ export const ClassProgramPanel: React.FC = () => {
               )}
             </div>
 
-            {/* Right: View switcher (only for managers when both published and draft exist) */}
-            {isManager && hasPublishedVersion && hasDraftVersion && hasUnpublishedChanges && (
-              <div style={{
-                display: 'inline-flex',
-                background: '#f1f5f9',
-                padding: '0.25rem',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)'
-              }}>
+            {/* Right: View switcher and Modifier action button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {isManager && hasPublishedVersion && hasDraftVersion && hasUnpublishedChanges && (
+                <div style={{
+                  display: 'inline-flex',
+                  background: '#f1f5f9',
+                  padding: '0.25rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <button
+                    onClick={() => setRequestedView('published')}
+                    style={{
+                      border: 'none',
+                      background: requestedView === 'published' ? 'white' : 'transparent',
+                      color: requestedView === 'published' ? 'var(--text-main)' : 'var(--text-muted)',
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: requestedView === 'published' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Version publiée
+                  </button>
+                  <button
+                    onClick={() => setRequestedView('draft')}
+                    style={{
+                      border: 'none',
+                      background: requestedView === 'draft' ? 'white' : 'transparent',
+                      color: requestedView === 'draft' ? 'var(--text-main)' : 'var(--text-muted)',
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: requestedView === 'draft' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Brouillon en cours
+                  </button>
+                </div>
+              )}
+
+              {isManager && source !== 'legacy' && (
                 <button
-                  onClick={() => setRequestedView('published')}
+                  type="button"
+                  onClick={() => setIsEditing(true)}
                   style={{
                     border: 'none',
-                    background: requestedView === 'published' ? 'white' : 'transparent',
-                    color: requestedView === 'published' ? 'var(--text-main)' : 'var(--text-muted)',
-                    padding: '0.4rem 0.8rem',
-                    borderRadius: '6px',
+                    backgroundColor: 'var(--primary-color)',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
                     fontSize: '0.85rem',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: requestedView === 'published' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  Version publiée
+                  Modifier le programme
                 </button>
-                <button
-                  onClick={() => setRequestedView('draft')}
-                  style={{
-                    border: 'none',
-                    background: requestedView === 'draft' ? 'white' : 'transparent',
-                    color: requestedView === 'draft' ? 'var(--text-main)' : 'var(--text-muted)',
-                    padding: '0.4rem 0.8rem',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: requestedView === 'draft' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  Brouillon en cours
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* 3. Empty program state or legacy explanation */}
+          {/* 5. Empty program state or legacy explanation */}
           {source === 'none' && (
-            <ClassProgramEmptyState
-              type={isReadOnlyRole ? 'no-program-read-only' : 'no-program'}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', width: '105%' }}>
+              <div style={{ width: '95%' }}>
+                <ClassProgramEmptyState
+                  type={isReadOnlyRole ? 'no-program-read-only' : 'no-program'}
+                />
+              </div>
+              {isManager && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  style={{
+                    border: 'none',
+                    backgroundColor: 'var(--primary-color)',
+                    color: 'white',
+                    padding: '0.6rem 1.25rem',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Configurer le programme
+                </button>
+              )}
+            </div>
           )}
 
-          {/* 4. Display totals summary card */}
+          {/* 6. Display totals summary card */}
           {source !== 'none' && (
             <ClassProgramSummary
               subjects={subjects}
@@ -301,7 +388,7 @@ export const ClassProgramPanel: React.FC = () => {
             />
           )}
 
-          {/* 5. Display program table */}
+          {/* 7. Display program table */}
           {source !== 'none' && (
             <ClassProgramTable
               subjects={subjects}

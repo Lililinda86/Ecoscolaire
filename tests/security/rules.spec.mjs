@@ -1,6 +1,6 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import fs from 'fs';
-import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs } from 'firebase/firestore';
+import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { test } from '@playwright/test';
 const { describe, beforeAll: before, beforeEach, afterAll: after } = test;
 const it = test;
@@ -708,6 +708,7 @@ describe('Class Programs and Subjects Security Rules', () => {
       // Users
       await setDoc(doc(firestore, 'users', 'owner-1'), { role: 'owner', schoolId: SCHOOL_ID, active: true, isActive: true });
       await setDoc(doc(firestore, 'users', 'owner-2'), { role: 'owner', schoolId: OTHER_SCHOOL, active: true, isActive: true });
+      await setDoc(doc(firestore, 'users', 'director-1'), { role: 'director', schoolId: SCHOOL_ID, active: true, isActive: true });
       await setDoc(doc(firestore, 'users', 'secretary-1'), { role: 'secretary', schoolId: SCHOOL_ID, active: true, isActive: true });
       await setDoc(doc(firestore, 'users', 'teacher-1'), { role: 'teacher', schoolId: SCHOOL_ID, active: true, isActive: true });
       await setDoc(doc(firestore, 'users', 'inactive-user'), { role: 'owner', schoolId: SCHOOL_ID, active: false, isActive: false });
@@ -823,6 +824,79 @@ describe('Class Programs and Subjects Security Rules', () => {
           updatedBy: 'owner-1'
         })
       );
+    });
+
+    it('director can create ClassProgram in their school', async () => {
+      const context = testEnv.authenticatedContext('director-1');
+      const docId = `${SCHOOL_ID}__2026-2027__class-create-dir`;
+
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'classes', 'class-create-dir'), {
+          id: 'class-create-dir',
+          schoolId: SCHOOL_ID,
+          name: 'CE1 Dir',
+          isActive: true
+        });
+      });
+
+      await assertSucceeds(
+        setDoc(doc(context.firestore(), 'classPrograms', docId), {
+          id: docId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-create-dir',
+          academicYearId: '2026-2027',
+          status: 'draft',
+          draftRevisionId: `${docId}__v1`,
+          draftRevisionNumber: 1,
+          hasUnpublishedChanges: true,
+          createdAt: '2026-07-23T19:00:00Z',
+          createdBy: 'director-1',
+          updatedAt: '2026-07-23T19:00:00Z',
+          updatedBy: 'director-1'
+        })
+      );
+    });
+
+    it('batch creation of ClassProgram and ClassSubject fails due to exists check on parent doc', async () => {
+      const context = testEnv.authenticatedContext('owner-1');
+      const progId = `${SCHOOL_ID}__2026-2027__class-batch`;
+      const subjDocId = `${progId}__v1__subj-1`;
+
+      const batch = writeBatch(context.firestore());
+      batch.set(doc(context.firestore(), 'classPrograms', progId), {
+        id: progId,
+        schoolId: SCHOOL_ID,
+        classId: 'class-create',
+        academicYearId: '2026-2027',
+        status: 'draft',
+        draftRevisionId: `${progId}__v1`,
+        draftRevisionNumber: 1,
+        hasUnpublishedChanges: true,
+        createdAt: '2026-07-23T19:00:00Z',
+        createdBy: 'owner-1',
+        updatedAt: '2026-07-23T19:00:00Z',
+        updatedBy: 'owner-1'
+      });
+      batch.set(doc(context.firestore(), 'classSubjects', subjDocId), {
+        id: subjDocId,
+        programId: progId,
+        schoolId: SCHOOL_ID,
+        classId: 'class-create',
+        academicYearId: '2026-2027',
+        subjectId: 'subj-1',
+        revisionId: `${progId}__v1`,
+        revisionNumber: 1,
+        subjectNameSnapshot: 'Maths',
+        isRequired: true,
+        isActive: true,
+        displayOrder: 1,
+        createdBy: 'owner-1',
+        updatedBy: 'owner-1',
+        createdAt: '2026-07-23T19:00:00Z',
+        updatedAt: '2026-07-23T19:00:00Z'
+      });
+
+      await assertFails(batch.commit());
     });
 
     it('creation with programId mismatch is denied', async () => {
@@ -1498,7 +1572,115 @@ describe('Class Programs and Subjects Security Rules', () => {
       );
     });
 
-    it('updatedBy falsified in ClassSubject update is denied', async () => {
+    it('creation with negative coefficient is denied', async () => {
+      const context = testEnv.authenticatedContext('owner-1');
+      const docId = `rev-2__subj-1`;
+      await assertFails(
+        setDoc(doc(context.firestore(), 'classSubjects', docId), {
+          id: docId,
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          coefficient: -2,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        })
+      );
+    });
+
+    it('creation with negative weeklyHours is denied', async () => {
+      const context = testEnv.authenticatedContext('owner-1');
+      const docId = `rev-2__subj-1`;
+      await assertFails(
+        setDoc(doc(context.firestore(), 'classSubjects', docId), {
+          id: docId,
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          weeklyHours: -1,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        })
+      );
+    });
+
+    it('creation with subject from another school is denied', async () => {
+      const context = testEnv.authenticatedContext('owner-1');
+      const docId = `rev-2__subj-other-school`;
+      await assertFails(
+        setDoc(doc(context.firestore(), 'classSubjects', docId), {
+          id: docId,
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-other-school',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'English',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        })
+      );
+    });
+
+    it('logical deactivation is allowed for managers', async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          id: 'rev-2__subj-1',
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        });
+      });
+      const context = testEnv.authenticatedContext('owner-1');
+      await assertSucceeds(
+        updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          isActive: false,
+          updatedBy: 'owner-1',
+          updatedAt: '2026-07-23T19:15:00Z'
+        })
+      );
+    });
+
+    it('modification of subjectId is denied', async () => {
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           id: 'rev-2__subj-1',
@@ -1522,8 +1704,104 @@ describe('Class Programs and Subjects Security Rules', () => {
       const context = testEnv.authenticatedContext('owner-1');
       await assertFails(
         updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
-          displayOrder: 10,
-          updatedBy: 'falsified-user'
+          subjectId: 'subj-with-code',
+          updatedBy: 'owner-1',
+          updatedAt: '2026-07-23T19:15:00Z'
+        })
+      );
+    });
+
+    it('modification of revisionId is denied', async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          id: 'rev-2__subj-1',
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        });
+      });
+      const context = testEnv.authenticatedContext('owner-1');
+      await assertFails(
+        updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          revisionId: 'rev-1',
+          updatedBy: 'owner-1',
+          updatedAt: '2026-07-23T19:15:00Z'
+        })
+      );
+    });
+
+    it('owner can delete coefficient from a draft ClassSubject', async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          id: 'rev-2__subj-1',
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          coefficient: 4,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        });
+      });
+      const context = testEnv.authenticatedContext('owner-1');
+      await assertSucceeds(
+        updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          coefficient: deleteField(),
+          updatedBy: 'owner-1',
+          updatedAt: '2026-07-23T19:15:00Z'
+        })
+      );
+    });
+
+    it('owner can delete weeklyHours from a draft ClassSubject', async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          id: 'rev-2__subj-1',
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          weeklyHours: 4,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        });
+      });
+      const context = testEnv.authenticatedContext('owner-1');
+      await assertSucceeds(
+        updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
+          weeklyHours: deleteField(),
+          updatedBy: 'owner-1',
+          updatedAt: '2026-07-23T19:15:00Z'
         })
       );
     });
