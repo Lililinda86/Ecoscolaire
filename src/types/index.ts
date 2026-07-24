@@ -562,3 +562,55 @@ export interface CashClosure {
   closedByName?: string;
   closedAt: DateLike;
 }
+
+export interface ClassProgram {
+  id: string; // `${schoolId}__${academicYearId}__${classId}`
+  schoolId: string;
+  classId: string;
+  academicYearId: string;
+
+  status: 'draft' | 'published';
+
+  draftRevisionId: string;
+  draftRevisionNumber: number;
+
+  publishedRevisionId?: string;
+  publishedRevisionNumber?: number;
+
+  hasUnpublishedChanges: boolean;
+
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+
+  publishedAt?: string;
+  publishedBy?: string;
+}
+
+export interface ClassSubject {
+  id: string; // `${revisionId}__${subjectId}`
+  programId: string;
+
+  schoolId: string;
+  classId: string;
+  academicYearId: string;
+  subjectId: string;
+
+  revisionId: string;
+  revisionNumber: number;
+
+  subjectNameSnapshot: string;
+  subjectCodeSnapshot?: string;
+
+  coefficient?: number;
+  weeklyHours?: number;
+  isRequired: boolean;
+  displayOrder: number;
+  isActive: boolean;
+
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}

@@ -19,10 +19,14 @@ import type {
   User,
   ValidationRequest,
   Notification,
-  TechnicalSpecialty
+  TechnicalSpecialty,
+  ClassProgram,
+  ClassSubject
 } from '../types';
 
 export interface Database {
+  classPrograms?: ClassProgram[];
+  classSubjects?: ClassSubject[];
   // --- SaaS Collections (Globales) ---
   schools: School[];
   users: User[];
