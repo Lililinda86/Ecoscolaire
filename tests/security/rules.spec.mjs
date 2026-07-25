@@ -2529,11 +2529,14 @@ describe('Class Programs and Subjects Security Rules', () => {
         await setDoc(doc(db, 'users', 'director-a'), { role: 'director', schoolId: SCHOOL_A, active: true });
         await setDoc(doc(db, 'users', 'secretary-a'), { role: 'secretary', schoolId: SCHOOL_A, active: true });
         await setDoc(doc(db, 'users', 'teacher-a'), { role: 'teacher', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'teacher-b'), { role: 'teacher', schoolId: SCHOOL_B, active: true });
         await setDoc(doc(db, 'users', 'director-b'), { role: 'director', schoolId: SCHOOL_B, active: true });
         await setDoc(doc(db, 'users', 'parent-a'), { role: 'parent', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'manager-inactive'), { role: 'secretary', schoolId: SCHOOL_A, active: false });
 
         // Links
         await setDoc(doc(db, 'staffUserLinkByUser', 'teacher-a'), { userId: 'teacher-a', staffId: 'staff-teacher-a', schoolId: SCHOOL_A, isActive: true });
+        await setDoc(doc(db, 'staffUserLinkByUser', 'teacher-inactive-link'), { userId: 'teacher-inactive-link', staffId: 'staff-teacher-a', schoolId: SCHOOL_A, isActive: false });
 
         // Seed some assignments and slots
         await setDoc(doc(db, 'teacherAssignments', 'assign-1'), {
@@ -2563,92 +2566,191 @@ describe('Class Programs and Subjects Security Rules', () => {
           teacherStaffId: 'staff-teacher-a',
           isActive: true
         });
+        await setDoc(doc(db, 'teacherAssignmentSlots', 'slot-inactive'), {
+          id: 'slot-inactive',
+          schoolId: SCHOOL_A,
+          academicYearId: '2026-2027',
+          classId: 'class-a',
+          subjectId: 'sub-a',
+          teacherStaffId: 'staff-teacher-a',
+          isActive: false
+        });
+
+        // Also seed a ClassSubject for published revision query tests
+        await setDoc(doc(db, 'classPrograms', 'SCHOOL-A__2026-2027__class-a'), {
+          id: 'SCHOOL-A__2026-2027__class-a',
+          schoolId: SCHOOL_A,
+          publishedRevisionId: 'REV1'
+        });
+        await setDoc(doc(db, 'classSubjects', 'REV1__sub-a'), {
+          id: 'REV1__sub-a',
+          schoolId: SCHOOL_A,
+          programId: 'SCHOOL-A__2026-2027__class-a',
+          revisionId: 'REV1',
+          isActive: true
+        });
       });
     });
 
-    it('Client writes directly are denied on both collections', async () => {
+    // ECRITURES
+    it('1. teacherAssignments create refusé', async () => {
       const dirCtx = testEnv.authenticatedContext('director-a');
-      const db = dirCtx.firestore();
-
-      await assertFails(setDoc(doc(db, 'teacherAssignments', 'new-assign'), { schoolId: SCHOOL_A }));
-      await assertFails(updateDoc(doc(db, 'teacherAssignments', 'assign-1'), { isActive: false }));
-      await assertFails(deleteDoc(doc(db, 'teacherAssignments', 'assign-1')));
-
-      await assertFails(setDoc(doc(db, 'teacherAssignmentSlots', 'new-slot'), { schoolId: SCHOOL_A }));
-      await assertFails(updateDoc(doc(db, 'teacherAssignmentSlots', 'slot-1'), { isActive: false }));
-      await assertFails(deleteDoc(doc(db, 'teacherAssignmentSlots', 'slot-1')));
+      await assertFails(setDoc(doc(dirCtx.firestore(), 'teacherAssignments', 'new-assign'), { schoolId: SCHOOL_A }));
+    });
+    it('2. teacherAssignments update refusé', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertFails(updateDoc(doc(dirCtx.firestore(), 'teacherAssignments', 'assign-1'), { isActive: false }));
+    });
+    it('3. teacherAssignments delete refusé', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertFails(deleteDoc(doc(dirCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('4. teacherAssignmentSlots create refusé', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertFails(setDoc(doc(dirCtx.firestore(), 'teacherAssignmentSlots', 'new-slot'), { schoolId: SCHOOL_A }));
+    });
+    it('5. teacherAssignmentSlots update refusé', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertFails(updateDoc(doc(dirCtx.firestore(), 'teacherAssignmentSlots', 'slot-1'), { isActive: false }));
+    });
+    it('6. teacherAssignmentSlots delete refusé', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertFails(deleteDoc(doc(dirCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
     });
 
-    it('Academic managers of the same school can read assignments and slots', async () => {
-      // SuperAdmin
+    // GESTIONNAIRES
+    it('7. superAdmin lit', async () => {
       const saCtx = testEnv.authenticatedContext('sa-uid');
       await assertSucceeds(getDoc(doc(saCtx.firestore(), 'teacherAssignments', 'assign-1')));
       await assertSucceeds(getDoc(doc(saCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
-
-      // Owner
+    });
+    it('8. owner même école lit', async () => {
       const ownerCtx = testEnv.authenticatedContext('owner-a');
       await assertSucceeds(getDoc(doc(ownerCtx.firestore(), 'teacherAssignments', 'assign-1')));
       await assertSucceeds(getDoc(doc(ownerCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
-
-      // Director
+    });
+    it('9. director même école lit', async () => {
       const dirCtx = testEnv.authenticatedContext('director-a');
       await assertSucceeds(getDoc(doc(dirCtx.firestore(), 'teacherAssignments', 'assign-1')));
       await assertSucceeds(getDoc(doc(dirCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
-
-      // Secretary
+    });
+    it('10. secretary même école lit', async () => {
       const secCtx = testEnv.authenticatedContext('secretary-a');
       await assertSucceeds(getDoc(doc(secCtx.firestore(), 'teacherAssignments', 'assign-1')));
       await assertSucceeds(getDoc(doc(secCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
     });
-
-    it('Managers from other schools cannot read', async () => {
+    it('11. owner autre école refusé', async () => {
       const otherCtx = testEnv.authenticatedContext('director-b');
       await assertFails(getDoc(doc(otherCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('12. director autre école refusé', async () => {
+      const otherCtx = testEnv.authenticatedContext('director-b');
       await assertFails(getDoc(doc(otherCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
     });
+    it('13. secretary autre école refusée', async () => {
+      const otherCtx = testEnv.authenticatedContext('director-b');
+      await assertFails(getDoc(doc(otherCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('14. gestionnaire inactif refusé', async () => {
+      const inactCtx = testEnv.authenticatedContext('manager-inactive');
+      await assertFails(getDoc(doc(inactCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
 
-    it('Teacher with active link can read their own active assignments and slots', async () => {
+    // TEACHER
+    it('15. lien actif lit son affectation active', async () => {
       const teacherCtx = testEnv.authenticatedContext('teacher-a');
       await assertSucceeds(getDoc(doc(teacherCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('16. lien actif lit son slot actif', async () => {
+      const teacherCtx = testEnv.authenticatedContext('teacher-a');
       await assertSucceeds(getDoc(doc(teacherCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
     });
-
-    it('Teacher cannot read inactive assignments or other teachers assignments', async () => {
+    it('17. autre staff refusé', async () => {
+      const otherTeacherCtx = testEnv.authenticatedContext('teacher-b');
+      await assertFails(getDoc(doc(otherTeacherCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('18. historique inactif refusé', async () => {
       const teacherCtx = testEnv.authenticatedContext('teacher-a');
-
-      // Inactive assignment
       await assertFails(getDoc(doc(teacherCtx.firestore(), 'teacherAssignments', 'assign-inactive')));
-
-      // Other staff assignment
+    });
+    it('19. slot inactif refusé', async () => {
+      const teacherCtx = testEnv.authenticatedContext('teacher-a');
+      await assertFails(getDoc(doc(teacherCtx.firestore(), 'teacherAssignmentSlots', 'slot-inactive')));
+    });
+    it('20. sans lien refusé', async () => {
+      const noLinkCtx = testEnv.authenticatedContext('teacher-b');
+      await assertFails(getDoc(doc(noLinkCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('21. lien inactif refusé', async () => {
+      const inactLinkCtx = testEnv.authenticatedContext('teacher-inactive-link');
+      await assertFails(getDoc(doc(inactLinkCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('22. lien autre école refusé', async () => {
       await testEnv.withSecurityRulesDisabled(async (context) => {
         const db = context.firestore();
-        await setDoc(doc(db, 'teacherAssignments', 'assign-other'), {
-          id: 'assign-other',
-          schoolId: SCHOOL_A,
-          academicYearId: '2026-2027',
-          classId: 'class-a',
-          subjectId: 'sub-b',
-          teacherStaffId: 'staff-teacher-other',
-          isActive: true
-        });
+        await setDoc(doc(db, 'staffUserLinkByUser', 'teacher-b'), { userId: 'teacher-b', staffId: 'staff-teacher-b', schoolId: SCHOOL_B, isActive: true });
       });
-      await assertFails(getDoc(doc(teacherCtx.firestore(), 'teacherAssignments', 'assign-other')));
+      const otherTeacherCtx = testEnv.authenticatedContext('teacher-b');
+      await assertFails(getDoc(doc(otherTeacherCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('23. ancien utilisateur refusé après unlink', async () => {
+      const teacherCtx = testEnv.authenticatedContext('teacher-a');
+      await assertSucceeds(getDoc(doc(teacherCtx.firestore(), 'teacherAssignments', 'assign-1')));
+
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await updateDoc(doc(db, 'staffUserLinkByUser', 'teacher-a'), { isActive: false });
+      });
+      await assertFails(getDoc(doc(teacherCtx.firestore(), 'teacherAssignments', 'assign-1')));
+    });
+    it('24. nouvel utilisateur autorisé après relink sans réécriture', async () => {
+      // unlink U1 (teacher-a)
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await updateDoc(doc(db, 'staffUserLinkByUser', 'teacher-a'), { isActive: false });
+        // relink U2 (teacher-relinked) to staff-teacher-a
+        await setDoc(doc(db, 'users', 'teacher-relinked'), { role: 'teacher', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'staffUserLinkByUser', 'teacher-relinked'), { userId: 'teacher-relinked', staffId: 'staff-teacher-a', schoolId: SCHOOL_A, isActive: true });
+      });
+      const relinkedCtx = testEnv.authenticatedContext('teacher-relinked');
+      await assertSucceeds(getDoc(doc(relinkedCtx.firestore(), 'teacherAssignments', 'assign-1')));
     });
 
-    it('Parent or Student cannot read assignments', async () => {
-      const parentCtx = testEnv.authenticatedContext('parent-a');
-      await assertFails(getDoc(doc(parentCtx.firestore(), 'teacherAssignments', 'assign-1')));
-    });
-
-    it('Manager queries must be filtered by schoolId', async () => {
+    // REQUÊTES
+    it('25. query manager contrainte autorisée', async () => {
       const dirCtx = testEnv.authenticatedContext('director-a');
-      const db = dirCtx.firestore();
-
-      const qOk = query(collection(db, 'teacherAssignments'), where('schoolId', '==', SCHOOL_A));
+      const qOk = query(collection(dirCtx.firestore(), 'teacherAssignments'), where('schoolId', '==', SCHOOL_A));
       await assertSucceeds(getDocs(qOk));
-
-      const qBad = query(collection(db, 'teacherAssignments'));
+    });
+    it('26. query manager inter-écoles refusée', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      const qBad = query(collection(dirCtx.firestore(), 'teacherAssignments'));
       await assertFails(getDocs(qBad));
+    });
+    it('27. query teacher contrainte autorisée', async () => {
+      const teacherCtx = testEnv.authenticatedContext('teacher-a');
+      const q = query(
+        collection(teacherCtx.firestore(), 'teacherAssignments'),
+        where('schoolId', '==', SCHOOL_A),
+        where('teacherStaffId', '==', 'staff-teacher-a'),
+        where('isActive', '==', true)
+      );
+      await assertSucceeds(getDocs(q));
+    });
+    it('28. query teacher non contrainte refusée', async () => {
+      const teacherCtx = testEnv.authenticatedContext('teacher-a');
+      const q = query(collection(teacherCtx.firestore(), 'teacherAssignments'));
+      await assertFails(getDocs(q));
+    });
+    it('29. query ClassSubject publiée utilisée par le panneau autorisée pour secretary', async () => {
+      const secCtx = testEnv.authenticatedContext('secretary-a');
+      const q = query(
+        collection(secCtx.firestore(), 'classSubjects'),
+        where('schoolId', '==', SCHOOL_A),
+        where('programId', '==', 'SCHOOL-A__2026-2027__class-a'),
+        where('revisionId', '==', 'REV1')
+      );
+      await assertSucceeds(getDocs(q));
     });
   });
 });

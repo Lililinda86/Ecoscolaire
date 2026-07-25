@@ -578,6 +578,20 @@ async function runAllTests() {
     const c4 = list.find(c => c.teacherStaffId === 'ST4');
     assert.strictEqual(c4.accountStatus, 'inconsistent');
     assert.strictEqual(c4.isEligible, false);
+
+    // Verify absence of sensitive fields
+    for (const c of list) {
+      assert.strictEqual(c.userId, undefined);
+      assert.strictEqual(c.teacherUserId, undefined);
+      assert.strictEqual(c.linkId, undefined);
+      assert.strictEqual(c.email, undefined);
+      assert.strictEqual(c.createdAt, undefined);
+      assert.strictEqual(c.updatedAt, undefined);
+      assert.strictEqual(c.deactivatedAt, undefined);
+      assert.strictEqual(c.deactivatedBy, undefined);
+      assert.strictEqual(c.deactivationReason, undefined);
+      assert.strictEqual(c.historique, undefined);
+    }
   });
 
   console.log('\n================================================================');
