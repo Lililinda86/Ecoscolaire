@@ -415,6 +415,54 @@ async function runTests() {
   assert.strictEqual(staffPointerDoc._data.isActive, true);
   assert.strictEqual(staffPointerDoc._data.linkId, newLinkId);
 
+  // -------------------------------------------------------------
+  // Test linkStaffToUser - Cross Re-linking scenarios after unlink
+  // -------------------------------------------------------------
+  
+  // First unlink the relinked pair again to make target_teacher and staff_teacher inactive
+  await unlinkStaffFromUser(
+    { schoolId: 'S1', staffId: 'staff_teacher', userId: 'target_teacher' },
+    { auth: { uid: 'operator_director' } }
+  );
+
+  // Scenario 43: userA (target_teacher, inactive pointer exists) to staffB (staff_teacher_2, no pointer exists)
+  const crossRelinkUserAToStaffB = await linkStaffToUser(
+    { schoolId: 'S1', staffId: 'staff_teacher_2', userId: 'target_teacher' },
+    { auth: { uid: 'operator_director' } }
+  );
+  assert.ok(crossRelinkUserAToStaffB.linked);
+  assert.strictEqual(crossRelinkUserAToStaffB.alreadyLinked, false);
+
+  const crossLinkDocUserA = docs[`staffUserLinks/${crossRelinkUserAToStaffB.linkId}`];
+  const userAPointerDoc = docs[`staffUserLinkByUser/target_teacher`];
+  const staffBPointerDoc = docs[`staffUserLinkByStaff/S1__staff_teacher_2`];
+
+  assert.strictEqual(crossLinkDocUserA._data.isActive, true);
+  assert.strictEqual(userAPointerDoc._data.isActive, true);
+  assert.strictEqual(userAPointerDoc._data.linkId, crossRelinkUserAToStaffB.linkId);
+  assert.strictEqual(userAPointerDoc._data.staffId, 'staff_teacher_2');
+  assert.strictEqual(staffBPointerDoc._data.isActive, true);
+  assert.strictEqual(staffBPointerDoc._data.linkId, crossRelinkUserAToStaffB.linkId);
+
+  // Scenario 44: userB (target_teacher_2, no pointer exists) to staffA (staff_teacher, inactive pointer exists)
+  const crossRelinkUserBToStaffA = await linkStaffToUser(
+    { schoolId: 'S1', staffId: 'staff_teacher', userId: 'target_teacher_2' },
+    { auth: { uid: 'operator_director' } }
+  );
+  assert.ok(crossRelinkUserBToStaffA.linked);
+  assert.strictEqual(crossRelinkUserBToStaffA.alreadyLinked, false);
+
+  const crossLinkDocStaffA = docs[`staffUserLinks/${crossRelinkUserBToStaffA.linkId}`];
+  const userBPointerDoc = docs[`staffUserLinkByUser/target_teacher_2`];
+  const staffAPointerDoc = docs[`staffUserLinkByStaff/S1__staff_teacher`];
+
+  assert.strictEqual(crossLinkDocStaffA._data.isActive, true);
+  assert.strictEqual(userBPointerDoc._data.isActive, true);
+  assert.strictEqual(userBPointerDoc._data.linkId, crossRelinkUserBToStaffA.linkId);
+  assert.strictEqual(staffAPointerDoc._data.isActive, true);
+  assert.strictEqual(staffAPointerDoc._data.linkId, crossRelinkUserBToStaffA.linkId);
+  assert.strictEqual(staffAPointerDoc._data.userId, 'target_teacher_2');
+
   console.log('✅ All Staff-User Links Cloud Functions Tests PASSED successfully!');
 }
 

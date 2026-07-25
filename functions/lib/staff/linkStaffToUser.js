@@ -117,60 +117,8 @@ exports.linkStaffToUser = functions.https.onCall(async (data, context) => {
             if (userPointerActive || staffPointerActive) {
                 throw new functions.https.HttpsError('failed-precondition', 'Un pointeur orphelin actif a été détecté en base.', { businessCode: 'LINK_INTEGRITY_ERROR' });
             }
-            // If both exist but are inactive
-            if (userPointerExists && staffPointerExists) {
-                const uLink = userPointerSnap.data();
-                const sLink = staffPointerSnap.data();
-                if (uLink.linkId !== sLink.linkId || uLink.staffId !== cleanStaffId || sLink.userId !== cleanUserId) {
-                    throw new functions.https.HttpsError('failed-precondition', 'Incohérence d\'intégrité détectée sur les pointeurs inactifs.', { businessCode: 'LINK_INTEGRITY_ERROR' });
-                }
-                // Validate historical link document integrity
-                const pastLinkRef = db.collection('staffUserLinks').doc(uLink.linkId);
-                const pastLinkSnap = await transaction.get(pastLinkRef);
-                if (!pastLinkSnap.exists || pastLinkSnap.data()?.isActive !== false) {
-                    throw new functions.https.HttpsError('failed-precondition', 'Incohérence d\'intégrité avec le document historique inactif.', { businessCode: 'LINK_INTEGRITY_ERROR' });
-                }
-                // We can link again (Re-link after unlink):
-                // Write 1: Create a NEW historic document
-                const linkDoc = {
-                    id: linkId,
-                    schoolId: cleanSchoolId,
-                    userId: cleanUserId,
-                    staffId: cleanStaffId,
-                    isActive: true,
-                    createdAt: nowIso,
-                    createdBy: uid,
-                    updatedAt: nowIso,
-                    updatedBy: uid
-                };
-                transaction.create(linkRef, linkDoc);
-                // Write 2 & 3: Update existing pointers with transaction.set or update (since they exist)
-                const updatedPointerDoc = {
-                    userId: cleanUserId,
-                    staffId: cleanStaffId,
-                    schoolId: cleanSchoolId,
-                    linkId: linkId,
-                    isActive: true,
-                    updatedAt: nowIso,
-                    updatedBy: uid
-                };
-                transaction.set(userPointerRef, updatedPointerDoc);
-                transaction.set(staffPointerRef, updatedPointerDoc);
-                return {
-                    linkId,
-                    schoolId: cleanSchoolId,
-                    userId: cleanUserId,
-                    staffId: cleanStaffId,
-                    linked: true,
-                    alreadyLinked: false
-                };
-            }
-            // If one exists inactives but the other does not -> Integrity error
-            if (userPointerExists || staffPointerExists) {
-                throw new functions.https.HttpsError('failed-precondition', 'Un seul des pointeurs inactifs existe en base.', { businessCode: 'LINK_INTEGRITY_ERROR' });
-            }
-            // Case: Neither pointer exists (First link creation)
-            // Write 1: Historic doc
+            // Execution of link creation / re-linking
+            // Write 1: Create a NEW historic document
             const linkDoc = {
                 id: linkId,
                 schoolId: cleanSchoolId,
@@ -183,8 +131,7 @@ exports.linkStaffToUser = functions.https.onCall(async (data, context) => {
                 updatedBy: uid
             };
             transaction.create(linkRef, linkDoc);
-            // Write 2: User pointer doc (create because it does not exist)
-            const userPointerDoc = {
+            const pointerDoc = {
                 userId: cleanUserId,
                 staffId: cleanStaffId,
                 schoolId: cleanSchoolId,
@@ -193,18 +140,20 @@ exports.linkStaffToUser = functions.https.onCall(async (data, context) => {
                 updatedAt: nowIso,
                 updatedBy: uid
             };
-            transaction.create(userPointerRef, userPointerDoc);
-            // Write 3: Staff pointer doc (create because it does not exist)
-            const staffPointerDoc = {
-                userId: cleanUserId,
-                staffId: cleanStaffId,
-                schoolId: cleanSchoolId,
-                linkId: linkId,
-                isActive: true,
-                updatedAt: nowIso,
-                updatedBy: uid
-            };
-            transaction.create(staffPointerRef, staffPointerDoc);
+            // Write 2: User pointer doc
+            if (userPointerExists) {
+                transaction.set(userPointerRef, pointerDoc);
+            }
+            else {
+                transaction.create(userPointerRef, pointerDoc);
+            }
+            // Write 3: Staff pointer doc
+            if (staffPointerExists) {
+                transaction.set(staffPointerRef, pointerDoc);
+            }
+            else {
+                transaction.create(staffPointerRef, pointerDoc);
+            }
             return {
                 linkId,
                 schoolId: cleanSchoolId,
