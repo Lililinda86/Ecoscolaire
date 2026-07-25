@@ -35,7 +35,8 @@ export const TeacherAssignmentsPanel: React.FC = () => {
   const {
     status: programStatus,
     subjects: publishedSubjects,
-    source: programSource
+    program,
+    errorCode: programErrorCode
   } = useClassProgram({
     schoolId,
     academicYearId: normalizedYear,
