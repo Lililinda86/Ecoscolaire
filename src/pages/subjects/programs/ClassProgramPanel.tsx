@@ -9,6 +9,7 @@ import { ClassProgramSummary } from './ClassProgramSummary';
 import { ClassProgramTable } from './ClassProgramTable';
 import { ClassProgramEmptyState } from './ClassProgramEmptyState';
 import { ClassProgramEditor } from './editor/ClassProgramEditor';
+import { ensureClassProgramDraft } from '../../../services/classProgramDraftFunctions';
 import type { TechnicalSpecialty } from '../../../types';
 
 export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) => void }> = ({ onDirtyChange }) => {
@@ -24,6 +25,8 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   const schoolId = db?.school?.id;
   const rawAcademicYear = db?.school?.academicYear || '';
@@ -36,6 +39,33 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
     setSelectedClassId(classId);
     setRequestedView('published');
     setIsEditing(false);
+    setDraftError(null);
+  };
+
+  const handleCreateDraft = async () => {
+    if (!schoolId || !normalizedYear || !selectedClassId) return;
+    setIsCreatingDraft(true);
+    setDraftError(null);
+    try {
+      await ensureClassProgramDraft({
+        schoolId,
+        academicYearId: normalizedYear,
+        classId: selectedClassId
+      });
+      // Force reload the program
+      retry();
+      // Select draft view and open editor
+      setRequestedView('draft');
+      setIsEditing(true);
+      if (onDirtyChange) {
+        onDirtyChange(false);
+      }
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : 'Erreur lors de la création du brouillon.';
+      setDraftError(errMessage);
+    } finally {
+      setIsCreatingDraft(false);
+    }
   };
 
   const handleSectionFilterChange = (value: 'all' | 'francophone' | 'anglophone') => {
@@ -122,6 +152,39 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
         technicalSpecialties={(db?.technicalSpecialties || []) as TechnicalSpecialty[]}
         activeSchoolId={currentSchool?.id || ''}
       />
+
+      {draftError && (
+        <div style={{
+          backgroundColor: '#fee2e2',
+          border: '1px solid #fca5a5',
+          color: '#b91c1c',
+          padding: '0.75rem 1rem',
+          borderRadius: '8px',
+          fontSize: '0.875rem',
+          fontWeight: 600,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxSizing: 'border-box',
+          width: '100%'
+        }}>
+          <span>{draftError}</span>
+          <button
+            onClick={() => setDraftError(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#b91c1c',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              marginLeft: '1rem'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 2. Loading, Forbidden, and Empty States resolution */}
       {!isEditing && status === 'loading' && <ClassProgramEmptyState type="loading" />}
@@ -327,24 +390,47 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
               )}
 
               {isManager && source !== 'legacy' && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  style={{
-                    border: 'none',
-                    backgroundColor: 'var(--primary-color)',
-                    color: 'white',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  Modifier le programme
-                </button>
+                hasPublishedVersion && !hasUnpublishedChanges ? (
+                  <button
+                    type="button"
+                    onClick={handleCreateDraft}
+                    disabled={isCreatingDraft}
+                    style={{
+                      border: 'none',
+                      backgroundColor: 'var(--primary-color)',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: isCreatingDraft ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
+                      transition: 'all 0.15s ease',
+                      opacity: isCreatingDraft ? 0.7 : 1
+                    }}
+                  >
+                    {isCreatingDraft ? 'Ouverture...' : 'Ouvrir un nouveau brouillon'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    style={{
+                      border: 'none',
+                      backgroundColor: 'var(--primary-color)',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Modifier le programme
+                  </button>
+                )
               )}
             </div>
           </div>

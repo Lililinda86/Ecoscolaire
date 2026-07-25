@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sweepZombieImportJobs = exports.approveTuitionDiscount = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
+exports.ensureClassProgramDraft = exports.sweepZombieImportJobs = exports.closeCashDrawer = exports.approveTuitionDiscount = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
 __exportStar(require("./importStudents"), exports);
 const admin = require("firebase-admin");
@@ -127,38 +127,301 @@ exports.campayWebhook = functions.https.onRequest(async (req, res) => {
         // 6. Transaction Firestore finale (Mise à jour sécurisée)
         await db.runTransaction(async (transaction) => {
             const txSnap = await transaction.get(txRef);
+            if (!txSnap.exists) {
+                throw new Error('Transaction document not found');
+            }
             const txData = txSnap.data();
-            // Re-vérification idempotence stricte
+            // Re-vérification idempotence stricte et validation Campay dans la transaction
             if (txData.status !== 'PENDING') {
                 return;
             }
-            // Validation croisée stricte
-            const isAmountMatch = Number(apiAmount) === Number(txData.amount);
-            const isExtRefMatch = String(apiExtRef) === String(external_reference);
+            if (txData.provider !== 'campay') {
+                throw new Error('Transaction provider is not campay');
+            }
+            if (Number(apiAmount) !== Number(txData.amount)) {
+                throw new Error('Amount mismatch between Campay API and transaction document');
+            }
+            if (String(apiExtRef) !== String(external_reference)) {
+                throw new Error('External reference mismatch');
+            }
+            if (txData.id !== external_reference) {
+                throw new Error('Transaction document ID is inconsistent');
+            }
             const upperStatus = String(apiStatus).toUpperCase();
-            if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus) && isAmountMatch && isExtRefMatch) {
+            if (['SUCCESS', 'SUCCESSFUL'].includes(upperStatus)) {
+                // --- 1. ALL READ OPERATIONS FIRST ---
+                // Read 1: Check if payment document already exists
+                const paymentRef = db.collection('payments').doc(external_reference);
+                const paymentSnap = await transaction.get(paymentRef);
+                if (paymentSnap.exists) {
+                    throw new Error('Inconsistent state: Payment already exists but transaction is still PENDING');
+                }
+                // Read 1.5: Check if receipt document already exists
+                const receiptRef = db.collection('receipts').doc(external_reference);
+                const receiptSnapForCheck = await transaction.get(receiptRef);
+                if (receiptSnapForCheck.exists) {
+                    throw new Error('Inconsistent state: Receipt already exists but transaction is still PENDING');
+                }
+                // Snapshot validation
+                if (txData.provider !== 'campay' ||
+                    typeof txData.schoolId !== 'string' || !txData.schoolId ||
+                    typeof txData.studentId !== 'string' || !txData.studentId ||
+                    typeof txData.academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(txData.academicYear) ||
+                    (txData.type !== 'tuition' && txData.type !== 'registration_fee') ||
+                    typeof txData.amount !== 'number' || !Number.isFinite(txData.amount) || !Number.isSafeInteger(txData.amount) || txData.amount <= 0 ||
+                    typeof txData.netExpectedAmount !== 'number' || !Number.isFinite(txData.netExpectedAmount) || !Number.isSafeInteger(txData.netExpectedAmount) || txData.netExpectedAmount <= 0 ||
+                    (txData.type === 'tuition' && txData.installment !== 'T1' && txData.installment !== 'T2' && txData.installment !== 'T3')) {
+                    throw new Error('Local transaction snapshot is corrupted or invalid');
+                }
+                // Read 2: Student
+                const studentRef = db.collection('students').doc(txData.studentId);
+                const studentSnap = await transaction.get(studentRef);
+                if (!studentSnap.exists) {
+                    throw new Error('Student not found');
+                }
+                const student = studentSnap.data();
+                if (student.schoolId !== txData.schoolId) {
+                    throw new Error('Student schoolId mismatch');
+                }
+                // Read 3: Counter
+                const counterRef = db.collection('counters').doc(`receipts_${txData.schoolId}`);
+                const counterSnap = await transaction.get(counterRef);
+                // Read 4: School
+                const schoolRef = db.collection('schools').doc(txData.schoolId);
+                const schoolSnap = await transaction.get(schoolRef);
+                if (!schoolSnap.exists) {
+                    throw new Error('School not found');
+                }
+                const school = schoolSnap.data();
+                // Read 5: Previous payments for installment / type limit validation
+                let query = db.collection('payments').where('studentId', '==', txData.studentId);
+                if (txData.type === 'registration_fee') {
+                    query = query.where('type', '==', 'registration_fee');
+                }
+                else {
+                    query = query.where('type', '==', 'tuition');
+                }
+                const paymentsSnap = await transaction.get(query);
+                const paymentsList = paymentsSnap.docs.map(doc => doc.data());
+                // Read 6: Compute Effective Annual Expected (does reads inside)
+                let effectiveAnnualResult = null;
+                if (txData.type === 'tuition') {
+                    effectiveAnnualResult = await computeEffectiveAnnualExpected({
+                        schoolId: txData.schoolId,
+                        studentId: txData.studentId,
+                        academicYear: txData.academicYear,
+                        studentFees: { feeT1: student.feeT1, feeT2: student.feeT2, feeT3: student.feeT3 },
+                        schoolGlobalFees: school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 },
+                        reader: (ref) => transaction.get(ref)
+                    });
+                    if (effectiveAnnualResult.corruption) {
+                        throw new Error(effectiveAnnualResult.corruption);
+                    }
+                }
+                // Read 7: All tuition payments for student to compute totals
+                let allTuitionSnap = null;
+                if (txData.type === 'tuition') {
+                    allTuitionSnap = await transaction.get(db.collection('payments').where('studentId', '==', txData.studentId).where('type', '==', 'tuition'));
+                }
+                // Read 8: All registration fee payments for student to compute totals
+                let allRegSnap = null;
+                if (txData.type === 'registration_fee') {
+                    allRegSnap = await transaction.get(db.collection('payments').where('studentId', '==', txData.studentId).where('type', '==', 'registration_fee'));
+                }
+                // Read 9: Tuition Discount if applicable
+                let discountSnap = null;
+                let discountRef = null;
+                if (txData.discountId) {
+                    discountRef = db.collection('tuitionDiscounts').doc(txData.discountId);
+                    discountSnap = await transaction.get(discountRef);
+                    if (!discountSnap.exists) {
+                        throw new Error('Discount not found');
+                    }
+                    const discount = discountSnap.data();
+                    if (discountSnap.id !== txData.discountId ||
+                        discount.schoolId !== txData.schoolId ||
+                        discount.studentId !== txData.studentId ||
+                        discount.academicYear !== txData.academicYear ||
+                        discount.installment !== txData.installment ||
+                        (discount.paymentType !== undefined && discount.paymentType !== 'tuition') ||
+                        discount.grossExpectedAmount !== txData.grossExpectedAmount ||
+                        discount.discountAmount !== txData.discountAmount ||
+                        discount.netExpectedAmount !== txData.netExpectedAmount) {
+                        throw new Error('Tuition discount snapshot mismatch or corrupted');
+                    }
+                    const calculated = (0, discountHelpers_1.calculateTuitionDiscountAmounts)(discount.grossExpectedAmount, discount.discountAmount);
+                    if (calculated.netExpectedAmount !== discount.netExpectedAmount) {
+                        throw new Error('Tuition discount amounts integrity check failed');
+                    }
+                    if (discount.status !== 'approved' && discount.status !== 'applied') {
+                        throw new Error(`Tuition discount is in incompatible status: ${discount.status}`);
+                    }
+                }
+                // --- 2. CALCULATIONS ---
+                const isConfirmedPayment = (p) => {
+                    return p.status === undefined || p.status === null || p.status === 'completed';
+                };
+                const validatePaymentAmount = (amt) => {
+                    return typeof amt === 'number' && Number.isFinite(amt) && Number.isSafeInteger(amt) && amt > 0;
+                };
+                let previousPaid = 0;
+                const filteredPayments = paymentsList.filter(p => {
+                    if (p.schoolId !== txData.schoolId || p.academicYear !== txData.academicYear) {
+                        return false;
+                    }
+                    if (txData.type === 'tuition') {
+                        return p.installment === txData.installment && p.type === 'tuition' && isConfirmedPayment(p);
+                    }
+                    else {
+                        return p.type === 'registration_fee' && isConfirmedPayment(p);
+                    }
+                });
+                for (const p of filteredPayments) {
+                    if (!validatePaymentAmount(p.amount)) {
+                        throw new Error('Historical payment amount is invalid or corrupted.');
+                    }
+                    previousPaid += p.amount;
+                }
+                const remaining = Math.max(0, txData.netExpectedAmount - previousPaid);
+                if (txData.amount > remaining) {
+                    throw new Error('Payment exceeds remaining balance');
+                }
+                // --- 3. ALL WRITE OPERATIONS LAST ---
+                // Write 1: Update transaction status
                 transaction.update(txRef, {
                     status: 'SUCCESS',
                     providerReference: reference || null,
                     providerResponse: apiTx,
                     updatedAt: firestore_1.FieldValue.serverTimestamp()
                 });
-                const paymentRef = db.collection('payments').doc(external_reference);
-                transaction.set(paymentRef, {
+                // Write 2: Create Payment
+                const paymentData = {
                     id: external_reference,
                     schoolId: txData.schoolId,
-                    studentId: txData.studentId || null,
+                    studentId: txData.studentId,
                     amount: txData.amount,
-                    type: txData.type || 'PAYMENT',
+                    type: txData.type,
                     installment: txData.installment || null,
                     paymentMethod: 'Mobile Money',
                     provider: 'Campay',
                     providerReference: reference || null,
                     transactionId: external_reference,
                     status: 'completed',
-                    date: firestore_1.FieldValue.serverTimestamp(),
-                    createdAt: firestore_1.FieldValue.serverTimestamp()
-                });
+                    date: new Date().toISOString().split('T')[0],
+                    createdAt: firestore_1.FieldValue.serverTimestamp(),
+                    bycampayWebhook: true,
+                    academicYear: txData.academicYear,
+                    expectedAmount: txData.netExpectedAmount,
+                    previousPaid,
+                    newPaid: previousPaid + txData.amount,
+                    remainingBalance: remaining - txData.amount,
+                    discountId: txData.discountId || null,
+                    grossExpectedAmount: txData.grossExpectedAmount,
+                    discountAmount: txData.discountAmount,
+                    netExpectedAmount: txData.netExpectedAmount
+                };
+                transaction.set(paymentRef, paymentData);
+                // Write 3: Create Receipt
+                let lastReceiptNumber = 0;
+                if (counterSnap.exists) {
+                    lastReceiptNumber = counterSnap.data()?.lastReceiptNumber || 0;
+                }
+                const nextReceiptNumber = lastReceiptNumber + 1;
+                transaction.set(counterRef, { lastReceiptNumber: nextReceiptNumber }, { merge: true });
+                const currentYear = new Date().getFullYear();
+                const formattedNum = String(nextReceiptNumber).padStart(4, '0');
+                const receiptNumber = `REC-${currentYear}-${formattedNum}`;
+                const receiptData = {
+                    id: external_reference,
+                    paymentId: external_reference,
+                    schoolId: txData.schoolId,
+                    receiptNumber,
+                    studentId: txData.studentId,
+                    amount: txData.amount,
+                    type: txData.type,
+                    method: 'mobile_money',
+                    paymentMethod: 'mobile_money',
+                    date: new Date().toISOString().split('T')[0],
+                    createdAt: firestore_1.FieldValue.serverTimestamp(),
+                    expectedAmount: txData.netExpectedAmount,
+                    previousPaid,
+                    newPaid: previousPaid + txData.amount,
+                    remainingBalance: remaining - txData.amount,
+                    discountId: txData.discountId || null,
+                    grossExpectedAmount: txData.grossExpectedAmount,
+                    discountAmount: txData.discountAmount,
+                    netExpectedAmount: txData.netExpectedAmount
+                };
+                transaction.set(receiptRef, receiptData);
+                // Write 4: Update Student & tuitionStatus/registrationFeeStatus
+                if (txData.type === 'tuition' && effectiveAnnualResult && allTuitionSnap) {
+                    const allTuitionList = allTuitionSnap.docs.map(doc => doc.data());
+                    const totalTuitionPaidForYear = allTuitionList
+                        .filter(p => p.schoolId === txData.schoolId && p.academicYear === txData.academicYear && isConfirmedPayment(p) && p.id !== external_reference)
+                        .reduce((sum, p) => {
+                        if (!validatePaymentAmount(p.amount)) {
+                            throw new Error('Historical tuition payment amount is invalid.');
+                        }
+                        return sum + p.amount;
+                    }, 0) + txData.amount;
+                    const totalTuitionExpectedForYear = effectiveAnnualResult.effectiveAnnualExpected;
+                    const studentUpdate = {
+                        tuitionPaid: totalTuitionPaidForYear,
+                        tuitionStatus: totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid')
+                    };
+                    transaction.update(studentRef, studentUpdate);
+                }
+                else if (txData.type === 'registration_fee' && allRegSnap) {
+                    const allRegList = allRegSnap.docs.map(doc => doc.data());
+                    const totalRegPaidForYear = allRegList
+                        .filter(p => p.schoolId === txData.schoolId && p.academicYear === txData.academicYear && isConfirmedPayment(p) && p.id !== external_reference)
+                        .reduce((sum, p) => {
+                        if (!validatePaymentAmount(p.amount)) {
+                            throw new Error('Historical registration fee payment amount is invalid.');
+                        }
+                        return sum + p.amount;
+                    }, 0) + txData.amount;
+                    const registrationFeeExpected = student.registrationFeeExpected ?? 15000;
+                    const registrationFeeStatus = totalRegPaidForYear >= registrationFeeExpected ? 'paid' : (totalRegPaidForYear > 0 ? 'partial' : 'unpaid');
+                    const studentUpdate = {
+                        registrationFeePaid: totalRegPaidForYear,
+                        registrationFeeStatus
+                    };
+                    transaction.update(studentRef, studentUpdate);
+                }
+                // Write 5: Update Tuition Discount status if applicable
+                if (discountRef && discountSnap && discountSnap.exists) {
+                    const discountData = discountSnap.data();
+                    const isFinalPayment = (remaining - txData.amount) === 0;
+                    if (discountData.status === 'approved') {
+                        if (isFinalPayment) {
+                            transaction.update(discountRef, {
+                                status: 'settled',
+                                firstAppliedAt: firestore_1.FieldValue.serverTimestamp(),
+                                firstPaymentId: external_reference,
+                                settledAt: firestore_1.FieldValue.serverTimestamp(),
+                                settlementPaymentId: external_reference
+                            });
+                        }
+                        else {
+                            transaction.update(discountRef, {
+                                status: 'applied',
+                                firstAppliedAt: firestore_1.FieldValue.serverTimestamp(),
+                                firstPaymentId: external_reference
+                            });
+                        }
+                    }
+                    else if (discountData.status === 'applied') {
+                        if (isFinalPayment) {
+                            transaction.update(discountRef, {
+                                status: 'settled',
+                                settledAt: firestore_1.FieldValue.serverTimestamp(),
+                                settlementPaymentId: external_reference
+                            });
+                        }
+                    }
+                }
+                // Write 6: Create log entry
                 transaction.set(db.collection('campay_logs').doc(), {
                     requestType: 'webhook_success_verified',
                     external_reference: external_reference,
@@ -229,17 +492,33 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
     if (!context.auth || !context.auth.uid) {
         throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
     }
-    const { schoolId, studentId, amount, type, installment, provider, phoneNumber } = data;
+    const { schoolId, studentId, amount, type, installment, provider, phoneNumber, academicYear } = data;
     if (!schoolId) {
         throw new functions.https.HttpsError('invalid-argument', 'schoolId is required');
+    }
+    if (!studentId || typeof studentId !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'studentId is required');
+    }
+    if (!academicYear || typeof academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(academicYear)) {
+        throw new functions.https.HttpsError('invalid-argument', 'academicYear must be in YYYY-YYYY format.');
+    }
+    if (type !== 'tuition' && type !== 'registration_fee') {
+        throw new functions.https.HttpsError('invalid-argument', 'type must be tuition or registration_fee.');
+    }
+    if (type === 'tuition') {
+        if (!installment || (installment !== 'T1' && installment !== 'T2' && installment !== 'T3')) {
+            throw new functions.https.HttpsError('invalid-argument', 'installment must be T1, T2, or T3 for tuition.');
+        }
+    }
+    else {
+        if (installment) {
+            throw new functions.https.HttpsError('invalid-argument', 'installment must not be provided for registration fee.');
+        }
     }
     if (provider === 'campay') {
         if (!phoneNumber || typeof phoneNumber !== 'string' || !phoneNumber.startsWith('237') || !/^\d+$/.test(phoneNumber)) {
             throw new functions.https.HttpsError('invalid-argument', 'A valid Cameroonian phone number starting with 237 is required for Campay');
         }
-    }
-    if (typeof amount !== 'number' || amount <= 0) {
-        throw new functions.https.HttpsError('invalid-argument', 'Amount must be greater than 0');
     }
     if (provider !== 'campay' && provider !== 'flutterwave') {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid provider');
@@ -254,25 +533,204 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
     if (!user || user.isActive !== true) {
         throw new functions.https.HttpsError('permission-denied', 'User is inactive or missing');
     }
-    const allowedRoles = ['parent', 'owner', 'director', 'accountant', 'superAdmin'];
+    const allowedRoles = ['parent', 'owner', 'director', 'accountant', 'secretary', 'superAdmin'];
     if (!allowedRoles.includes(user.role)) {
         throw new functions.https.HttpsError('permission-denied', 'Role not authorized for payments');
     }
     if (user.role !== 'superAdmin' && user.schoolId !== schoolId) {
         throw new functions.https.HttpsError('permission-denied', 'School access denied');
     }
-    // 2. If studentId is provided, check if student belongs to the school
-    if (studentId) {
-        const studentSnap = await db.collection('students').doc(studentId).get();
-        if (!studentSnap.exists) {
-            throw new functions.https.HttpsError('not-found', 'Student not found');
-        }
-        const student = studentSnap.data();
-        if (student?.schoolId !== schoolId) {
-            throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school');
+    // 2. Fetch School Context
+    const schoolSnap = await db.collection('schools').doc(schoolId).get();
+    if (!schoolSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'School not found.');
+    }
+    const school = schoolSnap.data();
+    if (!school.academicYear || typeof school.academicYear !== 'string' || !/^\d{4}-\d{4}$/.test(school.academicYear)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Active academic year is not defined or invalid for this school.');
+    }
+    if (academicYear !== school.academicYear) {
+        throw new functions.https.HttpsError('failed-precondition', 'The requested academic year is not the active academic year of the school.');
+    }
+    // 3. Fetch Student Context
+    const studentSnap = await db.collection('students').doc(studentId).get();
+    if (!studentSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Student not found.');
+    }
+    const student = studentSnap.data();
+    if (student.schoolId !== schoolId) {
+        throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school.');
+    }
+    // 4. Fetch Tuition Discount Slot if applicable
+    let hasValidSlot = false;
+    let slotSnap = null;
+    let discountSnap = null;
+    if (type === 'tuition') {
+        const slotId = (0, discountHelpers_1.makeTuitionDiscountSlotId)({ schoolId, studentId, academicYear, installment });
+        const slotRef = db.collection('tuitionDiscountSlots').doc(slotId);
+        slotSnap = await slotRef.get();
+        if (slotSnap.exists) {
+            const slotData = slotSnap.data();
+            if (typeof slotData.discountId !== 'string' || slotData.discountId.trim() === '') {
+                throw new functions.https.HttpsError('failed-precondition', 'Slot discountId is invalid.');
+            }
+            if (slotData.id !== undefined && slotData.id !== slotId) {
+                throw new functions.https.HttpsError('failed-precondition', 'Slot id mismatch.');
+            }
+            if (slotData.schoolId !== undefined && slotData.schoolId !== schoolId) {
+                throw new functions.https.HttpsError('failed-precondition', 'Slot schoolId mismatch.');
+            }
+            if (slotData.studentId !== undefined && slotData.studentId !== studentId) {
+                throw new functions.https.HttpsError('failed-precondition', 'Slot studentId mismatch.');
+            }
+            if (slotData.academicYear !== undefined && slotData.academicYear !== academicYear) {
+                throw new functions.https.HttpsError('failed-precondition', 'Slot academicYear mismatch.');
+            }
+            if (slotData.installment !== undefined && slotData.installment !== installment) {
+                throw new functions.https.HttpsError('failed-precondition', 'Slot installment mismatch.');
+            }
+            const discountRef = db.collection('tuitionDiscounts').doc(slotData.discountId);
+            discountSnap = await discountRef.get();
+            if (!discountSnap.exists) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount document not found.');
+            }
+            const discountData = discountSnap.data();
+            if (discountData.id !== undefined && discountData.id !== null && discountData.id !== discountSnap.id) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount ID mismatch between document body and document ID.');
+            }
+            if (discountData.schoolId !== schoolId) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount schoolId mismatch.');
+            }
+            if (discountData.studentId !== studentId) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount studentId mismatch.');
+            }
+            if (discountData.academicYear !== academicYear) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount academicYear mismatch.');
+            }
+            if (discountData.paymentType !== undefined && discountData.paymentType !== type) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount paymentType mismatch.');
+            }
+            if (discountData.installment !== installment) {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount installment mismatch.');
+            }
+            const allowedStatuses = ['approved', 'applied'];
+            if (!allowedStatuses.includes(discountData.status)) {
+                throw new functions.https.HttpsError('failed-precondition', `New payments are not allowed for status ${discountData.status}.`);
+            }
+            try {
+                const calc = (0, discountHelpers_1.calculateTuitionDiscountAmounts)(discountData.grossExpectedAmount, discountData.discountAmount);
+                if (calc.grossExpectedAmount !== discountData.grossExpectedAmount ||
+                    calc.discountAmount !== discountData.discountAmount ||
+                    calc.netExpectedAmount !== discountData.netExpectedAmount) {
+                    throw new Error('mismatch');
+                }
+            }
+            catch {
+                throw new functions.https.HttpsError('failed-precondition', 'Discount amounts calculation mismatch.');
+            }
+            hasValidSlot = true;
         }
     }
-    // 3. Create transaction
+    // 5. Fetch previous payments
+    let paymentsSnap;
+    if (type === 'registration_fee') {
+        paymentsSnap = await db.collection('payments')
+            .where('studentId', '==', studentId)
+            .where('type', '==', 'registration_fee')
+            .get();
+    }
+    else {
+        paymentsSnap = await db.collection('payments')
+            .where('studentId', '==', studentId)
+            .where('type', '==', 'tuition')
+            .get();
+    }
+    const paymentsList = paymentsSnap.docs.map(doc => doc.data());
+    // 6. Calculations Phase
+    let previousPaid = 0;
+    let grossExpectedAmount = 0;
+    let discountAmount = 0;
+    let netExpectedAmount = 0;
+    let discountId = null;
+    const globalFees = school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 };
+    const isConfirmedPayment = (p) => {
+        return p.status === undefined || p.status === null || p.status === 'completed';
+    };
+    if (hasValidSlot) {
+        const discountData = discountSnap.data();
+        grossExpectedAmount = discountData.grossExpectedAmount;
+        discountAmount = discountData.discountAmount;
+        netExpectedAmount = discountData.netExpectedAmount;
+        discountId = discountSnap.id;
+        const filteredPayments = paymentsList.filter(p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment && p.type === 'tuition' && isConfirmedPayment(p));
+        for (const p of filteredPayments) {
+            if (typeof p.amount !== 'number' ||
+                !Number.isFinite(p.amount) ||
+                !Number.isSafeInteger(p.amount) ||
+                p.amount <= 0) {
+                throw new functions.https.HttpsError('failed-precondition', 'Historical payment amount is invalid or corrupted.');
+            }
+            previousPaid += p.amount;
+        }
+    }
+    else {
+        if (type === 'registration_fee') {
+            grossExpectedAmount = student.registrationFeeExpected || 0;
+            discountAmount = 0;
+            netExpectedAmount = grossExpectedAmount;
+            const filteredPayments = paymentsList.filter(p => p.schoolId === schoolId && p.academicYear === academicYear && p.type === 'registration_fee' && isConfirmedPayment(p));
+            for (const p of filteredPayments) {
+                if (typeof p.amount !== 'number' ||
+                    !Number.isFinite(p.amount) ||
+                    !Number.isSafeInteger(p.amount) ||
+                    p.amount <= 0) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Historical payment amount is invalid or corrupted.');
+                }
+                previousPaid += p.amount;
+            }
+        }
+        else if (type === 'tuition') {
+            grossExpectedAmount = installment === 'T1'
+                ? (student.feeT1 ?? globalFees.feeT1 ?? 0)
+                : installment === 'T2'
+                    ? (student.feeT2 ?? globalFees.feeT2 ?? 0)
+                    : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+            discountAmount = 0;
+            netExpectedAmount = grossExpectedAmount;
+            const filteredPayments = paymentsList.filter(p => p.schoolId === schoolId && p.academicYear === academicYear && p.installment === installment && p.type === 'tuition' && isConfirmedPayment(p));
+            for (const p of filteredPayments) {
+                if (typeof p.amount !== 'number' ||
+                    !Number.isFinite(p.amount) ||
+                    !Number.isSafeInteger(p.amount) ||
+                    p.amount <= 0) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Historical payment amount is invalid or corrupted.');
+                }
+                previousPaid += p.amount;
+            }
+        }
+    }
+    if (typeof grossExpectedAmount !== 'number' ||
+        !Number.isFinite(grossExpectedAmount) ||
+        !Number.isSafeInteger(grossExpectedAmount) ||
+        grossExpectedAmount <= 0) {
+        throw new functions.https.HttpsError('failed-precondition', 'Fees expected amount is not defined or invalid.');
+    }
+    const remainingAmount = Math.max(0, netExpectedAmount - previousPaid);
+    if (remainingAmount <= 0) {
+        throw new functions.https.HttpsError('failed-precondition', 'No remaining amount to pay.');
+    }
+    const requestedAmount = amount ?? remainingAmount;
+    if (typeof requestedAmount !== 'number' ||
+        !Number.isFinite(requestedAmount) ||
+        !Number.isSafeInteger(requestedAmount) ||
+        requestedAmount <= 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'Amount must be a positive safe integer.');
+    }
+    if (requestedAmount > remainingAmount) {
+        throw new functions.https.HttpsError('invalid-argument', `The requested amount (${requestedAmount}) exceeds the remaining balance (${remainingAmount}).`);
+    }
+    const serverAmount = requestedAmount;
+    // 7. Create transaction
     const transactionRef = db.collection('transactions').doc();
     const generatedId = transactionRef.id;
     const idempotencyKey = `idemp_${generatedId}`;
@@ -301,7 +759,7 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
                 token = await campayService.login(secrets.campayAppUsername, secrets.campayAppPassword);
                 // 2. Request To Pay
                 const description = `Paiement pour ${studentId || 'élève inconnu'}`;
-                const response = await campayService.requestToPay(token, amount, phoneNumber, description, generatedId // transactionId as externalReference
+                const response = await campayService.requestToPay(token, serverAmount, phoneNumber, description, generatedId // transactionId as externalReference
                 );
                 message = 'Payment initiated via Campay Sandbox.';
                 mockPaymentUrl = ''; // No mock URL in real mode
@@ -312,7 +770,7 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
                     requestType: 'request_to_pay',
                     status: 'SUCCESS',
                     sanitizedRequest: {
-                        amount: amount.toString(),
+                        amount: serverAmount.toString(),
                         from: phoneNumber,
                         description,
                         external_reference: generatedId
@@ -330,7 +788,7 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
                     requestType: 'request_to_pay',
                     status: 'FAILED',
                     sanitizedRequest: {
-                        amount: amount.toString(),
+                        amount: serverAmount.toString(),
                         from: phoneNumber,
                         external_reference: generatedId
                     },
@@ -351,7 +809,7 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
         schoolId,
         userId: context.auth.uid,
         studentId: studentId || null,
-        amount,
+        amount: serverAmount,
         type,
         installment: installment || null,
         provider,
@@ -364,7 +822,16 @@ exports.initiatePayment = functions.https.onCall(async (data, context) => {
         idempotencyKey,
         mode,
         createdAt: firestore_1.FieldValue.serverTimestamp(),
-        updatedAt: firestore_1.FieldValue.serverTimestamp()
+        updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        academicYear,
+        paymentType: type,
+        operatorUid: context.auth.uid,
+        grossExpectedAmount,
+        discountAmount,
+        netExpectedAmount,
+        discountId: discountId || null,
+        remainingAmountBeforePayment: remainingAmount,
+        requestedAmount: serverAmount
     };
     await transactionRef.set(transactionData);
     return {
@@ -470,6 +937,10 @@ exports.onPaymentCreated = functions.firestore
     const paymentId = context.params.paymentId;
     if (!paymentData || !paymentData.schoolId) {
         console.log('Skipping receipt generation: Missing payment data or schoolId');
+        return null;
+    }
+    if (paymentData.byRecordCashPayment || paymentData.bycampayWebhook) {
+        console.log('Skipping receipt generation trigger for atomic payment creation');
         return null;
     }
     const schoolId = paymentData.schoolId;
@@ -586,7 +1057,7 @@ exports.updateStudentFinancialStatus = functions.firestore
     const paymentData = change.after.exists ? change.after.data() : change.before.data();
     if (!paymentData || !paymentData.studentId)
         return null;
-    if (!change.before.exists && paymentData.byRecordCashPayment) {
+    if (!change.before.exists && (paymentData.byRecordCashPayment || paymentData.bycampayWebhook)) {
         console.log('Skipping legacy financial status recalculation for atomic payment creation');
         return null;
     }
@@ -905,7 +1376,7 @@ exports.recordCashPayment = functions.https.onCall(async (data, context) => {
     if (!user || user.isActive !== true) {
         throw new functions.https.HttpsError('permission-denied', 'Operator is inactive.');
     }
-    const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin'];
+    const allowedRoles = ['owner', 'director', 'accountant', 'secretary', 'superAdmin'];
     if (!allowedRoles.includes(user.role)) {
         throw new functions.https.HttpsError('permission-denied', 'Operator role not authorized.');
     }
@@ -1990,6 +2461,152 @@ exports.approveTuitionDiscount = functions.https.onCall(async (data, context) =>
         };
     });
 });
+const getAfricaDoualaDateStr = (dateObj = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en', {
+        timeZone: 'Africa/Douala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(dateObj);
+    const getPart = (type) => parts.find(p => p.type === type)?.value || '';
+    return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+};
+exports.closeCashDrawer = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    const { schoolId, academicYear, date, openingBalance, countedBalance, notes } = data || {};
+    if (typeof schoolId !== 'string' || !schoolId.trim()) {
+        throw new functions.https.HttpsError('invalid-argument', 'schoolId is required.');
+    }
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new functions.https.HttpsError('invalid-argument', 'date is invalid (expected YYYY-MM-DD).');
+    }
+    const [yrStr, moStr, dyStr] = date.split('-');
+    const yr = Number(yrStr);
+    const mo = Number(moStr);
+    const dy = Number(dyStr);
+    const parsedDate = new Date(Date.UTC(yr, mo - 1, dy));
+    if (parsedDate.getUTCFullYear() !== yr || parsedDate.getUTCMonth() !== mo - 1 || parsedDate.getUTCDate() !== dy) {
+        throw new functions.https.HttpsError('invalid-argument', 'date does not exist.');
+    }
+    const todayDouala = getAfricaDoualaDateStr();
+    if (date > todayDouala) {
+        throw new functions.https.HttpsError('invalid-argument', 'La clôture d\'une date future est interdite.');
+    }
+    if (typeof openingBalance !== 'number' || !Number.isSafeInteger(openingBalance) || openingBalance < 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'openingBalance must be a non-negative integer.');
+    }
+    if (typeof countedBalance !== 'number' || !Number.isSafeInteger(countedBalance) || countedBalance < 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'countedBalance must be a non-negative integer.');
+    }
+    const cleanNotes = typeof notes === 'string' ? notes.trim() : '';
+    const db = admin.firestore();
+    const uid = context.auth.uid;
+    const userSnap = await db.collection('users').doc(uid).get();
+    if (!userSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'User profile not found.');
+    }
+    const userData = userSnap.data() || {};
+    const isActive = userData.active === true || userData.isActive === true;
+    if (!isActive) {
+        throw new functions.https.HttpsError('permission-denied', 'User account is inactive.');
+    }
+    const role = userData.role;
+    const allowedRoles = ['secretary', 'accountant', 'owner', 'director', 'superAdmin'];
+    if (!allowedRoles.includes(role)) {
+        throw new functions.https.HttpsError('permission-denied', 'User role is not authorized to close cash drawer.');
+    }
+    if (role !== 'superAdmin' && userData.schoolId !== schoolId) {
+        throw new functions.https.HttpsError('permission-denied', 'User schoolId does not match target school.');
+    }
+    const schoolSnap = await db.collection('schools').doc(schoolId).get();
+    if (!schoolSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'School not found.');
+    }
+    const schoolData = schoolSnap.data() || {};
+    const officialAcademicYear = typeof schoolData.academicYear === 'string'
+        ? schoolData.academicYear.trim()
+        : '';
+    if (!/^\d{4}-\d{4}$/.test(officialAcademicYear)) {
+        throw new functions.https.HttpsError('failed-precondition', 'School academic year is missing or invalid.');
+    }
+    if (academicYear !== undefined &&
+        academicYear !== officialAcademicYear) {
+        throw new functions.https.HttpsError('invalid-argument', 'academicYear does not match school record.');
+    }
+    const closureId = `${schoolId}__${date}`;
+    const closureRef = db.collection('cashClosures').doc(closureId);
+    return await db.runTransaction(async (transaction) => {
+        const existingSnap = await transaction.get(closureRef);
+        if (existingSnap.exists) {
+            throw new functions.https.HttpsError('already-exists', 'La caisse pour cette date a déjà été clôturée.');
+        }
+        const paymentsQuery = db.collection('payments')
+            .where('schoolId', '==', schoolId)
+            .where('date', '==', date);
+        const paymentsSnap = await transaction.get(paymentsQuery);
+        let cashReceived = 0;
+        paymentsSnap.forEach(docSnap => {
+            const p = docSnap.data();
+            if (p) {
+                const method = p.method ? String(p.method).toLowerCase() : 'cash';
+                const status = p.status ? String(p.status).toLowerCase() : 'completed';
+                const excludedStatuses = ['pending', 'failed', 'cancelled', 'canceled', 'refunded', 'reversed'];
+                if (method === 'cash' && !excludedStatuses.includes(status)) {
+                    const amt = Number(p.amount) || 0;
+                    if (Number.isSafeInteger(amt) && amt > 0) {
+                        cashReceived += amt;
+                    }
+                }
+            }
+        });
+        const expensesQuery = db.collection('expenses')
+            .where('schoolId', '==', schoolId)
+            .where('date', '==', date);
+        const expensesSnap = await transaction.get(expensesQuery);
+        let cashExpenses = 0;
+        expensesSnap.forEach(docSnap => {
+            const e = docSnap.data();
+            if (e) {
+                const amt = Number(e.amount) || 0;
+                if (Number.isSafeInteger(amt) && amt > 0) {
+                    cashExpenses += amt;
+                }
+            }
+        });
+        const theoreticalBalance = openingBalance + cashReceived - cashExpenses;
+        const discrepancy = countedBalance - theoreticalBalance;
+        if (discrepancy !== 0 && !cleanNotes) {
+            throw new functions.https.HttpsError('invalid-argument', 'Une observation est obligatoire en cas d\'écart de caisse.');
+        }
+        const closedByName = userData.name || userData.displayName || userData.email || uid;
+        const closureDoc = {
+            id: closureId,
+            schoolId,
+            academicYear: officialAcademicYear,
+            date,
+            openingBalance,
+            cashReceived,
+            cashExpenses,
+            theoreticalBalance,
+            countedBalance,
+            discrepancy,
+            notes: cleanNotes,
+            status: 'closed',
+            closedBy: uid,
+            closedByName,
+            closedAt: firestore_1.FieldValue.serverTimestamp()
+        };
+        transaction.set(closureRef, closureDoc);
+        return {
+            success: true,
+            closureId
+        };
+    });
+});
 var studentImportSweeper_1 = require("./studentImportSweeper");
 Object.defineProperty(exports, "sweepZombieImportJobs", { enumerable: true, get: function () { return studentImportSweeper_1.sweepZombieImportJobs; } });
+var ensureClassProgramDraft_1 = require("./academic/ensureClassProgramDraft");
+Object.defineProperty(exports, "ensureClassProgramDraft", { enumerable: true, get: function () { return ensureClassProgramDraft_1.ensureClassProgramDraft; } });
 //# sourceMappingURL=index.js.map

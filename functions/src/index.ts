@@ -3018,3 +3018,4 @@ export const closeCashDrawer = functions.https.onCall(async (data, context) => {
 });
 
 export { sweepZombieImportJobs } from './studentImportSweeper';
+export { ensureClassProgramDraft } from './academic/ensureClassProgramDraft';
