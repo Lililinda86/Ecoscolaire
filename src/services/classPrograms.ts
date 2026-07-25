@@ -5,6 +5,10 @@ import {
   buildClassProgramId,
   ClassProgramServiceError
 } from './classProgramQueryResult';
+import type { ClassProgramErrorType } from './classProgramQueryResult';
+
+export { ClassProgramServiceError };
+export type { ClassProgramErrorType };
 
 export async function getClassProgramById(
   schoolId: string,

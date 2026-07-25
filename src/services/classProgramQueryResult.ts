@@ -1,3 +1,5 @@
+import type { ClassProgram } from '../types';
+
 export type ClassProgramErrorType =
   | 'PROGRAM_NOT_FOUND'
   | 'PROGRAM_NOT_PUBLISHED'
