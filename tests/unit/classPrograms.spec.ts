@@ -3,8 +3,13 @@ import { test, expect } from '@playwright/test';
 // We implement a pure helper check since we can't easily mock import.meta.env in Playwright node tests.
 // Let's define the pure function that interprets results of the query:
 
+interface MockDocSnap {
+  id: string;
+  data: () => Record<string, unknown>;
+}
+
 function interpretQueryResults(
-  docs: any[],
+  docs: MockDocSnap[],
   schoolId: string,
   academicYearId: string,
   classId: string,
