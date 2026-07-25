@@ -9,9 +9,10 @@ import { SubjectFormModal } from './subjects/SubjectFormModal';
 import { ClassProgramPanel } from './subjects/programs/ClassProgramPanel';
 import Modal from '../components/Modal';
 import { canManageAcademicPrograms } from '../utils/academicPermissions';
+import { seedDefaultSubjectCatalog } from '../services/subjectCatalogSeedFunctions';
 
 const SubjectsProgram: React.FC = () => {
-  const { db, safeMergeDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, updateLocalState, currentUser } = useAppContext();
 
   // Navigation tabs for the module (only Catalogue is active in Lot 1)
   const [activeModuleTab, setActiveModuleTab] = useState<'catalogue' | 'program' | 'assignment'>('catalogue');
@@ -30,6 +31,8 @@ const SubjectsProgram: React.FC = () => {
   const [editingSubject, setEditingSubject] = useState<Partial<Subject> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmDeactivateSubject, setConfirmDeactivateSubject] = useState<Subject | null>(null);
+  const [isSeedModalOpen, setSeedModalOpen] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Subject>>({
     name: '',
@@ -351,6 +354,89 @@ const SubjectsProgram: React.FC = () => {
     }
   };
 
+  const handleSeedCatalog = async () => {
+    if (isSeeding) return;
+    if (!activeSchoolId) {
+      setToast({ message: "Aucun établissement actif n’est sélectionné.", type: 'error' });
+      return;
+    }
+    const targetSchoolId = activeSchoolId;
+    setIsSeeding(true);
+    let seedSucceeded = false;
+    try {
+      const res = await seedDefaultSubjectCatalog({ schoolId: targetSchoolId });
+      seedSucceeded = true;
+      
+      const fetchedSubjects: Subject[] = [];
+      try {
+        const { db: firestoreDb } = await import('../db/firebase');
+        const { collection, getDocs, query, where } = await import('firebase/firestore');
+        const q = query(collection(firestoreDb, 'subjects'), where('schoolId', '==', targetSchoolId));
+        const querySnap = await getDocs(q);
+        querySnap.forEach((doc) => {
+          fetchedSubjects.push({ id: doc.id, ...doc.data() } as Subject);
+        });
+      } catch (refreshErr) {
+        if (import.meta.env.DEV) {
+          console.error("Refresh subjects after seed failed:", refreshErr);
+        }
+        setToast({
+          message: "Le catalogue a été complété, mais son affichage n’a pas pu être actualisé. Rechargez la page.",
+          type: 'error'
+        });
+        setSeedModalOpen(false);
+        return;
+      }
+
+      updateLocalState({ subjects: fetchedSubjects });
+
+      if (res.createdCount > 0) {
+        setToast({
+          message: `Catalogue complété : ${res.createdCount} matières ajoutées, ${res.skippedCount} déjà présentes.`,
+          type: 'success'
+        });
+      } else {
+        setToast({
+          message: 'Le catalogue contient déjà toutes les matières proposées.',
+          type: 'success'
+        });
+      }
+      setSeedModalOpen(false);
+    } catch (err: unknown) {
+      if (seedSucceeded) {
+        setToast({
+          message: "Le catalogue a été complété, mais son affichage n’a pas pu être actualisé. Rechargez la page.",
+          type: 'error'
+        });
+      } else {
+        const errObj = err as { details?: { businessCode?: string }; message?: string };
+        const businessCode = errObj.details?.businessCode;
+        let userMessage = "Une erreur est survenue.";
+
+        if (businessCode === 'PERMISSION_DENIED') {
+          userMessage = "Vous n’êtes pas autorisé à préremplir ce catalogue.";
+        } else if (businessCode === 'SCHOOL_MISMATCH') {
+          userMessage = "L’établissement sélectionné ne correspond pas à votre compte.";
+        } else if (businessCode === 'SUBJECT_SEED_CONFLICT') {
+          userMessage = "Une matière existante utilise un code ou un identifiant incompatible. Vérifiez le catalogue avant de relancer le préremplissage.";
+        } else if (businessCode === 'SEED_INTEGRITY_ERROR') {
+          userMessage = "La configuration du catalogue proposé est incohérente.";
+        } else if (businessCode === 'INVALID_ARGUMENT') {
+          userMessage = "L’établissement sélectionné est invalide.";
+        } else if (err instanceof Error) {
+          userMessage = err.message;
+        }
+
+        if (import.meta.env.DEV) {
+          console.error("Seeding catalog failed:", err);
+        }
+        setToast({ message: userMessage, type: 'error' });
+      }
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="page-container" style={{ fontFamily: "'Inter', sans-serif", position: 'relative' }}>
       
@@ -381,25 +467,50 @@ const SubjectsProgram: React.FC = () => {
           <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Matières & Programmes</h1>
         </div>
         {canWrite && activeModuleTab === 'catalogue' && (
-          <button 
-            ref={openModalButtonRef}
-            onClick={handleOpenCreate} 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem',
-              backgroundColor: 'var(--primary-color)',
-              color: 'white',
-              border: 'none',
-              padding: '0.75rem 1.25rem',
-              borderRadius: '8px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.15)'
-            }}
-          >
-            <Plus size={18} /> Ajouter une matière
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={() => {
+                if (!activeSchoolId) {
+                  setToast({ message: "Aucun établissement actif n’est sélectionné.", type: 'error' });
+                  return;
+                }
+                setSeedModalOpen(true);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: 'transparent',
+                color: 'var(--primary-color)',
+                border: '2px solid var(--primary-color)',
+                padding: '0.70rem 1.25rem',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Préremplir le catalogue
+            </button>
+            <button 
+              ref={openModalButtonRef}
+              onClick={handleOpenCreate} 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                backgroundColor: 'var(--primary-color)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.25rem',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.15)'
+              }}
+            >
+              <Plus size={18} /> Ajouter une matière
+            </button>
+          </div>
         )}
       </div>
 
@@ -641,6 +752,61 @@ const SubjectsProgram: React.FC = () => {
           }
         }}
       />
+
+      {/* SEED CONFIRMATION MODAL */}
+      <Modal 
+        isOpen={isSeedModalOpen} 
+        onClose={() => !isSeeding && setSeedModalOpen(false)}
+        title="Préremplir le catalogue des matières ?"
+      >
+        <div style={{ padding: '0.5rem', fontFamily: "'Inter', sans-serif" }}>
+          <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.5rem', marginBottom: '1rem' }}>
+            Cette action ajoutera les matières manquantes d’un catalogue de base francophone et anglophone. Les matières existantes ne seront ni modifiées, ni supprimées, ni réactivées.
+          </p>
+          <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+            <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#475569', marginTop: 0, marginBottom: '0.5rem' }}>
+              Résumé du catalogue proposé :
+            </h4>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#64748b', fontSize: '0.875rem', lineHeight: '1.25rem' }}>
+              <li>Maternelle et nursery</li>
+              <li>Primaire et primary</li>
+              <li>Secondaire francophone et anglophone</li>
+            </ul>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button
+              onClick={() => setSeedModalOpen(false)}
+              disabled={isSeeding}
+              style={{
+                backgroundColor: 'white',
+                color: '#475569',
+                border: '1px solid #cbd5e1',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: 600,
+                cursor: isSeeding ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSeedCatalog}
+              disabled={isSeeding}
+              style={{
+                backgroundColor: 'var(--primary-color)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: 600,
+                cursor: isSeeding ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isSeeding ? 'Préremplissage en cours…' : 'Préremplir'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
