@@ -78,11 +78,13 @@ exports.seedDefaultSubjectCatalog = functions.https.onCall(async (data, context)
                 if (detSnap.exists) {
                     const existingDet = detSnap.data();
                     // Verify compatibility
+                    const sameSchool = existingDet.schoolId === cleanSchoolId;
+                    const sameSection = existingDet.section === candidate.section;
+                    const hasCommonCycle = candidate.cycles.some((c) => (existingDet.cycles || []).includes(c));
                     const normExistingName = normalizeSubjectText(existingDet.name || '');
                     const normCandidateName = normalizeSubjectText(candidate.name);
-                    const hasCommonCycle = candidate.cycles.some((c) => (existingDet.cycles || []).includes(c));
-                    const sameSection = existingDet.section === candidate.section;
-                    if (sameSection && hasCommonCycle && (normExistingName === normCandidateName || (candidate.aliases || []).map(normalizeSubjectText).includes(normExistingName))) {
+                    const isNameOrAliasMatch = normExistingName === normCandidateName || (candidate.aliases || []).map(normalizeSubjectText).includes(normExistingName);
+                    if (sameSchool && sameSection && hasCommonCycle && isNameOrAliasMatch) {
                         skippedCount++;
                         existingByCodeCount++;
                         continue;

@@ -11,7 +11,6 @@ const dbMock = {
         if (typeof refOrQuery.mockGet === 'function') {
           return await refOrQuery.mockGet();
         }
-        // Handle document references
         return await refOrQuery.mockGet();
       },
       create: (ref, data) => ref.mockCreate(data),
@@ -154,210 +153,403 @@ function setDocState(collection, id, exists, data) {
   dbMock.collection(collection).doc(id).setState(exists, data);
 }
 
-async function runTests() {
-  console.log('🧪 Starting Seed Subject Catalog Cloud Functions Tests...');
+// Test Runner variables
+let testsRun = 0;
+let testsPassed = 0;
 
-  const assertThrowsBusinessError = async (fn, expectedCode, expectedBusinessCode) => {
-    try {
-      await fn();
-      assert.fail(`Expected function to throw HttpsError with ${expectedBusinessCode}`);
-    } catch (err) {
-      if (err.name === 'AssertionError') throw err;
-      assert.strictEqual(err.code, expectedCode, `Expected code ${expectedCode}, got ${err.code}`);
-      assert.ok(err.details, 'Expected error details to exist');
-      assert.strictEqual(err.details.businessCode, expectedBusinessCode, `Expected businessCode ${expectedBusinessCode}, got ${err.details.businessCode}`);
-    }
-  };
-
-  // -------------------------------------------------------------
-  // AUTHENTIFICATION & AUTORISATION
-  // -------------------------------------------------------------
-  
-  // 1. non authentifié refusé
-  await assertThrowsBusinessError(
-    () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, {}),
-    'unauthenticated',
-    'UNAUTHENTICATED'
-  );
-
-  // Set up common operators
-  setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
-  setDocState('users', 'op_teacher', true, { role: 'teacher', isActive: true, schoolId: 'S1' });
-  setDocState('users', 'op_accountant', true, { role: 'accountant', isActive: true, schoolId: 'S1' });
-  setDocState('users', 'op_secretary', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
-  setDocState('users', 'op_inactive', true, { role: 'director', isActive: false, schoolId: 'S1' });
-  setDocState('users', 'op_other_school', true, { role: 'director', isActive: true, schoolId: 'S2' });
-  setDocState('users', 'op_superadmin', true, { role: 'superAdmin', isActive: true });
-
-  // 2. teacher refusé
-  await assertThrowsBusinessError(
-    () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_teacher' } }),
-    'permission-denied',
-    'PERMISSION_DENIED'
-  );
-
-  // 3. accountant refusé
-  await assertThrowsBusinessError(
-    () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_accountant' } }),
-    'permission-denied',
-    'PERMISSION_DENIED'
-  );
-
-  // 4. secretary même école autorisée
-  // We'll verify this during the execution tests.
-  
-  // 5. secretary autre école refusée
-  await assertThrowsBusinessError(
-    () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_other_school' } }),
-    'permission-denied',
-    'SCHOOL_MISMATCH'
-  );
-
-  // 6. gestionnaire inactif refusé
-  await assertThrowsBusinessError(
-    () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_inactive' } }),
-    'permission-denied',
-    'PERMISSION_DENIED'
-  );
-
-  // -------------------------------------------------------------
-  // INTÉGRITÉ DE LA CONSTANTE
-  // -------------------------------------------------------------
-  
-  // 8. totalCandidates égal à DEFAULT_SUBJECT_CATALOG.length
-  // 9. total exact de 72
-  assert.strictEqual(DEFAULT_SUBJECT_CATALOG.length, 72, 'DEFAULT_SUBJECT_CATALOG must have exactly 72 subjects');
-
-  // 10. internalCode uniques, 11. codes uniques
-  const internalCodes = new Set();
-  const codes = new Set();
-  DEFAULT_SUBJECT_CATALOG.forEach(s => {
-    assert.ok(s.internalCode, 'Every subject must have internalCode');
-    assert.ok(s.code, 'Every subject must have code');
-    assert.ok(s.name, 'Every subject must have name');
-    assert.ok(s.section, 'Every subject must have section');
-    assert.ok(s.cycles && s.cycles.length > 0, 'Every subject must have at least one cycle');
-    assert.ok(s.category, 'Every subject must have category');
-
-    internalCodes.add(s.internalCode);
-    codes.add(s.code);
-  });
-  assert.strictEqual(internalCodes.size, 72, 'internalCodes must be unique');
-  assert.strictEqual(codes.size, 72, 'codes must be unique');
-
-  // -------------------------------------------------------------
-  // CRÉATION DE LA SEED
-  // -------------------------------------------------------------
-  
-  // 18. catalogue vide crée 72 matières
-  const result = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_secretary' } });
-  assert.strictEqual(result.seedVersion, 'cameroon-bilingual-v1');
-  assert.strictEqual(result.totalCandidates, 72);
-  assert.strictEqual(result.createdCount, 72);
-  assert.strictEqual(result.skippedCount, 0);
-
-  // 19. schoolId, 21. createdBy, 22. IDs déterministes sur chaque document
-  const sampleDetId = 'S1__subject__fr-mat-lang';
-  const sampleDoc = docs[`subjects/${sampleDetId}`];
-  assert.ok(sampleDoc && sampleDoc.exists, 'Deterministic document must exist');
-  assert.strictEqual(sampleDoc._data.schoolId, 'S1');
-  assert.strictEqual(sampleDoc._data.createdBy, 'op_secretary');
-  assert.strictEqual(sampleDoc._data.isActive, true);
-
-  // -------------------------------------------------------------
-  // IDEMPOTENCE
-  // -------------------------------------------------------------
-  
-  // 25. second appel crée zéro matière
-  const result2 = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_secretary' } });
-  assert.strictEqual(result2.createdCount, 0);
-  assert.strictEqual(result2.skippedCount, 72);
-
-  // Clean DB for specific idempotency tests
-  resetDb();
-  setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
-
-  // 26. matière existante par code compatible ignorée
-  setDocState('subjects', 'custom_id_math', true, {
-    id: 'custom_id_math',
-    schoolId: 'S1',
-    code: 'FR-MAT-MATH',
-    name: 'Éveil mathématique',
-    section: 'francophone',
-    cycles: ['nursery'],
-    category: 'Mathématiques',
-    isActive: true
-  });
-  const resCodeIdempotent = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
-  assert.strictEqual(resCodeIdempotent.createdCount, 71);
-  assert.strictEqual(resCodeIdempotent.skippedCount, 1);
-  assert.strictEqual(resCodeIdempotent.existingByCodeCount, 1);
-
-  // 27. matière existante par nom identique / alias / casse / accents ignorée
-  resetDb();
-  setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
-  // Set existing subject with different accent and typography
-  setDocState('subjects', 'custom_id_math', true, {
-    id: 'custom_id_math',
-    schoolId: 'S1',
-    name: 'activites mathematiques',
-    section: 'francophone',
-    cycles: ['nursery'],
-    category: 'Mathématiques',
-    isActive: true
-  });
-  const resAliasIdempotent = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
-  assert.strictEqual(resAliasIdempotent.createdCount, 71);
-  assert.strictEqual(resAliasIdempotent.skippedCount, 1);
-  assert.strictEqual(resAliasIdempotent.existingByAliasCount, 1);
-
-  // 37. mathématiques francophone maternelle empêche Éveil mathématique (cas existant de la capture)
-  resetDb();
-  setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
-  setDocState('subjects', 'math_capture', true, {
-    id: 'math_capture',
-    schoolId: 'S1',
-    name: 'mathématiques',
-    section: 'francophone',
-    cycles: ['nursery'],
-    category: 'Mathématiques',
-    isActive: true
-  });
-  const resCapture = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
-  assert.strictEqual(resCapture.createdCount, 71);
-  assert.strictEqual(resCapture.skippedCount, 1);
-  const captureDoc = docs['subjects/math_capture'];
-  assert.strictEqual(captureDoc._data.name, 'mathématiques', 'Capture subject must not be renamed');
-  assert.strictEqual(captureDoc._data.code, undefined, 'Capture subject must not automatically get code');
-
-  // -------------------------------------------------------------
-  // CONFLITS
-  // -------------------------------------------------------------
-  
-  // 40. même code avec autre section refusé
-  resetDb();
-  setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
-  setDocState('subjects', 'custom_conflicting_code', true, {
-    id: 'custom_conflicting_code',
-    schoolId: 'S1',
-    code: 'FR-MAT-MATH',
-    name: 'Éveil mathématique',
-    section: 'anglophone', // anglophone instead of francophone
-    cycles: ['nursery'],
-    category: 'Mathématiques',
-    isActive: true
-  });
-  await assertThrowsBusinessError(
-    () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } }),
-    'failed-precondition',
-    'SUBJECT_SEED_CONFLICT'
-  );
-
-  console.log("Les tests mockés démontrent les branches métier et les écritures préparées. Ils ne démontrent pas le retry ni la concurrence réelle du SDK Firestore.");
-  console.log('✅ All Seed Subject Catalog Cloud Functions Tests PASSED successfully!');
+async function runTest(name, fn) {
+  testsRun++;
+  try {
+    resetDb();
+    await fn();
+    testsPassed++;
+    console.log(`✅ test("${name}") -> PASSED`);
+  } catch (err) {
+    console.error(`❌ test("${name}") -> FAILED`);
+    console.error(err);
+    process.exit(1);
+  }
 }
 
-runTests().catch(err => {
+const assertThrowsBusinessError = async (fn, expectedCode, expectedBusinessCode) => {
+  try {
+    await fn();
+    assert.fail(`Expected function to throw HttpsError with ${expectedBusinessCode}`);
+  } catch (err) {
+    if (err.name === 'AssertionError') throw err;
+    assert.strictEqual(err.code, expectedCode, `Expected code ${expectedCode}, got ${err.code}`);
+    assert.ok(err.details, 'Expected error details to exist');
+    assert.strictEqual(err.details.businessCode, expectedBusinessCode, `Expected businessCode ${expectedBusinessCode}, got ${err.details.businessCode}`);
+  }
+};
+
+async function runAllTests() {
+  console.log('🧪 Starting Seed Subject Catalog Cloud Functions Tests...');
+
+  // 1. Authentification & Autorisation
+  await runTest('non authentifié refusé', async () => {
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, {}),
+      'unauthenticated',
+      'UNAUTHENTICATED'
+    );
+  });
+
+  await runTest('utilisateur absent refusé', async () => {
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_unknown' } }),
+      'permission-denied',
+      'PERMISSION_DENIED'
+    );
+  });
+
+  await runTest('utilisateur inactif refusé', async () => {
+    setDocState('users', 'op_inactive', true, { role: 'director', isActive: false, schoolId: 'S1' });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_inactive' } }),
+      'permission-denied',
+      'PERMISSION_DENIED'
+    );
+  });
+
+  await runTest('teacher refusé', async () => {
+    setDocState('users', 'op_teacher', true, { role: 'teacher', isActive: true, schoolId: 'S1' });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_teacher' } }),
+      'permission-denied',
+      'PERMISSION_DENIED'
+    );
+  });
+
+  await runTest('accountant refusé', async () => {
+    setDocState('users', 'op_accountant', true, { role: 'accountant', isActive: true, schoolId: 'S1' });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_accountant' } }),
+      'permission-denied',
+      'PERMISSION_DENIED'
+    );
+  });
+
+  await runTest('supervisor / parent / student / driver / rôle inconnu refusé', async () => {
+    setDocState('users', 'op_parent', true, { role: 'parent', isActive: true, schoolId: 'S1' });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_parent' } }),
+      'permission-denied',
+      'PERMISSION_DENIED'
+    );
+  });
+
+  await runTest('secretary même école autorisée', async () => {
+    setDocState('users', 'op_secretary', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_secretary' } });
+    assert.strictEqual(res.seedVersion, 'cameroon-bilingual-v1');
+    assert.strictEqual(res.createdCount, 72);
+  });
+
+  await runTest('director même école autorisé', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    assert.strictEqual(res.createdCount, 72);
+  });
+
+  await runTest('owner même école autorisé', async () => {
+    setDocState('users', 'op_owner', true, { role: 'owner', isActive: true, schoolId: 'S1' });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_owner' } });
+    assert.strictEqual(res.createdCount, 72);
+  });
+
+  await runTest('superAdmin autorisé', async () => {
+    setDocState('users', 'op_superadmin', true, { role: 'superAdmin', isActive: true });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_superadmin' } });
+    assert.strictEqual(res.createdCount, 72);
+  });
+
+  await runTest('gestionnaire d’une autre école refusé', async () => {
+    setDocState('users', 'op_other_school', true, { role: 'director', isActive: true, schoolId: 'S2' });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_other_school' } }),
+      'permission-denied',
+      'SCHOOL_MISMATCH'
+    );
+  });
+
+  await runTest('schoolId vide / invalide refusé', async () => {
+    setDocState('users', 'op_superadmin', true, { role: 'superAdmin', isActive: true });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: '' }, { auth: { uid: 'op_superadmin' } }),
+      'invalid-argument',
+      'INVALID_ARGUMENT'
+    );
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1/S2' }, { auth: { uid: 'op_superadmin' } }),
+      'invalid-argument',
+      'INVALID_ARGUMENT'
+    );
+  });
+
+  // 2. Intégrité de la constante
+  await runTest('DEFAULT_SUBJECT_CATALOG.length === 72 et répartition exacte', async () => {
+    assert.strictEqual(DEFAULT_SUBJECT_CATALOG.length, 72);
+    
+    const countBySectionAndCycle = (section, cycle) => 
+      DEFAULT_SUBJECT_CATALOG.filter(s => s.section === section && s.cycles.includes(cycle)).length;
+
+    assert.strictEqual(countBySectionAndCycle('francophone', 'nursery'), 8);
+    assert.strictEqual(countBySectionAndCycle('anglophone', 'nursery'), 8);
+    assert.strictEqual(countBySectionAndCycle('francophone', 'primary'), 14);
+    assert.strictEqual(countBySectionAndCycle('anglophone', 'primary'), 13);
+    assert.strictEqual(countBySectionAndCycle('francophone', 'secondary'), 13);
+    assert.strictEqual(countBySectionAndCycle('anglophone', 'secondary'), 16);
+  });
+
+  await runTest('champs interdits absents et internalCode/codes uniques', async () => {
+    const internalCodes = new Set();
+    const codes = new Set();
+
+    DEFAULT_SUBJECT_CATALOG.forEach(s => {
+      assert.ok(s.internalCode);
+      assert.ok(s.code);
+      assert.ok(s.name);
+      assert.ok(['francophone', 'anglophone', 'all'].includes(s.section));
+      assert.ok(s.cycles.every(c => ['nursery', 'primary', 'secondary'].includes(c)));
+      assert.ok(s.category);
+      
+      // Forbidden fields
+      assert.strictEqual(s.coefficient, undefined);
+      assert.strictEqual(s.weeklyHours, undefined);
+      assert.strictEqual(s.teacherId, undefined);
+      assert.strictEqual(s.classId, undefined);
+      assert.strictEqual(s.academicYearId, undefined);
+
+      internalCodes.add(s.internalCode);
+      codes.add(s.code);
+    });
+
+    assert.strictEqual(internalCodes.size, 72);
+    assert.strictEqual(codes.size, 72);
+  });
+
+  // 3. Métadonnées serveur
+  await runTest('métadonnées serveur correctes et champs client ignorés', async () => {
+    setDocState('users', 'op_secretary', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
+    const payload = {
+      schoolId: 'S1',
+      role: 'superAdmin',
+      createdBy: 'fake_uid',
+      updatedBy: 'fake_uid',
+      isActive: false
+    };
+    const res = await seedDefaultSubjectCatalog(payload, { auth: { uid: 'op_secretary' } });
+    assert.strictEqual(res.createdCount, 72);
+
+    const sampleDetId = 'S1__subject__fr-mat-lang';
+    const sampleDoc = docs[`subjects/${sampleDetId}`];
+    assert.ok(sampleDoc.exists);
+    assert.strictEqual(sampleDoc._data.schoolId, 'S1');
+    assert.strictEqual(sampleDoc._data.createdBy, 'op_secretary');
+    assert.strictEqual(sampleDoc._data.updatedBy, 'op_secretary');
+    assert.strictEqual(sampleDoc._data.isActive, true);
+    assert.strictEqual(sampleDoc._data.createdAt, sampleDoc._data.updatedAt);
+  });
+
+  // 4. Idempotence & Matières existantes
+  await runTest('second appel après création complète n’écrit rien', async () => {
+    setDocState('users', 'op_secretary', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
+    await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_secretary' } });
+    
+    // Clear tracked calls in mocks
+    for (const key in docs) {
+      if (key.startsWith('subjects/')) {
+        docs[key].creates = [];
+        docs[key].updates = [];
+      }
+    }
+
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_secretary' } });
+    assert.strictEqual(res.createdCount, 0);
+    assert.strictEqual(res.skippedCount, 72);
+
+    // Verify absolutely no write calls occurred
+    for (const key in docs) {
+      if (key.startsWith('subjects/')) {
+        assert.strictEqual(docs[key].creates.length, 0);
+        assert.strictEqual(docs[key].updates.length, 0);
+      }
+    }
+  });
+
+  await runTest('matière existante par code compatible ignorée', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    setDocState('subjects', 'custom_id_math', true, {
+      id: 'custom_id_math',
+      schoolId: 'S1',
+      code: 'FR-MAT-MATH',
+      name: 'Éveil mathématique',
+      section: 'francophone',
+      cycles: ['nursery'],
+      category: 'Mathématiques',
+      isActive: true
+    });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    assert.strictEqual(res.createdCount, 71);
+    assert.strictEqual(res.skippedCount, 1);
+    assert.strictEqual(res.existingByCodeCount, 1);
+  });
+
+  await runTest('matière existante par nom normalisé avec diacritiques ignorée', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    setDocState('subjects', 'custom_id_math', true, {
+      id: 'custom_id_math',
+      schoolId: 'S1',
+      name: 'Activites Mathematiques',
+      section: 'francophone',
+      cycles: ['nursery'],
+      category: 'Mathématiques',
+      isActive: true
+    });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    assert.strictEqual(res.createdCount, 71);
+    assert.strictEqual(res.skippedCount, 1);
+  });
+
+  await runTest('matière existante par alias ignorée', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    setDocState('subjects', 'custom_id_math', true, {
+      id: 'custom_id_math',
+      schoolId: 'S1',
+      name: 'éveil mathématique',
+      section: 'francophone',
+      cycles: ['nursery'],
+      category: 'Mathématiques',
+      isActive: true
+    });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    assert.strictEqual(res.createdCount, 71);
+    assert.strictEqual(res.skippedCount, 1);
+  });
+
+  await runTest('matière inactive compatible ignorée sans réactivation', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    setDocState('subjects', 'custom_id_math', true, {
+      id: 'custom_id_math',
+      schoolId: 'S1',
+      code: 'FR-MAT-MATH',
+      name: 'Éveil mathématique',
+      section: 'francophone',
+      cycles: ['nursery'],
+      category: 'Mathématiques',
+      isActive: false
+    });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    assert.strictEqual(res.createdCount, 71);
+    assert.strictEqual(res.skippedCount, 1);
+    
+    // Verify it was not reactivated
+    const existing = docs['subjects/custom_id_math'];
+    assert.strictEqual(existing._data.isActive, false);
+  });
+
+  await runTest('autre cycle ou section n’empêche pas la création', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    setDocState('subjects', 'custom_id_math', true, {
+      id: 'custom_id_math',
+      schoolId: 'S1',
+      name: 'Éveil mathématique',
+      section: 'francophone',
+      cycles: ['primary'], // primary instead of nursery
+      category: 'Mathématiques',
+      isActive: true
+    });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    // Nursery FR-MAT-MATH should still be created
+    assert.strictEqual(res.createdCount, 72);
+  });
+
+  // 5. Cas Mathématiques Maternelle
+  await runTest('cas mathématiques maternelle existante', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    setDocState('subjects', 'math_capture', true, {
+      id: 'math_capture',
+      schoolId: 'S1',
+      name: 'mathématiques',
+      section: 'francophone',
+      cycles: ['nursery'],
+      category: 'Mathématiques',
+      isActive: true
+    });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    assert.strictEqual(res.createdCount, 71);
+    assert.strictEqual(res.skippedCount, 1);
+    
+    const captureDoc = docs['subjects/math_capture'];
+    assert.strictEqual(captureDoc._data.name, 'mathématiques');
+    assert.strictEqual(captureDoc._data.code, undefined);
+  });
+
+  // 6. Conflits par code
+  await runTest('conflits par code', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    setDocState('subjects', 'custom_conflicting_code', true, {
+      id: 'custom_conflicting_code',
+      schoolId: 'S1',
+      code: 'FR-MAT-MATH',
+      name: 'Éveil mathématique',
+      section: 'anglophone', // Incompatible section
+      cycles: ['nursery'],
+      isActive: true
+    });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } }),
+      'failed-precondition',
+      'SUBJECT_SEED_CONFLICT'
+    );
+  });
+
+  // 7. Conflits par ID déterministe
+  await runTest('conflits par identifiant déterministe', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    // Deterministic ID S1__subject__fr-mat-math occupied by school S2
+    setDocState('subjects', 'S1__subject__fr-mat-math', true, {
+      id: 'S1__subject__fr-mat-math',
+      schoolId: 'S2', // Incompatible schoolId
+      code: 'FR-MAT-MATH',
+      name: 'Éveil mathématique',
+      section: 'francophone',
+      cycles: ['nursery'],
+      isActive: true
+    });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } }),
+      'failed-precondition',
+      'SUBJECT_SEED_CONFLICT'
+    );
+  });
+
+  // 8. Cohérence de la réponse
+  await runTest('cohérence de la réponse', async () => {
+    setDocState('users', 'op_director', true, { role: 'director', isActive: true, schoolId: 'S1' });
+    const res = await seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_director' } });
+    
+    assert.strictEqual(res.seedVersion, 'cameroon-bilingual-v1');
+    assert.strictEqual(res.totalCandidates, 72);
+    assert.strictEqual(res.createdCount + res.skippedCount, res.totalCandidates);
+    assert.strictEqual(res.createdSubjectIds.length, res.createdCount);
+    
+    const uniqueIds = new Set(res.createdSubjectIds);
+    assert.strictEqual(uniqueIds.size, res.createdCount);
+  });
+
+  console.log('\n================================================================');
+  console.log(`TESTS SUMMARY: ${testsPassed} / ${testsRun} tests passed successfully.`);
+  console.log("Les tests mockés démontrent les branches métier et les écritures préparées. Ils ne démontrent pas le retry ni la concurrence réelle du SDK Firestore.");
+  console.log('================================================================\n');
+
+  if (testsPassed !== testsRun) {
+    process.exit(1);
+  }
+}
+
+runAllTests().catch(err => {
   console.error('❌ Test failed with error:', err);
   process.exit(1);
 });
