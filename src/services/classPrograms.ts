@@ -1,10 +1,9 @@
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import type { ClassProgram, ClassSubject } from '../types';
 import {
   buildClassProgramId,
-  ClassProgramServiceError,
-  ClassProgramErrorType
+  ClassProgramServiceError
 } from './classProgramQueryResult';
 
 export async function getClassProgramById(
@@ -57,6 +56,7 @@ import {
   interpretClassProgramQueryResult,
   validateClassProgramIdentityParams
 } from './classProgramQueryResult';
+import { buildClassProgramQuery } from './classProgramQueryFactory';
 
 export async function getClassProgramByIdentity(params: {
   schoolId?: string;
@@ -71,15 +71,7 @@ export async function getClassProgramByIdentity(params: {
   const { cleanSchoolId, cleanAcademicYearId, cleanClassId } = validated;
 
   try {
-    const collRef = collection(db, 'classPrograms');
-    const q = query(
-      collRef,
-      where('schoolId', '==', cleanSchoolId),
-      where('academicYearId', '==', cleanAcademicYearId),
-      where('classId', '==', cleanClassId),
-      limit(2)
-    );
-
+    const q = buildClassProgramQuery(db, cleanSchoolId, cleanAcademicYearId, cleanClassId);
     const snap = await getDocs(q);
 
     return interpretClassProgramQueryResult({

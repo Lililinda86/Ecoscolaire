@@ -39,7 +39,7 @@ export function interpretClassProgramQueryResult({
   schoolId: string;
   academicYearId: string;
   classId: string;
-}): any | null {
+}): ClassProgram | null {
   if (docs.length === 0) {
     return null;
   }
@@ -52,7 +52,7 @@ export function interpretClassProgramQueryResult({
   }
 
   const docSnap = docs[0];
-  const data = docSnap.data() as any;
+  const data = docSnap.data() as Record<string, unknown>;
   const expectedId = buildClassProgramId(schoolId, academicYearId, classId);
 
   if (
@@ -68,7 +68,7 @@ export function interpretClassProgramQueryResult({
     );
   }
 
-  return data;
+  return data as unknown as ClassProgram;
 }
 
 export function validateClassProgramIdentityParams({

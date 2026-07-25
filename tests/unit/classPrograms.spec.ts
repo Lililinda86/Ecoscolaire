@@ -3,6 +3,7 @@ import {
   interpretClassProgramQueryResult,
   validateClassProgramIdentityParams
 } from '../../src/services/classProgramQueryResult';
+import { buildClassProgramQueryConstraints } from '../../src/services/classProgramQueryConstraints';
 
 test.describe('ClassProgram Query & Interpretation production logic tests', () => {
   const schoolId = 'school-a';
@@ -211,5 +212,33 @@ test.describe('ClassProgram Query & Interpretation production logic tests', () =
       academicYearId,
       classId
     })).toThrow('Les données du programme de cette classe sont incohérentes.');
+  });
+
+  test('17. buildClassProgramQueryConstraints: validation de la structure de requête Firestore de production', () => {
+    const q = buildClassProgramQueryConstraints('school-1', '2026-2027', 'class-1');
+
+    // Assure collection name is correct
+    expect(q.collectionName).toBe('classPrograms');
+
+    // Assure limit(2) is used
+    expect(q.limitVal).toBe(2);
+
+    // Assure 3 where filters are used
+    expect(q.filters.length).toBe(3);
+
+    const schoolFilter = q.filters.find((c) => c.field === 'schoolId');
+    expect(schoolFilter).toBeDefined();
+    expect(schoolFilter?.op).toBe('==');
+    expect(schoolFilter?.val).toBe('school-1');
+
+    const yearFilter = q.filters.find((c) => c.field === 'academicYearId');
+    expect(yearFilter).toBeDefined();
+    expect(yearFilter?.op).toBe('==');
+    expect(yearFilter?.val).toBe('2026-2027');
+
+    const classFilter = q.filters.find((c) => c.field === 'classId');
+    expect(classFilter).toBeDefined();
+    expect(classFilter?.op).toBe('==');
+    expect(classFilter?.val).toBe('class-1');
   });
 });
