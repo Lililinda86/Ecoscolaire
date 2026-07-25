@@ -1,6 +1,6 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import fs from 'fs';
-import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField, limit } from 'firebase/firestore';
 import { test } from '@playwright/test';
 const { describe, beforeAll: before, beforeEach, afterAll: after } = test;
 const it = test;
@@ -2751,6 +2751,121 @@ describe('Class Programs and Subjects Security Rules', () => {
         where('revisionId', '==', 'REV1')
       );
       await assertSucceeds(getDocs(q));
+    });
+  });
+
+  describe('Class Program Query Security Rules', () => {
+    const SCHOOL_A = 'school-a';
+    const SCHOOL_B = 'school-b';
+
+    beforeEach(async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, 'users', 'sa-uid'), { role: 'superAdmin', active: true });
+        await setDoc(doc(db, 'users', 'owner-a'), { role: 'owner', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'director-a'), { role: 'director', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'secretary-a'), { role: 'secretary', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'director-b'), { role: 'director', schoolId: SCHOOL_B, active: true });
+
+        // Seed an existing program
+        await setDoc(doc(db, 'classPrograms', `${SCHOOL_A}__2026-2027__class-a`), {
+          id: `${SCHOOL_A}__2026-2027__class-a`,
+          schoolId: SCHOOL_A,
+          academicYearId: '2026-2027',
+          classId: 'class-a',
+          status: 'draft',
+          draftRevisionNumber: 1,
+          draftRevisionId: `${SCHOOL_A}__2026-2027__class-a__v1`,
+          hasUnpublishedChanges: true,
+          createdBy: 'some-uid',
+          updatedBy: 'some-uid',
+          createdAt: '2026-07-25T00:00:00Z',
+          updatedAt: '2026-07-25T00:00:00Z'
+        });
+      });
+    });
+
+    it('30. secretary même école : query vide autorisée', async () => {
+      const secCtx = testEnv.authenticatedContext('secretary-a');
+      const q = query(
+        collection(secCtx.firestore(), 'classPrograms'),
+        where('schoolId', '==', SCHOOL_A),
+        where('academicYearId', '==', '2026-2027'),
+        where('classId', '==', 'non-existent-class'),
+        limit(2)
+      );
+      await assertSucceeds(getDocs(q));
+    });
+
+    it('31. owner même école : query vide autorisée', async () => {
+      const ownerCtx = testEnv.authenticatedContext('owner-a');
+      const q = query(
+        collection(ownerCtx.firestore(), 'classPrograms'),
+        where('schoolId', '==', SCHOOL_A),
+        where('academicYearId', '==', '2026-2027'),
+        where('classId', '==', 'non-existent-class'),
+        limit(2)
+      );
+      await assertSucceeds(getDocs(q));
+    });
+
+    it('32. director même école : query vide autorisée', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      const q = query(
+        collection(dirCtx.firestore(), 'classPrograms'),
+        where('schoolId', '==', SCHOOL_A),
+        where('academicYearId', '==', '2026-2027'),
+        where('classId', '==', 'non-existent-class'),
+        limit(2)
+      );
+      await assertSucceeds(getDocs(q));
+    });
+
+    it('33. programme existant même école lisible', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      const q = query(
+        collection(dirCtx.firestore(), 'classPrograms'),
+        where('schoolId', '==', SCHOOL_A),
+        where('academicYearId', '==', '2026-2027'),
+        where('classId', '==', 'class-a'),
+        limit(2)
+      );
+      await assertSucceeds(getDocs(q));
+    });
+
+    it('34. autre école refusée', async () => {
+      const otherCtx = testEnv.authenticatedContext('director-b');
+      const q = query(
+        collection(otherCtx.firestore(), 'classPrograms'),
+        where('schoolId', '==', SCHOOL_A),
+        where('academicYearId', '==', '2026-2027'),
+        where('classId', '==', 'class-a'),
+        limit(2)
+      );
+      await assertFails(getDocs(q));
+    });
+
+    it('35. query sans schoolId refusée', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      const q = query(
+        collection(dirCtx.firestore(), 'classPrograms'),
+        where('academicYearId', '==', '2026-2027'),
+        where('classId', '==', 'class-a'),
+        limit(2)
+      );
+      await assertFails(getDocs(q));
+    });
+
+    it('36. query avec mauvais schoolId refusée', async () => {
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      const q = query(
+        collection(dirCtx.firestore(), 'classPrograms'),
+        where('schoolId', '==', SCHOOL_B),
+        where('academicYearId', '==', '2026-2027'),
+        where('classId', '==', 'class-a'),
+        limit(2)
+      );
+      await assertFails(getDocs(q));
     });
   });
 });

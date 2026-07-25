@@ -110,7 +110,7 @@ export const ClassProgramEmptyState: React.FC<ClassProgramEmptyStateProps> = ({
           Aucun programme configuré
         </h3>
         <p style={{ color: 'var(--text-muted)', maxWidth: '460px', margin: 0, fontSize: '0.95rem', lineHeight: '1.45' }}>
-          Le programme de cette classe sera configuré dans l'étape suivante (Lot 2C).
+          Aucun programme n’a encore été créé pour cette classe.
         </p>
       </div>
     );
@@ -119,14 +119,14 @@ export const ClassProgramEmptyState: React.FC<ClassProgramEmptyStateProps> = ({
   if (type === 'no-program-read-only') {
     return (
       <div style={containerStyle}>
-        <div style={iconCircleStyle('rgba(100, 116, Slate, 0.05)')}>
+        <div style={iconCircleStyle('rgba(100, 116, 139, 0.05)')}>
           <AlertCircle size={32} style={{ color: 'var(--text-muted)' }} />
         </div>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 750, color: '#1e293b', margin: 0 }}>
           Aucun programme publié
         </h3>
         <p style={{ color: 'var(--text-muted)', maxWidth: '460px', margin: 0, fontSize: '0.95rem', lineHeight: '1.45' }}>
-          Aucun programme publié n'est disponible pour cette classe.
+          Aucun programme n’a encore été créé pour cette classe.
         </p>
       </div>
     );
@@ -151,9 +151,9 @@ export const ClassProgramEmptyState: React.FC<ClassProgramEmptyStateProps> = ({
   // General error state
   let errorMessage = 'Une erreur est survenue lors de la récupération des données.';
   if (errorCode === 'PROGRAM_PERMISSION_DENIED') {
-    errorMessage = "Vous n'avez pas les autorisations nécessaires pour accéder à ces informations.";
+    errorMessage = "Vous n’êtes pas autorisé à consulter le programme de cette classe.";
   } else if (errorCode === 'PROGRAM_INTEGRITY_ERROR') {
-    errorMessage = "Erreur de cohérence : Les données récupérées ne correspondent pas aux critères de sélection.";
+    errorMessage = "Les données du programme de cette classe sont incohérentes.";
   }
 
   return (

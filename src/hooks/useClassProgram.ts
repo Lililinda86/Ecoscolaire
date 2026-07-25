@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ClassProgram, ClassSubject, ClassSection, GlobalRole, Subject } from '../types';
 import {
-  getClassProgramById,
+  getClassProgramByIdentity,
   getClassSubjectsByRevision,
   ClassProgramServiceError
 } from '../services/classPrograms';
@@ -91,22 +91,25 @@ export function useClassProgram({
 
     async function loadData() {
       try {
-        // Fetch ClassProgram
-        let prog: ClassProgram;
+        // Fetch ClassProgram using query identity instead of direct getDoc
+        let prog: ClassProgram | null = null;
         try {
-          prog = await getClassProgramById(schoolId!, academicYearId!, classId!);
+          prog = await getClassProgramByIdentity({
+            schoolId: schoolId!,
+            academicYearId: academicYearId!,
+            classId: classId!
+          });
         } catch (err: unknown) {
           if (currentSeq !== requestSeq.current) return;
-
-          // If program is not found, attempt historical fallback
-          if (err instanceof ClassProgramServiceError && err.code === 'PROGRAM_NOT_FOUND') {
-            handleLegacyFallback(currentSeq);
-            return;
-          }
           throw err;
         }
 
         if (currentSeq !== requestSeq.current) return;
+
+        if (prog === null) {
+          handleLegacyFallback(currentSeq);
+          return;
+        }
 
         // Resolve revision based on role and requestedView
         let targetRevisionId: string | undefined;

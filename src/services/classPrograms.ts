@@ -1,4 +1,4 @@
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import type { ClassProgram, ClassSubject } from '../types';
 
@@ -66,7 +66,83 @@ export async function getClassProgramById(
     if (errObj && errObj.code === 'permission-denied') {
       throw new ClassProgramServiceError(
         'PROGRAM_PERMISSION_DENIED',
-        'Permission denied reading program'
+        'Vous n’êtes pas autorisé à consulter le programme de cette classe.'
+      );
+    }
+    const errMessage = (error instanceof Error) ? error.message : String(error);
+    throw new ClassProgramServiceError('FIRESTORE_ERROR', errMessage || 'Firestore reading error');
+  }
+}
+
+export async function getClassProgramByIdentity(params: {
+  schoolId?: string;
+  academicYearId?: string;
+  classId?: string;
+}): Promise<ClassProgram | null> {
+  const { schoolId, academicYearId, classId } = params;
+
+  if (
+    !schoolId || schoolId.trim() === '' || schoolId.includes('/') ||
+    !academicYearId || academicYearId.trim() === '' || academicYearId.includes('/') ||
+    !classId || classId.trim() === '' || classId.includes('/')
+  ) {
+    return null;
+  }
+
+  const cleanSchoolId = schoolId.trim();
+  const cleanAcademicYearId = academicYearId.trim();
+  const cleanClassId = classId.trim();
+
+  try {
+    const collRef = collection(db, 'classPrograms');
+    const q = query(
+      collRef,
+      where('schoolId', '==', cleanSchoolId),
+      where('academicYearId', '==', cleanAcademicYearId),
+      where('classId', '==', cleanClassId),
+      limit(2)
+    );
+
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      return null;
+    }
+
+    if (snap.size > 1) {
+      throw new ClassProgramServiceError(
+        'PROGRAM_INTEGRITY_ERROR',
+        'Les données du programme de cette classe sont incohérentes.'
+      );
+    }
+
+    const docSnap = snap.docs[0];
+    const data = docSnap.data() as ClassProgram;
+    const expectedId = buildClassProgramId(cleanSchoolId, cleanAcademicYearId, cleanClassId);
+
+    if (
+      docSnap.id !== expectedId ||
+      data.id !== expectedId ||
+      data.schoolId !== cleanSchoolId ||
+      data.academicYearId !== cleanAcademicYearId ||
+      data.classId !== cleanClassId
+    ) {
+      throw new ClassProgramServiceError(
+        'PROGRAM_INTEGRITY_ERROR',
+        'Les données du programme de cette classe sont incohérentes.'
+      );
+    }
+
+    return data;
+  } catch (error: unknown) {
+    if (error instanceof ClassProgramServiceError) {
+      throw error;
+    }
+    const errObj = error as Record<string, unknown>;
+    if (errObj && errObj.code === 'permission-denied') {
+      throw new ClassProgramServiceError(
+        'PROGRAM_PERMISSION_DENIED',
+        'Vous n’êtes pas autorisé à consulter le programme de cette classe.'
       );
     }
     const errMessage = (error instanceof Error) ? error.message : String(error);
@@ -94,9 +170,6 @@ export async function getClassSubjectsByRevision(
       list.push(d.data() as ClassSubject);
     });
 
-    // Local sorting:
-    // 1. displayOrder ascending
-    // 2. subjectNameSnapshot using localeCompare
     list.sort((a, b) => {
       const orderA = a.displayOrder ?? 0;
       const orderB = b.displayOrder ?? 0;
@@ -112,7 +185,7 @@ export async function getClassSubjectsByRevision(
     if (errObj && errObj.code === 'permission-denied') {
       throw new ClassProgramServiceError(
         'PROGRAM_PERMISSION_DENIED',
-        'Permission denied reading subjects'
+        'Vous n’êtes pas autorisé à consulter le programme de cette classe.'
       );
     }
     const errMessage = (error instanceof Error) ? error.message : String(error);

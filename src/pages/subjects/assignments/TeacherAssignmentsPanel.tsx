@@ -62,6 +62,16 @@ export const TeacherAssignmentsPanel: React.FC = () => {
   // Load slots and candidates
   const loadAssignmentsData = useCallback(async () => {
     if (!schoolId || !normalizedYear || !selectedClassId) return;
+
+    // Check program load status
+    if (programStatus === 'loading' || programStatus === 'idle') return;
+    if (programStatus === 'error' || programStatus === 'forbidden') return;
+    if (!program || !program.publishedRevisionId || program.publishedRevisionId === '') {
+      setSlots([]);
+      setCandidates([]);
+      return;
+    }
+
     setIsLoading(true);
     setErrorMsg(null);
     try {
@@ -73,15 +83,15 @@ export const TeacherAssignmentsPanel: React.FC = () => {
       setCandidates(candidatesRes.candidates || []);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg('Erreur lors du chargement des affectations et des candidats.');
+      setErrorMsg('La liste des enseignants n’a pas pu être chargée.');
     } finally {
       setIsLoading(false);
     }
-  }, [schoolId, normalizedYear, selectedClassId]);
+  }, [schoolId, normalizedYear, selectedClassId, program, programStatus]);
 
   useEffect(() => {
     loadAssignmentsData();
-  }, [loadAssignmentsData]);
+  }, [loadAssignmentsData, program, programStatus]);
 
   // List of active eligible teachers in the school
   const eligibleTeachers = React.useMemo(() => {
@@ -211,17 +221,35 @@ export const TeacherAssignmentsPanel: React.FC = () => {
           <h3>Aucune classe sélectionnée</h3>
           <p style={{ fontSize: '0.9rem' }}>Veuillez sélectionner une classe ci-dessus pour gérer les affectations.</p>
         </div>
+      ) : programStatus === 'forbidden' ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', color: '#991b1b', border: '1px solid #fecaca', backgroundColor: '#fef2f2' }}>
+          <ShieldAlert size={48} style={{ margin: '0 auto 1rem', color: '#ef4444' }} />
+          <h3>Accès refusé</h3>
+          <p style={{ fontSize: '0.9rem' }}>Vous n’êtes pas autorisé à consulter le programme de cette classe.</p>
+        </div>
+      ) : programStatus === 'error' ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', color: '#991b1b', border: '1px solid #fecaca', backgroundColor: '#fef2f2' }}>
+          <AlertTriangle size={48} style={{ margin: '0 auto 1rem', color: '#ef4444' }} />
+          <h3>Erreur</h3>
+          <p style={{ fontSize: '0.9rem' }}>
+            {programErrorCode === 'PROGRAM_PERMISSION_DENIED'
+              ? 'Vous n’êtes pas autorisé à consulter le programme de cette classe.'
+              : programErrorCode === 'PROGRAM_INTEGRITY_ERROR'
+              ? 'Les données du programme de cette classe sont incohérentes.'
+              : 'Une erreur est survenue lors de la récupération des données.'}
+          </p>
+        </div>
       ) : programStatus === 'loading' || isLoading ? (
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <div className="spinner" style={{ margin: '0 auto 1rem' }} />
           <p>Chargement des données...</p>
         </div>
-      ) : programSource !== 'published' ? (
+      ) : (!program || !program.publishedRevisionId || program.publishedRevisionId === '') ? (
         <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px dashed var(--border-color)' }}>
           <AlertTriangle size={48} style={{ margin: '0 auto 1rem', color: '#eab308' }} />
           <h3>Programme officiel non publié</h3>
           <p style={{ fontSize: '0.9rem', maxWidth: '500px', margin: '0 auto 1rem', color: 'var(--text-muted)' }}>
-            Publiez d’abord le programme officiel de cette classe avant d’affecter les enseignants.
+            Aucun programme officiel n’a encore été publié pour cette classe.
           </p>
         </div>
       ) : publishedActiveSubjects.length === 0 ? (

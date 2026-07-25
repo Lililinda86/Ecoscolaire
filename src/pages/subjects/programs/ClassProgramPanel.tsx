@@ -390,7 +390,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
               )}
 
               {isManager && source !== 'legacy' && (
-                hasPublishedVersion && !hasUnpublishedChanges ? (
+                hasPublishedVersion && !hasDraftVersion ? (
                   <button
                     type="button"
                     onClick={handleCreateDraft}
@@ -409,12 +409,13 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
                       opacity: isCreatingDraft ? 0.7 : 1
                     }}
                   >
-                    {isCreatingDraft ? 'Ouverture...' : 'Ouvrir un nouveau brouillon'}
+                    {isCreatingDraft ? 'Création...' : 'Créer un brouillon de modification'}
                   </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setIsEditing(true)}
+                    onClick={handleCreateDraft}
+                    disabled={isCreatingDraft}
                     style={{
                       border: 'none',
                       backgroundColor: 'var(--primary-color)',
@@ -423,12 +424,13 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
                       borderRadius: '8px',
                       fontSize: '0.85rem',
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: isCreatingDraft ? 'not-allowed' : 'pointer',
                       boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      opacity: isCreatingDraft ? 0.7 : 1
                     }}
                   >
-                    Modifier le programme
+                    {isCreatingDraft ? 'Ouverture...' : 'Modifier le brouillon'}
                   </button>
                 )
               )}
@@ -446,7 +448,8 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
               {isManager && (
                 <button
                   type="button"
-                  onClick={() => setIsEditing(true)}
+                  onClick={handleCreateDraft}
+                  disabled={isCreatingDraft}
                   style={{
                     border: 'none',
                     backgroundColor: 'var(--primary-color)',
@@ -455,12 +458,13 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
                     borderRadius: '8px',
                     fontSize: '0.9rem',
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: isCreatingDraft ? 'not-allowed' : 'pointer',
                     boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
-                    transition: 'all 0.15s ease'
+                    transition: 'all 0.15s ease',
+                    opacity: isCreatingDraft ? 0.7 : 1
                   }}
                 >
-                  Configurer le programme
+                  {isCreatingDraft ? 'Création...' : 'Créer le programme'}
                 </button>
               )}
             </div>
