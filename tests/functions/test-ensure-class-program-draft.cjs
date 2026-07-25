@@ -641,6 +641,98 @@ async function runTests() {
     }
   );
 
+  // 15. secretary active from same school can open a new draft
+  await testCase(
+    '15. secretary active from same school can open a new draft',
+    () => {
+      dbMock.collection('users').doc('user-secretary').setState(true, {
+        id: 'user-secretary',
+        role: 'secretary',
+        isActive: true,
+        schoolId: 'school-1'
+      });
+      dbMock.collection('classes').doc('class-1').setState(true, {
+        id: 'class-1',
+        schoolId: 'school-1'
+      });
+      dbMock.collection('classPrograms').doc('school-1__2026-2027__class-1').setState(true, {
+        id: 'school-1__2026-2027__class-1',
+        schoolId: 'school-1',
+        classId: 'class-1',
+        academicYearId: '2026-2027',
+        status: 'published',
+        publishedRevisionId: 'school-1__2026-2027__class-1__v1',
+        publishedRevisionNumber: 1,
+        draftRevisionId: 'school-1__2026-2027__class-1__v1',
+        draftRevisionNumber: 1,
+        hasUnpublishedChanges: false
+      });
+      dbMock.collection('classSubjects').doc('school-1__2026-2027__class-1__v1__subj-1').setState(true, {
+        id: 'school-1__2026-2027__class-1__v1__subj-1',
+        programId: 'school-1__2026-2027__class-1',
+        schoolId: 'school-1',
+        classId: 'class-1',
+        academicYearId: '2026-2027',
+        subjectId: 'subj-1',
+        revisionId: 'school-1__2026-2027__class-1__v1',
+        revisionNumber: 1,
+        subjectNameSnapshot: 'Français',
+        isRequired: true,
+        displayOrder: 1,
+        isActive: true
+      });
+    },
+    () => ensureClassProgramDraft(
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
+      { auth: { uid: 'user-secretary' } }
+    ),
+    (err, res) => {
+      assert.ifError(err);
+      assert.strictEqual(res.created, true);
+      assert.strictEqual(res.draftRevisionId, 'school-1__2026-2027__class-1__v2');
+      assert.strictEqual(res.draftRevisionNumber, 2);
+      assert.strictEqual(res.clonedSubjectCount, 1);
+    }
+  );
+
+  // 16. inactive academic manager is denied
+  await testCase(
+    '16. inactive academic manager is denied',
+    () => {
+      dbMock.collection('users').doc('user-inactive').setState(true, {
+        id: 'user-inactive',
+        role: 'owner',
+        isActive: false, // INACTIF !
+        schoolId: 'school-1'
+      });
+      dbMock.collection('classes').doc('class-1').setState(true, {
+        id: 'class-1',
+        schoolId: 'school-1'
+      });
+      dbMock.collection('classPrograms').doc('school-1__2026-2027__class-1').setState(true, {
+        id: 'school-1__2026-2027__class-1',
+        schoolId: 'school-1',
+        classId: 'class-1',
+        academicYearId: '2026-2027',
+        status: 'published',
+        publishedRevisionId: 'school-1__2026-2027__class-1__v1',
+        publishedRevisionNumber: 1,
+        draftRevisionId: 'school-1__2026-2027__class-1__v1',
+        draftRevisionNumber: 1,
+        hasUnpublishedChanges: false
+      });
+    },
+    () => ensureClassProgramDraft(
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
+      { auth: { uid: 'user-inactive' } }
+    ),
+    (err) => {
+      assert.ok(err);
+      assert.strictEqual(err.code, 'permission-denied');
+      assert.strictEqual(err.details?.businessCode, 'PERMISSION_DENIED');
+    }
+  );
+
   console.log(`\n=== BILAN DES TESTS ===\nRéussis : ${passed}\nÉchecs : ${failed}`);
   if (failed > 0) {
     process.exit(1);
