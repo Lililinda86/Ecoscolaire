@@ -1,69 +1,93 @@
 import { test, expect } from '@playwright/test';
+import {
+  interpretClassProgramQueryResult,
+  validateClassProgramIdentityParams
+} from '../../src/services/classProgramQueryResult';
 
-// We implement a pure helper check since we can't easily mock import.meta.env in Playwright node tests.
-// Let's define the pure function that interprets results of the query:
-
-interface MockDocSnap {
-  id: string;
-  data: () => Record<string, unknown>;
-}
-
-function interpretQueryResults(
-  docs: MockDocSnap[],
-  schoolId: string,
-  academicYearId: string,
-  classId: string,
-  expectedId: string
-) {
-  if (docs.length === 0) {
-    return null;
-  }
-
-  if (docs.length > 1) {
-    throw new Error('PROGRAM_INTEGRITY_ERROR');
-  }
-
-  const docSnap = docs[0];
-  const data = docSnap.data();
-
-  if (
-    docSnap.id !== expectedId ||
-    (data.id !== undefined && data.id !== expectedId) ||
-    data.schoolId !== schoolId ||
-    data.academicYearId !== academicYearId ||
-    data.classId !== classId
-  ) {
-    throw new Error('PROGRAM_INTEGRITY_ERROR');
-  }
-
-  return data;
-}
-
-test.describe('interpretQueryResults helper tests', () => {
+test.describe('ClassProgram Query & Interpretation production logic tests', () => {
   const schoolId = 'school-a';
   const academicYearId = '2026-2027';
   const classId = 'class-a';
   const expectedId = 'school-a__2026-2027__class-a';
 
-  test('1. Paramètres invalides non testés ici (géré par l\'appelant)', () => {
-    // ce test n'appelle pas la fonction interpretQueryResults directement car getClassProgramByIdentity s'en occupe.
-    expect(true).toBe(true);
-  });
-
-  test('2. Query avec les trois where et limit(2) : mock vérifié', () => {
-    expect(true).toBe(true);
-  });
-
-  test('3. Limit(2) : mock vérifié', () => {
-    expect(true).toBe(true);
-  });
-
-  test('4. 0 résultat retourne null', () => {
-    const res = interpretQueryResults([], schoolId, academicYearId, classId, expectedId);
+  test('1. validateClassProgramIdentityParams: schoolId absent', () => {
+    const res = validateClassProgramIdentityParams({
+      schoolId: '',
+      academicYearId: '2026-2027',
+      classId: 'class-a'
+    });
     expect(res).toBeNull();
   });
 
-  test('5. 1 résultat valide retourne le programme', () => {
+  test('2. validateClassProgramIdentityParams: academicYearId absent', () => {
+    const res = validateClassProgramIdentityParams({
+      schoolId: 'school-a',
+      academicYearId: '',
+      classId: 'class-a'
+    });
+    expect(res).toBeNull();
+  });
+
+  test('3. validateClassProgramIdentityParams: classId absent', () => {
+    const res = validateClassProgramIdentityParams({
+      schoolId: 'school-a',
+      academicYearId: '2026-2027',
+      classId: ''
+    });
+    expect(res).toBeNull();
+  });
+
+  test('4. validateClassProgramIdentityParams: slash invalide dans schoolId', () => {
+    const res = validateClassProgramIdentityParams({
+      schoolId: 'school/a',
+      academicYearId: '2026-2027',
+      classId: 'class-a'
+    });
+    expect(res).toBeNull();
+  });
+
+  test('5. validateClassProgramIdentityParams: slash invalide dans academicYearId', () => {
+    const res = validateClassProgramIdentityParams({
+      schoolId: 'school-a',
+      academicYearId: '2026/2027',
+      classId: 'class-a'
+    });
+    expect(res).toBeNull();
+  });
+
+  test('6. validateClassProgramIdentityParams: slash invalide dans classId', () => {
+    const res = validateClassProgramIdentityParams({
+      schoolId: 'school-a',
+      academicYearId: '2026-2027',
+      classId: 'class/a'
+    });
+    expect(res).toBeNull();
+  });
+
+  test('7. validateClassProgramIdentityParams: paramètres valides sont nettoyés et retournés', () => {
+    const res = validateClassProgramIdentityParams({
+      schoolId: ' school-a  ',
+      academicYearId: ' 2026-2027 ',
+      classId: ' class-a '
+    });
+    expect(res).toEqual({
+      cleanSchoolId: 'school-a',
+      cleanAcademicYearId: '2026-2027',
+      cleanClassId: 'class-a'
+    });
+  });
+
+  test('8. interpretClassProgramQueryResult: zéro document retourne null', () => {
+    const res = interpretClassProgramQueryResult({
+      docs: [],
+      schoolId,
+      academicYearId,
+      classId
+    });
+    expect(res).toBeNull();
+  });
+
+  test('9. interpretClassProgramQueryResult: un document valide est retourné', () => {
     const mockData = {
       id: expectedId,
       schoolId,
@@ -71,12 +95,16 @@ test.describe('interpretQueryResults helper tests', () => {
       classId,
       status: 'draft'
     };
-    const docs = [{ id: expectedId, data: () => mockData }];
-    const res = interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId);
+    const res = interpretClassProgramQueryResult({
+      docs: [{ id: expectedId, data: () => mockData }],
+      schoolId,
+      academicYearId,
+      classId
+    });
     expect(res).toEqual(mockData);
   });
 
-  test('6. Mauvais docSnap.id refusé (PROGRAM_INTEGRITY_ERROR)', () => {
+  test('10. interpretClassProgramQueryResult: doc.id incohérent refusé', () => {
     const mockData = {
       id: expectedId,
       schoolId,
@@ -84,11 +112,15 @@ test.describe('interpretQueryResults helper tests', () => {
       classId,
       status: 'draft'
     };
-    const docs = [{ id: 'wrong-doc-id', data: () => mockData }];
-    expect(() => interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId)).toThrow('PROGRAM_INTEGRITY_ERROR');
+    expect(() => interpretClassProgramQueryResult({
+      docs: [{ id: 'wrong-doc-id', data: () => mockData }],
+      schoolId,
+      academicYearId,
+      classId
+    })).toThrow('Les données du programme de cette classe sont incohérentes.');
   });
 
-  test('7. Mauvais data.id refusé (PROGRAM_INTEGRITY_ERROR)', () => {
+  test('11. interpretClassProgramQueryResult: data.id présent et incohérent refusé', () => {
     const mockData = {
       id: 'wrong-data-id',
       schoolId,
@@ -96,11 +128,31 @@ test.describe('interpretQueryResults helper tests', () => {
       classId,
       status: 'draft'
     };
-    const docs = [{ id: expectedId, data: () => mockData }];
-    expect(() => interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId)).toThrow('PROGRAM_INTEGRITY_ERROR');
+    expect(() => interpretClassProgramQueryResult({
+      docs: [{ id: expectedId, data: () => mockData }],
+      schoolId,
+      academicYearId,
+      classId
+    })).toThrow('Les données du programme de cette classe sont incohérentes.');
   });
 
-  test('8. Mauvais data.schoolId refusé (PROGRAM_INTEGRITY_ERROR)', () => {
+  test('12. interpretClassProgramQueryResult: data.id absent accepté pour legacy', () => {
+    const mockLegacyData = {
+      schoolId,
+      academicYearId,
+      classId,
+      status: 'published'
+    };
+    const res = interpretClassProgramQueryResult({
+      docs: [{ id: expectedId, data: () => mockLegacyData }],
+      schoolId,
+      academicYearId,
+      classId
+    });
+    expect(res).toEqual(mockLegacyData);
+  });
+
+  test('13. interpretClassProgramQueryResult: mauvais schoolId refusé', () => {
     const mockData = {
       id: expectedId,
       schoolId: 'wrong-school',
@@ -108,11 +160,15 @@ test.describe('interpretQueryResults helper tests', () => {
       classId,
       status: 'draft'
     };
-    const docs = [{ id: expectedId, data: () => mockData }];
-    expect(() => interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId)).toThrow('PROGRAM_INTEGRITY_ERROR');
+    expect(() => interpretClassProgramQueryResult({
+      docs: [{ id: expectedId, data: () => mockData }],
+      schoolId,
+      academicYearId,
+      classId
+    })).toThrow('Les données du programme de cette classe sont incohérentes.');
   });
 
-  test('9. Mauvais data.academicYearId refusé (PROGRAM_INTEGRITY_ERROR)', () => {
+  test('14. interpretClassProgramQueryResult: mauvais academicYearId refusé', () => {
     const mockData = {
       id: expectedId,
       schoolId,
@@ -120,11 +176,15 @@ test.describe('interpretQueryResults helper tests', () => {
       classId,
       status: 'draft'
     };
-    const docs = [{ id: expectedId, data: () => mockData }];
-    expect(() => interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId)).toThrow('PROGRAM_INTEGRITY_ERROR');
+    expect(() => interpretClassProgramQueryResult({
+      docs: [{ id: expectedId, data: () => mockData }],
+      schoolId,
+      academicYearId,
+      classId
+    })).toThrow('Les données du programme de cette classe sont incohérentes.');
   });
 
-  test('10. Mauvais data.classId refusé (PROGRAM_INTEGRITY_ERROR)', () => {
+  test('15. interpretClassProgramQueryResult: mauvais classId refusé', () => {
     const mockData = {
       id: expectedId,
       schoolId,
@@ -132,35 +192,24 @@ test.describe('interpretQueryResults helper tests', () => {
       classId: 'wrong-class',
       status: 'draft'
     };
-    const docs = [{ id: expectedId, data: () => mockData }];
-    expect(() => interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId)).toThrow('PROGRAM_INTEGRITY_ERROR');
+    expect(() => interpretClassProgramQueryResult({
+      docs: [{ id: expectedId, data: () => mockData }],
+      schoolId,
+      academicYearId,
+      classId
+    })).toThrow('Les données du programme de cette classe sont incohérentes.');
   });
 
-  test('11. 2 résultats refusés (PROGRAM_INTEGRITY_ERROR)', () => {
+  test('16. interpretClassProgramQueryResult: deux documents refusés', () => {
     const docs = [
       { id: expectedId, data: () => ({}) },
       { id: expectedId + '-2', data: () => ({}) }
     ];
-    expect(() => interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId)).toThrow('PROGRAM_INTEGRITY_ERROR');
-  });
-
-  test('12. permission-denied mappé correctement : vérifié', () => {
-    expect(true).toBe(true);
-  });
-
-  test('13. Erreur inconnue contrôlée : vérifié', () => {
-    expect(true).toBe(true);
-  });
-
-  test('14. Compatibilité legacy: data.id manquant accepté', () => {
-    const mockLegacyData = {
+    expect(() => interpretClassProgramQueryResult({
+      docs,
       schoolId,
       academicYearId,
-      classId,
-      status: 'published'
-    };
-    const docs = [{ id: expectedId, data: () => mockLegacyData }];
-    const res = interpretQueryResults(docs, schoolId, academicYearId, classId, expectedId);
-    expect(res).toEqual(mockLegacyData);
+      classId
+    })).toThrow('Les données du programme de cette classe sont incohérentes.');
   });
 });

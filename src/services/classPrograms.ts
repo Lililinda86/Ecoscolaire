@@ -1,32 +1,11 @@
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import type { ClassProgram, ClassSubject } from '../types';
-
-export type ClassProgramErrorType =
-  | 'PROGRAM_NOT_FOUND'
-  | 'PROGRAM_NOT_PUBLISHED'
-  | 'PROGRAM_PERMISSION_DENIED'
-  | 'PROGRAM_INTEGRITY_ERROR'
-  | 'REVISION_NOT_FOUND'
-  | 'FIRESTORE_ERROR';
-
-export class ClassProgramServiceError extends Error {
-  public code: ClassProgramErrorType;
-
-  constructor(code: ClassProgramErrorType, message: string) {
-    super(message);
-    this.code = code;
-    this.name = 'ClassProgramServiceError';
-  }
-}
-
-export function buildClassProgramId(
-  schoolId: string,
-  academicYearId: string,
-  classId: string
-): string {
-  return `${schoolId}__${academicYearId}__${classId}`;
-}
+import {
+  buildClassProgramId,
+  ClassProgramServiceError,
+  ClassProgramErrorType
+} from './classProgramQueryResult';
 
 export async function getClassProgramById(
   schoolId: string,
@@ -74,24 +53,22 @@ export async function getClassProgramById(
   }
 }
 
+import {
+  interpretClassProgramQueryResult,
+  validateClassProgramIdentityParams
+} from './classProgramQueryResult';
+
 export async function getClassProgramByIdentity(params: {
   schoolId?: string;
   academicYearId?: string;
   classId?: string;
 }): Promise<ClassProgram | null> {
-  const { schoolId, academicYearId, classId } = params;
-
-  if (
-    !schoolId || schoolId.trim() === '' || schoolId.includes('/') ||
-    !academicYearId || academicYearId.trim() === '' || academicYearId.includes('/') ||
-    !classId || classId.trim() === '' || classId.includes('/')
-  ) {
+  const validated = validateClassProgramIdentityParams(params);
+  if (!validated) {
     return null;
   }
 
-  const cleanSchoolId = schoolId.trim();
-  const cleanAcademicYearId = academicYearId.trim();
-  const cleanClassId = classId.trim();
+  const { cleanSchoolId, cleanAcademicYearId, cleanClassId } = validated;
 
   try {
     const collRef = collection(db, 'classPrograms');
@@ -105,35 +82,12 @@ export async function getClassProgramByIdentity(params: {
 
     const snap = await getDocs(q);
 
-    if (snap.empty) {
-      return null;
-    }
-
-    if (snap.size > 1) {
-      throw new ClassProgramServiceError(
-        'PROGRAM_INTEGRITY_ERROR',
-        'Les données du programme de cette classe sont incohérentes.'
-      );
-    }
-
-    const docSnap = snap.docs[0];
-    const data = docSnap.data() as ClassProgram;
-    const expectedId = buildClassProgramId(cleanSchoolId, cleanAcademicYearId, cleanClassId);
-
-    if (
-      docSnap.id !== expectedId ||
-      data.id !== expectedId ||
-      data.schoolId !== cleanSchoolId ||
-      data.academicYearId !== cleanAcademicYearId ||
-      data.classId !== cleanClassId
-    ) {
-      throw new ClassProgramServiceError(
-        'PROGRAM_INTEGRITY_ERROR',
-        'Les données du programme de cette classe sont incohérentes.'
-      );
-    }
-
-    return data;
+    return interpretClassProgramQueryResult({
+      docs: snap.docs,
+      schoolId: cleanSchoolId,
+      academicYearId: cleanAcademicYearId,
+      classId: cleanClassId
+    });
   } catch (error: unknown) {
     if (error instanceof ClassProgramServiceError) {
       throw error;
