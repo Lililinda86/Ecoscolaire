@@ -47,10 +47,10 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
     );
   }
 
-  if (typeof expectedDraftStateToken !== 'string' || expectedDraftStateToken.trim() === '') {
+  if (typeof expectedDraftStateToken !== 'string' || !/^[0-9a-f]{64}$/.test(expectedDraftStateToken)) {
     throw new functions.https.HttpsError(
       'invalid-argument',
-      'expectedDraftStateToken doit être une chaîne non vide.',
+      'expectedDraftStateToken doit être un hash SHA-256 de 64 caractères hexadécimaux minuscules.',
       { businessCode: 'INVALID_ARGUMENT' }
     );
   }

@@ -12,22 +12,17 @@ export interface DraftSubjectInput {
   revisionNumber: number;
 }
 
-export function computeDraftStateToken(subjects: DraftSubjectInput[]): string {
+export function canonicalizeDraftState(subjects: DraftSubjectInput[]): string {
   // Sort by document ID to ensure determinism
   const sorted = [...subjects].sort((a, b) => a.id.localeCompare(b.id));
 
   // Map to stable object structure
   const normalized = sorted.map((s) => {
-    const obj: Record<string, unknown> = {
-      id: s.id,
-      subjectId: s.subjectId,
-      subjectNameSnapshot: s.subjectNameSnapshot,
-      isRequired: !!s.isRequired,
-      displayOrder: Number(s.displayOrder),
-      isActive: !!s.isActive,
-      revisionId: s.revisionId,
-      revisionNumber: Number(s.revisionNumber),
-    };
+    // Explicit, fixed ordering of keys in the resulting JSON
+    const obj: Record<string, unknown> = {};
+    obj.id = s.id;
+    obj.subjectId = s.subjectId;
+    obj.subjectNameSnapshot = s.subjectNameSnapshot;
 
     if (s.subjectCodeSnapshot !== undefined && s.subjectCodeSnapshot !== null) {
       obj.subjectCodeSnapshot = s.subjectCodeSnapshot;
@@ -39,16 +34,27 @@ export function computeDraftStateToken(subjects: DraftSubjectInput[]): string {
       obj.weeklyHours = Number(s.weeklyHours);
     }
 
+    obj.isRequired = !!s.isRequired;
+    obj.displayOrder = Number(s.displayOrder);
+    obj.isActive = !!s.isActive;
+    obj.revisionId = s.revisionId;
+    obj.revisionNumber = Number(s.revisionNumber);
+
     return obj;
   });
 
-  const jsonStr = JSON.stringify(normalized);
+  return JSON.stringify(normalized);
+}
 
-  // Simple deterministic hash (FNV-1a 32-bit)
-  let hash = 2166136261;
-  for (let i = 0; i < jsonStr.length; i++) {
-    hash ^= jsonStr.charCodeAt(i);
-    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+export async function computeDraftStateToken(subjects: DraftSubjectInput[]): Promise<string> {
+  if (typeof crypto === 'undefined' || !crypto.subtle) {
+    throw new Error('Web Crypto API (crypto.subtle) est indisponible dans cet environnement.');
   }
-  return (hash >>> 0).toString(16);
+
+  const canonicalState = canonicalizeDraftState(subjects);
+  const data = new TextEncoder().encode(canonicalState);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hashHex.toLowerCase();
 }

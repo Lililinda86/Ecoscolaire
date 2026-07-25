@@ -43,6 +43,8 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     isSaving,
     error,
     draftStateToken,
+    isTokenCalculating,
+    tokenError,
     addSubject,
     updateSubjectFields,
     removeSubject,
@@ -169,13 +171,26 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
       {/* 1. Header Toolbar */}
       <ClassProgramDraftToolbar
         isDirty={isDirty}
-        isSaving={isSaving}
+        isSaving={isSaving || isTokenCalculating}
         isManager={userRole === 'superAdmin' || userRole === 'owner' || userRole === 'director' || userRole === 'secretary'}
         onSave={saveDraft}
         onCancel={cancelChanges}
         onAddSubject={() => setIsPickerOpen(true)}
-        onPublish={() => setIsPublishConfirmOpen(true)}
+        onPublish={() => !isTokenCalculating && setIsPublishConfirmOpen(true)}
       />
+
+      {isTokenCalculating && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400 font-medium mb-4 flex items-center gap-2">
+          <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Signature SHA-256 en cours de génération...
+        </div>
+      )}
+      {tokenError && (
+        <ClassProgramEditorState type="error" message={`Erreur lors du calcul de la signature : ${tokenError}`} />
+      )}
 
       {/* 2. Error Display */}
       {error && (

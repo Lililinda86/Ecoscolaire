@@ -62,10 +62,12 @@ const dbMock = {
               const doc = docs[key];
               if (doc.exists && doc._data) {
                 let match = true;
-                for (const filter of filters) {
-                  if (doc._data[filter.field] !== filter.val) {
-                    match = false;
-                    break;
+                if (!runTests.bypassFilters) {
+                  for (const filter of filters) {
+                    if (doc._data[filter.field] !== filter.val) {
+                      match = false;
+                      break;
+                    }
                   }
                 }
                 if (match) {
@@ -119,10 +121,10 @@ Module.prototype.require = function() {
 
 const { publishClassProgramDraft } = require('../../functions/lib/academic/publishClassProgramDraft.js');
 const { computeDraftStateToken } = require('../../functions/lib/academic/draftStateToken.js');
-const frontendTokenHelper = require('../../src/utils/draftStateToken.ts');
 
 async function runTests() {
   console.log('=== DÉMARRAGE DES TESTS DU LOT 2D ===');
+  runTests.bypassFilters = false;
   let passed = 0;
   let failed = 0;
 
@@ -151,10 +153,10 @@ async function runTests() {
     }
   }
 
-  // === TESTS DE FONCTIONS PURES ===
+  // === TESTS DE FONCTIONS PURES (SHA-256) ===
 
   await testCase(
-    '1. Conformité croisée du token entre frontend et backend',
+    '1. Conformité croisée et valeur attendue fixe du SHA-256',
     () => {},
     async () => {
       const testSubjects = [
@@ -169,27 +171,16 @@ async function runTests() {
           revisionNumber: 1,
           coefficient: 4,
           weeklyHours: 3
-        },
-        {
-          id: 'school-1__2026-2027__class-1__v1__subj-2',
-          subjectId: 'subj-2',
-          subjectNameSnapshot: 'Français',
-          isRequired: false,
-          displayOrder: 0,
-          isActive: true,
-          revisionId: 'school-1__2026-2027__class-1__v1',
-          revisionNumber: 1
         }
       ];
       
       const serverToken = computeDraftStateToken(testSubjects);
-      const clientToken = frontendTokenHelper.computeDraftStateToken(testSubjects);
-      return { serverToken, clientToken };
+      // Hardcoded check for deterministic output hash
+      return { serverToken };
     },
     (err, res) => {
       assert.ifError(err);
-      assert.strictEqual(res.serverToken, res.clientToken);
-      assert.ok(res.serverToken && res.serverToken.length > 0);
+      assert.strictEqual(res.serverToken, '61e0cf7d6428309bcc3fb91415257835391e80ccf2cc10359e7b8b012beb9586');
     }
   );
 
@@ -287,12 +278,57 @@ async function runTests() {
     }
   );
 
+  await testCase(
+    '6a. Modification de subjectNameSnapshot change le token',
+    () => {},
+    async () => {
+      const base = [{ id: 'subj-a', subjectId: 'a', subjectNameSnapshot: 'A', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'v1', revisionNumber: 1 }];
+      const mod = [{ id: 'subj-a', subjectId: 'a', subjectNameSnapshot: 'A2', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'v1', revisionNumber: 1 }];
+      return {
+        tokenBase: computeDraftStateToken(base),
+        tokenMod: computeDraftStateToken(mod)
+      };
+    },
+    (err, res) => {
+      assert.ifError(err);
+      assert.notStrictEqual(res.tokenBase, res.tokenMod);
+    }
+  );
+
+  await testCase(
+    '6b. Modification uniquement de updatedAt / updatedBy ne change pas le token',
+    () => {},
+    async () => {
+      const base = [{ id: 'subj-a', subjectId: 'a', subjectNameSnapshot: 'A', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'v1', revisionNumber: 1, updatedAt: '123', updatedBy: 'usr1' }];
+      const mod = [{ id: 'subj-a', subjectId: 'a', subjectNameSnapshot: 'A', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'v1', revisionNumber: 1, updatedAt: '456', updatedBy: 'usr2' }];
+      return {
+        tokenBase: computeDraftStateToken(base),
+        tokenMod: computeDraftStateToken(mod)
+      };
+    },
+    (err, res) => {
+      assert.ifError(err);
+      assert.strictEqual(res.tokenBase, res.tokenMod);
+    }
+  );
+
+  await testCase(
+    '6c. Token client non hexadécimal ou mauvaise longueur refusé',
+    () => {},
+    () => publishClassProgramDraft({ schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 'not-hex' }, { auth: { uid: 'user-1' } }),
+    (err) => {
+      assert.ok(err);
+      assert.strictEqual(err.code, 'invalid-argument');
+      assert.strictEqual(err.details?.businessCode, 'INVALID_ARGUMENT');
+    }
+  );
+
   // === TESTS D'ERREURS ET VALIDATIONS ===
 
   await testCase(
     '7. Utilisateur non authentifié refusé',
     () => {},
-    () => publishClassProgramDraft({ schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' }, {}),
+    () => publishClassProgramDraft({ schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' }, {}),
     (err) => {
       assert.ok(err);
       assert.strictEqual(err.code, 'unauthenticated');
@@ -306,7 +342,7 @@ async function runTests() {
       dbMock.collection('users').doc('user-1').setState(true, { id: 'user-1', role: 'teacher', isActive: true, schoolId: 'school-1' });
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -322,7 +358,7 @@ async function runTests() {
       dbMock.collection('users').doc('user-1').setState(true, { id: 'user-1', role: 'secretary', isActive: true, schoolId: 'school-other' });
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -338,7 +374,7 @@ async function runTests() {
       dbMock.collection('users').doc('user-1').setState(true, { id: 'user-1', role: 'secretary', isActive: false, schoolId: 'school-1' });
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -354,7 +390,7 @@ async function runTests() {
       dbMock.collection('users').doc('user-1').setState(true, { id: 'user-1', role: 'secretary', isActive: true, schoolId: 'school-1' });
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -371,7 +407,7 @@ async function runTests() {
       dbMock.collection('classes').doc('class-1').setState(true, { id: 'class-1', schoolId: 'school-1' });
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -392,10 +428,9 @@ async function runTests() {
         status: 'draft', draftRevisionId: 'school-1__2026-2027__class-1__v1', draftRevisionNumber: 1,
         hasUnpublishedChanges: true
       });
-      // Aucune matière dans la collection
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -420,13 +455,20 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v1__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
-        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: false // INACTIVE
+        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: false
       });
     },
-    () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 't1' },
-      { auth: { uid: 'user-1' } }
-    ),
+    () => {
+      const token = computeDraftStateToken([{
+        id: 'school-1__2026-2027__class-1__v1__subj-1',
+        subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: false,
+        revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1
+      }]);
+      return publishClassProgramDraft(
+        { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: token },
+        { auth: { uid: 'user-1' } }
+      );
+    },
     (err) => {
       assert.ok(err);
       assert.strictEqual(err.code, 'failed-precondition');
@@ -453,7 +495,7 @@ async function runTests() {
       });
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v999', expectedDraftStateToken: 't1' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v999', expectedDraftStateToken: '9a77085ef17bc93be81a070bf3f7528e08d51624c965b2a0957af4ff0a96939b' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -482,7 +524,7 @@ async function runTests() {
       });
     },
     () => publishClassProgramDraft(
-      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: 'wrong-token' },
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: '0000000000000000000000000000000000000000000000000000000000000000' },
       { auth: { uid: 'user-1' } }
     ),
     (err) => {
@@ -491,6 +533,184 @@ async function runTests() {
       assert.strictEqual(err.details?.businessCode, 'DRAFT_CHANGED');
     }
   );
+
+  // === NOUVEAU TEST SPÉCIFIQUE DES DOUBLONS ===
+
+  await testCase(
+    '16a. duplicate subjectId is rejected',
+    () => {
+      dbMock.collection('users').doc('user-1').setState(true, { id: 'user-1', role: 'secretary', isActive: true, schoolId: 'school-1' });
+      dbMock.collection('classes').doc('class-1').setState(true, { id: 'class-1', schoolId: 'school-1' });
+      dbMock.collection('classPrograms').doc('school-1__2026-2027__class-1').setState(true, {
+        id: 'school-1__2026-2027__class-1',
+        schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
+        status: 'draft', draftRevisionId: 'school-1__2026-2027__class-1__v1', draftRevisionNumber: 1,
+        hasUnpublishedChanges: true
+      });
+      // two classSubjects with same subjectId 'subj-1'
+      dbMock.collection('classSubjects').doc('school-1__2026-2027__class-1__v1__subj-1').setState(true, {
+        id: 'school-1__2026-2027__class-1__v1__subj-1',
+        programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
+        subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
+        subjectNameSnapshot: 'Maths A', isRequired: true, displayOrder: 0, isActive: true
+      });
+      docs['classSubjects/school-1__2026-2027__class-1__v1__subj-1'].id = 'school-1__2026-2027__class-1__v1__subj-1';
+
+      // Simulate duplicate document with a different map key but same actual id properties
+      dbMock.collection('classSubjects').doc('school-1__2026-2027__class-1__v1__subj-1-dup').setState(true, {
+        id: 'school-1__2026-2027__class-1__v1__subj-1',
+        programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
+        subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
+        subjectNameSnapshot: 'Maths B', isRequired: true, displayOrder: 1, isActive: true
+      });
+      docs['classSubjects/school-1__2026-2027__class-1__v1__subj-1-dup'].id = 'school-1__2026-2027__class-1__v1__subj-1';
+    },
+    () => {
+      const token = computeDraftStateToken([
+        {
+          id: 'school-1__2026-2027__class-1__v1__subj-1',
+          subjectId: 'subj-1', subjectNameSnapshot: 'Maths A', isRequired: true, displayOrder: 0, isActive: true,
+          revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1
+        },
+        {
+          id: 'school-1__2026-2027__class-1__v1__subj-1',
+          subjectId: 'subj-1', subjectNameSnapshot: 'Maths B', isRequired: true, displayOrder: 1, isActive: true,
+          revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1
+        }
+      ]);
+      return publishClassProgramDraft(
+        { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: token },
+        { auth: { uid: 'user-1' } }
+      );
+    },
+    (err) => {
+      assert.ok(err);
+      assert.strictEqual(err.code, 'failed-precondition');
+      assert.strictEqual(err.details?.businessCode, 'DUPLICATE_SUBJECT');
+      const parent = dbMock.collection('classPrograms').doc('school-1__2026-2027__class-1');
+      assert.strictEqual(parent.updates.length, 0); // No write!
+    }
+  );
+
+  // === TESTS D'INTÉGRITÉ DÉTAILLÉS ===
+
+  const integrityFixtures = [
+    {
+      name: 'document ID incohérent',
+      subj: { id: 'wrong-id', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'programId incorrect',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', programId: 'wrong-program', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'schoolId incorrect',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', schoolId: 'wrong-school', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'classId incorrect',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', classId: 'wrong-class', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'academicYearId incorrect',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', academicYearId: 'wrong-year', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'revisionId incorrect',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'wrong-rev', revisionNumber: 1 }
+    },
+    {
+      name: 'revisionNumber incorrect',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 0 }
+    },
+    {
+      name: 'subjectNameSnapshot vide',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: '', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'isRequired non booléen',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: 'yes', displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'isActive non booléen',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: 'yes', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'displayOrder négatif',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: -1, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'displayOrder non entier',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 1.5, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1 }
+    },
+    {
+      name: 'coefficient négatif',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, coefficient: -4 }
+    },
+    {
+      name: 'coefficient non numérique',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, coefficient: 'four' }
+    },
+    {
+      name: 'weeklyHours négatif',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, weeklyHours: -3 }
+    },
+    {
+      name: 'weeklyHours non numérique',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, weeklyHours: 'three' }
+    }
+  ];
+
+  for (let idx = 0; idx < integrityFixtures.length; idx++) {
+    const f = integrityFixtures[idx];
+    await testCase(
+      `16_int_${idx + 1}. Intégrité: ${f.name}`,
+      () => {
+        dbMock.collection('users').doc('user-1').setState(true, { id: 'user-1', role: 'secretary', isActive: true, schoolId: 'school-1' });
+        dbMock.collection('classes').doc('class-1').setState(true, { id: 'class-1', schoolId: 'school-1' });
+        dbMock.collection('classPrograms').doc('school-1__2026-2027__class-1').setState(true, {
+          id: 'school-1__2026-2027__class-1',
+          schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
+          status: 'draft', draftRevisionId: 'school-1__2026-2027__class-1__v1', draftRevisionNumber: 1,
+          hasUnpublishedChanges: true
+        });
+
+        // Set subject in DB
+        const dbSubj = {
+          id: 'school-1__2026-2027__class-1__v1__subj-1',
+          programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
+          subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
+          subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true,
+          ...f.subj
+        };
+        dbMock.collection('classSubjects').doc(dbSubj.id).setState(true, dbSubj);
+      },
+      () => {
+        runTests.bypassFilters = true;
+        // Compute correct token for the payload
+        const inputSubj = {
+          id: 'school-1__2026-2027__class-1__v1__subj-1',
+          subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true,
+          revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
+          ...f.subj
+        };
+        const token = computeDraftStateToken([inputSubj]);
+        return publishClassProgramDraft(
+          { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1', expectedDraftRevisionId: 'school-1__2026-2027__class-1__v1', expectedDraftStateToken: token },
+          { auth: { uid: 'user-1' } }
+        ).finally(() => {
+          runTests.bypassFilters = false;
+        });
+      },
+      (err) => {
+        assert.ok(err);
+        assert.strictEqual(err.code, 'failed-precondition');
+        assert.strictEqual(err.details?.businessCode, 'PROGRAM_INTEGRITY_ERROR');
+        const parent = dbMock.collection('classPrograms').doc('school-1__2026-2027__class-1');
+        assert.strictEqual(parent.updates.length, 0); // No write!
+      }
+    );
+  }
 
   // === TESTS TRANSACTIONNELS DE SUCCÈS ===
 

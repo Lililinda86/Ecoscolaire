@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ClassProgram, ClassSubject, Subject } from '../types';
 import {
   createInitialClassProgram,
@@ -42,6 +42,9 @@ export function useClassProgramDraft({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [draftStateToken, setDraftStateToken] = useState<string | null>(null);
+  const [isTokenCalculating, setIsTokenCalculating] = useState<boolean>(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const tokenGenerationRef = useRef<number>(0);
 
   // Sync state with initial values
   useEffect(() => {
@@ -52,10 +55,24 @@ export function useClassProgramDraft({
     setIsDirty(false);
     setError(null);
     if (onDirtyChange) onDirtyChange(false);
+    const nextGen = ++tokenGenerationRef.current;
+    setIsTokenCalculating(true);
+    setTokenError(null);
+    setDraftStateToken(null);
 
-    // Calculate token based on initial subjects (representing the database state)
-    const token = computeDraftStateToken(initialSubjects);
-    setDraftStateToken(token);
+    computeDraftStateToken(initialSubjects)
+      .then((token) => {
+        if (tokenGenerationRef.current === nextGen) {
+          setDraftStateToken(token);
+          setIsTokenCalculating(false);
+        }
+      })
+      .catch((err) => {
+        if (tokenGenerationRef.current === nextGen) {
+          setTokenError(err.message || 'Erreur lors du calcul du token.');
+          setIsTokenCalculating(false);
+        }
+      });
   }, [initialProgram, initialSubjects, onDirtyChange]);
 
   const updateDirtyState = (newSubjects: ClassSubject[]) => {
@@ -304,6 +321,8 @@ export function useClassProgramDraft({
     isSaving,
     error,
     draftStateToken,
+    isTokenCalculating,
+    tokenError,
     addSubject,
     updateSubjectFields,
     removeSubject,
