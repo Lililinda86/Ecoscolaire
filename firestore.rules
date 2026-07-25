@@ -830,5 +830,40 @@ service cloud.firestore {
       allow get, list: if isAuthenticated() && isActive() && (isSuperAdmin() || (resource.data.schoolId == getUserSchoolId() && (isOwner() || isDirector() || isSecretary() || isAccountant())));
       allow create, update, delete: if false;
     }
+
+    // --- TEACHER ASSIGNMENTS ---
+    match /teacherAssignments/{assignmentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (
+          isTeacher()
+          && hasSchoolAccess(resource.data.schoolId)
+          && resource.data.isActive == true
+          && exists(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid))
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.isActive == true
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.schoolId == resource.data.schoolId
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.staffId == resource.data.teacherStaffId
+        )
+      );
+      allow write: if false;
+    }
+
+    match /teacherAssignmentSlots/{slotId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (
+          isTeacher()
+          && hasSchoolAccess(resource.data.schoolId)
+          && resource.data.isActive == true
+          && exists(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid))
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.isActive == true
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.schoolId == resource.data.schoolId
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.staffId == resource.data.teacherStaffId
+        )
+      );
+      allow write: if false;
+    }
   }
 }

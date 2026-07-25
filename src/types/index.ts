@@ -650,3 +650,45 @@ export interface StaffUserLinkByStaff {
   updatedAt: string;
   updatedBy: string;
 }
+
+export interface TeacherAssignment {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  subjectId: string;
+  teacherStaffId: string;
+  assignmentRole: 'primary';
+  sourceProgramId: string;
+  sourcePublishedRevisionId: string;
+  sourceClassSubjectId: string;
+  isActive: boolean;
+  startedAt: string;
+  endedAt?: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  deactivatedAt?: string;
+  deactivatedBy?: string;
+  deactivationReason?: string;
+  teacherUserId?: string;
+}
+
+export interface TeacherAssignmentSlot {
+  id: string;
+  assignmentId: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  subjectId: string;
+  teacherStaffId: string;
+  assignmentRole: 'primary';
+  sourceProgramId: string;
+  sourcePublishedRevisionId: string;
+  sourceClassSubjectId: string;
+  isActive: boolean;
+  updatedAt: string;
+  updatedBy: string;
+  teacherUserId?: string;
+}

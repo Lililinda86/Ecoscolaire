@@ -3023,4 +3023,6 @@ export { publishClassProgramDraft } from './academic/publishClassProgramDraft';
 export { linkStaffToUser } from './staff/linkStaffToUser';
 export { unlinkStaffFromUser } from './staff/unlinkStaffFromUser';
 export { seedDefaultSubjectCatalog } from './academic/seedDefaultSubjectCatalog';
-
+export { setPrimaryTeacherAssignment } from './academic/setPrimaryTeacherAssignment';
+export { deactivateTeacherAssignment } from './academic/deactivateTeacherAssignment';
+export { getTeacherAssignmentCandidates } from './academic/getTeacherAssignmentCandidates';

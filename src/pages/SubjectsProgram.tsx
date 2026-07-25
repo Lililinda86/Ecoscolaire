@@ -7,6 +7,7 @@ import { SubjectTable } from './subjects/SubjectTable';
 import { SubjectStatusDialog } from './subjects/SubjectStatusDialog';
 import { SubjectFormModal } from './subjects/SubjectFormModal';
 import { ClassProgramPanel } from './subjects/programs/ClassProgramPanel';
+import { TeacherAssignmentsPanel } from './subjects/assignments/TeacherAssignmentsPanel';
 import Modal from '../components/Modal';
 import { canManageAcademicPrograms } from '../utils/academicPermissions';
 import { seedDefaultSubjectCatalog } from '../services/subjectCatalogSeedFunctions';
@@ -17,7 +18,7 @@ const SubjectsProgram: React.FC = () => {
   // Navigation tabs for the module (only Catalogue is active in Lot 1)
   const [activeModuleTab, setActiveModuleTab] = useState<'catalogue' | 'program' | 'assignment'>('catalogue');
   const [isProgramDirty, setIsProgramDirty] = useState<boolean>(false);
-  const [pendingTabSwitch, setPendingTabSwitch] = useState<'catalogue' | 'program' | null>(null);
+  const [pendingTabSwitch, setPendingTabSwitch] = useState<'catalogue' | 'program' | 'assignment' | null>(null);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +93,7 @@ const SubjectsProgram: React.FC = () => {
 
   const activeSchoolId = db.school?.id;
 
-  const handleTabSwitch = (tab: 'catalogue' | 'program') => {
+  const handleTabSwitch = (tab: 'catalogue' | 'program' | 'assignment') => {
     if (activeModuleTab === 'program' && isProgramDirty && tab !== 'program') {
       setPendingTabSwitch(tab);
     } else {
@@ -553,16 +554,16 @@ const SubjectsProgram: React.FC = () => {
           style={{
             background: 'none',
             border: 'none',
-            color: 'var(--text-muted)',
+            borderBottom: activeModuleTab === 'assignment' ? '3px solid var(--primary-color)' : 'none',
+            color: activeModuleTab === 'assignment' ? 'var(--primary-color)' : 'var(--text-muted)',
+            fontWeight: 700,
             padding: '0.5rem 1.25rem',
-            cursor: 'not-allowed',
-            opacity: 0.5,
+            cursor: 'pointer',
             fontSize: '0.95rem'
           }}
-          disabled
-          title="Disponible dans le prochain lot"
+          onClick={() => handleTabSwitch('assignment')}
         >
-          Affectation des Enseignants (Bientôt)
+          Affectation des Enseignants
         </button>
       </div>
 
@@ -684,6 +685,8 @@ const SubjectsProgram: React.FC = () => {
       )}
 
       {activeModuleTab === 'program' && <ClassProgramPanel onDirtyChange={setIsProgramDirty} />}
+
+      {activeModuleTab === 'assignment' && <TeacherAssignmentsPanel />}
 
       {/* CONFIRMATION EXIT TAB MODAL */}
       <Modal
