@@ -2368,4 +2368,151 @@ describe('Class Programs and Subjects Security Rules', () => {
       await assertFails(getDocs(q));
     });
   });
+
+  describe('Staff-User Links Security Rules', () => {
+    const SCHOOL_A = 'school-a';
+    const SCHOOL_B = 'school-b';
+
+    beforeEach(async () => {
+      // Setup mock operators, targets and staff
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const firestore = ctx.firestore();
+        
+        // Superadmin
+        await setDoc(doc(firestore, 'users', 'sa-uid'), { role: 'superAdmin', active: true });
+        
+        // School A Members
+        await setDoc(doc(firestore, 'users', 'owner-a'), { role: 'owner', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(firestore, 'users', 'director-a'), { role: 'director', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(firestore, 'users', 'secretary-a'), { role: 'secretary', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(firestore, 'users', 'teacher-a'), { role: 'teacher', schoolId: SCHOOL_A, active: true });
+        
+        // School B Members
+        await setDoc(doc(firestore, 'users', 'director-b'), { role: 'director', schoolId: SCHOOL_B, active: true });
+
+        // Staff members
+        await setDoc(doc(firestore, 'staff', 'staff-a'), { role: 'teacher', schoolId: SCHOOL_A });
+
+        // Existing link documents
+        await setDoc(doc(firestore, 'staffUserLinks', 'link-1'), {
+          id: 'link-1',
+          schoolId: SCHOOL_A,
+          userId: 'teacher-a',
+          staffId: 'staff-a',
+          isActive: true
+        });
+
+        await setDoc(doc(firestore, 'staffUserLinkByUser', 'teacher-a'), {
+          userId: 'teacher-a',
+          staffId: 'staff-a',
+          schoolId: SCHOOL_A,
+          linkId: 'link-1',
+          isActive: true
+        });
+
+        await setDoc(doc(firestore, 'staffUserLinkByStaff', `${SCHOOL_A}__staff-a`), {
+          userId: 'teacher-a',
+          staffId: 'staff-a',
+          schoolId: SCHOOL_A,
+          linkId: 'link-1',
+          isActive: true
+        });
+      });
+    });
+
+    it('Direct client writes to links or pointer collections must be denied', async () => {
+      const context = testEnv.authenticatedContext('owner-a');
+      const db = context.firestore();
+
+      await assertFails(setDoc(doc(db, 'staffUserLinks', 'link-new'), { schoolId: SCHOOL_A, userId: 'teacher-a', staffId: 'staff-a', isActive: true }));
+      await assertFails(updateDoc(doc(db, 'staffUserLinks', 'link-1'), { isActive: false }));
+      await assertFails(deleteDoc(doc(db, 'staffUserLinks', 'link-1')));
+
+      await assertFails(setDoc(doc(db, 'staffUserLinkByUser', 'teacher-new'), { userId: 'teacher-new', staffId: 'staff-a', schoolId: SCHOOL_A, isActive: true }));
+      await assertFails(setDoc(doc(db, 'staffUserLinkByStaff', `${SCHOOL_A}__staff-new`), { userId: 'teacher-a', staffId: 'staff-new', schoolId: SCHOOL_A, isActive: true }));
+    });
+
+    it('Reads on staffUserLinks details rules check', async () => {
+      // Superadmin can read
+      const saCtx = testEnv.authenticatedContext('sa-uid');
+      await assertSucceeds(getDoc(doc(saCtx.firestore(), 'staffUserLinks', 'link-1')));
+
+      // Director/Owner same school can read
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertSucceeds(getDoc(doc(dirCtx.firestore(), 'staffUserLinks', 'link-1')));
+
+      const ownerCtx = testEnv.authenticatedContext('owner-a');
+      await assertSucceeds(getDoc(doc(ownerCtx.firestore(), 'staffUserLinks', 'link-1')));
+
+      // Linked teacher cannot read (history is confidential)
+      const targetCtx = testEnv.authenticatedContext('teacher-a');
+      await assertFails(getDoc(doc(targetCtx.firestore(), 'staffUserLinks', 'link-1')));
+
+      // Secretary or other school cannot read
+      const secCtx = testEnv.authenticatedContext('secretary-a');
+      await assertFails(getDoc(doc(secCtx.firestore(), 'staffUserLinks', 'link-1')));
+
+      const otherCtx = testEnv.authenticatedContext('director-b');
+      await assertFails(getDoc(doc(otherCtx.firestore(), 'staffUserLinks', 'link-1')));
+    });
+
+    it('Reads on staffUserLinkByUser pointers rules check', async () => {
+      // Target user can read own pointer
+      const targetCtx = testEnv.authenticatedContext('teacher-a');
+      await assertSucceeds(getDoc(doc(targetCtx.firestore(), 'staffUserLinkByUser', 'teacher-a')));
+
+      // Other teacher cannot read
+      const otherTeacherCtx = testEnv.authenticatedContext('teacher-other', { schoolId: SCHOOL_A });
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'users', 'teacher-other'), { role: 'teacher', schoolId: SCHOOL_A, active: true });
+      });
+      await assertFails(getDoc(doc(otherTeacherCtx.firestore(), 'staffUserLinkByUser', 'teacher-a')));
+
+      // SuperAdmin can read pointer of another user
+      const saCtx = testEnv.authenticatedContext('sa-uid');
+      await assertSucceeds(getDoc(doc(saCtx.firestore(), 'staffUserLinkByUser', 'teacher-a')));
+
+      // Director same school can read
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertSucceeds(getDoc(doc(dirCtx.firestore(), 'staffUserLinkByUser', 'teacher-a')));
+
+      // Owner same school can read
+      const ownerCtx = testEnv.authenticatedContext('owner-a');
+      await assertSucceeds(getDoc(doc(ownerCtx.firestore(), 'staffUserLinkByUser', 'teacher-a')));
+
+      // Secretary cannot read
+      const secCtx = testEnv.authenticatedContext('secretary-a');
+      await assertFails(getDoc(doc(secCtx.firestore(), 'staffUserLinkByUser', 'teacher-a')));
+
+      // Other school cannot read
+      const otherCtx = testEnv.authenticatedContext('director-b');
+      await assertFails(getDoc(doc(otherCtx.firestore(), 'staffUserLinkByUser', 'teacher-a')));
+    });
+
+    it('Reads on staffUserLinkByStaff pointers rules check', async () => {
+      // SuperAdmin can read
+      const saCtx = testEnv.authenticatedContext('sa-uid');
+      await assertSucceeds(getDoc(doc(saCtx.firestore(), 'staffUserLinkByStaff', `${SCHOOL_A}__staff-a`)));
+
+      // Director same school can read
+      const dirCtx = testEnv.authenticatedContext('director-a');
+      await assertSucceeds(getDoc(doc(dirCtx.firestore(), 'staffUserLinkByStaff', `${SCHOOL_A}__staff-a`)));
+
+      // Owner same school can read
+      const ownerCtx = testEnv.authenticatedContext('owner-a');
+      await assertSucceeds(getDoc(doc(ownerCtx.firestore(), 'staffUserLinkByStaff', `${SCHOOL_A}__staff-a`)));
+
+      // Teacher cannot read
+      const targetCtx = testEnv.authenticatedContext('teacher-a');
+      await assertFails(getDoc(doc(targetCtx.firestore(), 'staffUserLinkByStaff', `${SCHOOL_A}__staff-a`)));
+
+      // Secretary cannot read
+      const secCtx = testEnv.authenticatedContext('secretary-a');
+      await assertFails(getDoc(doc(secCtx.firestore(), 'staffUserLinkByStaff', `${SCHOOL_A}__staff-a`)));
+
+      // Other school cannot read
+      const otherCtx = testEnv.authenticatedContext('director-b');
+      await assertFails(getDoc(doc(otherCtx.firestore(), 'staffUserLinkByStaff', `${SCHOOL_A}__staff-a`)));
+    });
+  });
 });

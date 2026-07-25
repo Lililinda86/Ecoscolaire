@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.publishClassProgramDraft = exports.ensureClassProgramDraft = exports.sweepZombieImportJobs = exports.closeCashDrawer = exports.approveTuitionDiscount = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
+exports.unlinkStaffFromUser = exports.linkStaffToUser = exports.publishClassProgramDraft = exports.ensureClassProgramDraft = exports.sweepZombieImportJobs = exports.closeCashDrawer = exports.approveTuitionDiscount = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
 __exportStar(require("./importStudents"), exports);
 const admin = require("firebase-admin");
@@ -2611,4 +2611,8 @@ var ensureClassProgramDraft_1 = require("./academic/ensureClassProgramDraft");
 Object.defineProperty(exports, "ensureClassProgramDraft", { enumerable: true, get: function () { return ensureClassProgramDraft_1.ensureClassProgramDraft; } });
 var publishClassProgramDraft_1 = require("./academic/publishClassProgramDraft");
 Object.defineProperty(exports, "publishClassProgramDraft", { enumerable: true, get: function () { return publishClassProgramDraft_1.publishClassProgramDraft; } });
+var linkStaffToUser_1 = require("./staff/linkStaffToUser");
+Object.defineProperty(exports, "linkStaffToUser", { enumerable: true, get: function () { return linkStaffToUser_1.linkStaffToUser; } });
+var unlinkStaffFromUser_1 = require("./staff/unlinkStaffFromUser");
+Object.defineProperty(exports, "unlinkStaffFromUser", { enumerable: true, get: function () { return unlinkStaffFromUser_1.unlinkStaffFromUser; } });
 //# sourceMappingURL=index.js.map

@@ -664,6 +664,28 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
       allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
     }
+    match /staffUserLinks/{linkId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow write: if false;
+    }
+    match /staffUserLinkByUser/{userId} {
+      allow read: if isAuthenticated() && isActive() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        ((isOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow write: if false;
+    }
+    match /staffUserLinkByStaff/{pointerId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow write: if false;
+    }
 
     // --- FINANCE (PAYMENTS & EXPENSES) ---
     match /transactions/{transactionId} {

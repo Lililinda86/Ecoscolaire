@@ -293,6 +293,7 @@ export interface Staff {
   licenseNumber?: string;
   assignedBusId?: string;
   status?: 'actif' | 'absent' | 'remplacé';
+  isActive?: boolean;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'left_early';
@@ -611,6 +612,41 @@ export interface ClassSubject {
 
   createdAt: string;
   createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface StaffUserLink {
+  id: string;
+  schoolId: string;
+  userId: string;
+  staffId: string;
+  isActive: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  deactivatedAt?: string;
+  deactivatedBy?: string;
+  deactivationReason?: string;
+}
+
+export interface StaffUserLinkByUser {
+  userId: string;
+  staffId: string;
+  schoolId: string;
+  linkId: string;
+  isActive: boolean;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface StaffUserLinkByStaff {
+  userId: string;
+  staffId: string;
+  schoolId: string;
+  linkId: string;
+  isActive: boolean;
   updatedAt: string;
   updatedBy: string;
 }
