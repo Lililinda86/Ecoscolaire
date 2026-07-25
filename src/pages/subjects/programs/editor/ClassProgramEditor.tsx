@@ -6,6 +6,7 @@ import { ClassProgramDraftSummary } from './ClassProgramDraftSummary';
 import { ClassProgramSubjectRow } from './ClassProgramSubjectRow';
 import { ClassProgramSubjectPicker } from './ClassProgramSubjectPicker';
 import { ClassProgramEditorState } from './ClassProgramEditorState';
+import { publishClassProgramDraft } from '../../../../services/classProgramPublishFunctions';
 import Modal from '../../../../components/Modal';
 
 interface ClassProgramEditorProps {
@@ -41,6 +42,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     isDirty,
     isSaving,
     error,
+    draftStateToken,
     addSubject,
     updateSubjectFields,
     removeSubject,
@@ -62,6 +64,38 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  const handlePublish = async () => {
+    if (isPublishing || !program) return;
+    setIsPublishing(true);
+    setPublishError(null);
+    try {
+      await publishClassProgramDraft({
+        schoolId,
+        academicYearId,
+        classId,
+        expectedDraftRevisionId: program.draftRevisionId,
+        expectedDraftStateToken: draftStateToken || ''
+      });
+      setIsPublishConfirmOpen(false);
+      onSaveSuccess({
+        ...program,
+        status: 'published',
+        publishedRevisionId: program.draftRevisionId,
+        publishedRevisionNumber: program.draftRevisionNumber,
+        hasUnpublishedChanges: false
+      }, initialSubjects);
+      onClose();
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : 'Erreur lors de la publication du programme.';
+      setPublishError(errMessage);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   const handleClose = () => {
     if (isDirty) {
@@ -136,14 +170,19 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
       <ClassProgramDraftToolbar
         isDirty={isDirty}
         isSaving={isSaving}
+        isManager={userRole === 'superAdmin' || userRole === 'owner' || userRole === 'director' || userRole === 'secretary'}
         onSave={saveDraft}
         onCancel={cancelChanges}
         onAddSubject={() => setIsPickerOpen(true)}
+        onPublish={() => setIsPublishConfirmOpen(true)}
       />
 
       {/* 2. Error Display */}
       {error && (
         <ClassProgramEditorState type="error" message={error} />
+      )}
+      {publishError && (
+        <ClassProgramEditorState type="error" message={publishError} />
       )}
 
       {/* 3. Summary Stats */}
@@ -234,6 +273,51 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
             >
               Abandonner les modifications
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 8. Publish confirmation Modal */}
+      <Modal
+        isOpen={isPublishConfirmOpen}
+        onClose={() => !isPublishing && setIsPublishConfirmOpen(false)}
+        title="Publier le programme ?"
+        closeOnBackdrop={!isPublishing}
+      >
+        <div className="p-2">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+            Voulez-vous publier la révision <strong>v{program?.draftRevisionNumber}</strong> de ce programme de classe pour l'année scolaire <strong>{academicYearId}</strong> ?
+          </p>
+          <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg text-xs text-gray-600 dark:text-gray-400 mb-4 space-y-1.5 border border-gray-150 dark:border-gray-800">
+            <div>• Matières actives : <strong>{subjects.length}</strong></div>
+            <div>• Matières inactives : <strong>{initialSubjects.length - subjects.length}</strong></div>
+            <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 font-medium">
+              Note : ces chiffres et l'intégrité du programme seront revérifiés côté serveur avant publication.
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">
+            Cette version deviendra le programme officiel visible par les enseignants.
+          </p>
+          {publishError && (
+            <div className="mb-4 text-xs font-semibold text-red-600">
+              {publishError}
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <button
+              disabled={isPublishing}
+              onClick={() => setIsPublishConfirmOpen(false)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-850 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              disabled={isPublishing}
+              onClick={handlePublish}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {isPublishing ? 'Publication...' : 'Publier'}
             </button>
           </div>
         </div>

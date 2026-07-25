@@ -7,6 +7,7 @@ import {
   ClassProgramDraftError
 } from '../services/classProgramDrafts';
 import { getClassProgramAccessMode } from './useClassProgram';
+import { computeDraftStateToken } from '../utils/draftStateToken';
 
 export interface UseClassProgramDraftProps {
   initialProgram: ClassProgram | null;
@@ -40,6 +41,7 @@ export function useClassProgramDraft({
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftStateToken, setDraftStateToken] = useState<string | null>(null);
 
   // Sync state with initial values
   useEffect(() => {
@@ -50,6 +52,10 @@ export function useClassProgramDraft({
     setIsDirty(false);
     setError(null);
     if (onDirtyChange) onDirtyChange(false);
+
+    // Calculate token based on initial subjects (representing the database state)
+    const token = computeDraftStateToken(initialSubjects);
+    setDraftStateToken(token);
   }, [initialProgram, initialSubjects, onDirtyChange]);
 
   const updateDirtyState = (newSubjects: ClassSubject[]) => {
@@ -297,6 +303,7 @@ export function useClassProgramDraft({
     isDirty,
     isSaving,
     error,
+    draftStateToken,
     addSubject,
     updateSubjectFields,
     removeSubject,

@@ -70,6 +70,7 @@ const dbMock = {
                 }
                 if (match) {
                   matches.push({
+                    id: doc.id,
                     data: () => doc._data
                   });
                 }

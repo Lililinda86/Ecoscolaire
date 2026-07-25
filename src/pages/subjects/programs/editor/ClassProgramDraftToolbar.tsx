@@ -3,17 +3,21 @@ import React from 'react';
 interface ClassProgramDraftToolbarProps {
   isDirty: boolean;
   isSaving: boolean;
+  isManager?: boolean;
   onSave: () => void;
   onCancel: () => void;
   onAddSubject: () => void;
+  onPublish: () => void;
 }
 
 export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> = ({
   isDirty,
   isSaving,
+  isManager = false,
   onSave,
   onCancel,
-  onAddSubject
+  onAddSubject,
+  onPublish
 }) => {
   return (
     <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
@@ -23,9 +27,15 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
           <span className="text-xs font-bold text-amber-800 dark:text-amber-400">
             Modification du brouillon actif
           </span>
-          <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-            Les modifications ne seront appliquées qu'après avoir enregistré.
-          </span>
+          {isDirty ? (
+            <span className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-0.5">
+              Enregistrez vos modifications avant de publier.
+            </span>
+          ) : (
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+              Les modifications ne seront appliquées qu'après avoir enregistré.
+            </span>
+          )}
         </div>
       </div>
 
@@ -74,6 +84,21 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
             </>
           )}
         </button>
+
+        {isManager && (
+          <button
+            type="button"
+            onClick={onPublish}
+            disabled={isDirty || isSaving}
+            title={isDirty ? "Enregistrez vos modifications avant de publier." : "Publier le programme officiel"}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm shadow-emerald-500/20"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
+            Publier
+          </button>
+        )}
       </div>
     </div>
   );

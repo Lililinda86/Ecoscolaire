@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ensureClassProgramDraft = exports.sweepZombieImportJobs = exports.closeCashDrawer = exports.approveTuitionDiscount = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
+exports.publishClassProgramDraft = exports.ensureClassProgramDraft = exports.sweepZombieImportJobs = exports.closeCashDrawer = exports.approveTuitionDiscount = exports.createTuitionDiscount = exports.recordCashPayment = exports.updateStudentFinancialStatus = exports.enforceStudentSaasLimits = exports.onPaymentCreated = exports.mockConfirmPayment = exports.initiatePayment = exports.dailySubscriptionCheck = exports.verifySaaSPayment = exports.campayWebhook = exports.createSaaSCheckout = void 0;
 const functions = require("firebase-functions");
 __exportStar(require("./importStudents"), exports);
 const admin = require("firebase-admin");
@@ -2609,4 +2609,6 @@ var studentImportSweeper_1 = require("./studentImportSweeper");
 Object.defineProperty(exports, "sweepZombieImportJobs", { enumerable: true, get: function () { return studentImportSweeper_1.sweepZombieImportJobs; } });
 var ensureClassProgramDraft_1 = require("./academic/ensureClassProgramDraft");
 Object.defineProperty(exports, "ensureClassProgramDraft", { enumerable: true, get: function () { return ensureClassProgramDraft_1.ensureClassProgramDraft; } });
+var publishClassProgramDraft_1 = require("./academic/publishClassProgramDraft");
+Object.defineProperty(exports, "publishClassProgramDraft", { enumerable: true, get: function () { return publishClassProgramDraft_1.publishClassProgramDraft; } });
 //# sourceMappingURL=index.js.map
