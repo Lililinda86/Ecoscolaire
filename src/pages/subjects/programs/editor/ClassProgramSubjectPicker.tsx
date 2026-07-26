@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Subject, ClassSubject, ClassSection } from '../../../../types';
 import { normalizeClassSection, normalizeClassCycle } from '../../../../utils/classClassification';
-import type { NormalizedSection, NormalizedCycle } from '../../../../utils/classClassification';
+import { filterAvailableSubjectsForClass } from './classProgramSubjectFilters';
 
 interface ClassProgramSubjectPickerProps {
   catalogSubjects: Subject[];
@@ -11,54 +11,6 @@ interface ClassProgramSubjectPickerProps {
   selectedClass?: ClassSection | null;
   onSelect: (subject: Subject) => void;
   onClose: () => void;
-}
-
-export function filterAvailableSubjectsForClass(params: {
-  catalogSubjects: Subject[];
-  activeSubjects: ClassSubject[];
-  schoolId: string;
-  classSection: NormalizedSection;
-  classCycle: NormalizedCycle;
-  isFiltered: boolean;
-  searchTerm: string;
-}): Subject[] {
-  const { catalogSubjects, activeSubjects, schoolId, classSection, classCycle, isFiltered, searchTerm } = params;
-  return catalogSubjects.filter(s => {
-    const isSchoolMatch = s.schoolId === schoolId || !s.schoolId;
-    const isActive = s.isActive !== false;
-    const isAlreadyAdded = activeSubjects.some(as => as.subjectId === s.id && as.isActive);
-
-    if (!isSchoolMatch || !isActive || isAlreadyAdded) return false;
-
-    // Apply smart filter by section and cycle
-    if (isFiltered) {
-      // Legacy rule: if subject has no section or cycles metadata, keep it visible by default
-      const hasSectionMeta = !!s.section && s.section !== 'all';
-      const hasCycleMeta = !!s.cycles && s.cycles.length > 0;
-      
-      if (hasSectionMeta || hasCycleMeta) {
-        const matchesSection = !s.section || s.section === 'all' || s.section === classSection;
-        
-        // s.cycles can be nursery/primary/secondary. Class cycles are maternelle/primaire/secondaire. Map them.
-        const mappedCycles = (s.cycles || []).map(c => {
-          if (c === 'nursery') return 'maternelle';
-          if (c === 'primary') return 'primaire';
-          if (c === 'secondary') return 'secondaire';
-          return c;
-        });
-        const matchesCycle = !s.cycles || s.cycles.length === 0 || (classCycle !== 'unknown' && mappedCycles.includes(classCycle));
-
-        if (!matchesSection || !matchesCycle) return false;
-      }
-    }
-
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      (s.name || '').toLowerCase().includes(term) ||
-      (s.code || '').toLowerCase().includes(term)
-    );
-  });
 }
 
 export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps> = ({

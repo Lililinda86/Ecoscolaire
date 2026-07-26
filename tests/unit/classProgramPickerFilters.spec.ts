@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Subject, ClassSubject } from '../../src/types';
 
-import { filterAvailableSubjectsForClass } from '../../src/pages/subjects/programs/editor/ClassProgramSubjectPicker';
+import { filterAvailableSubjectsForClass } from '../../src/pages/subjects/programs/editor/classProgramSubjectFilters';
 
 test.describe('ClassProgramSubjectPicker Recommendation Filter Logic tests', () => {
   const schoolId = 'emu-school';
@@ -275,5 +275,69 @@ test.describe('ClassProgramSubjectPicker Recommendation Filter Logic tests', () 
       searchTerm: ''
     });
     expect(res.some(s => s.id === 'exp-legacy')).toBe(false);
+  });
+
+  test('16. matière legacy non classifiable visible en mode global', () => {
+    const legacySub: Subject = {
+      id: 'unclassifiable-legacy',
+      name: 'Unclassifiable Legacy',
+      isActive: true
+    };
+    const res = filterAvailableSubjectsForClass({
+      catalogSubjects: [legacySub],
+      activeSubjects: [],
+      schoolId,
+      classSection: francophoneClassSection,
+      classCycle: primaryCycle,
+      isFiltered: false, // global mode
+      searchTerm: ''
+    });
+    expect(res.some(s => s.id === 'unclassifiable-legacy')).toBe(true);
+  });
+
+  test('17. aucune matière recommandée', () => {
+    const res = filterAvailableSubjectsForClass({
+      catalogSubjects: catalog,
+      activeSubjects: [],
+      schoolId,
+      classSection: 'unknown',
+      classCycle: 'unknown',
+      isFiltered: true,
+      searchTerm: ''
+    });
+    // In recommendation mode, since cycle/section are unknown and legacy metadata doesn't match recom, expect empty
+    expect(res.filter(s => s.id !== 'legacy-sub').length).toBe(0);
+  });
+
+  test('18. toutes les matières déjà ajoutées', () => {
+    const res = filterAvailableSubjectsForClass({
+      catalogSubjects: catalog,
+      activeSubjects: [
+        { subjectId: 'math-fr', isActive: true },
+        { subjectId: 'eng-en', isActive: true },
+        { subjectId: 'bil-common', isActive: true },
+        { subjectId: 'nursery-math', isActive: true },
+        { subjectId: 'legacy-sub', isActive: true }
+      ] as ClassSubject[],
+      schoolId,
+      classSection: francophoneClassSection,
+      classCycle: primaryCycle,
+      isFiltered: false,
+      searchTerm: ''
+    });
+    expect(res.length).toBe(0);
+  });
+
+  test('19. recherche sans résultat', () => {
+    const res = filterAvailableSubjectsForClass({
+      catalogSubjects: catalog,
+      activeSubjects: [],
+      schoolId,
+      classSection: francophoneClassSection,
+      classCycle: primaryCycle,
+      isFiltered: false,
+      searchTerm: 'non-existing-subject-name'
+    });
+    expect(res.length).toBe(0);
   });
 });
