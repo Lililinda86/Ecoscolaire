@@ -169,7 +169,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   }
 
   return (
-    <div className="flex flex-col">
+    <section className="w-full min-w-0 flex flex-col gap-4">
       {/* 1. Header Toolbar */}
       <ClassProgramDraftToolbar
         isDirty={isDirty}
@@ -343,6 +343,6 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
           Fermer l'éditeur
         </button>
       </div>
-    </div>
+    </section>
   );
 };
