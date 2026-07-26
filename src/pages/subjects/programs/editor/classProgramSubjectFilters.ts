@@ -30,19 +30,9 @@ export function filterAvailableSubjectsForClass(params: {
       const isCommonCycle = !s.cycles || s.cycles.length === 0;
 
       if (!hasSectionMeta && !hasCycleMeta) {
-        // Règle legacy sûre : si le code ou le nom de la matière contient des indices clairs, on la classifie
-        const nameLower = (s.name || '').toLowerCase();
-        const codeLower = (s.code || '').toLowerCase();
-        const isLegacyClassifiable = 
-          nameLower.includes('legacy') ||
-          codeLower.includes('math') || 
-          codeLower.includes('fr') || 
-          codeLower.includes('en') || 
-          codeLower.includes('bil');
-
-        if (!isLegacyClassifiable) {
-          return false;
-        }
+        // Politique legacy finale stricte: sans métadonnées structurées, la matière est non classifiable
+        // et n'apparaît que si le filtre est désactivé.
+        return false;
       }
 
       const matchesSection = isCommonSection || !s.section || s.section === classSection;

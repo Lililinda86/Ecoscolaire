@@ -245,28 +245,16 @@ test.describe('ClassProgramSubjectPicker Recommendation Filter Logic tests', () 
     expect(res[0].id).toBe('eng-en');
   });
 
-  test('14. métadonnées legacy selon la règle existante', () => {
-    const res = filterAvailableSubjectsForClass({
-      catalogSubjects: catalog,
-      activeSubjects: [],
-      schoolId,
-      classSection: francophoneClassSection,
-      classCycle: primaryCycle,
-      isFiltered: true,
-      searchTerm: ''
-    });
-    expect(res.some(s => s.id === 'legacy-sub')).toBe(true);
-  });
-
-  test('15. matière legacy non classifiable (explicitement exclue si section/cycle précisé ailleurs)', () => {
-    const explicitLegacySubject: Subject = {
-      id: 'exp-legacy',
-      name: 'Explicit Legacy',
-      section: 'anglophone',
+  test('14. matière legacy classifiable', () => {
+    const classifiableLegacy: Subject = {
+      id: 'legacy-classifiable',
+      name: 'Legacy Math',
+      section: 'francophone',
+      cycles: ['primary'],
       isActive: true
     };
     const res = filterAvailableSubjectsForClass({
-      catalogSubjects: [explicitLegacySubject],
+      catalogSubjects: [classifiableLegacy],
       activeSubjects: [],
       schoolId,
       classSection: francophoneClassSection,
@@ -274,7 +262,25 @@ test.describe('ClassProgramSubjectPicker Recommendation Filter Logic tests', () 
       isFiltered: true,
       searchTerm: ''
     });
-    expect(res.some(s => s.id === 'exp-legacy')).toBe(false);
+    expect(res.some(s => s.id === 'legacy-classifiable')).toBe(true);
+  });
+
+  test('15. matière legacy non classifiable masquée', () => {
+    const unclassifiableLegacy: Subject = {
+      id: 'legacy-unclassifiable',
+      name: 'Old Course',
+      isActive: true
+    };
+    const res = filterAvailableSubjectsForClass({
+      catalogSubjects: [unclassifiableLegacy],
+      activeSubjects: [],
+      schoolId,
+      classSection: francophoneClassSection,
+      classCycle: primaryCycle,
+      isFiltered: true,
+      searchTerm: ''
+    });
+    expect(res.some(s => s.id === 'legacy-unclassifiable')).toBe(false);
   });
 
   test('16. matière legacy non classifiable visible en mode global', () => {
@@ -305,8 +311,7 @@ test.describe('ClassProgramSubjectPicker Recommendation Filter Logic tests', () 
       isFiltered: true,
       searchTerm: ''
     });
-    // In recommendation mode, since cycle/section are unknown and legacy metadata doesn't match recom, expect empty
-    expect(res.filter(s => s.id !== 'legacy-sub').length).toBe(0);
+    expect(res.length).toBe(0);
   });
 
   test('18. toutes les matières déjà ajoutées', () => {
