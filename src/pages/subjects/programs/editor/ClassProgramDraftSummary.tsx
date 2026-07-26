@@ -15,24 +15,24 @@ export const ClassProgramDraftSummary: React.FC<ClassProgramDraftSummaryProps> =
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
       <div className="flex flex-col justify-center">
-        <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Nombre de matières</span>
-        <span className="text-xl font-extrabold text-gray-900 dark:text-white mt-1.5">
-          {count}
-        </span>
+        <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">Nombre de matières</div>
+        <div>
+          <strong className="text-xl font-extrabold text-gray-900 dark:text-white block mt-1">{count}</strong>
+        </div>
       </div>
 
       <div className="flex flex-col justify-center border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-800 pt-3 sm:pt-0 sm:pl-4">
-        <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Total des coefficients</span>
-        <span className="text-xl font-extrabold text-gray-900 dark:text-white mt-1.5">
-          {totalCoefficients}
-        </span>
+        <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">Total des coefficients</div>
+        <div>
+          <strong className="text-xl font-extrabold text-gray-900 dark:text-white block mt-1">{totalCoefficients}</strong>
+        </div>
       </div>
 
       <div className="flex flex-col justify-center border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-800 pt-3 sm:pt-0 sm:pl-4">
-        <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Volume horaire hebdomadaire</span>
-        <span className="text-xl font-extrabold text-gray-900 dark:text-white mt-1.5">
-          {totalHours} h
-        </span>
+        <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">Volume horaire hebdomadaire</div>
+        <div>
+          <strong className="text-xl font-extrabold text-gray-900 dark:text-white block mt-1">{totalHours} h</strong>
+        </div>
       </div>
     </div>
   );

@@ -77,6 +77,8 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </div>
           <button
             onClick={onClose}
+            aria-label="Fermer la liste des matières"
+            title="Fermer la liste des matières"
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -140,17 +142,26 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                   className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 rounded-lg transition"
                 >
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">
                       {s.name}
                     </span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {s.code && (
-                        <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
-                          {s.code}
-                        </span>
-                      )}
-                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400">
-                        {s.section || 'All'} • {(s.cycles || []).join(', ') || 'All'}
+                    {s.code && (
+                      <div className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-0.5">
+                        Code : {s.code}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 font-medium">
+                        {s.section === 'francophone' ? 'Francophone' : s.section === 'anglophone' ? 'Anglophone' : 'Tous'}
+                      </span>
+                      <span className="text-gray-300 dark:text-gray-600">•</span>
+                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 font-medium">
+                        {(s.cycles || []).map(c => {
+                          if (c === 'nursery') return 'Maternelle';
+                          if (c === 'primary') return 'Primaire';
+                          if (c === 'secondary') return 'Secondaire';
+                          return c;
+                        }).join(', ') || 'Tous'}
                       </span>
                     </div>
                   </div>
@@ -174,7 +185,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-semibold transition"
           >
-            Fermer
+            Fermer la liste des matières
           </button>
         </div>
       </div>

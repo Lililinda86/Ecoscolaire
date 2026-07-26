@@ -213,16 +213,16 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-xl">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-xl w-full">
+          <table className="w-full text-left border-collapse" style={{ minWidth: '768px' }}>
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-800/40 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-800">
-                <th className="p-3 text-center w-12">Ordre</th>
+                <th className="p-3 text-center w-24">Ordre</th>
                 <th className="p-3 text-left">Matière</th>
                 <th className="p-3 text-center w-32">Coefficient</th>
                 <th className="p-3 text-center w-32">Volume Horaire</th>
                 <th className="p-3 text-center w-36">Statut</th>
-                <th className="p-3 text-center w-20">Actions</th>
+                <th className="p-3 text-center w-28">Actions</th>
               </tr>
             </thead>
             <tbody>
