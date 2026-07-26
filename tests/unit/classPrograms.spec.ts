@@ -5,6 +5,7 @@ import {
 } from '../../src/services/classProgramQueryResult';
 import { buildClassProgramQueryConstraints } from '../../src/services/classProgramQueryConstraints';
 import { determineProgramAction } from '../../src/services/classProgramActions';
+import { resolveClassProgramHookState } from '../../src/services/classProgramHookStateResolver';
 
 test.describe('ClassProgram Query & Interpretation production logic tests', () => {
   const schoolId = 'school-a';
@@ -253,30 +254,41 @@ test.describe('ClassProgram Query & Interpretation production logic tests', () =
     });
     expect(prog).toBeNull();
 
-    // Simulation du comportement du Hook pour ce cas :
-    // status: 'success', source: 'none', program: null, subjects: [], errorCode: null
-    const simulatedHookState = {
-      status: 'success',
-      source: 'none',
+    // Appel de la fonction de production pour simuler la résolution d'état
+    const resolvedState = resolveClassProgramHookState({
       program: prog,
-      subjects: [],
-      errorCode: null
-    };
+      isReadOnlyRole: false,
+      isManager: true,
+      requestedView: 'published',
+      legacySubjectsCount: 0
+    });
 
-    expect(simulatedHookState.status).toBe('success');
-    expect(simulatedHookState.source).toBe('none');
-    expect(simulatedHookState.program).toBeNull();
-    expect(simulatedHookState.subjects).toEqual([]);
-    expect(simulatedHookState.errorCode).toBeNull();
+    expect(resolvedState.status).toBe('success');
+    expect(resolvedState.source).toBe('none');
+    expect(resolvedState.program).toBeNull();
+    expect(resolvedState.subjects).toEqual([]);
+    expect(resolvedState.errorCode).toBeNull();
+    expect(resolvedState.visibleRevisionId).toBeNull();
   });
 
   test('27. Hook resolution simulation: résultat null n’exécute aucune résolution de révision ni lecture de matières', () => {
     // Si prog est null, le code du Hook s’arrête immédiatement sans résoudre de révision ni lire les classSubjects.
-    // Nous vérifions ici que determineProgramAction retourne bien 'create-program' pour le manager
-    const action = determineProgramAction({
-      status: 'success',
-      source: 'none',
+    const resolvedState = resolveClassProgramHookState({
       program: null,
+      isReadOnlyRole: false,
+      isManager: true,
+      requestedView: 'published',
+      legacySubjectsCount: 0
+    });
+
+    expect(resolvedState.visibleRevisionId).toBeNull();
+    expect(resolvedState.source).toBe('none');
+
+    // determineProgramAction doit retourner 'create-program'
+    const action = determineProgramAction({
+      status: resolvedState.status,
+      source: resolvedState.source,
+      program: resolvedState.program,
       isManager: true
     });
     expect(action).toBe('create-program');
@@ -302,26 +314,29 @@ test.describe('ClassProgram Query & Interpretation production logic tests', () =
     expect(prog).not.toBeNull();
     expect(prog?.draftRevisionId).toBe('draft-revision-123');
 
+    const resolvedState = resolveClassProgramHookState({
+      program: prog,
+      isReadOnlyRole: false,
+      isManager: true,
+      requestedView: 'draft',
+      legacySubjectsCount: 0
+    });
+
+    expect(resolvedState.source).toBe('draft');
+    expect(resolvedState.visibleRevisionId).toBe('draft-revision-123');
+
     // determineProgramAction doit renvoyer 'edit-draft' pour ouvrir le brouillon
     const action = determineProgramAction({
-      status: 'success',
-      source: 'draft',
-      program: prog,
+      status: resolvedState.status,
+      source: resolvedState.source,
+      program: resolvedState.program,
       isManager: true
     });
     expect(action).toBe('edit-draft');
   });
 
   test('29. Hook resolution simulation: erreur permission-denied réelle -> status error, aucun bouton', () => {
-    // Simulation d'une erreur de permission renvoyée par le service
-    const simulatedErrorState = {
-      status: 'forbidden',
-      source: 'none',
-      program: null,
-      errorCode: 'PROGRAM_PERMISSION_DENIED'
-    };
-
-    // determineProgramAction doit retourner 'none' (aucun bouton de création visible)
+    // determineProgramAction doit retourner 'none' (aucun bouton de création visible) en cas d'erreur de permission
     const action = determineProgramAction({
       status: 'forbidden',
       source: 'none',
@@ -329,7 +344,6 @@ test.describe('ClassProgram Query & Interpretation production logic tests', () =
       isManager: true
     });
     expect(action).toBe('none');
-    expect(simulatedErrorState.status).toBe('forbidden');
   });
 
   test('18. determineProgramAction: none + rôle autorisé -> create-program', () => {

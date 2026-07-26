@@ -5,6 +5,7 @@ import {
   getClassSubjectsByRevision
 } from '../services/classPrograms';
 import type { ClassProgramErrorType } from '../services/classPrograms';
+import { resolveClassProgramHookState } from '../services/classProgramHookStateResolver';
 
 export interface UseClassProgramProps {
   schoolId: string | undefined;
@@ -105,46 +106,21 @@ export function useClassProgram({
 
         if (currentSeq !== requestSeq.current) return;
 
-        if (prog === null) {
+        const resolvedState = resolveClassProgramHookState({
+          program: prog,
+          isReadOnlyRole,
+          isManager,
+          requestedView,
+          legacySubjectsCount: legacySubjectsString ? legacySubjectsString.split(',').filter(Boolean).length : 0
+        });
+
+        if (resolvedState.source === 'legacy') {
           handleLegacyFallback(currentSeq);
           return;
         }
 
-        // Resolve revision based on role and requestedView
-        let targetRevisionId: string | undefined;
-        let selectedSource: 'published' | 'draft' = 'published';
-
-        const hasPub = !!prog.publishedRevisionId && prog.publishedRevisionId !== '';
-
-        if (isReadOnlyRole) {
-          // Read-only role: must only see published version
-          if (!hasPub) {
-            // Not published yet, fall back to historical or fail
-            handleLegacyFallback(currentSeq);
-            return;
-          }
-          targetRevisionId = prog.publishedRevisionId;
-          selectedSource = 'published';
-        } else if (isManager) {
-          // Manager role: can see draft or published
-          if (requestedView === 'draft') {
-            targetRevisionId = prog.draftRevisionId;
-            selectedSource = 'draft';
-          } else {
-            if (!hasPub) {
-              // Switch to draft if no published revision exists
-              targetRevisionId = prog.draftRevisionId;
-              selectedSource = 'draft';
-            } else {
-              targetRevisionId = prog.publishedRevisionId;
-              selectedSource = 'published';
-            }
-          }
-        }
-
-        if (!targetRevisionId) {
-          // If no revision ID is found (but prog is not null), it's success with none.
-          setProgram(prog);
+        if (resolvedState.source === 'none' && !resolvedState.visibleRevisionId) {
+          setProgram(resolvedState.program);
           setSubjects([]);
           setSource('none');
           setVisibleRevisionId(null);
@@ -152,13 +128,15 @@ export function useClassProgram({
           return;
         }
 
+        const targetRevisionId = resolvedState.visibleRevisionId!;
+
         // Fetch subjects
-        const list = await getClassSubjectsByRevision(schoolId!, prog.id, targetRevisionId);
+        const list = await getClassSubjectsByRevision(schoolId!, prog!.id, targetRevisionId);
         if (currentSeq !== requestSeq.current) return;
 
         setProgram(prog);
         setSubjects(list);
-        setSource(selectedSource);
+        setSource(resolvedState.source as 'published' | 'draft');
         setVisibleRevisionId(targetRevisionId);
         setStatus('success');
       } catch (err: unknown) {
