@@ -20,26 +20,26 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
   onPublish
 }) => {
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-        <div className="flex flex-col">
-          <span className="text-xs font-bold text-amber-800 dark:text-amber-400">
+    <div className="flex flex-col gap-4 mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+      <div className="flex items-start gap-2.5">
+        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse mt-1" />
+        <div className="flex flex-col gap-1">
+          <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400">
             Modification du brouillon actif
-          </span>
+          </h4>
           {isDirty ? (
-            <span className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-0.5">
+            <p className="text-xs text-red-600 dark:text-red-400 font-bold">
               Enregistrez vos modifications avant de publier.
-            </span>
+            </p>
           ) : (
-            <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Les modifications ne seront appliquées qu'après avoir enregistré.
-            </span>
+            </p>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+      <div className="border-t border-gray-150 dark:border-gray-800/80 pt-3 flex flex-wrap items-center gap-2.5 justify-end">
         <button
           type="button"
           onClick={onAddSubject}

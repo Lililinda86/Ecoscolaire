@@ -209,16 +209,6 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Aucune matière n'est actuellement ajoutée au brouillon.
           </p>
-          <button
-            type="button"
-            onClick={() => setIsPickerOpen(true)}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1.5"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            Ajouter une matière
-          </button>
         </div>
       ) : (
         <div className="overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-xl">
@@ -257,6 +247,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
           catalogSubjects={catalogSubjects}
           activeSubjects={subjects}
           schoolId={schoolId}
+          classId={classId}
           onSelect={(s) => {
             addSubject(s);
             setIsPickerOpen(false);

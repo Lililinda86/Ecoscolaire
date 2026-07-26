@@ -24,15 +24,16 @@ export const ClassProgramSubjectRow: React.FC<ClassProgramSubjectRowProps> = ({
     <tr className="hover:bg-gray-50/40 dark:hover:bg-gray-800/10 transition border-b border-gray-150 dark:border-gray-800/80">
       {/* Drag/Reorder Controls */}
       <td className="p-3 text-center w-12">
-        <div className="flex flex-col gap-1 items-center">
+        <div className="flex flex-col gap-1.5 items-center">
           <button
             type="button"
             onClick={onMoveUp}
             disabled={index === 0}
-            className="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800"
-            title="Déplacer vers le haut"
+            aria-label="Monter la matière"
+            className="p-1.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-blue-50 dark:hover:bg-blue-950/20 transition flex items-center justify-center"
+            title="Monter"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
             </svg>
           </button>
@@ -40,10 +41,11 @@ export const ClassProgramSubjectRow: React.FC<ClassProgramSubjectRowProps> = ({
             type="button"
             onClick={onMoveDown}
             disabled={index === totalCount - 1}
-            className="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800"
-            title="Déplacer vers le bas"
+            aria-label="Descendre la matière"
+            className="p-1.5 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-blue-50 dark:hover:bg-blue-950/20 transition flex items-center justify-center"
+            title="Descendre"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
@@ -116,6 +118,7 @@ export const ClassProgramSubjectRow: React.FC<ClassProgramSubjectRowProps> = ({
         <button
           type="button"
           onClick={onRemove}
+          aria-label="Retirer la matière"
           className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition"
           title="Retirer la matière"
         >
