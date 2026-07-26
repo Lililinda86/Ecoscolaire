@@ -65,10 +65,15 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col max-h-[85vh]">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="subject-picker-title"
+        className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col max-h-[85vh]"
+      >
+        <header className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center shrink-0">
           <div className="flex flex-col">
-            <h3 className="text-base font-bold text-gray-950 dark:text-white">
+            <h3 id="subject-picker-title" className="text-base font-bold text-gray-950 dark:text-white">
               Ajouter des matières au programme
             </h3>
             <span className="text-[10px] text-gray-500 mt-0.5">
@@ -76,18 +81,20 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             </span>
           </div>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Fermer la liste des matières"
             title="Fermer la liste des matières"
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="px-2.5 py-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-850 text-gray-700 dark:text-gray-350 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
+            <span>Fermer la liste des matières</span>
           </button>
-        </div>
+        </header>
 
-        <div className="p-4 bg-gray-50 dark:bg-gray-850/50 flex flex-col gap-3">
+        <div className="p-4 bg-gray-50 dark:bg-gray-850/50 flex flex-col gap-3 shrink-0">
           <input
             type="text"
             placeholder="Rechercher une matière par son nom ou son code..."
@@ -114,7 +121,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </label>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {availableSubjects.length === 0 ? (
             <div className="text-center py-8 px-4 text-gray-500 dark:text-gray-400">
               {searchTerm ? (
@@ -179,16 +186,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             </div>
           )}
         </div>
-
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-semibold transition"
-          >
-            Fermer la liste des matières
-          </button>
-        </div>
-      </div>
+      </section>
     </div>
   );
 };
