@@ -21,8 +21,8 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
 }) => {
   return (
     <div className="flex flex-col gap-3 mb-5 p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-      <div className="flex items-center justify-between flex-wrap sm:flex-nowrap gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
           <h4 className="text-xs font-bold text-amber-800 dark:text-amber-400 whitespace-nowrap">
             Modification du brouillon actif :
@@ -38,7 +38,7 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           <button
             type="button"
             onClick={onAddSubject}
