@@ -221,10 +221,11 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
       {isEditing && selectedClass && (
         <div style={{
           backgroundColor: 'var(--card-bg)',
-          padding: '1.5rem',
+          padding: '0.75rem',
           borderRadius: '12px',
           border: '1px solid var(--border-color)',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          width: '100%'
         }}>
           <ClassProgramEditor
             initialProgram={program}

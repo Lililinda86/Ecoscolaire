@@ -62,7 +62,7 @@ export const ClassProgramSubjectRow: React.FC<ClassProgramSubjectRowProps> = ({
           </span>
           {subject.subjectCodeSnapshot && (
             <span className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-0.5">
-              {subject.subjectCodeSnapshot}
+              Code : {subject.subjectCodeSnapshot}
             </span>
           )}
         </div>

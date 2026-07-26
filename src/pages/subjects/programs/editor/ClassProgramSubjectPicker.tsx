@@ -85,12 +85,11 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             onClick={onClose}
             aria-label="Fermer la liste des matières"
             title="Fermer la liste des matières"
-            className="px-2.5 py-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-850 text-gray-700 dark:text-gray-350 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg transition"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-            <span>Fermer la liste des matières</span>
           </button>
         </header>
 
@@ -157,24 +156,30 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                         Code : {s.code}
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 font-medium">
-                        {s.section === 'francophone' ? 'Francophone' : s.section === 'anglophone' ? 'Anglophone' : 'Tous'}
-                      </span>
-                      <span className="text-gray-300 dark:text-gray-600">•</span>
-                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 font-medium">
-                        {(s.cycles || []).map(c => {
-                          if (c === 'nursery') return 'Maternelle';
-                          if (c === 'primary') return 'Primaire';
-                          if (c === 'secondary') return 'Secondaire';
-                          return c;
-                        }).join(', ') || 'Tous'}
-                      </span>
-                    </div>
+                    {((s.section && s.section !== 'all' && s.section !== classSection) ||
+                      (s.cycles && s.cycles.length > 0 && !s.cycles.some(c => {
+                        const mapped = c === 'nursery' ? 'maternelle' : c === 'primary' ? 'primaire' : c === 'secondary' ? 'secondaire' : c;
+                        return mapped === classCycle;
+                      }))) && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400 font-medium">
+                          {s.section === 'francophone' ? 'Francophone' : s.section === 'anglophone' ? 'Anglophone' : 'Tous'}
+                        </span>
+                        <span className="text-gray-300 dark:text-gray-600">•</span>
+                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400 font-medium">
+                          {(s.cycles || []).map(c => {
+                            if (c === 'nursery') return 'Maternelle';
+                            if (c === 'primary') return 'Primaire';
+                            if (c === 'secondary') return 'Secondaire';
+                            return c;
+                          }).join(', ') || 'Tous'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => onSelect(s)}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1"
+                    className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shrink-0"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

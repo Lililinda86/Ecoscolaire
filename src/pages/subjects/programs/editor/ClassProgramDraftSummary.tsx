@@ -13,26 +13,20 @@ export const ClassProgramDraftSummary: React.FC<ClassProgramDraftSummaryProps> =
   const totalHours = activeSubjects.reduce((sum, s) => sum + (s.weeklyHours || 0), 0);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
-      <div className="flex flex-col justify-center">
-        <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">Nombre de matières</div>
-        <div>
-          <strong className="text-xl font-extrabold text-gray-900 dark:text-white block mt-1">{count}</strong>
-        </div>
+    <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900 bg-gradient-to-br from-blue-50/50 to-white dark:from-blue-950/20 dark:to-gray-900 shadow-sm flex flex-col justify-between">
+        <div className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Nombre matières</div>
+        <strong className="text-2xl font-extrabold text-gray-900 dark:text-white mt-2 block">{count}</strong>
       </div>
 
-      <div className="flex flex-col justify-center border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-800 pt-3 sm:pt-0 sm:pl-4">
-        <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">Total des coefficients</div>
-        <div>
-          <strong className="text-xl font-extrabold text-gray-900 dark:text-white block mt-1">{totalCoefficients}</strong>
-        </div>
+      <div className="p-4 rounded-xl border border-indigo-150 dark:border-indigo-900 bg-gradient-to-br from-indigo-50/50 to-white dark:from-indigo-950/20 dark:to-gray-900 shadow-sm flex flex-col justify-between">
+        <div className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">Total coefficients</div>
+        <strong className="text-2xl font-extrabold text-gray-900 dark:text-white mt-2 block">{totalCoefficients}</strong>
       </div>
 
-      <div className="flex flex-col justify-center border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-800 pt-3 sm:pt-0 sm:pl-4">
-        <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-1">Volume horaire hebdomadaire</div>
-        <div>
-          <strong className="text-xl font-extrabold text-gray-900 dark:text-white block mt-1">{totalHours} h</strong>
-        </div>
+      <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-950 bg-gradient-to-br from-emerald-50/50 to-white dark:from-emerald-950/20 dark:to-gray-900 shadow-sm flex flex-col justify-between">
+        <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">Volume hebdo</div>
+        <strong className="text-2xl font-extrabold text-gray-900 dark:text-white mt-2 block">{totalHours} h</strong>
       </div>
     </div>
   );
