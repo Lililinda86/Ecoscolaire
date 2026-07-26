@@ -520,7 +520,7 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v1__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
-        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true
+        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4
       });
     },
     () => publishClassProgramDraft(
@@ -552,7 +552,7 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v1__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
-        subjectNameSnapshot: 'Maths A', isRequired: true, displayOrder: 0, isActive: true
+        subjectNameSnapshot: 'Maths A', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4
       });
       docs['classSubjects/school-1__2026-2027__class-1__v1__subj-1'].id = 'school-1__2026-2027__class-1__v1__subj-1';
 
@@ -561,7 +561,7 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v1__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
-        subjectNameSnapshot: 'Maths B', isRequired: true, displayOrder: 1, isActive: true
+        subjectNameSnapshot: 'Maths B', isRequired: true, displayOrder: 1, isActive: true, coefficient: 2, weeklyHours: 4
       });
       docs['classSubjects/school-1__2026-2027__class-1__v1__subj-1-dup'].id = 'school-1__2026-2027__class-1__v1__subj-1';
     },
@@ -569,12 +569,12 @@ async function runTests() {
       const token = computeDraftStateToken([
         {
           id: 'school-1__2026-2027__class-1__v1__subj-1',
-          subjectId: 'subj-1', subjectNameSnapshot: 'Maths A', isRequired: true, displayOrder: 0, isActive: true,
+          subjectId: 'subj-1', subjectNameSnapshot: 'Maths A', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4,
           revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1
         },
         {
           id: 'school-1__2026-2027__class-1__v1__subj-1',
-          subjectId: 'subj-1', subjectNameSnapshot: 'Maths B', isRequired: true, displayOrder: 1, isActive: true,
+          subjectId: 'subj-1', subjectNameSnapshot: 'Maths B', isRequired: true, displayOrder: 1, isActive: true, coefficient: 2, weeklyHours: 4,
           revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1
         }
       ]);
@@ -648,16 +648,32 @@ async function runTests() {
       subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, coefficient: -4 }
     },
     {
+      name: 'coefficient zéro',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, coefficient: 0 }
+    },
+    {
       name: 'coefficient non numérique',
       subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, coefficient: 'four' }
+    },
+    {
+      name: 'coefficient null',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, coefficient: null }
     },
     {
       name: 'weeklyHours négatif',
       subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, weeklyHours: -3 }
     },
     {
+      name: 'weeklyHours zéro',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, weeklyHours: 0 }
+    },
+    {
       name: 'weeklyHours non numérique',
       subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, weeklyHours: 'three' }
+    },
+    {
+      name: 'weeklyHours null',
+      subj: { id: 'school-1__2026-2027__class-1__v1__subj-1', subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1, weeklyHours: null }
     }
   ];
 
@@ -734,14 +750,14 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v1__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
-        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true
+        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4
       };
       dbMock.collection('classSubjects').doc('school-1__2026-2027__class-1__v1__subj-1').setState(true, subject);
     },
     () => {
       const token = computeDraftStateToken([{
         id: 'school-1__2026-2027__class-1__v1__subj-1',
-        subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true,
+        subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4,
         revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1
       }]);
       return publishClassProgramDraft(
@@ -792,7 +808,7 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v1__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
-        subjectNameSnapshot: 'Maths v1', isRequired: true, displayOrder: 0, isActive: true
+        subjectNameSnapshot: 'Maths v1', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4
       });
 
       // v2 subjects to publish
@@ -800,13 +816,13 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v2__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v2', revisionNumber: 2,
-        subjectNameSnapshot: 'Maths v2', isRequired: true, displayOrder: 0, isActive: true
+        subjectNameSnapshot: 'Maths v2', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4
       });
     },
     () => {
       const token = computeDraftStateToken([{
         id: 'school-1__2026-2027__class-1__v2__subj-1',
-        subjectId: 'subj-1', subjectNameSnapshot: 'Maths v2', isRequired: true, displayOrder: 0, isActive: true,
+        subjectId: 'subj-1', subjectNameSnapshot: 'Maths v2', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4,
         revisionId: 'school-1__2026-2027__class-1__v2', revisionNumber: 2
       }]);
       return publishClassProgramDraft(
@@ -850,13 +866,13 @@ async function runTests() {
         id: 'school-1__2026-2027__class-1__v1__subj-1',
         programId: 'school-1__2026-2027__class-1', schoolId: 'school-1', classId: 'class-1', academicYearId: '2026-2027',
         subjectId: 'subj-1', revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1,
-        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true
+        subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4
       });
     },
     () => {
       const token = computeDraftStateToken([{
         id: 'school-1__2026-2027__class-1__v1__subj-1',
-        subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true,
+        subjectId: 'subj-1', subjectNameSnapshot: 'Maths', isRequired: true, displayOrder: 0, isActive: true, coefficient: 2, weeklyHours: 4,
         revisionId: 'school-1__2026-2027__class-1__v1', revisionNumber: 1
       }]);
       return publishClassProgramDraft(

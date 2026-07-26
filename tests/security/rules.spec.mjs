@@ -1603,6 +1603,32 @@ describe('Class Programs and Subjects Security Rules', () => {
       );
     });
 
+    it('creation with coefficient 0 is denied', async () => {
+      const context = testEnv.authenticatedContext('owner-1');
+      const docId = `rev-2__subj-1`;
+      await assertFails(
+        setDoc(doc(context.firestore(), 'classSubjects', docId), {
+          id: docId,
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          coefficient: 0,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        })
+      );
+    });
+
     it('creation with negative weeklyHours is denied', async () => {
       const context = testEnv.authenticatedContext('owner-1');
       const docId = `rev-2__subj-1`;
@@ -1621,6 +1647,32 @@ describe('Class Programs and Subjects Security Rules', () => {
           isActive: true,
           displayOrder: 1,
           weeklyHours: -1,
+          createdBy: 'owner-1',
+          updatedBy: 'owner-1',
+          createdAt: '2026-07-23T19:00:00Z',
+          updatedAt: '2026-07-23T19:00:00Z'
+        })
+      );
+    });
+
+    it('creation with weeklyHours 0 is denied', async () => {
+      const context = testEnv.authenticatedContext('owner-1');
+      const docId = `rev-2__subj-1`;
+      await assertFails(
+        setDoc(doc(context.firestore(), 'classSubjects', docId), {
+          id: docId,
+          programId: parentProgramId,
+          schoolId: SCHOOL_ID,
+          classId: 'class-1',
+          academicYearId: '2026-2027',
+          subjectId: 'subj-1',
+          revisionId: 'rev-2',
+          revisionNumber: 2,
+          subjectNameSnapshot: 'Maths',
+          isRequired: true,
+          isActive: true,
+          displayOrder: 1,
+          weeklyHours: 0,
           createdBy: 'owner-1',
           updatedBy: 'owner-1',
           createdAt: '2026-07-23T19:00:00Z',

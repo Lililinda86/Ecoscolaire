@@ -152,7 +152,10 @@ export function useClassProgramDraft({
     updateDirtyState(nextSubjects);
   };
 
-  const updateSubjectFields = (subjectId: string, fields: Partial<ClassSubject>) => {
+  const updateSubjectFields = (subjectId: string, fields: Partial<Omit<ClassSubject, 'coefficient' | 'weeklyHours'>> & {
+    coefficient?: number | null;
+    weeklyHours?: number | null;
+  }) => {
     if (!isManager) return;
     const nextSubjects = subjects.map(s => {
       if (s.subjectId === subjectId) {
@@ -163,7 +166,7 @@ export function useClassProgramDraft({
             delete updated.coefficient;
           } else {
             const val = typeof fields.coefficient === 'string' ? parseFloat(fields.coefficient) : fields.coefficient;
-            if (!isNaN(val) && isFinite(val) && val >= 0) {
+            if (!isNaN(val) && isFinite(val) && val > 0) {
               updated.coefficient = val;
             }
           }
@@ -174,7 +177,7 @@ export function useClassProgramDraft({
             delete updated.weeklyHours;
           } else {
             const val = typeof fields.weeklyHours === 'string' ? parseFloat(fields.weeklyHours) : fields.weeklyHours;
-            if (!isNaN(val) && isFinite(val) && val >= 0) {
+            if (!isNaN(val) && isFinite(val) && val > 0) {
               updated.weeklyHours = val;
             }
           }

@@ -3,9 +3,10 @@ import {
   runTransaction,
   deleteField,
   getDoc,
+  getFirestore,
   type DocumentReference
 } from 'firebase/firestore';
-import { db as firestoreDb } from '../db/firebase';
+import { getApp } from 'firebase/app';
 import type { ClassProgram, ClassSubject } from '../types';
 
 export type ClassProgramDraftErrorType =
@@ -19,7 +20,10 @@ export type ClassProgramDraftErrorType =
   | 'DRAFT_SUBJECT_NOT_FOUND'
   | 'DRAFT_SUBJECT_INVALID'
   | 'DRAFT_INTEGRITY_ERROR'
-  | 'DRAFT_SAVE_FAILED';
+  | 'DRAFT_SAVE_FAILED'
+  | 'DRAFT_VALIDATION_ERROR'
+  | 'DRAFT_PRECONDITION_FAILED'
+  | 'DRAFT_NETWORK_ERROR';
 
 export class ClassProgramDraftError extends Error {
   public code: ClassProgramDraftErrorType;
@@ -51,6 +55,7 @@ export async function createInitialClassProgram({
   classId,
   userId
 }: CreateInitialParams): Promise<ClassProgram> {
+  const firestoreDb = getFirestore(getApp());
   const programId = buildClassProgramId(schoolId, academicYearId, classId);
   const programRef = doc(firestoreDb, 'classPrograms', programId);
 
@@ -119,6 +124,7 @@ export async function saveClassProgramDraft({
   editedSubjects,
   userId
 }: SaveClassProgramDraftParams): Promise<void> {
+  const firestoreDb = getFirestore(getApp());
   const programRef = doc(firestoreDb, 'classPrograms', program.id);
 
   try {
@@ -173,96 +179,149 @@ export async function saveClassProgramDraft({
       for (const edited of editedSubjects) {
         const snap = originalSnaps[edited.id];
         const isNew = !originalSubjects.some(orig => orig.id === edited.id);
+        const original = originalSubjects.find(orig => orig.id === edited.id) || null;
 
-        if (isNew) {
-          if (snap) {
-            if (!snap.isActive) {
-              transaction.update(subjectRefs[edited.id], {
-                isActive: true,
-                updatedAt: now,
-                updatedBy: userId
-              });
-            } else {
-              throw new ClassProgramDraftError('DRAFT_CONFLICT', `La matière ${edited.subjectNameSnapshot} existe déjà dans le programme.`);
-            }
-          } else {
-            const newDoc: ClassSubject = {
-              id: edited.id,
-              programId: edited.programId,
-              schoolId: edited.schoolId,
-              classId: edited.classId,
-              academicYearId: edited.academicYearId,
-              subjectId: edited.subjectId,
-              revisionId: edited.revisionId,
-              revisionNumber: edited.revisionNumber,
-              subjectNameSnapshot: edited.subjectNameSnapshot,
-              isRequired: edited.isRequired,
-              isActive: edited.isActive,
-              displayOrder: edited.displayOrder,
-              createdAt: now,
-              createdBy: userId,
-              updatedAt: now,
-              updatedBy: userId
-            };
+        const mutation = buildClassSubjectMutation(edited, snap || null, original, isNew, userId, now, deleteField);
 
-            if (edited.subjectCodeSnapshot !== undefined) {
-              newDoc.subjectCodeSnapshot = edited.subjectCodeSnapshot;
-            }
-            if (edited.coefficient !== undefined) {
-              newDoc.coefficient = edited.coefficient;
-            }
-            if (edited.weeklyHours !== undefined) {
-              newDoc.weeklyHours = edited.weeklyHours;
-            }
-
-            transaction.set(subjectRefs[edited.id], newDoc);
-          }
-        } else {
-          const original = originalSubjects.find(orig => orig.id === edited.id)!;
-          const hasChanges =
-            original.coefficient !== edited.coefficient ||
-            original.weeklyHours !== edited.weeklyHours ||
-            original.isRequired !== edited.isRequired ||
-            original.displayOrder !== edited.displayOrder ||
-            original.isActive !== edited.isActive;
-
-          if (hasChanges && snap) {
-            const updates: Record<string, unknown> = {
-              isRequired: edited.isRequired,
-              displayOrder: edited.displayOrder,
-              isActive: edited.isActive,
-              updatedAt: now,
-              updatedBy: userId
-            };
-
-            // Field deletion handling
-            if (edited.coefficient === undefined) {
-              if (original.coefficient !== undefined) {
-                updates.coefficient = deleteField();
-              }
-            } else {
-              updates.coefficient = edited.coefficient;
-            }
-
-            if (edited.weeklyHours === undefined) {
-              if (original.weeklyHours !== undefined) {
-                updates.weeklyHours = deleteField();
-              }
-            } else {
-              updates.weeklyHours = edited.weeklyHours;
-            }
-
-            transaction.update(subjectRefs[edited.id], updates);
+        if (mutation) {
+          if (mutation.type === 'set') {
+            transaction.set(subjectRefs[edited.id], mutation.payload as unknown);
+          } else if (mutation.type === 'update') {
+            transaction.update(subjectRefs[edited.id], mutation.payload);
           }
         }
       }
     });
   } catch (err: unknown) {
     if (err instanceof ClassProgramDraftError) throw err;
-    const errObj = err as { code?: string; message?: string };
-    if (errObj?.code === 'permission-denied') {
-      throw new ClassProgramDraftError('DRAFT_PERMISSION_DENIED', 'Permissions insuffisantes pour enregistrer le brouillon.');
-    }
-    throw new ClassProgramDraftError('DRAFT_SAVE_FAILED', errObj?.message || 'Erreur lors de la sauvegarde du brouillon.');
+    throw mapClassProgramDraftError(err);
   }
+}
+
+export function buildClassSubjectMutation(
+  edited: ClassSubject,
+  snap: ClassSubject | null,
+  original: ClassSubject | null,
+  isNew: boolean,
+  userId: string,
+  now: string,
+  deleteSentinel: () => unknown
+): { type: 'set' | 'update'; payload: Record<string, unknown> } | null {
+  if (isNew) {
+    if (snap) {
+      if (!snap.isActive) {
+        const updates: Record<string, unknown> = {
+          isActive: true,
+          isRequired: edited.isRequired,
+          displayOrder: edited.displayOrder,
+          updatedAt: now,
+          updatedBy: userId
+        };
+
+        if (edited.coefficient === undefined) {
+          if (snap.coefficient !== undefined) updates.coefficient = deleteSentinel();
+        } else {
+          updates.coefficient = edited.coefficient;
+        }
+
+        if (edited.weeklyHours === undefined) {
+          if (snap.weeklyHours !== undefined) updates.weeklyHours = deleteSentinel();
+        } else {
+          updates.weeklyHours = edited.weeklyHours;
+        }
+
+        return { type: 'update', payload: updates };
+      } else {
+        throw new ClassProgramDraftError('DRAFT_CONFLICT', `La matière ${edited.subjectNameSnapshot} existe déjà dans le programme.`);
+      }
+    } else {
+      const newDoc: Record<string, unknown> = {
+        id: edited.id,
+        programId: edited.programId,
+        schoolId: edited.schoolId,
+        classId: edited.classId,
+        academicYearId: edited.academicYearId,
+        subjectId: edited.subjectId,
+        revisionId: edited.revisionId,
+        revisionNumber: edited.revisionNumber,
+        subjectNameSnapshot: edited.subjectNameSnapshot,
+        isRequired: edited.isRequired,
+        isActive: edited.isActive,
+        displayOrder: edited.displayOrder,
+        createdAt: now,
+        createdBy: userId,
+        updatedAt: now,
+        updatedBy: userId
+      };
+
+      if (edited.subjectCodeSnapshot !== undefined) {
+        newDoc.subjectCodeSnapshot = edited.subjectCodeSnapshot;
+      }
+      if (edited.coefficient !== undefined) {
+        newDoc.coefficient = edited.coefficient;
+      }
+      if (edited.weeklyHours !== undefined) {
+        newDoc.weeklyHours = edited.weeklyHours;
+      }
+
+      return { type: 'set', payload: newDoc };
+    }
+  } else {
+    if (!original || !snap) return null;
+    const hasChanges =
+      original.coefficient !== edited.coefficient ||
+      original.weeklyHours !== edited.weeklyHours ||
+      original.isRequired !== edited.isRequired ||
+      original.displayOrder !== edited.displayOrder ||
+      original.isActive !== edited.isActive;
+
+    if (hasChanges) {
+      const updates: Record<string, unknown> = {
+        isRequired: edited.isRequired,
+        displayOrder: edited.displayOrder,
+        isActive: edited.isActive,
+        updatedAt: now,
+        updatedBy: userId
+      };
+
+      if (edited.coefficient === undefined) {
+        if (original.coefficient !== undefined) {
+          updates.coefficient = deleteSentinel();
+        }
+      } else {
+        updates.coefficient = edited.coefficient;
+      }
+
+      if (edited.weeklyHours === undefined) {
+        if (original.weeklyHours !== undefined) {
+          updates.weeklyHours = deleteSentinel();
+        }
+      } else {
+        updates.weeklyHours = edited.weeklyHours;
+      }
+
+      return { type: 'update', payload: updates };
+    }
+    return null;
+  }
+}
+
+export function mapClassProgramDraftError(err: unknown): ClassProgramDraftError {
+  const errObj = err as { code?: string; message?: string };
+  if (errObj?.code === 'permission-denied') {
+    return new ClassProgramDraftError('DRAFT_PERMISSION_DENIED', 'Vous n’avez pas l’autorisation d’enregistrer ce programme.');
+  }
+  if (errObj?.code === 'invalid-argument') {
+    return new ClassProgramDraftError('DRAFT_VALIDATION_ERROR', errObj.message || 'Données invalides.');
+  }
+  if (errObj?.code === 'failed-precondition') {
+    return new ClassProgramDraftError('DRAFT_PRECONDITION_FAILED', errObj.message || 'Précondition non satisfaite.');
+  }
+  if (errObj?.code === 'aborted' || errObj?.code === 'conflict') {
+    return new ClassProgramDraftError('DRAFT_CONFLICT', 'Le brouillon a été modifié ailleurs. Rechargez la page.');
+  }
+  if (errObj?.code === 'unavailable') {
+    return new ClassProgramDraftError('DRAFT_NETWORK_ERROR', 'Impossible de joindre le service. Réessayez.');
+  }
+  return new ClassProgramDraftError('DRAFT_SAVE_FAILED', errObj?.message || 'Erreur lors de la sauvegarde du brouillon.');
 }

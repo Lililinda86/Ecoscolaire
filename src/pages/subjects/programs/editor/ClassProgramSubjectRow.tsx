@@ -5,7 +5,10 @@ interface ClassProgramSubjectRowProps {
   subject: ClassSubject;
   index: number;
   totalCount: number;
-  onUpdate: (fields: Partial<ClassSubject>) => void;
+  onUpdate: (fields: Partial<Omit<ClassSubject, 'coefficient' | 'weeklyHours'>> & {
+    coefficient?: number | null;
+    weeklyHours?: number | null;
+  }) => void;
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -56,12 +59,12 @@ export const ClassProgramSubjectRow: React.FC<ClassProgramSubjectRowProps> = ({
 
       {/* Subject Name and Code */}
       <td className="p-3">
-        <div className="flex flex-col">
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span className="text-sm font-semibold text-gray-900 dark:text-white">
             {subject.subjectNameSnapshot}
           </span>
           {subject.subjectCodeSnapshot && (
-            <span className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-0.5">
+            <span className="text-xs font-mono text-gray-500 dark:text-gray-400" style={{ marginTop: '0.125rem' }}>
               Code : {subject.subjectCodeSnapshot}
             </span>
           )}
@@ -72,15 +75,15 @@ export const ClassProgramSubjectRow: React.FC<ClassProgramSubjectRowProps> = ({
       <td className="p-3 w-32">
         <input
           type="number"
-          min="0"
-          step="any"
+          min="0.5"
+          step="0.5"
           value={subject.coefficient !== undefined && subject.coefficient !== null ? subject.coefficient : ''}
           onChange={(e) => {
             const val = e.target.value === '' ? null : parseFloat(e.target.value);
-            onUpdate({ coefficient: val === null ? undefined : val });
+            onUpdate({ coefficient: val });
           }}
           className="w-full px-2.5 py-1.5 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-transparent text-center font-semibold"
-          placeholder="Non défini"
+          placeholder="-"
         />
       </td>
 
@@ -88,15 +91,15 @@ export const ClassProgramSubjectRow: React.FC<ClassProgramSubjectRowProps> = ({
       <td className="p-3 w-32">
         <input
           type="number"
-          min="0"
-          step="any"
+          min="0.5"
+          step="0.5"
           value={subject.weeklyHours !== undefined && subject.weeklyHours !== null ? subject.weeklyHours : ''}
           onChange={(e) => {
             const val = e.target.value === '' ? null : parseFloat(e.target.value);
-            onUpdate({ weeklyHours: val === null ? undefined : val });
+            onUpdate({ weeklyHours: val });
           }}
           className="w-full px-2.5 py-1.5 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-transparent text-center font-semibold"
-          placeholder="Non défini"
+          placeholder="-"
         />
       </td>
 

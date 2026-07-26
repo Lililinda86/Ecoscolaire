@@ -566,8 +566,8 @@ service cloud.firestore {
                     && request.resource.data.isActive is bool
                     && request.resource.data.displayOrder is int
                     && request.resource.data.displayOrder >= 0
-                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient >= 0))
-                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours >= 0))
+                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient > 0))
+                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours > 0))
                     && request.resource.data.createdBy == request.auth.uid
                     && request.resource.data.updatedBy == request.auth.uid
                     && request.resource.data.createdAt is string
@@ -596,8 +596,8 @@ service cloud.firestore {
                     && request.resource.data.isActive is bool
                     && request.resource.data.displayOrder is int
                     && request.resource.data.displayOrder >= 0
-                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient >= 0))
-                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours >= 0))
+                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient > 0))
+                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours > 0))
                     && request.resource.data.updatedBy == request.auth.uid
                     && request.resource.data.updatedAt is string
                     && request.resource.data.keys().hasOnly([

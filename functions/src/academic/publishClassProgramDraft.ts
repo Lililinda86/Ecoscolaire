@@ -181,7 +181,14 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
           );
         }
 
-        if (d.coefficient !== undefined && d.coefficient !== null) {
+        if (d.isActive) {
+          if (d.coefficient === undefined || d.coefficient === null) {
+            throw new functions.https.HttpsError(
+              'failed-precondition',
+              'Le coefficient est obligatoire pour les matières actives.',
+              { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
+            );
+          }
           if (typeof d.coefficient !== 'number' || d.coefficient <= 0 || isNaN(d.coefficient)) {
             throw new functions.https.HttpsError(
               'failed-precondition',
@@ -189,15 +196,40 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
               { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
             );
           }
-        }
 
-        if (d.weeklyHours !== undefined && d.weeklyHours !== null) {
+          if (d.weeklyHours === undefined || d.weeklyHours === null) {
+            throw new functions.https.HttpsError(
+              'failed-precondition',
+              'Le volume horaire est obligatoire pour les matières actives.',
+              { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
+            );
+          }
           if (typeof d.weeklyHours !== 'number' || d.weeklyHours <= 0 || isNaN(d.weeklyHours)) {
             throw new functions.https.HttpsError(
               'failed-precondition',
               'Heures hebdomadaires invalides détectées.',
               { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
             );
+          }
+        } else {
+          // Si inactive, on s'assure juste que s'il y a une valeur, elle est valide
+          if (d.coefficient !== undefined && d.coefficient !== null) {
+            if (typeof d.coefficient !== 'number' || d.coefficient <= 0 || isNaN(d.coefficient)) {
+              throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Coefficient invalide détecté.',
+                { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
+              );
+            }
+          }
+          if (d.weeklyHours !== undefined && d.weeklyHours !== null) {
+            if (typeof d.weeklyHours !== 'number' || d.weeklyHours <= 0 || isNaN(d.weeklyHours)) {
+              throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Heures hebdomadaires invalides détectées.',
+                { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
+              );
+            }
           }
         }
 
