@@ -104,16 +104,55 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
       // 3. Read ClassProgram document
       const programRef = db.collection('classPrograms').doc(programId);
       const programSnap = await transaction.get(programRef);
+
+      // Case A: Program does not exist
       if (!programSnap.exists) {
-        throw new functions.https.HttpsError(
-          'not-found',
-          'Programme introuvable.',
-          { businessCode: 'PROGRAM_NOT_FOUND' }
-        );
+        const initialDraftRevisionNumber = 1;
+        const initialDraftRevisionId = `${programId}__v${initialDraftRevisionNumber}`;
+
+        // Orphan check / Collision check on revision & subjects
+        const targetSubjectsQuery = db.collection('classSubjects')
+          .where('programId', '==', programId)
+          .limit(1);
+        const targetSubjectsSnap = await transaction.get(targetSubjectsQuery);
+        if (!targetSubjectsSnap.empty) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Des matières orphelines existent déjà pour ce programme.',
+            { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
+          );
+        }
+
+        const newProgramPayload = {
+          id: programId,
+          schoolId: cleanSchoolId,
+          academicYearId: cleanAcademicYearId,
+          classId: cleanClassId,
+          status: 'draft',
+          draftRevisionId: initialDraftRevisionId,
+          draftRevisionNumber: initialDraftRevisionNumber,
+          hasUnpublishedChanges: true,
+          createdBy: uid,
+          createdAt: nowIso,
+          updatedBy: uid,
+          updatedAt: nowIso
+        };
+
+        transaction.create(programRef, newProgramPayload);
+
+        return {
+          programId,
+          draftRevisionId: initialDraftRevisionId,
+          draftRevisionNumber: initialDraftRevisionNumber,
+          created: true,
+          clonedSubjectCount: 0,
+          mode: 'initial'
+        };
       }
+
       const program = programSnap.data()!;
 
-      // 4. Invariants and idempotency checks
+      // Case B/D: Brouillon actif existant (avec ou sans version publiée)
       const hasValidDraft =
         program.hasUnpublishedChanges === true &&
         typeof program.draftRevisionId === 'string' &&
@@ -121,12 +160,15 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
         typeof program.draftRevisionNumber === 'number' &&
         program.draftRevisionNumber >= 1 &&
         program.draftRevisionId === `${programId}__v${program.draftRevisionNumber}` &&
-        typeof program.publishedRevisionId === 'string' &&
-        program.publishedRevisionId !== '' &&
-        typeof program.publishedRevisionNumber === 'number' &&
-        program.publishedRevisionNumber >= 1 &&
-        program.draftRevisionId !== program.publishedRevisionId &&
-        program.draftRevisionNumber > program.publishedRevisionNumber;
+        (program.publishedRevisionId === undefined || program.draftRevisionId !== program.publishedRevisionId);
+
+      if (program.hasUnpublishedChanges === true && !hasValidDraft) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Le programme présente un brouillon incohérent.',
+          { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
+        );
+      }
 
       if (hasValidDraft) {
         return {
@@ -134,29 +176,46 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           draftRevisionId: program.draftRevisionId,
           draftRevisionNumber: program.draftRevisionNumber,
           created: false,
-          clonedSubjectCount: 0
+          clonedSubjectCount: 0,
+          mode: 'existing-draft'
         };
       }
 
-      // If program has not been published yet
+      // If program has not been published yet but has no draft and is not published
       if (
-        !program.publishedRevisionId ||
+        (!program.publishedRevisionId ||
         typeof program.publishedRevisionId !== 'string' ||
-        program.publishedRevisionId.trim() === '' ||
-        typeof program.publishedRevisionNumber !== 'number' ||
-        program.publishedRevisionNumber < 1
+        program.publishedRevisionId.trim() === '') &&
+        program.status === 'draft'
       ) {
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          'Le programme n\'a pas encore de version publiée.',
-          { businessCode: 'PROGRAM_NOT_PUBLISHED' }
-        );
+        // If it's draft status with no active draft ID, let's create v1 draft revision.
+        const initialDraftRevisionNumber = 1;
+        const initialDraftRevisionId = `${programId}__v${initialDraftRevisionNumber}`;
+        transaction.update(programRef, {
+          draftRevisionId: initialDraftRevisionId,
+          draftRevisionNumber: initialDraftRevisionNumber,
+          hasUnpublishedChanges: true,
+          updatedAt: nowIso,
+          updatedBy: uid
+        });
+        return {
+          programId,
+          draftRevisionId: initialDraftRevisionId,
+          draftRevisionNumber: initialDraftRevisionNumber,
+          created: true,
+          clonedSubjectCount: 0,
+          mode: 'initial'
+        };
       }
 
       // Verify published but no draft state
       const isPublishedWithoutDraft =
         program.status === 'published' &&
         program.hasUnpublishedChanges === false &&
+        typeof program.publishedRevisionId === 'string' &&
+        program.publishedRevisionId !== '' &&
+        typeof program.publishedRevisionNumber === 'number' &&
+        program.publishedRevisionNumber >= 1 &&
         program.draftRevisionId === program.publishedRevisionId &&
         program.draftRevisionNumber === program.publishedRevisionNumber;
 
@@ -300,7 +359,8 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
         draftRevisionId: newDraftRevisionId,
         draftRevisionNumber: newDraftRevisionNumber,
         created: true,
-        clonedSubjectCount: publishedSubjects.length
+        clonedSubjectCount: publishedSubjects.length,
+        mode: 'cloned-from-published'
       };
     });
   } catch (error: unknown) {

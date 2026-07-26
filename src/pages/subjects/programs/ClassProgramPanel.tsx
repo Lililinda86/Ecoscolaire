@@ -62,7 +62,20 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
         onDirtyChange(false);
       }
     } catch (err: unknown) {
-      const errMessage = err instanceof Error ? err.message : 'Erreur lors de la création du brouillon.';
+      let errMessage = 'Le programme n’a pas pu être créé. Veuillez réessayer.';
+      const errObj = err as Record<string, unknown>;
+      const bCode = errObj?.details && typeof errObj.details === 'object' ? (errObj.details as Record<string, unknown>).businessCode : undefined;
+      const code = errObj?.code;
+
+      if (bCode === 'PROGRAM_INTEGRITY_ERROR') {
+        errMessage = 'Les données du programme sont incohérentes.';
+      } else if (bCode === 'CLASS_NOT_FOUND') {
+        errMessage = 'La classe sélectionnée est introuvable.';
+      } else if (code === 'permission-denied' || bCode === 'PERMISSION_DENIED') {
+        errMessage = 'Vous n’êtes pas autorisé à créer le programme de cette classe.';
+      } else if (err instanceof Error) {
+        errMessage = err.message;
+      }
       setDraftError(errMessage);
     } finally {
       setIsCreatingDraft(false);

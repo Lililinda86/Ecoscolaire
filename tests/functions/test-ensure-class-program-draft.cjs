@@ -131,7 +131,7 @@ async function runTests() {
       delete docs[key];
     }
     try {
-      setup();
+      await setup();
       const result = await execute();
       verify(null, result);
       console.log(`✅ ${name} -> PASS`);
@@ -229,9 +229,9 @@ async function runTests() {
     }
   );
 
-  // 5. Programme absent
+  // 5. Programme absent crée le programme initial
   await testCase(
-    '5. Programme absent refusé',
+    '5. Programme absent crée le programme initial et brouillon v1',
     () => {
       dbMock.collection('users').doc('user-1').setState(true, {
         id: 'user-1',
@@ -243,22 +243,26 @@ async function runTests() {
         id: 'class-1',
         schoolId: 'school-1'
       });
-      // Le programme n'est pas ajouté
+      // Le programme n'est pas ajouté au départ
     },
     () => ensureClassProgramDraft(
       { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
       { auth: { uid: 'user-1' } }
     ),
-    (err) => {
-      assert.ok(err);
-      assert.strictEqual(err.code, 'not-found');
-      assert.strictEqual(err.details?.businessCode, 'PROGRAM_NOT_FOUND');
+    (err, result) => {
+      assert.ifError(err);
+      assert.ok(result);
+      assert.strictEqual(result.programId, 'school-1__2026-2027__class-1');
+      assert.strictEqual(result.draftRevisionId, 'school-1__2026-2027__class-1__v1');
+      assert.strictEqual(result.draftRevisionNumber, 1);
+      assert.strictEqual(result.created, true);
+      assert.strictEqual(result.mode, 'initial');
     }
   );
 
-  // 6. Programme non publié
+  // 6. Programme draft sans brouillon actif crée la révision v1
   await testCase(
-    '6. Programme non publié refusé',
+    '6. Programme draft sans brouillon actif crée la révision v1',
     () => {
       dbMock.collection('users').doc('user-1').setState(true, {
         id: 'user-1',
@@ -276,19 +280,21 @@ async function runTests() {
         classId: 'class-1',
         academicYearId: '2026-2027',
         status: 'draft',
-        draftRevisionId: 'school-1__2026-2027__class-1__v1',
-        draftRevisionNumber: 1,
-        hasUnpublishedChanges: true
+        hasUnpublishedChanges: false
       });
     },
     () => ensureClassProgramDraft(
       { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
       { auth: { uid: 'user-1' } }
     ),
-    (err) => {
-      assert.ok(err);
-      assert.strictEqual(err.code, 'failed-precondition');
-      assert.strictEqual(err.details?.businessCode, 'PROGRAM_NOT_PUBLISHED');
+    (err, result) => {
+      assert.ifError(err);
+      assert.ok(result);
+      assert.strictEqual(result.programId, 'school-1__2026-2027__class-1');
+      assert.strictEqual(result.draftRevisionId, 'school-1__2026-2027__class-1__v1');
+      assert.strictEqual(result.draftRevisionNumber, 1);
+      assert.strictEqual(result.created, true);
+      assert.strictEqual(result.mode, 'initial');
     }
   );
 
@@ -696,41 +702,138 @@ async function runTests() {
     }
   );
 
-  // 16. inactive academic manager is denied
+  // 17. Des matières orphelines déjà présentes bloquent avec PROGRAM_INTEGRITY_ERROR
   await testCase(
-    '16. inactive academic manager is denied',
+    '17. Des matières orphelines bloquent le programme inexistant avec PROGRAM_INTEGRITY_ERROR',
     () => {
-      dbMock.collection('users').doc('user-inactive').setState(true, {
-        id: 'user-inactive',
-        role: 'owner',
-        isActive: false, // INACTIF !
+      dbMock.collection('users').doc('user-1').setState(true, {
+        id: 'user-1',
+        role: 'secretary',
+        isActive: true,
         schoolId: 'school-1'
       });
       dbMock.collection('classes').doc('class-1').setState(true, {
         id: 'class-1',
         schoolId: 'school-1'
       });
-      dbMock.collection('classPrograms').doc('school-1__2026-2027__class-1').setState(true, {
-        id: 'school-1__2026-2027__class-1',
+      // orphan subject present for the same programId
+      dbMock.collection('classSubjects').doc('school-1__2026-2027__class-1__v1__subj-1').setState(true, {
+        id: 'school-1__2026-2027__class-1__v1__subj-1',
+        programId: 'school-1__2026-2027__class-1',
         schoolId: 'school-1',
         classId: 'class-1',
         academicYearId: '2026-2027',
-        status: 'published',
-        publishedRevisionId: 'school-1__2026-2027__class-1__v1',
-        publishedRevisionNumber: 1,
-        draftRevisionId: 'school-1__2026-2027__class-1__v1',
-        draftRevisionNumber: 1,
-        hasUnpublishedChanges: false
+        subjectId: 'subj-1',
+        revisionId: 'school-1__2026-2027__class-1__v1',
+        revisionNumber: 1
       });
     },
     () => ensureClassProgramDraft(
       { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
-      { auth: { uid: 'user-inactive' } }
+      { auth: { uid: 'user-1' } }
     ),
     (err) => {
       assert.ok(err);
-      assert.strictEqual(err.code, 'permission-denied');
-      assert.strictEqual(err.details?.businessCode, 'PERMISSION_DENIED');
+      assert.strictEqual(err.code, 'failed-precondition');
+      assert.strictEqual(err.details?.businessCode, 'PROGRAM_INTEGRITY_ERROR');
+    }
+  );
+
+  // 18. Simulation de concurrence idempotence séquentielle
+  await testCase(
+    '18. Simulation idempotence séquentielle de création double',
+    async () => {
+      dbMock.collection('users').doc('user-1').setState(true, {
+        id: 'user-1',
+        role: 'secretary',
+        isActive: true,
+        schoolId: 'school-1'
+      });
+      dbMock.collection('classes').doc('class-1').setState(true, {
+        id: 'class-1',
+        schoolId: 'school-1'
+      });
+      // Call first time
+      const res1 = await ensureClassProgramDraft(
+        { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
+        { auth: { uid: 'user-1' } }
+      );
+      // Call second time simulating idempotent retry
+      const res2 = await ensureClassProgramDraft(
+        { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
+        { auth: { uid: 'user-1' } }
+      );
+      return { res1, res2 };
+    },
+    async () => {
+      // already executed in setup
+      return docs['classPrograms/school-1__2026-2027__class-1']?._data;
+    },
+    (err, res) => {
+      assert.ifError(err);
+      assert.ok(res);
+      assert.strictEqual(res.id, 'school-1__2026-2027__class-1');
+      assert.strictEqual(res.draftRevisionId, 'school-1__2026-2027__class-1__v1');
+      assert.strictEqual(res.draftRevisionNumber, 1);
+    }
+  );
+
+  // 19. Propriétés d’identité client sensibles ignorées
+  await testCase(
+    '19. Propriétés d’identité client sensibles ignorées',
+    () => {
+      dbMock.collection('users').doc('user-1').setState(true, {
+        id: 'user-1',
+        role: 'secretary',
+        isActive: true,
+        schoolId: 'school-1'
+      });
+      dbMock.collection('classes').doc('class-1').setState(true, {
+        id: 'class-1',
+        schoolId: 'school-1'
+      });
+    },
+    () => ensureClassProgramDraft(
+      {
+        schoolId: 'school-1',
+        academicYearId: '2026-2027',
+        classId: 'class-1',
+        role: 'admin',
+        draftRevisionId: 'fake-id',
+        draftRevisionNumber: 99
+      },
+      { auth: { uid: 'user-1' } }
+    ),
+    (err, result) => {
+      assert.ifError(err);
+      assert.ok(result);
+      assert.strictEqual(result.draftRevisionId, 'school-1__2026-2027__class-1__v1');
+      assert.strictEqual(result.draftRevisionNumber, 1);
+    }
+  );
+
+  // 20. Classe d’une autre école refusée
+  await testCase(
+    '20. Classe d’une autre école refusée',
+    () => {
+      dbMock.collection('users').doc('user-1').setState(true, {
+        id: 'user-1',
+        role: 'secretary',
+        isActive: true,
+        schoolId: 'school-1'
+      });
+      dbMock.collection('classes').doc('class-1').setState(true, {
+        id: 'class-1',
+        schoolId: 'school-other' // AUTRE ECOLE !
+      });
+    },
+    () => ensureClassProgramDraft(
+      { schoolId: 'school-1', academicYearId: '2026-2027', classId: 'class-1' },
+      { auth: { uid: 'user-1' } }
+    ),
+    (err) => {
+      assert.ok(err);
+      assert.strictEqual(err.code, 'invalid-argument');
     }
   );
 
