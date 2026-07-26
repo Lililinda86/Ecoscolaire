@@ -123,6 +123,18 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           );
         }
 
+        const targetRevisionQuery = db.collection('classSubjects')
+          .where('revisionId', '==', initialDraftRevisionId)
+          .limit(1);
+        const targetRevisionSnap = await transaction.get(targetRevisionQuery);
+        if (!targetRevisionSnap.empty) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Des matières orphelines existent déjà pour la révision de départ.',
+            { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
+          );
+        }
+
         const newProgramPayload = {
           id: programId,
           schoolId: cleanSchoolId,

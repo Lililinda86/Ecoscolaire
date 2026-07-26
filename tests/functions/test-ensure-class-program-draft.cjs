@@ -55,6 +55,9 @@ const dbMock = {
           filters.push({ field: f, op: o, val: v });
           return this;
         },
+        limit: function(num) {
+          return this;
+        },
         mockGet: async () => {
           const matches = [];
           for (const key in docs) {

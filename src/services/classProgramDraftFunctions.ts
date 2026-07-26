@@ -13,6 +13,7 @@ export interface EnsureClassProgramDraftResult {
   draftRevisionNumber: number;
   created: boolean;
   clonedSubjectCount: number;
+  mode?: 'initial' | 'existing-draft' | 'cloned-from-published';
 }
 
 export type EnsureDraftErrorType =

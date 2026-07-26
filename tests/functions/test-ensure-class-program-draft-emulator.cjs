@@ -159,6 +159,37 @@ async function runEmulatorTests() {
   assert.strictEqual(finalCheckSnap.exists, true);
   assert.strictEqual(finalCheckSnap.data().draftRevisionNumber, 1);
 
+  // 8. Corrupted orphan checks (mismatching programId but matching revisionId)
+  console.log('Appel 4: Détection de matières orphelines corrompues...');
+  await db.collection('classPrograms').doc(programId).delete();
+  
+  // Set an orphan subject with matching target initial revisionId but different programId
+  const orphanId = `${programId}__v1__subj-fraud`;
+  await db.collection('classSubjects').doc(orphanId).set({
+    id: orphanId,
+    revisionId: `${programId}__v1`,
+    programId: 'mismatching-program-id',
+    schoolId: schoolId,
+    classId: classId,
+    academicYearId: academicYearId,
+    subjectId: 'subj-fraud'
+  });
+
+  try {
+    await ensureClassProgramDraft.run(
+      { schoolId, academicYearId, classId },
+      mockContext
+    );
+    assert.fail('La création initiale aurait dû échouer en raison des matières orphelines.');
+  } catch (err) {
+    assert.ok(err);
+    assert.strictEqual(err.code, 'failed-precondition');
+    assert.strictEqual(err.details?.businessCode, 'PROGRAM_INTEGRITY_ERROR');
+  }
+
+  // Cleanup the fraud orphan document
+  await db.collection('classSubjects').doc(orphanId).delete();
+
   console.log('✅ TOUS LES TESTS DE L\'ÉMULATEUR FIRESTORE RÉEL SONT PASSÉS !');
 }
 

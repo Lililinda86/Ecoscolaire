@@ -63,10 +63,18 @@ exports.ensureClassProgramDraft = functions.https.onCall(async (data, context) =
                 const initialDraftRevisionId = `${programId}__v${initialDraftRevisionNumber}`;
                 // Orphan check / Collision check on revision & subjects
                 const targetSubjectsQuery = db.collection('classSubjects')
-                    .where('programId', '==', programId);
+                    .where('programId', '==', programId)
+                    .limit(1);
                 const targetSubjectsSnap = await transaction.get(targetSubjectsQuery);
                 if (!targetSubjectsSnap.empty) {
                     throw new functions.https.HttpsError('failed-precondition', 'Des matières orphelines existent déjà pour ce programme.', { businessCode: 'PROGRAM_INTEGRITY_ERROR' });
+                }
+                const targetRevisionQuery = db.collection('classSubjects')
+                    .where('revisionId', '==', initialDraftRevisionId)
+                    .limit(1);
+                const targetRevisionSnap = await transaction.get(targetRevisionQuery);
+                if (!targetRevisionSnap.empty) {
+                    throw new functions.https.HttpsError('failed-precondition', 'Des matières orphelines existent déjà pour la révision de départ.', { businessCode: 'PROGRAM_INTEGRITY_ERROR' });
                 }
                 const newProgramPayload = {
                     id: programId,
