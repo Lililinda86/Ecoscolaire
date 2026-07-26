@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { ClassProgram, ClassSubject, Subject } from '../../../../types';
 import { useClassProgramDraft } from '../../../../hooks/useClassProgramDraft';
+import type { ClassProgram, ClassSubject, Subject, ClassSection } from '../../../../types';
 import { ClassProgramDraftToolbar } from './ClassProgramDraftToolbar';
 import { ClassProgramDraftSummary } from './ClassProgramDraftSummary';
 import { ClassProgramSubjectRow } from './ClassProgramSubjectRow';
@@ -15,6 +15,7 @@ interface ClassProgramEditorProps {
   schoolId: string;
   academicYearId: string;
   classId: string;
+  selectedClass?: ClassSection | null;
   userId: string;
   userRole: string;
   catalogSubjects: Subject[];
@@ -29,6 +30,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   schoolId,
   academicYearId,
   classId,
+  selectedClass,
   userId,
   userRole,
   catalogSubjects,
@@ -244,10 +246,12 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
       {/* 5. Subject Picker overlay */}
       {isPickerOpen && (
         <ClassProgramSubjectPicker
+          key={classId}
           catalogSubjects={catalogSubjects}
           activeSubjects={subjects}
           schoolId={schoolId}
           classId={classId}
+          selectedClass={selectedClass}
           onSelect={(s) => {
             addSubject(s);
             setIsPickerOpen(false);

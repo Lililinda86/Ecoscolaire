@@ -1,53 +1,29 @@
 import React, { useState, useMemo } from 'react';
-import type { Subject, ClassSubject } from '../../../../types';
+import type { Subject, ClassSubject, ClassSection } from '../../../../types';
+import { normalizeClassSection, normalizeClassCycle } from '../../../../utils/classClassification';
+import type { NormalizedSection, NormalizedCycle } from '../../../../utils/classClassification';
 
 interface ClassProgramSubjectPickerProps {
   catalogSubjects: Subject[];
   activeSubjects: ClassSubject[];
   schoolId: string;
   classId: string;
+  selectedClass?: ClassSection | null;
   onSelect: (subject: Subject) => void;
   onClose: () => void;
 }
 
-export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps> = ({
-  catalogSubjects,
-  activeSubjects,
-  schoolId,
-  classId,
-  onSelect,
-  onClose
-}) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isFiltered, setIsFiltered] = useState(true);
-
-  // Determine section and cycle from classId (e.g. SIL, CP, Nursery, CE1, etc.)
-  const classIdLower = (classId || '').toLowerCase();
-  
-  // Section: 'francophone' or 'anglophone' (SIL/CP/CE1/CE2/CM1/CM2 are Francophone, class 1-6 are Anglophone)
-  const classSection = useMemo(() => {
-    if (classIdLower.includes('anglophone') || classIdLower.includes('class_') || classIdLower.includes('nursery_')) {
-      return 'anglophone';
-    }
-    return 'francophone'; // default standard Primary/Maternelle sections in francophone Cam
-  }, [classIdLower]);
-
-  // Cycle: 'maternelle' | 'primaire' | 'secondaire'
-  const classCycle = useMemo(() => {
-    if (classIdLower.includes('maternelle') || classIdLower.includes('nursery')) {
-      return 'nursery';
-    }
-    if (classIdLower.includes('secondaire') || classIdLower.includes('seconde') || classIdLower.includes('terminale')) {
-      return 'secondary';
-    }
-    return 'primary';
-  }, [classIdLower]);
-
-  // Filter catalog subjects:
-  // 1. Must belong to the active school (or be a legacy/global subject without schoolId)
-  // 2. Must be active (isActive !== false)
-  // 3. Must not already be active in the class program
-  const availableSubjects = catalogSubjects.filter(s => {
+export function filterAvailableSubjectsForClass(params: {
+  catalogSubjects: Subject[];
+  activeSubjects: ClassSubject[];
+  schoolId: string;
+  classSection: NormalizedSection;
+  classCycle: NormalizedCycle;
+  isFiltered: boolean;
+  searchTerm: string;
+}): Subject[] {
+  const { catalogSubjects, activeSubjects, schoolId, classSection, classCycle, isFiltered, searchTerm } = params;
+  return catalogSubjects.filter(s => {
     const isSchoolMatch = s.schoolId === schoolId || !s.schoolId;
     const isActive = s.isActive !== false;
     const isAlreadyAdded = activeSubjects.some(as => as.subjectId === s.id && as.isActive);
@@ -56,13 +32,24 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
     // Apply smart filter by section and cycle
     if (isFiltered) {
-      // s.section can be 'francophone', 'anglophone', or 'all'
-      const matchesSection = !s.section || s.section === 'all' || s.section === classSection;
+      // Legacy rule: if subject has no section or cycles metadata, keep it visible by default
+      const hasSectionMeta = !!s.section && s.section !== 'all';
+      const hasCycleMeta = !!s.cycles && s.cycles.length > 0;
       
-      // s.cycles is an array: ('nursery' | 'primary' | 'secondary')[]
-      const matchesCycle = !s.cycles || s.cycles.length === 0 || s.cycles.includes(classCycle);
+      if (hasSectionMeta || hasCycleMeta) {
+        const matchesSection = !s.section || s.section === 'all' || s.section === classSection;
+        
+        // s.cycles can be nursery/primary/secondary. Class cycles are maternelle/primaire/secondaire. Map them.
+        const mappedCycles = (s.cycles || []).map(c => {
+          if (c === 'nursery') return 'maternelle';
+          if (c === 'primary') return 'primaire';
+          if (c === 'secondary') return 'secondaire';
+          return c;
+        });
+        const matchesCycle = !s.cycles || s.cycles.length === 0 || (classCycle !== 'unknown' && mappedCycles.includes(classCycle));
 
-      if (!matchesSection || !matchesCycle) return false;
+        if (!matchesSection || !matchesCycle) return false;
+      }
     }
 
     if (!searchTerm) return true;
@@ -72,6 +59,57 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
       (s.code || '').toLowerCase().includes(term)
     );
   });
+}
+
+export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps> = ({
+  catalogSubjects,
+  activeSubjects,
+  schoolId,
+  classId,
+  selectedClass,
+  onSelect,
+  onClose
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isFiltered, setIsFiltered] = useState(true);
+
+  // Extract class details using classClassification helpers
+  const classSection = useMemo(() => {
+    if (selectedClass) {
+      return normalizeClassSection(selectedClass);
+    }
+    const classIdLower = (classId || '').toLowerCase();
+    if (classIdLower.includes('anglophone') || classIdLower.includes('class_') || classIdLower.includes('nursery_')) {
+      return 'anglophone';
+    }
+    return 'francophone';
+  }, [selectedClass, classId]);
+
+  const classCycle = useMemo(() => {
+    if (selectedClass) {
+      return normalizeClassCycle(selectedClass);
+    }
+    const classIdLower = (classId || '').toLowerCase();
+    if (classIdLower.includes('maternelle') || classIdLower.includes('nursery')) {
+      return 'maternelle';
+    }
+    if (classIdLower.includes('secondaire') || classIdLower.includes('seconde') || classIdLower.includes('terminale')) {
+      return 'secondaire';
+    }
+    return 'primaire';
+  }, [selectedClass, classId]);
+
+  const availableSubjects = useMemo(() => {
+    return filterAvailableSubjectsForClass({
+      catalogSubjects,
+      activeSubjects,
+      schoolId,
+      classSection,
+      classCycle,
+      isFiltered,
+      searchTerm
+    });
+  }, [catalogSubjects, activeSubjects, schoolId, classSection, classCycle, isFiltered, searchTerm]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -82,7 +120,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
               Ajouter des matières au programme
             </h3>
             <span className="text-[10px] text-gray-500 mt-0.5">
-              Classe : <span className="font-semibold text-gray-700 dark:text-gray-300">{classIdLower.split('__').pop()?.toUpperCase()}</span> ({classSection.toUpperCase()} • {classCycle.toUpperCase()})
+              Classe : <span className="font-semibold text-gray-700 dark:text-gray-300">{(selectedClass?.name || classId.split('__').pop() || '').toUpperCase()}</span> ({classSection.toUpperCase()} • {classCycle.toUpperCase()})
             </span>
           </div>
           <button

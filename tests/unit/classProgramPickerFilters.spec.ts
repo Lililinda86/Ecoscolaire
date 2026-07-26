@@ -1,45 +1,14 @@
 import { test, expect } from '@playwright/test';
 import type { Subject, ClassSubject } from '../../src/types';
 
-// Pure production logic representation for test verification
-function filterAvailableSubjectsForClass(params: {
-  catalogSubjects: Subject[];
-  activeSubjects: ClassSubject[];
-  schoolId: string;
-  classSection: 'francophone' | 'anglophone';
-  classCycle: 'nursery' | 'primary' | 'secondary';
-  isFiltered: boolean;
-  searchTerm: string;
-}): Subject[] {
-  const { catalogSubjects, activeSubjects, schoolId, classSection, classCycle, isFiltered, searchTerm } = params;
-  return catalogSubjects.filter(s => {
-    const isSchoolMatch = s.schoolId === schoolId || !s.schoolId;
-    const isActive = s.isActive !== false;
-    const isAlreadyAdded = activeSubjects.some(as => as.subjectId === s.id && as.isActive);
-
-    if (!isSchoolMatch || !isActive || isAlreadyAdded) return false;
-
-    if (isFiltered) {
-      const matchesSection = !s.section || s.section === 'all' || s.section === classSection;
-      const matchesCycle = !s.cycles || s.cycles.length === 0 || s.cycles.includes(classCycle);
-      if (!matchesSection || !matchesCycle) return false;
-    }
-
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      (s.name || '').toLowerCase().includes(term) ||
-      (s.code || '').toLowerCase().includes(term)
-    );
-  });
-}
+import { filterAvailableSubjectsForClass } from '../../src/pages/subjects/programs/editor/ClassProgramSubjectPicker';
 
 test.describe('ClassProgramSubjectPicker Recommendation Filter Logic tests', () => {
   const schoolId = 'emu-school';
   const francophoneClassSection = 'francophone';
   const anglophoneClassSection = 'anglophone';
-  const primaryCycle = 'primary';
-  const nurseryCycle = 'nursery';
+  const primaryCycle = 'primaire';
+  const nurseryCycle = 'maternelle';
 
   const mathFrancophone: Subject = {
     id: 'math-fr',
@@ -287,5 +256,24 @@ test.describe('ClassProgramSubjectPicker Recommendation Filter Logic tests', () 
       searchTerm: ''
     });
     expect(res.some(s => s.id === 'legacy-sub')).toBe(true);
+  });
+
+  test('15. matière legacy non classifiable (explicitement exclue si section/cycle précisé ailleurs)', () => {
+    const explicitLegacySubject: Subject = {
+      id: 'exp-legacy',
+      name: 'Explicit Legacy',
+      section: 'anglophone',
+      isActive: true
+    };
+    const res = filterAvailableSubjectsForClass({
+      catalogSubjects: [explicitLegacySubject],
+      activeSubjects: [],
+      schoolId,
+      classSection: francophoneClassSection,
+      classCycle: primaryCycle,
+      isFiltered: true,
+      searchTerm: ''
+    });
+    expect(res.some(s => s.id === 'exp-legacy')).toBe(false);
   });
 });
