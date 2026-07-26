@@ -8,6 +8,7 @@ import { ClassProgramSubjectPicker } from './ClassProgramSubjectPicker';
 import { ClassProgramEditorState } from './ClassProgramEditorState';
 import { publishClassProgramDraft } from '../../../../services/classProgramPublishFunctions';
 import Modal from '../../../../components/Modal';
+import './ClassProgramEditor.css';
 
 interface ClassProgramEditorProps {
   initialProgram: ClassProgram | null;
@@ -169,7 +170,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   }
 
   return (
-    <section className="w-full min-w-0 flex flex-col gap-4">
+    <section className="class-program-editor-wrapper">
       {/* 1. Header Toolbar */}
       <ClassProgramDraftToolbar
         isDirty={isDirty}

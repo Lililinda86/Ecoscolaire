@@ -64,14 +64,14 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
   }, [catalogSubjects, activeSubjects, schoolId, classSection, classCycle, isFiltered, searchTerm]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+    <div className="class-program-picker-overlay">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="subject-picker-title"
-        className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col max-h-[85vh]"
+        className="class-program-picker-dialog"
       >
-        <header className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center shrink-0">
+        <header className="class-program-picker-header">
           <div className="flex flex-col">
             <h3 id="subject-picker-title" className="text-base font-bold text-gray-950 dark:text-white">
               Ajouter des matières au programme
@@ -85,15 +85,13 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             onClick={onClose}
             aria-label="Fermer la liste des matières"
             title="Fermer la liste des matières"
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg transition"
+            className="class-program-picker-close"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            ×
           </button>
         </header>
 
-        <div className="p-4 bg-gray-50 dark:bg-gray-850/50 flex flex-col gap-3 shrink-0">
+        <div className="class-program-picker-controls">
           <input
             type="text"
             placeholder="Rechercher une matière par son nom ou son code..."
@@ -102,25 +100,27 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
           />
 
-          <label className="flex flex-col cursor-pointer gap-1 select-none self-start">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={!isFiltered}
-                onChange={(e) => setIsFiltered(!e.target.checked)}
-                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:ring-2"
-              />
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-350">
+          <div className="class-program-picker-options">
+            <input
+              type="checkbox"
+              id="show-other-subjects-checkbox"
+              checked={!isFiltered}
+              onChange={(e) => setIsFiltered(!e.target.checked)}
+            />
+
+            <div className="class-program-picker-option-text">
+              <label htmlFor="show-other-subjects-checkbox">
                 Afficher aussi les matières des autres sections et cycles
-              </span>
+              </label>
+
+              <p id="show-other-subjects-help">
+                Utilisez cette option uniquement pour ajouter une matière exceptionnelle.
+              </p>
             </div>
-            <span className="text-[10px] text-gray-500 dark:text-gray-400 pl-6">
-              Utilisez cette option uniquement pour ajouter une matière exceptionnelle.
-            </span>
-          </label>
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="class-program-picker-list">
           {availableSubjects.length === 0 ? (
             <div className="text-center py-8 px-4 text-gray-500 dark:text-gray-400">
               {searchTerm ? (
@@ -133,7 +133,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                     onClick={() => setIsFiltered(false)}
                     className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-semibold"
                   >
-                    Afficher aussi les matières des autres sections et cycles
+                     Afficher aussi les matières des autres sections et cycles
                   </button>
                 </>
               ) : (
@@ -141,18 +141,18 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
               )}
             </div>
           ) : (
-            <div className="divide-y divide-gray-150 dark:divide-gray-800/60">
+            <div>
               {availableSubjects.map((s) => (
                 <div
                   key={s.id}
-                  className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 rounded-lg transition"
+                  className="class-program-picker-item"
                 >
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                  <div className="class-program-picker-item-content">
+                    <span className="class-program-picker-item-name">
                       {s.name}
                     </span>
                     {s.code && (
-                      <div className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-0.5">
+                      <div className="class-program-picker-item-code">
                         Code : {s.code}
                       </div>
                     )}
@@ -179,7 +179,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                   </div>
                   <button
                     onClick={() => onSelect(s)}
-                    className="h-7 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shrink-0"
+                    className="class-program-picker-add class-program-btn-add"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
