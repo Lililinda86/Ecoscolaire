@@ -10,6 +10,7 @@ import { ClassProgramTable } from './ClassProgramTable';
 import { ClassProgramEmptyState } from './ClassProgramEmptyState';
 import { ClassProgramEditor } from './editor/ClassProgramEditor';
 import { ensureClassProgramDraft } from '../../../services/classProgramDraftFunctions';
+import { determineProgramAction } from '../../../services/classProgramActions';
 import type { TechnicalSpecialty } from '../../../types';
 
 export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) => void }> = ({ onDirtyChange }) => {
@@ -389,51 +390,66 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
                 </div>
               )}
 
-              {isManager && source !== 'legacy' && (
-                hasPublishedVersion && !hasDraftVersion ? (
-                  <button
-                    type="button"
-                    onClick={handleCreateDraft}
-                    disabled={isCreatingDraft}
-                    style={{
-                      border: 'none',
-                      backgroundColor: 'var(--primary-color)',
-                      color: 'white',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      cursor: isCreatingDraft ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
-                      transition: 'all 0.15s ease',
-                      opacity: isCreatingDraft ? 0.7 : 1
-                    }}
-                  >
-                    {isCreatingDraft ? 'Création...' : 'Créer un brouillon de modification'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleCreateDraft}
-                    disabled={isCreatingDraft}
-                    style={{
-                      border: 'none',
-                      backgroundColor: 'var(--primary-color)',
-                      color: 'white',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      cursor: isCreatingDraft ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
-                      transition: 'all 0.15s ease',
-                      opacity: isCreatingDraft ? 0.7 : 1
-                    }}
-                  >
-                    {isCreatingDraft ? 'Ouverture...' : 'Modifier le brouillon'}
-                  </button>
-                )
-              )}
+              {(() => {
+                const action = determineProgramAction({
+                  status,
+                  source,
+                  program,
+                  isManager
+                });
+
+                if (action === 'create-modification-draft') {
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleCreateDraft}
+                      disabled={isCreatingDraft}
+                      style={{
+                        border: 'none',
+                        backgroundColor: 'var(--primary-color)',
+                        color: 'white',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: isCreatingDraft ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
+                        transition: 'all 0.15s ease',
+                        opacity: isCreatingDraft ? 0.7 : 1
+                      }}
+                    >
+                      {isCreatingDraft ? 'Création...' : 'Créer un brouillon de modification'}
+                    </button>
+                  );
+                }
+
+                if (action === 'edit-draft') {
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleCreateDraft}
+                      disabled={isCreatingDraft}
+                      style={{
+                        border: 'none',
+                        backgroundColor: 'var(--primary-color)',
+                        color: 'white',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: isCreatingDraft ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 4px rgba(79, 70, 229, 0.15)',
+                        transition: 'all 0.15s ease',
+                        opacity: isCreatingDraft ? 0.7 : 1
+                      }}
+                    >
+                      {isCreatingDraft ? 'Ouverture...' : 'Modifier le brouillon'}
+                    </button>
+                  );
+                }
+
+                return null;
+              })()}
             </div>
           </div>
 
@@ -445,7 +461,12 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
                   type={isReadOnlyRole ? 'no-program-read-only' : 'no-program'}
                 />
               </div>
-              {isManager && (
+              {determineProgramAction({
+                status,
+                source,
+                program,
+                isManager
+              }) === 'create-program' && (
                 <button
                   type="button"
                   onClick={handleCreateDraft}

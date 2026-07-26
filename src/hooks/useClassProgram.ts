@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ClassProgram, ClassSubject, ClassSection, GlobalRole, Subject } from '../types';
 import {
   getClassProgramByIdentity,
-  getClassSubjectsByRevision,
-  ClassProgramServiceError
+  getClassSubjectsByRevision
 } from '../services/classPrograms';
 import type { ClassProgramErrorType } from '../services/classPrograms';
 
@@ -144,7 +143,13 @@ export function useClassProgram({
         }
 
         if (!targetRevisionId) {
-          throw new ClassProgramServiceError('REVISION_NOT_FOUND', 'Target revision is missing');
+          // If no revision ID is found (but prog is not null), it's success with none.
+          setProgram(prog);
+          setSubjects([]);
+          setSource('none');
+          setVisibleRevisionId(null);
+          setStatus('success');
+          return;
         }
 
         // Fetch subjects

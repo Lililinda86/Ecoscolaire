@@ -107,10 +107,10 @@ export const ClassProgramEmptyState: React.FC<ClassProgramEmptyStateProps> = ({
           <AlertCircle size={32} style={{ color: '#d97706' }} />
         </div>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 750, color: '#1e293b', margin: 0 }}>
-          Aucun programme configuré
+          Aucun programme n’a encore été créé pour cette classe.
         </h3>
         <p style={{ color: 'var(--text-muted)', maxWidth: '460px', margin: 0, fontSize: '0.95rem', lineHeight: '1.45' }}>
-          Aucun programme n’a encore été créé pour cette classe.
+          Créez un brouillon afin de définir les matières et de publier le programme officiel.
         </p>
       </div>
     );

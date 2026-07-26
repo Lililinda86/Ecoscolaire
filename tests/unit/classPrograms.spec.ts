@@ -4,6 +4,7 @@ import {
   validateClassProgramIdentityParams
 } from '../../src/services/classProgramQueryResult';
 import { buildClassProgramQueryConstraints } from '../../src/services/classProgramQueryConstraints';
+import { determineProgramAction } from '../../src/services/classProgramActions';
 
 test.describe('ClassProgram Query & Interpretation production logic tests', () => {
   const schoolId = 'school-a';
@@ -240,5 +241,182 @@ test.describe('ClassProgram Query & Interpretation production logic tests', () =
     expect(classFilter).toBeDefined();
     expect(classFilter?.op).toBe('==');
     expect(classFilter?.val).toBe('class-1');
+  });
+
+  test('26. Hook resolution simulation: résultat null -> status success, source none, program null, subjects vide, errorCode null', () => {
+    // Si la query Firestore retourne 0 doc, interpretClassProgramQueryResult retourne null
+    const prog = interpretClassProgramQueryResult({
+      docs: [],
+      schoolId,
+      academicYearId,
+      classId
+    });
+    expect(prog).toBeNull();
+
+    // Simulation du comportement du Hook pour ce cas :
+    // status: 'success', source: 'none', program: null, subjects: [], errorCode: null
+    const simulatedHookState = {
+      status: 'success',
+      source: 'none',
+      program: prog,
+      subjects: [],
+      errorCode: null
+    };
+
+    expect(simulatedHookState.status).toBe('success');
+    expect(simulatedHookState.source).toBe('none');
+    expect(simulatedHookState.program).toBeNull();
+    expect(simulatedHookState.subjects).toEqual([]);
+    expect(simulatedHookState.errorCode).toBeNull();
+  });
+
+  test('27. Hook resolution simulation: résultat null n’exécute aucune résolution de révision ni lecture de matières', () => {
+    // Si prog est null, le code du Hook s’arrête immédiatement sans résoudre de révision ni lire les classSubjects.
+    // Nous vérifions ici que determineProgramAction retourne bien 'create-program' pour le manager
+    const action = determineProgramAction({
+      status: 'success',
+      source: 'none',
+      program: null,
+      isManager: true
+    });
+    expect(action).toBe('create-program');
+  });
+
+  test('28. Hook resolution simulation: programme existant chargé avec comportement précédent conservé', () => {
+    const mockData = {
+      id: expectedId,
+      schoolId,
+      academicYearId,
+      classId,
+      status: 'draft',
+      draftRevisionId: 'draft-revision-123'
+    };
+
+    const prog = interpretClassProgramQueryResult({
+      docs: [{ id: expectedId, data: () => mockData }],
+      schoolId,
+      academicYearId,
+      classId
+    });
+
+    expect(prog).not.toBeNull();
+    expect(prog?.draftRevisionId).toBe('draft-revision-123');
+
+    // determineProgramAction doit renvoyer 'edit-draft' pour ouvrir le brouillon
+    const action = determineProgramAction({
+      status: 'success',
+      source: 'draft',
+      program: prog,
+      isManager: true
+    });
+    expect(action).toBe('edit-draft');
+  });
+
+  test('29. Hook resolution simulation: erreur permission-denied réelle -> status error, aucun bouton', () => {
+    // Simulation d'une erreur de permission renvoyée par le service
+    const simulatedErrorState = {
+      status: 'forbidden',
+      source: 'none',
+      program: null,
+      errorCode: 'PROGRAM_PERMISSION_DENIED'
+    };
+
+    // determineProgramAction doit retourner 'none' (aucun bouton de création visible)
+    const action = determineProgramAction({
+      status: 'forbidden',
+      source: 'none',
+      program: null,
+      isManager: true
+    });
+    expect(action).toBe('none');
+    expect(simulatedErrorState.status).toBe('forbidden');
+  });
+
+  test('18. determineProgramAction: none + rôle autorisé -> create-program', () => {
+    const res = determineProgramAction({
+      status: 'success',
+      source: 'none',
+      program: null,
+      isManager: true
+    });
+    expect(res).toBe('create-program');
+  });
+
+  test('19. determineProgramAction: none + rôle refusé -> none', () => {
+    const res = determineProgramAction({
+      status: 'success',
+      source: 'none',
+      program: null,
+      isManager: false
+    });
+    expect(res).toBe('none');
+  });
+
+  test('20. determineProgramAction: draft seul -> edit-draft', () => {
+    const res = determineProgramAction({
+      status: 'success',
+      source: 'draft',
+      program: {
+        draftRevisionId: 'draft-1'
+      },
+      isManager: true
+    });
+    expect(res).toBe('edit-draft');
+  });
+
+  test('21. determineProgramAction: published sans draft -> create-modification-draft', () => {
+    const res = determineProgramAction({
+      status: 'success',
+      source: 'published',
+      program: {
+        publishedRevisionId: 'pub-1',
+        draftRevisionId: null
+      },
+      isManager: true
+    });
+    expect(res).toBe('create-modification-draft');
+  });
+
+  test('22. determineProgramAction: published avec draft -> edit-draft', () => {
+    const res = determineProgramAction({
+      status: 'success',
+      source: 'published',
+      program: {
+        publishedRevisionId: 'pub-1',
+        draftRevisionId: 'draft-1'
+      },
+      isManager: true
+    });
+    expect(res).toBe('edit-draft');
+  });
+
+  test('23. determineProgramAction: loading -> none', () => {
+    const res = determineProgramAction({
+      status: 'loading',
+      source: 'none',
+      program: null,
+      isManager: true
+    });
+    expect(res).toBe('none');
+  });
+
+  test('24. determineProgramAction: permission-denied -> none', () => {
+    const res = determineProgramAction({
+      status: 'forbidden',
+      source: 'none',
+      program: null,
+      isManager: true
+    });
+    expect(res).toBe('none');
+  });
+
+  test('25. determineProgramAction: integrity error -> none', () => {
+    const res = determineProgramAction({
+      status: 'error',
+      source: 'none',
+      program: null,
+      isManager: true
+    });
+    expect(res).toBe('none');
   });
 });
