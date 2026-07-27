@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { buildClassSubjectMutation, mapClassProgramDraftError } from '../../src/services/classProgramDrafts';
+import { buildClassSubjectMutation, mapClassProgramDraftError, getSubjectIdsToFetch } from '../../src/services/classProgramDrafts';
 import { ClassProgramDraftError } from '../../src/services/classProgramDrafts';
 import type { ClassSubject } from '../../src/types';
 
@@ -163,6 +163,154 @@ test.describe('ClassProgramDrafts Service - Pure Functions', () => {
     // on Update, only updatable fields are sent
     expect(mutation?.payload).not.toHaveProperty('subjectCodeSnapshot');
     expect(mutation?.payload).not.toHaveProperty('schoolId');
+  });
+
+  test('15. getSubjectIdsToFetch - inclut les matières existantes', () => {
+    const original = [{ ...baseSubject, id: 'existant-1' }];
+    const edited = [{ ...baseSubject, id: 'existant-1' }];
+    const ids = getSubjectIdsToFetch(original as unknown as never, edited as unknown as never);
+    expect(ids.has('existant-1')).toBe(true);
+    expect(ids.size).toBe(1);
+  });
+
+  test('16. getSubjectIdsToFetch - exclut les matières nouvelles (jamais enregistrées)', () => {
+    const original = [{ ...baseSubject, id: 'existant-1' }];
+    const edited = [{ ...baseSubject, id: 'existant-1' }, { ...baseSubject, id: 'nouveau-1' }];
+    const ids = getSubjectIdsToFetch(original as unknown as never, edited as unknown as never);
+    expect(ids.has('existant-1')).toBe(true);
+    expect(ids.has('nouveau-1')).toBe(false);
+    expect(ids.size).toBe(1);
+  });
+});
+
+test.describe('ClassProgramDrafts Service - saveClassProgramDraft', () => {
+  const dummyDate = '2026-07-27T00:00:00.000Z';
+  const baseProgram = { id: 'prog-1', draftRevisionId: 'rev-1', draftRevisionNumber: 1 };
+
+  const baseSubject = {
+    id: 'school-1__2026__class-1__subj-1',
+    programId: 'school-1__2026__class-1',
+    schoolId: 'school-1',
+    classId: 'class-1',
+    academicYearId: '2026',
+    subjectId: 'subj-1',
+    revisionId: 'rev-1',
+    revisionNumber: 1,
+    subjectNameSnapshot: 'Maths',
+    isRequired: true,
+    isActive: true,
+    displayOrder: 0,
+    createdAt: dummyDate,
+    createdBy: 'user-1',
+    updatedAt: dummyDate,
+    updatedBy: 'user-1'
+  };
+
+  test('Test complet des appels transaction', async () => {
+    const getRefs: unknown[] = [];
+    const setCalls: { ref: unknown, payload: unknown }[] = [];
+    const updateCalls: { ref: unknown, payload: unknown }[] = [];
+
+    const mockSnapshots: Record<string, unknown> = {
+      'prog-1': { exists: () => true, data: () => baseProgram },
+      'school-1__2026__class-1__subj-1': { exists: () => true, data: () => baseSubject },
+      'school-1__2026__class-1__subj-inactive': { exists: () => true, data: () => ({ ...baseSubject, isActive: false, id: 'school-1__2026__class-1__subj-inactive', coefficient: 2, weeklyHours: 2, displayOrder: 1, isRequired: true }) },
+      'school-1__2026__class-1__subj-removed': { exists: () => true, data: () => ({ ...baseSubject, id: 'school-1__2026__class-1__subj-removed', isActive: true }) }
+    };
+
+    const mockTransaction = {
+      get: async (ref: { id: string }) => {
+        getRefs.push(ref);
+        const snap = mockSnapshots[ref.id] as { exists: () => boolean, data: () => unknown } | undefined;
+        if (snap) return snap;
+        return { exists: () => false, data: () => null };
+      },
+      set: (ref: unknown, payload: unknown) => { setCalls.push({ ref, payload }); },
+      update: (ref: unknown, payload: unknown) => { updateCalls.push({ ref, payload }); }
+    };
+
+    const mockDeps = {
+      db: {},
+      doc: (db: unknown, path: unknown, id: unknown) => ({ path, id }),
+      runTransaction: async (db: unknown, callback: (t: typeof mockTransaction) => Promise<void>) => {
+        await callback(mockTransaction);
+      },
+      deleteField: () => 'DELETE'
+    };
+
+    const originalSubjects = [
+      baseSubject, // existant actif (modifié)
+      { ...baseSubject, id: 'school-1__2026__class-1__subj-inactive', isActive: false, coefficient: 2, weeklyHours: 2, displayOrder: 1, isRequired: true }, // inactif réactivé
+      { ...baseSubject, id: 'school-1__2026__class-1__subj-removed', isActive: true } // retiré
+    ];
+
+    const editedSubjects = [
+      { ...baseSubject, coefficient: 5 }, // existant modifié
+      { ...baseSubject, id: 'school-1__2026__class-1__subj-inactive', isActive: true, coefficient: 2, weeklyHours: 2, displayOrder: 1, isRequired: true }, // réactivé sans changement de coef
+      { ...baseSubject, id: 'school-1__2026__class-1__subj-removed', isActive: false }, // retiré
+      { ...baseSubject, id: 'school-1__2026__class-1__subj-new-1' }, // nouveau 1
+      { ...baseSubject, id: 'school-1__2026__class-1__subj-new-2' } // nouveau 2
+    ];
+
+    const { saveClassProgramDraft } = await import('../../src/services/classProgramDrafts');
+    await saveClassProgramDraft({
+      program: baseProgram as unknown as never,
+      originalSubjects: originalSubjects as unknown as never,
+      editedSubjects: editedSubjects as unknown as never,
+      userId: 'user-1',
+      deps: mockDeps
+    });
+
+    // 1. Programme lu exactement une fois.
+    expect(getRefs.filter(r => (r as {id: string}).id === 'prog-1').length).toBe(1);
+
+    // 4. Sujet existant actif : lecture exacte ; update exact.
+    expect(getRefs.some(r => (r as {id: string}).id === 'school-1__2026__class-1__subj-1')).toBe(true);
+    const update1 = updateCalls.find(c => (c.ref as {id: string}).id === 'school-1__2026__class-1__subj-1');
+    expect(update1).toBeDefined();
+    expect((update1?.payload as Record<string, unknown>).coefficient).toBe(5);
+
+    // 5. Sujet inactif réactivé : lecture exacte ; isActive: true ; coefficient conservé ; weeklyHours conservé ; displayOrder conservé ; isRequired conservé.
+    expect(getRefs.some(r => (r as {id: string}).id === 'school-1__2026__class-1__subj-inactive')).toBe(true);
+    const updateInactive = updateCalls.find(c => (c.ref as {id: string}).id === 'school-1__2026__class-1__subj-inactive');
+    expect(updateInactive).toBeDefined();
+    expect((updateInactive?.payload as Record<string, unknown>).isActive).toBe(true);
+    expect((updateInactive?.payload as Record<string, unknown>).coefficient).toBe(2);
+    expect((updateInactive?.payload as Record<string, unknown>).weeklyHours).toBe(2);
+    expect((updateInactive?.payload as Record<string, unknown>).displayOrder).toBe(1);
+    expect((updateInactive?.payload as Record<string, unknown>).isRequired).toBe(true);
+
+    // 6. Sujet retiré : lecture exacte ; isActive: false.
+    expect(getRefs.some(r => (r as {id: string}).id === 'school-1__2026__class-1__subj-removed')).toBe(true);
+    const updateRemoved = updateCalls.find(c => (c.ref as {id: string}).id === 'school-1__2026__class-1__subj-removed');
+    expect(updateRemoved).toBeDefined();
+    expect((updateRemoved?.payload as Record<string, unknown>).isActive).toBe(false);
+
+    // 10. Une matière nouvelle et une existante : seule l'existante est lue.
+    // 11. Deux nouvelles matières : aucune lecture classSubjects.
+    expect(getRefs.some(r => (r as {id: string}).id === 'school-1__2026__class-1__subj-new-1')).toBe(false);
+    expect(getRefs.some(r => (r as {id: string}).id === 'school-1__2026__class-1__subj-new-2')).toBe(false);
+
+    // 2. Nouveau sujet 1 : aucune lecture ; set sur la bonne référence ; payload complet.
+    // 3. Nouveau sujet 2 : aucune lecture ; set sur la bonne référence.
+    const setNew1 = setCalls.find(c => (c.ref as {id: string}).id === 'school-1__2026__class-1__subj-new-1');
+    expect(setNew1).toBeDefined();
+    expect((setNew1?.payload as Record<string, unknown>).isActive).toBe(true);
+    expect((setNew1?.payload as Record<string, unknown>).schoolId).toBe('school-1');
+
+    const setNew2 = setCalls.find(c => (c.ref as {id: string}).id === 'school-1__2026__class-1__subj-new-2');
+    expect(setNew2).toBeDefined();
+
+    // 7. Aucun set/update ne contient undefined.
+    [...setCalls, ...updateCalls].forEach(call => {
+      Object.values(call.payload as Record<string, unknown>).forEach(value => {
+        expect(value).not.toBeUndefined();
+      });
+    });
+
+    // 9. Les champs immuables ne sont pas réécrits lors d'un update.
+    expect(update1?.payload).not.toHaveProperty('schoolId');
+    expect(update1?.payload).not.toHaveProperty('programId');
   });
 });
 

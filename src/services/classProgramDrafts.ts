@@ -1,11 +1,4 @@
-import {
-  doc,
-  runTransaction,
-  deleteField,
-  getDoc,
-  getFirestore,
-  type DocumentReference
-} from 'firebase/firestore';
+import { getFirestore, doc, runTransaction, type Firestore, type DocumentReference, deleteField, getDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import type { ClassProgram, ClassSubject } from '../types';
 
@@ -116,19 +109,30 @@ interface SaveClassProgramDraftParams {
   originalSubjects: ClassSubject[];
   editedSubjects: ClassSubject[];
   userId: string;
+  deps?: {
+    db?: unknown;
+    runTransaction?: unknown;
+    doc?: unknown;
+    deleteField?: unknown;
+  };
 }
 
 export async function saveClassProgramDraft({
   program,
   originalSubjects,
   editedSubjects,
-  userId
+  userId,
+  deps
 }: SaveClassProgramDraftParams): Promise<void> {
-  const firestoreDb = getFirestore(getApp());
-  const programRef = doc(firestoreDb, 'classPrograms', program.id);
+  const firestoreDb = (deps?.db as Firestore) || getFirestore(getApp());
+  const docFn = (deps?.doc as typeof doc) || doc;
+  const runTransactionFn = (deps?.runTransaction as typeof runTransaction) || runTransaction;
+  const deleteFieldFn = (deps?.deleteField as typeof deleteField) || deleteField;
+
+  const programRef = docFn(firestoreDb, 'classPrograms', program.id);
 
   try {
-    await runTransaction(firestoreDb, async (transaction) => {
+    await runTransactionFn(firestoreDb, async (transaction) => {
       // PHASE 1 & 2 — Références et Lectures
       const programSnap = await transaction.get(programRef);
       if (!programSnap.exists()) {
@@ -148,12 +152,10 @@ export async function saveClassProgramDraft({
       const originalSnaps: { [id: string]: ClassSubject | null } = {};
       const subjectRefs: { [id: string]: DocumentReference } = {};
 
-      const allSubjectIds = new Set<string>();
-      originalSubjects.forEach(s => allSubjectIds.add(s.id));
-      editedSubjects.forEach(s => allSubjectIds.add(s.id));
+      const allSubjectIds = getSubjectIdsToFetch(originalSubjects, editedSubjects);
 
       for (const id of allSubjectIds) {
-        const sRef = doc(firestoreDb, 'classSubjects', id);
+        const sRef = docFn(firestoreDb, 'classSubjects', id);
         subjectRefs[id] = sRef;
         const sSnap = await transaction.get(sRef);
         if (sSnap.exists()) {
@@ -181,13 +183,18 @@ export async function saveClassProgramDraft({
         const isNew = !originalSubjects.some(orig => orig.id === edited.id);
         const original = originalSubjects.find(orig => orig.id === edited.id) || null;
 
-        const mutation = buildClassSubjectMutation(edited, snap || null, original, isNew, userId, now, deleteField);
+        let sRef = subjectRefs[edited.id];
+        if (!sRef) {
+          sRef = docFn(firestoreDb, 'classSubjects', edited.id);
+        }
+
+        const mutation = buildClassSubjectMutation(edited, snap || null, original, isNew, userId, now, deleteFieldFn);
 
         if (mutation) {
           if (mutation.type === 'set') {
-            transaction.set(subjectRefs[edited.id], mutation.payload as unknown);
+            transaction.set(sRef, mutation.payload as unknown);
           } else if (mutation.type === 'update') {
-            transaction.update(subjectRefs[edited.id], mutation.payload);
+            transaction.update(sRef, mutation.payload);
           }
         }
       }
@@ -196,6 +203,18 @@ export async function saveClassProgramDraft({
     if (err instanceof ClassProgramDraftError) throw err;
     throw mapClassProgramDraftError(err);
   }
+}
+
+export function getSubjectIdsToFetch(originalSubjects: ClassSubject[], editedSubjects: ClassSubject[]): Set<string> {
+  const allSubjectIds = new Set<string>();
+  originalSubjects.forEach(s => allSubjectIds.add(s.id));
+  editedSubjects.forEach(s => {
+    const isNew = !originalSubjects.some(orig => orig.id === s.id);
+    if (!isNew) {
+      allSubjectIds.add(s.id);
+    }
+  });
+  return allSubjectIds;
 }
 
 export function buildClassSubjectMutation(

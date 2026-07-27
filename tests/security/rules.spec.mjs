@@ -35,7 +35,7 @@ describe('SaaS Fields Security Rules', () => {
       await setDoc(doc(context.firestore(), 'schools', 'school-123'), { name: 'Initial Name' });
     });
 
-    const context = testEnv.authenticatedContext('owner-uid', { 
+    const context = testEnv.authenticatedContext('owner-uid', {
       email: 'owner@test.com'
     });
     // Need to set up the user doc for getRole() and getUserSchoolId()
@@ -55,7 +55,7 @@ describe('SaaS Fields Security Rules', () => {
     });
 
     const context = testEnv.authenticatedContext('owner-uid');
-    
+
     await assertFails(
       updateDoc(doc(context.firestore(), 'schools', 'school-123'), { subscriptionPlan: 'premium' })
     );
@@ -2429,16 +2429,16 @@ describe('Class Programs and Subjects Security Rules', () => {
       // Setup mock operators, targets and staff
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
         const firestore = ctx.firestore();
-        
+
         // Superadmin
         await setDoc(doc(firestore, 'users', 'sa-uid'), { role: 'superAdmin', active: true });
-        
+
         // School A Members
         await setDoc(doc(firestore, 'users', 'owner-a'), { role: 'owner', schoolId: SCHOOL_A, active: true });
         await setDoc(doc(firestore, 'users', 'director-a'), { role: 'director', schoolId: SCHOOL_A, active: true });
         await setDoc(doc(firestore, 'users', 'secretary-a'), { role: 'secretary', schoolId: SCHOOL_A, active: true });
         await setDoc(doc(firestore, 'users', 'teacher-a'), { role: 'teacher', schoolId: SCHOOL_A, active: true });
-        
+
         // School B Members
         await setDoc(doc(firestore, 'users', 'director-b'), { role: 'director', schoolId: SCHOOL_B, active: true });
 
