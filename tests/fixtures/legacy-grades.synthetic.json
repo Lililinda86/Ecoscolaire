@@ -1,0 +1,5 @@
+[
+  { "id": "g1", "schoolId": "sch1", "studentId": "s1", "subjectId": "sub1", "score": 10, "maxScore": 20 },
+  { "id": "g2", "studentId": "s2", "score": 15 },
+  { "id": "g3", "schoolId": "sch1", "studentId": "s3", "subjectId": "sub2" }
+]

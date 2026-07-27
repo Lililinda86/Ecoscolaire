@@ -318,14 +318,125 @@ export interface StaffAttendance {
   reason?: string;
 }
 
+export interface AcademicYear {
+  id: string;
+  schoolId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: 'draft' | 'active' | 'closed' | 'archived';
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface Period {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  name: string;
+  type: 'term' | 'semester' | 'sequence' | 'custom';
+  order: number;
+  startDate: string;
+  endDate: string;
+  status: 'draft' | 'open' | 'closed' | 'published' | 'archived';
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface Evaluation {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  periodId: string;
+  classId: string;
+  subjectId: string;
+  classSubjectId: string;
+  teacherId: string;
+  title: string;
+  type: string;
+  date: string;
+  maxScore: number;
+  weight: number;
+  status: 'draft' | 'open' | 'submitted' | 'validated' | 'locked';
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export type GradeResultStatus = 'scored' | 'absent' | 'excused' | 'exempt' | 'notSubmitted';
+export type GradeStatus = 'draft' | 'submitted' | 'validated' | 'published' | 'locked';
+
+export interface LegacyGrade {
+  id?: string;
+  schoolId?: string;
+  subjectId?: string;
+  studentId?: string;
+  date?: string; // e.g. "2023-10-01"
+  score?: number;
+  maxScore?: number;
+  status?: string;
+  version?: number;
+}
+
+export interface LegacyGradeAnalysis {
+  grade: LegacyGrade;
+  isMigratable: boolean;
+  missingFields: string[];
+  warnings: string[];
+  legacy: true;
+}
+
 export interface Grade {
   id: string;
-  schoolId?: string;
-  studentId: string;
+  schoolId: string;
+  academicYearId: string;
+  periodId: string;
+  evaluationId: string;
+  classId: string;
+  classSubjectId: string;
   subjectId: string;
-  date: string; // e.g. "2023-10-01" ou un ID de semestre
-  score: number;
-  maxScore?: number;
+  studentId: string;
+  teacherId: string;
+  status: GradeStatus;
+  resultStatus: GradeResultStatus;
+  score?: number; // Obligatoire seulement si resultStatus === 'scored'
+  maxScore: number;
+  comment?: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  version: number;
+}
+
+export interface CreateGradeInput {
+  schoolId: string;
+  academicYearId: string;
+  periodId: string;
+  evaluationId: string;
+  classId: string;
+  classSubjectId: string;
+  subjectId: string;
+  studentId: string;
+  teacherId: string;
+  status: GradeStatus;
+  resultStatus: GradeResultStatus;
+  score?: number;
+  maxScore: number;
+  comment?: string;
+}
+
+export interface UpdateGradeInput {
+  score?: number;
+  resultStatus?: GradeResultStatus;
+  comment?: string;
+  status?: GradeStatus;
+  expectedVersion: number;
 }
 
 export interface Bus {

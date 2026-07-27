@@ -2921,3 +2921,89 @@ describe('Class Programs and Subjects Security Rules', () => {
     });
   });
 });
+
+describe('Lot 1B Notes & Bulletins Security Rules', () => {
+
+  const setupAdmin = async (userId, data, docId = userId, collection = 'users') => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), collection, docId), data);
+    });
+  };
+
+  describe('AcademicYear', () => {
+    it('owner même école autorisé', async () => {
+      await setupAdmin('owner1', { role: 'owner', schoolId: 'school-a', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner1').firestore();
+      const ref = doc(collection(dbOwner, 'academicYears'), 'ay1');
+      await assertSucceeds(setDoc(ref, { schoolId: 'school-a', name: '2023' }));
+    });
+
+    it('autre école refusée', async () => {
+      await setupAdmin('owner2', { role: 'owner', schoolId: 'school-a', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner2').firestore();
+      const ref = doc(collection(dbOwner, 'academicYears'), 'ay2');
+      await assertFails(setDoc(ref, { schoolId: 'school-b', name: '2023' }));
+    });
+
+    it('teacher refusé', async () => {
+      await setupAdmin('teacher1', { role: 'teacher', schoolId: 'school-a', isActive: true });
+      const dbTeacher = testEnv.authenticatedContext('teacher1').firestore();
+      const ref = doc(collection(dbTeacher, 'academicYears'), 'ay3');
+      await assertFails(setDoc(ref, { schoolId: 'school-a', name: '2023' }));
+    });
+
+    it('schoolId absent refusé', async () => {
+      await setupAdmin('owner3', { role: 'owner', schoolId: 'school-a', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner3').firestore();
+      const ref = doc(collection(dbOwner, 'academicYears'), 'ay4');
+      await assertFails(setDoc(ref, { name: '2023' }));
+    });
+  });
+
+  describe('Period', () => {
+    it('owner même école autorisé', async () => {
+      await setupAdmin('owner-p', { role: 'owner', schoolId: 'school-p', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner-p').firestore();
+      const ref = doc(collection(dbOwner, 'periods'), 'p1');
+      await assertSucceeds(setDoc(ref, { schoolId: 'school-p', academicYearId: 'ay1', name: 'T1', type: 'TERM', order: 1, startDate: '2023-01-01', endDate: '2023-03-31', status: 'DRAFT', createdAt: '2023-01-01', createdBy: 'owner-p', updatedAt: '2023-01-01', updatedBy: 'owner-p' }));
+    });
+
+    it('autre école refusée', async () => {
+      await setupAdmin('owner-p2', { role: 'owner', schoolId: 'school-p', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner-p2').firestore();
+      const ref = doc(collection(dbOwner, 'periods'), 'p2');
+      await assertFails(setDoc(ref, { schoolId: 'school-b', academicYearId: 'ay1', name: 'T1', type: 'TERM', order: 1, startDate: '2023-01-01', endDate: '2023-03-31', status: 'DRAFT', createdAt: '2023-01-01', createdBy: 'owner-p2', updatedAt: '2023-01-01', updatedBy: 'owner-p2' }));
+    });
+
+    it('champs requis absents refusés', async () => {
+      await setupAdmin('owner-p3', { role: 'owner', schoolId: 'school-p', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner-p3').firestore();
+      const ref = doc(collection(dbOwner, 'periods'), 'p3');
+      await assertFails(setDoc(ref, { schoolId: 'school-p', name: 'T1' })); 
+    });
+  });
+
+  describe('Grade legacy transitoire', () => {
+    it('bon schoolId autorisé selon rôle historique', async () => {
+      await setupAdmin('owner-g', { role: 'owner', schoolId: 'school-g', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner-g').firestore();
+      const ref = doc(collection(dbOwner, 'grades'), 'g1');
+      await assertSucceeds(setDoc(ref, { schoolId: 'school-g', studentId: 's1', score: 10 }));
+    });
+
+    it('sans schoolId refusé', async () => {
+      await setupAdmin('owner-g2', { role: 'owner', schoolId: 'school-g', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner-g2').firestore();
+      const ref = doc(collection(dbOwner, 'grades'), 'g2');
+      await assertFails(setDoc(ref, { studentId: 's1', score: 10 }));
+    });
+
+    it('autre école refusée', async () => {
+      await setupAdmin('owner-g3', { role: 'owner', schoolId: 'school-g', isActive: true });
+      const dbOwner = testEnv.authenticatedContext('owner-g3').firestore();
+      const ref = doc(collection(dbOwner, 'grades'), 'g3');
+      await assertFails(setDoc(ref, { schoolId: 'school-b', studentId: 's1', score: 10 }));
+    });
+  });
+
+});

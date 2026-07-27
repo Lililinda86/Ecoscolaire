@@ -6,7 +6,7 @@ import type {
   Subject,
   Attendance,
   StaffAttendance,
-  Grade,
+  LegacyGrade,
   Bus,
   BusRoute,
   FuelExpense,
@@ -43,7 +43,7 @@ export interface Database {
   technicalSpecialties: TechnicalSpecialty[];
   attendance: Attendance[];
   staffAttendance: StaffAttendance[];
-  grades: Grade[];
+  grades: LegacyGrade[];
   buses: Bus[];
   busRoutes: BusRoute[];
   fuelExpenses: FuelExpense[];

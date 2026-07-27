@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
-import type { Grade } from '../types';
+import type { LegacyGrade } from '../types';
+import { getLegacyGradeNormalizedValue } from '../utils/legacyGrades';
 import Modal from '../components/Modal';
 import { Plus, Printer, Trophy } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
@@ -53,9 +54,12 @@ const Grades: React.FC = () => {
     });
   };
 
-  const handleSaveBulk = (e: React.FormEvent) => {
+  const handleSaveBulk = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bulkStudentId || !currentUser || !currentSchool) return;
+    if (!bulkStudentId || !currentUser || !currentSchool) {
+      alert("Erreur : aucune école active ou élève sélectionné.");
+      return;
+    }
     
     const canSaveDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
     const newDb = { ...db };
@@ -64,12 +68,13 @@ const Grades: React.FC = () => {
     Object.keys(bulkGrades).forEach(subjectId => {
       const g = bulkGrades[subjectId];
       if (g.score !== '') {
-        const gradeObj: Grade = {
+        const gradeObj: LegacyGrade = {
           id: crypto.randomUUID(),
+          schoolId: currentSchool.id,
           studentId: bulkStudentId,
           subjectId,
           score: parseFloat(g.score),
-          maxScore: parseFloat(g.maxScore) || 20,
+          maxScore: parseFloat(g.maxScore),
           date: bulkDate
         };
 
@@ -78,7 +83,7 @@ const Grades: React.FC = () => {
           logAuditAction({
             action: 'CREATE_GRADE',
             targetType: 'GRADE',
-            targetId: gradeObj.id,
+            targetId: gradeObj.id as string,
             targetName: `Note de ${g.score} en ${subjectId}`
           });
         } else {
@@ -90,7 +95,7 @@ const Grades: React.FC = () => {
             requesterRole: currentUser.role,
             actionType: 'UPDATE_GRADE',
             targetCollection: 'grades',
-            targetDocumentId: gradeObj.id,
+            targetDocumentId: gradeObj.id as string,
             proposedData: gradeObj,
             status: 'pending',
             createdAt: new Date().toISOString()
@@ -99,12 +104,18 @@ const Grades: React.FC = () => {
       }
     });
     
-    safeMergeDB(newDb);
-    setModalOpen(false);
-    if (hasValidations) {
-      alert("Les notes ont été soumises pour validation par le Directeur.");
-    } else {
-      alert("Notes enregistrées avec succès.");
+    try {
+      await safeMergeDB(newDb);
+      setModalOpen(false);
+      if (hasValidations) {
+        alert("Les notes ont été soumises pour validation par le Directeur.");
+      } else {
+        alert("Notes enregistrées avec succès.");
+      }
+    } catch (err) {
+      console.error("Erreur safeMergeDB:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(`Erreur lors de l'enregistrement des notes: ${errorMessage}`);
     }
   };
 
@@ -134,16 +145,18 @@ const Grades: React.FC = () => {
   const studentGrades = db.grades.filter(g => g.studentId === selectedStudent);
   const student = db.students.find(s => s.id === selectedStudent);
   const studentClass = db.classes.find(c => c.id === student?.classId);
-  const totalNormalized = studentGrades.reduce((sum, g) => sum + ((g.score / (g.maxScore || 20)) * 20), 0);
-  const average = studentGrades.length > 0 ? totalNormalized / studentGrades.length : 0;
+  const validStudentGrades = studentGrades.map(g => getLegacyGradeNormalizedValue(g)).filter(v => v.calculable) as { calculable: true, value: number }[];
+  const totalNormalized = validStudentGrades.reduce((sum, v) => sum + v.value, 0);
+  const average = validStudentGrades.length > 0 ? totalNormalized / validStudentGrades.length : 0;
 
   // Ranking Calculation
   const classStudents = db.students.filter(s => s.classId === selectedClassRank);
   const rankingData = classStudents.map(s => {
     const sGrades = db.grades.filter(g => g.studentId === s.id);
-    const sum = sGrades.reduce((acc, g) => acc + ((g.score / (g.maxScore || 20)) * 20), 0);
-    const avg = sGrades.length > 0 ? sum / sGrades.length : 0;
-    return { student: s, avg, hasGrades: sGrades.length > 0 };
+    const validSGrades = sGrades.map(g => getLegacyGradeNormalizedValue(g)).filter(v => v.calculable) as { calculable: true, value: number }[];
+    const sum = validSGrades.reduce((acc, v) => acc + v.value, 0);
+    const avg = validSGrades.length > 0 ? sum / validSGrades.length : 0;
+    return { student: s, avg, hasGrades: validSGrades.length > 0 };
   }).filter(d => d.hasGrades).sort((a, b) => b.avg - a.avg);
 
   const classAvg = rankingData.length > 0 ? rankingData.reduce((sum, d) => sum + d.avg, 0) / rankingData.length : 0;
@@ -152,10 +165,11 @@ const Grades: React.FC = () => {
   // School Ranking Calculation
   const schoolRankingData = db.classes.map(c => {
     const cStudents = db.students.filter(s => s.classId === c.id);
-    const validStudentAvgs = cStudents.map(s => {
-      const sGrades = db.grades.filter(g => g.studentId === s.id);
-      const sum = sGrades.reduce((acc, g) => acc + ((g.score / (g.maxScore || 20)) * 20), 0);
-      return sGrades.length > 0 ? sum / sGrades.length : null;
+      const validStudentAvgs = cStudents.map(s => {
+        const sGrades = db.grades.filter(g => g.studentId === s.id);
+        const validSGrades = sGrades.map(g => getLegacyGradeNormalizedValue(g)).filter(v => v.calculable) as { calculable: true, value: number }[];
+        const sum = validSGrades.reduce((acc, v) => acc + v.value, 0);
+        return validSGrades.length > 0 ? sum / validSGrades.length : null;
     }).filter(a => a !== null) as number[];
     
     const cAvg = validStudentAvgs.length > 0 ? validStudentAvgs.reduce((sum, a) => sum + a, 0) / validStudentAvgs.length : 0;
@@ -230,12 +244,19 @@ const Grades: React.FC = () => {
                    ) : (
                      studentGrades.map(g => {
                        const subject = db.subjects.find(s => s.id === g.subjectId);
+                       const norm = getLegacyGradeNormalizedValue(g);
                        return (
                          <tr key={g.id}>
                            <td style={{ border: '1px solid #000', padding: '0.75rem' }}>{subject?.name || 'Inconnue'}</td>
-                           <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>{new Date(g.date).toLocaleDateString('fr-FR')}</td>
-                           <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>{g.score} / {g.maxScore || 20}</td>
-                           <td style={{ border: '1px solid #000', padding: '0.75rem', fontStyle: 'italic' }}>{getAppreciation(g.score, g.maxScore || 20)}</td>
+                           <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>
+                             {g.date ? new Date(g.date).toLocaleDateString('fr-FR') : 'Date inconnue'}
+                           </td>
+                           <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
+                             {norm.calculable ? `${norm.originalScore} / ${norm.originalMaxScore}` : (norm.reason === 'missing-score' ? 'Non noté' : 'Barème manquant')}
+                           </td>
+                           <td style={{ border: '1px solid #000', padding: '0.75rem', fontStyle: 'italic' }}>
+                             {norm.calculable ? getAppreciation(norm.originalScore, norm.originalMaxScore) : '-'}
+                           </td>
                          </tr>
                        )
                      })

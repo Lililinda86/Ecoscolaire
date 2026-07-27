@@ -139,6 +139,18 @@ service cloud.firestore {
       return isSuperAdmin() || isOwner() || isDirector() || isSecretary();
     }
 
+    function isTeacherAssignedToClassSubject(schoolId, academicYearId, classId, classSubjectId) {
+      let staffLink = get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid));
+      let assignmentPath = /databases/$(database)/documents/teacherAssignments/$(schoolId + '__' + academicYearId + '__' + classId + '__' + classSubjectId + '__' + staffLink.data.staffId);
+      return isAuthenticated()
+        && isTeacher()
+        && staffLink != null
+        && staffLink.data.isActive == true
+        && staffLink.data.schoolId == schoolId
+        && exists(assignmentPath)
+        && get(assignmentPath).data.isActive == true;
+    }
+
     function hasValidStudentClass(studentData) {
       let classPath = /databases/$(database)/documents/classes/$(studentData.classId);
       return studentData.classId is string
@@ -627,11 +639,11 @@ service cloud.firestore {
                     && request.resource.data.skippedCount is int && request.resource.data.skippedCount == 0
                     && request.resource.data.failedCount is int && request.resource.data.failedCount == 0
                     && request.resource.data.createdBy is string
-                    && request.resource.data.createdAt is timestamp
-                    && (!('startedAt' in request.resource.data) || request.resource.data.startedAt == null)
-                    && (!('finishedAt' in request.resource.data) || request.resource.data.finishedAt == null)
-                    && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null)
-                    && (!('errorMessage' in request.resource.data) || request.resource.data.errorMessage == null);
+        && request.resource.data.createdAt is timestamp
+        && (!('startedAt' in request.resource.data) || request.resource.data.startedAt == null)
+        && (!('finishedAt' in request.resource.data) || request.resource.data.finishedAt == null)
+        && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null)
+        && (!('errorMessage' in request.resource.data) || request.resource.data.errorMessage == null);
       allow update, delete: if false; // Only Cloud Functions (Admin SDK) can update/delete
     }
 
@@ -642,14 +654,66 @@ service cloud.firestore {
       allow update, delete: if false; // Immuable
     }
 
+    match /academicYears/{yearId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow delete: if false;
+    }
+
+    match /periods/{periodId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && 
+        hasSchoolAccess(request.resource.data.schoolId) &&
+        request.resource.data.keys().hasAll(['schoolId', 'academicYearId', 'name', 'type', 'order', 'startDate', 'endDate', 'status', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']);
+      allow delete: if false;
+    }
+
+    match /evaluations/{evalId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow create, update: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || isDirector()) ||
+        (isTeacher() && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId))
+      ) && hasSchoolAccess(request.resource.data.schoolId);
+      allow delete: if false;
+    }
+
     match /grades/{gradeId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() || 
         ((isOwner() || isDirector() || isSecretary() || isTeacher()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId)) // La logique "uniquement si payé" est gérée par le client, on peut difficilement la faire en rules sans check croisé de /payments/
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published') ||
+        (isStudent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published' && resource.data.studentId == request.auth.uid)
       );
-      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isTeacher()) && hasSchoolAccess(request.resource.data.schoolId);
-      allow delete: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      
+      allow create: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || isDirector()) ||
+        (
+          isTeacher()
+          && request.resource.data.keys().hasAll(['schoolId', 'academicYearId', 'periodId', 'evaluationId', 'classId', 'classSubjectId', 'studentId', 'teacherId', 'status', 'maxScore'])
+          && request.resource.data.schoolId == getUserSchoolId()
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+          && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.maxScore))
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId);
+      
+      allow update: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || isDirector()) ||
+        (
+          isTeacher()
+          && resource.data.status in ['draft', 'submitted']
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.academicYearId == resource.data.academicYearId
+          && request.resource.data.evaluationId == resource.data.evaluationId
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.classId == resource.data.classId
+          && request.resource.data.subjectId == resource.data.subjectId
+          && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.maxScore))
+          && request.resource.data.version > resource.data.version
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId);
+      
+      allow delete: if false;
     }
 
     match /attendance/{attendanceId} {
