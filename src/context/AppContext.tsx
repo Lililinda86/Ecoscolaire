@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Database, DatabasePatch } from '../db/storage';
 import { defaultDB } from '../db/storage';
-import type { User, School, Student, Payment, Expense } from '../types';
 import type { User as FirebaseUser } from 'firebase/auth';
+import type { Database, DatabasePatch } from '../db/storage';
+import type { User, School, Student, Payment, Expense, Evaluation, Grade } from '../types';
 import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
+import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
 
 type EntityWithId = {
   id: string;
@@ -66,6 +68,7 @@ interface AppContextProps {
   saveDB: (newDb: Database) => Promise<void>;
   safeMergeDB: (newDb: Database) => Promise<void>;
   safePatchDB: (patch: DatabasePatch) => Promise<void>;
+  saveStructuredGrades: (params: { evaluation: Evaluation, grades: Grade[] }) => Promise<void>;
   currentUser: User | null;
   currentSchool: School | null;
   isSupervising: boolean;
@@ -95,6 +98,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+
+  const updateLocalState = (patch: Partial<Database>) => {
+    setDb(prev => prev ? { ...prev, ...patch } : null);
+  };
 
   // 1. Auth Listener
   useEffect(() => {
@@ -200,7 +207,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'classes', 'students', 'staff', 'buses', 'inventory', 
           'grades', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'technicalSpecialties', 'busRoutes', 'fuelExpenses', 'maintenances',
-          'breakdowns', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts'
+          'breakdowns', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts',
+          'academicYears', 'periods', 'classPrograms', 'classSubjects', 'evaluations', 'teacherAssignments'
         ];
 
         console.log("================ DIAGNOSTIC AppContext ===============");
@@ -316,7 +324,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]) as { colName: keyof Database; data: unknown[] }[];
 
         results.forEach((res) => {
-          Object.assign(loadedDb, { [res.colName]: res.data });
+          if (res.colName === 'grades') {
+            const partition = partitionGradeDocuments(res.data);
+            Object.assign(loadedDb, { 
+              grades: partition.legacyGrades, 
+              gradesStrict: partition.strictGrades,
+              invalidGradeDocumentsCount: partition.invalidGrades.length
+            });
+            if (partition.invalidGrades.length > 0) {
+               console.warn(`[AppContext] ${partition.invalidGrades.length} grades ignorés (structure invalide ou hybride).`);
+            }
+          } else {
+            Object.assign(loadedDb, { [res.colName]: res.data });
+          }
         });
 
         console.log("5. Contenu de loadedDb.schools avant setDb final (Mode École) :", loadedDb.schools);
@@ -498,6 +518,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.error("Sync Error:", e);
       alert("Une erreur de permissions est survenue lors de la synchronisation.");
+    }
+  };
+
+  const saveStructuredGrades = async ({ evaluation, grades }: { evaluation: Evaluation, grades: Grade[] }) => {
+    if (!db) {
+      throw new Error("Les données de l'école ne sont pas disponibles.");
+    }
+    if (!currentUser) {
+      throw new Error("Vous devez être authentifié pour enregistrer les notes.");
+    }
+    
+    if (isSupervising) {
+      const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les notes structurées de cette école. Êtes-vous sûr ?");
+      if (!confirm) {
+        throw new StructuredGradeSaveCancelledError();
+      }
+    }
+
+    try {
+      const { db: firestoreDb } = await import('../db/firebase');
+      await saveStructuredEvaluationGrades({ firestore: firestoreDb, evaluation, grades });
+      
+      // Update local state after successful persistence
+      setDb(prevDb => {
+        if (!prevDb) return prevDb;
+        
+        // Update evaluations
+        const nextEvaluations = [...(prevDb.evaluations || [])];
+        const evalIndex = nextEvaluations.findIndex(e => e.id === evaluation.id);
+        if (evalIndex >= 0) {
+          nextEvaluations[evalIndex] = evaluation;
+        } else {
+          nextEvaluations.push(evaluation);
+        }
+        
+        // Update gradesStrict
+        const nextStrictGrades = [...(prevDb.gradesStrict || [])];
+        grades.forEach(g => {
+          const gIndex = nextStrictGrades.findIndex(existing => existing.id === g.id);
+          if (gIndex >= 0) {
+            nextStrictGrades[gIndex] = g;
+          } else {
+            nextStrictGrades.push(g);
+          }
+        });
+        
+        return {
+          ...prevDb,
+          evaluations: nextEvaluations,
+          gradesStrict: nextStrictGrades
+        };
+      });
+    } catch (e) {
+      console.error("Structured Grades Save Error:", e);
+      throw e;
     }
   };
 
@@ -752,9 +827,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isSchoolSuspended = !currentSchool?.isInternalSchool && (currentSchool?.subscriptionStatus === 'suspended' || currentSchool?.subscriptionStatus === 'expired');
 
-  const updateLocalState = (patch: Partial<Database>) => {
-    setDb(prev => prev ? { ...prev, ...patch } : null);
-  };
+
 
   const updateStudentLocal = (
     studentId: string,
@@ -854,7 +927,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      db, updateLocalState, updateStudentLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, currentUser, currentSchool,
+      db, updateLocalState, updateStudentLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, saveStructuredGrades, currentUser, currentSchool,
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended

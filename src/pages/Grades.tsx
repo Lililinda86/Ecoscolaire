@@ -4,8 +4,6 @@ import { useI18n } from '../context/I18nContext';
 import type { Grade, Evaluation } from '../types';
 import { getLegacyGradeNormalizedValue } from '../utils/legacyGrades';
 import { getEffectiveClassSubjects } from '../services/effectiveClassSubjects';
-import { upsertGradeInCache } from '../services/gradeUpsert';
-import { upsertEvaluationInCache } from '../services/evaluationUpsert';
 import { groupGradesByClassSubject, calculateSubjectAverage, calculateWeightedGeneralAverage } from '../services/gradeCalculations';
 import { buildEvaluationId, buildGradeId } from '../utils/gradeIds';
 import Modal from '../components/Modal';
@@ -25,15 +23,13 @@ export const getAppreciation = (score: number, max: number = 20) => {
 };
 
 const Grades: React.FC = () => {
-  const { db, safeMergeDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, saveStructuredGrades, currentUser, currentSchool, logAuditAction, isSchoolSuspended, firestoreError } = useAppContext();
   const { t } = useI18n();
   
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
-  // Logic for Individual Tab
   const [selectedStudent, setSelectedStudent] = useState<string>('');
 
-  // New Workflow States for Modal
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>('');
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
@@ -49,13 +45,13 @@ const Grades: React.FC = () => {
   const [evaluationWeight, setEvaluationWeight] = useState<string>('1');
   const [gradeEntryRows, setGradeEntryRows] = useState<Record<string, {score: string}>>({});
 
-  // Logic for Ranking Tab
   const [selectedClassRank, setSelectedClassRank] = useState<string>('');
 
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
 
   const activeYear = db.academicYears?.find(y => y.schoolId === currentSchool?.id && y.status === 'active');
-  const periods = db.periods?.filter(p => p.schoolId === currentSchool?.id && p.academicYearId === activeYear?.id) || [];
+  const dropdownPeriods = db.periods?.filter(p => p.schoolId === currentSchool?.id && p.academicYearId === selectedAcademicYearId && p.status === 'open').sort((a, b) => (a.order || 0) - (b.order || 0)) || [];
+  const hasAcademicYears = db.academicYears && db.academicYears.filter(y => y.schoolId === currentSchool?.id).length > 0;
 
   const handleOpenModal = () => {
     setSelectedAcademicYearId(activeYear?.id || '');
@@ -106,13 +102,12 @@ const Grades: React.FC = () => {
       return;
     }
     
-    const activePeriod = periods.find(p => p.id === selectedPeriodId);
+    const activePeriod = dropdownPeriods.find(p => p.id === selectedPeriodId);
     if (!activePeriod) {
-      alert("Aucune période de saisie ouverte n'est disponible pour cette année scolaire.");
+      alert("Aucune période de saisie n'est actuellement ouverte pour cette année scolaire.");
       return;
     }
 
-    // effectiveSubjects logic inlined
     const effSub = getEffectiveClassSubjects({ classId: selectedClassId, classes: db.classes, classPrograms: db.classPrograms || [], classSubjects: db.classSubjects || [], subjects: db.subjects, activeAcademicYearId: selectedAcademicYearId }).find(s => s.classSubjectId === selectedClassSubjectId);
     if (!effSub) return;
     
@@ -138,11 +133,8 @@ const Grades: React.FC = () => {
       return;
     }
 
-    const newDb = { ...db };
-    if (!newDb.evaluations) newDb.evaluations = [];
-    if (!newDb.gradesStrict) newDb.gradesStrict = [];
-    
     let finalEvalId = '';
+    let theEval: Evaluation | undefined;
     
     if (evaluationMode === 'new') {
       if (!newEvaluationKey) return;
@@ -168,17 +160,19 @@ const Grades: React.FC = () => {
         updatedBy: currentUser.id,
         version: 1
       };
-      if (!newDb.evaluations) newDb.evaluations = []; upsertEvaluationInCache(newDb.evaluations, newEval);
+      theEval = newEval;
     } else {
       if (!selectedEvaluationId) {
         alert("Veuillez sélectionner une évaluation existante.");
         return;
       }
       finalEvalId = selectedEvaluationId;
+      theEval = (db.evaluations || []).find(e => e.id === finalEvalId);
     }
     
-    const theEval = newDb.evaluations.find(e => e.id === finalEvalId);
     if (!theEval) return;
+
+    const gradesToSave: Grade[] = [];
 
     Object.keys(gradeEntryRows).forEach(studentId => {
       const entry = gradeEntryRows[studentId];
@@ -206,16 +200,21 @@ const Grades: React.FC = () => {
           updatedBy: currentUser.id,
           version: 1
         };
-        if (!newDb.gradesStrict) newDb.gradesStrict = []; upsertGradeInCache(newDb.gradesStrict, newGrade);
+        gradesToSave.push(newGrade);
       }
     });
 
     try {
-      await safeMergeDB(newDb);
-      alert("Notes enregistrées avec succès.");
+      await saveStructuredGrades({ evaluation: theEval, grades: gradesToSave });
+      
+      alert("Notes structurées enregistrées avec succès !");
       setModalOpen(false);
+      setGradeEntryRows({});
     } catch (err) {
-      console.error("Erreur safeMergeDB:", err);
+      if (err instanceof Error && err.name === "StructuredGradeSaveCancelledError") {
+        return; // Silent cancel, preserve modal and rows
+      }
+      console.error("Erreur saveStructuredGrades:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
       alert(`Erreur lors de l'enregistrement des notes: ${errorMessage}`);
     }
@@ -244,7 +243,6 @@ const Grades: React.FC = () => {
     });
   };
 
-  // Ranking Calculation (unchanged legacy behavior for other tabs)
   const classStudents = db.students.filter(s => s.classId === selectedClassRank);
   const rankingData = classStudents.map(s => {
     const sGrades = db.grades.filter(g => g.studentId === s.id);
@@ -256,7 +254,6 @@ const Grades: React.FC = () => {
   const classAvg = rankingData.length > 0 ? rankingData.reduce((sum, d) => sum + d.avg, 0) / rankingData.length : 0;
   const currentRankClass = db.classes.find(c => c.id === selectedClassRank);
 
-  // School Ranking Calculation
   const schoolRankingData = db.classes.map(c => {
     const cStudents = db.students.filter(s => s.classId === c.id);
       const validStudentAvgs = cStudents.map(s => {
@@ -265,9 +262,11 @@ const Grades: React.FC = () => {
         const sum = validSGrades.reduce((acc, v) => acc + v.value, 0);
         return validSGrades.length > 0 ? sum / validSGrades.length : null;
     }).filter(a => a !== null) as number[];
-    const cAvg = validStudentAvgs.length > 0 ? validStudentAvgs.reduce((sum, a) => sum + a, 0) / validStudentAvgs.length : 0;
+  const cAvg = validStudentAvgs.length > 0 ? validStudentAvgs.reduce((sum, a) => sum + a, 0) / validStudentAvgs.length : 0;
     return { class: c, avg: cAvg, studentCount: cStudents.length, evaluatedCount: validStudentAvgs.length };
   }).filter(d => d.evaluatedCount > 0).sort((a, b) => b.avg - a.avg);
+
+  const isGlobalRankingDisabled = true;
 
   return (
     <div className="page-container" id="grades-page">
@@ -322,13 +321,11 @@ const Grades: React.FC = () => {
                 const studentClass = db.classes.find(c => c.id === student?.classId);
                 if (!student || !studentClass) return null;
                 
-                // Structured Bulletin logic
                 let generalAvg = 0;
                 let subjectsRender = null;
                 
                 if (activeYear) {
-                  // Get active period or first period
-                  const activePer = periods[0];
+                  const activePer = db.periods?.find(p => p.schoolId === currentSchool?.id && p.academicYearId === activeYear.id && p.status === 'open');
                   if (activePer) {
                     const effSubjects = getEffectiveClassSubjects({ classId: studentClass.id, classes: db.classes, classPrograms: db.classPrograms || [], classSubjects: db.classSubjects || [], subjects: db.subjects, activeAcademicYearId: activeYear.id });
                     const stGrades = (db.gradesStrict || []).filter(g => 
@@ -352,8 +349,6 @@ const Grades: React.FC = () => {
                         </thead>
                         <tbody>
                           {summaries.map(sub => {
-                            
-                            
                             const coeff = sub.coefficient || 1;
                             const pts = (sub.calculable && sub.rawAverage !== null) ? (sub.rawAverage * coeff) : null;
                             
@@ -380,7 +375,6 @@ const Grades: React.FC = () => {
                   }
                 }
                 
-                // Legacy Historical Section
                 const legacyGrades = db.grades.filter(g => g.studentId === student.id);
                 
                 return (
@@ -392,7 +386,7 @@ const Grades: React.FC = () => {
                         <p><strong>Section :</strong> {student.section}</p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <p><strong>Année Scolaire :</strong> {activeYear?.name || 'N/A'}</p>
+                        <p><strong>Année Scolaire :</strong> {activeYear?.name || 'Année scolaire non configurée'}</p>
                         <p><strong>Décision du conseil :</strong> Non renseignée</p>
                       </div>
                     </div>
@@ -526,7 +520,9 @@ const Grades: React.FC = () => {
               <p>Basé sur la moyenne générale de chaque classe | Date : {new Date().toLocaleDateString('fr-FR')}</p>
             </div>
 
-            {schoolRankingData.length > 0 ? (
+            {isGlobalRankingDisabled ? (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Le classement global sera disponible après configuration d'une politique de comparaison commune aux classes.</p>
+            ) : schoolRankingData.length > 0 ? (
               <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000' }}>
                 <thead style={{ background: 'var(--bg-color)' }}>
                   <tr>
@@ -571,8 +567,19 @@ const Grades: React.FC = () => {
         </>
       )}
 
-      {/* Structured Grade Entry Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Saisie des Notes">
+        {firestoreError ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <p style={{ marginBottom: '1rem', color: 'var(--danger-color)', fontWeight: 'bold' }}>Le calendrier académique n'a pas pu être chargé. Vérifiez vos droits ou réessayez.</p>
+          </div>
+        ) : !hasAcademicYears ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <p style={{ marginBottom: '1rem', color: 'var(--danger-color)', fontWeight: 'bold' }}>Aucun calendrier académique n’est configuré pour cette école.</p>
+            <p style={{ marginBottom: '2rem' }}>Configurez l'année scolaire et ses périodes avant la saisie des notes.</p>
+            <button type="button" onClick={() => window.location.href = '#/settings'}>Configurer le calendrier académique</button>
+            <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>* Note: L'écran de configuration complet du calendrier académique fera l'objet d'un lot séparé. Pour l'instant, naviguez vers les paramètres.</p>
+          </div>
+        ) : (
         <form onSubmit={handleSaveBulk}>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -589,10 +596,13 @@ const Grades: React.FC = () => {
               <label>Période</label>
               <select required value={selectedPeriodId} onChange={e => setSelectedPeriodId(e.target.value)}>
                 <option value="">-- Choisir --</option>
-                {periods.map(p => (
+                {dropdownPeriods.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
+              {selectedAcademicYearId && dropdownPeriods.length === 0 && (
+                <small style={{ color: 'var(--danger-color)', display: 'block', marginTop: '0.5rem' }}>Aucune période de saisie n'est actuellement ouverte pour cette année scolaire.</small>
+              )}
             </div>
           </div>
           
@@ -719,9 +729,10 @@ const Grades: React.FC = () => {
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
             <button type="button" className="secondary" onClick={() => setModalOpen(false)}>Annuler</button>
-            <button type="submit">Enregistrer les notes</button>
+            <button type="submit" disabled={dropdownPeriods.length === 0}>Enregistrer les notes</button>
           </div>
         </form>
+        )}
       </Modal>
     </div>
   );

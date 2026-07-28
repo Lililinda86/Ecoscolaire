@@ -36,6 +36,7 @@ export interface Database {
   periods?: Period[];
   evaluations?: Evaluation[];
   gradesStrict?: Grade[];
+  invalidGradeDocumentsCount?: number;
   teacherAssignments?: TeacherAssignment[];
   // --- SaaS Collections (Globales) ---
   schools: School[];
