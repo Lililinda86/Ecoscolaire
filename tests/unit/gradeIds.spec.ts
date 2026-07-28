@@ -29,7 +29,7 @@ describe('Grade IDs Generation', () => {
   });
 
   it('différencie deux évaluations', () => {
-    expect(buildEvaluationId('s1', 'ay', 'csub', 'eval1')).not.toBe(buildEvaluationId('s1', 'ay', 'csub', 'eval2'));
+    expect(buildEvaluationId('s1', 'ay', 'p1', 'c1', 'csub', 'eval1')).not.toBe(buildEvaluationId('s1', 'ay', 'p1', 'c1', 'csub', 'eval2'));
   });
 
   it('différencie deux élèves', () => {

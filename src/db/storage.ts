@@ -21,12 +21,22 @@ import type {
   Notification,
   TechnicalSpecialty,
   ClassProgram,
-  ClassSubject
+  ClassSubject,
+  AcademicYear,
+  Period,
+  Evaluation,
+  Grade,
+  TeacherAssignment
 } from '../types';
 
 export interface Database {
   classPrograms?: ClassProgram[];
   classSubjects?: ClassSubject[];
+  academicYears?: AcademicYear[];
+  periods?: Period[];
+  evaluations?: Evaluation[];
+  gradesStrict?: Grade[];
+  teacherAssignments?: TeacherAssignment[];
   // --- SaaS Collections (Globales) ---
   schools: School[];
   users: User[];
@@ -155,7 +165,12 @@ const initialDB: Database = {
   inventoryTransactions: [],
   transactions: [],
   audit_logs: [],
-  receipts: []
+  receipts: [],
+  academicYears: [],
+  periods: [],
+  evaluations: [],
+  gradesStrict: [],
+  teacherAssignments: []
 };
 
 export const defaultDB = initialDB;

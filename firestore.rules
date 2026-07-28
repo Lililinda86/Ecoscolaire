@@ -6,8 +6,49 @@ service cloud.firestore {
     // UTILS : FONCTIONS DE SÉCURITÉ
     // ==========================================
     
+    
+    function isStrictGradePayload(data) {
+      return data.keys().hasAll(['academicYearId', 'periodId', 'evaluationId', 'classId', 'classSubjectId']);
+    }
+
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function isValidEvaluationStatusTransition(oldStatus, newStatus, role) {
+      return (
+        (role == 'teacher' && (
+          (oldStatus == 'NEW' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'submitted') ||
+          (oldStatus == 'submitted' && newStatus == 'draft')
+        )) ||
+        (role == 'director' && (
+          (oldStatus == 'NEW' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'draft' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'submitted' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'validated' && (newStatus == 'draft' || newStatus == 'validated' || newStatus == 'locked'))
+        )) ||
+        (role == 'owner' || role == 'superAdmin')
+      );
+    }
+
+    function isValidGradeStatusTransition(oldStatus, newStatus, role) {
+      return (
+        (role == 'teacher' && (
+          (oldStatus == 'NEW' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'submitted') ||
+          (oldStatus == 'submitted' && newStatus == 'draft')
+        )) ||
+        (role == 'director' && (
+          (oldStatus == 'NEW' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'draft' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'submitted' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'validated' && (newStatus == 'draft' || newStatus == 'validated' || newStatus == 'locked'))
+        )) ||
+        (role == 'owner' || role == 'superAdmin')
+      );
     }
 
     function isProtectedCashPayment(data) {
@@ -670,10 +711,21 @@ service cloud.firestore {
 
     match /evaluations/{evalId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow create, update: if isAuthenticated() && isActive() && (
-        (isAdminOrOwner() || isDirector()) ||
-        (isTeacher() && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId))
-      ) && hasSchoolAccess(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || (isDirector() && isValidEvaluationStatusTransition('NEW', request.resource.data.status, 'director'))) ||
+        (isTeacher() 
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+          && isValidEvaluationStatusTransition('NEW', request.resource.data.status, 'teacher')
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId) && request.resource.data.weight > 0;
+      allow update: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || (isDirector() && isValidEvaluationStatusTransition(resource.data.status, request.resource.data.status, 'director'))) ||
+        (isTeacher() 
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+          && isValidEvaluationStatusTransition(resource.data.status, request.resource.data.status, 'teacher')
+          && resource.data.status != 'locked'
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId) && request.resource.data.weight > 0;
       allow delete: if false;
     }
 
@@ -686,32 +738,38 @@ service cloud.firestore {
       );
       
       allow create: if isAuthenticated() && isActive() && (
-        (isAdminOrOwner() || isDirector()) ||
+        (isAdminOrOwner() || (isDirector() && isValidGradeStatusTransition('NEW', request.resource.data.status, 'director'))) ||
         (
           isTeacher()
           && request.resource.data.keys().hasAll(['schoolId', 'academicYearId', 'periodId', 'evaluationId', 'classId', 'classSubjectId', 'studentId', 'teacherId', 'status', 'maxScore'])
           && request.resource.data.schoolId == getUserSchoolId()
           && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
-          && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.maxScore))
+          && isValidGradeStatusTransition('NEW', request.resource.data.status, 'teacher')
         )
-      ) && hasSchoolAccess(request.resource.data.schoolId);
+      ) && hasSchoolAccess(request.resource.data.schoolId)
+        && (!isStrictGradePayload(request.resource.data) || request.resource.data.teacherId != '')
+        && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && (!('maxScore' in request.resource.data) || request.resource.data.score <= request.resource.data.maxScore)))
+        && (!isStrictGradePayload(request.resource.data) || !('resultStatus' in request.resource.data) || request.resource.data.resultStatus != 'scored' || ('score' in request.resource.data));
       
       allow update: if isAuthenticated() && isActive() && (
-        (isAdminOrOwner() || isDirector()) ||
+        (isAdminOrOwner() || (isDirector() && isValidGradeStatusTransition(resource.data.status, request.resource.data.status, 'director'))) ||
         (
           isTeacher()
-          && resource.data.status in ['draft', 'submitted']
+          && isValidGradeStatusTransition(resource.data.status, request.resource.data.status, 'teacher')
+          && resource.data.status != 'locked'
           && request.resource.data.schoolId == resource.data.schoolId
           && request.resource.data.academicYearId == resource.data.academicYearId
           && request.resource.data.evaluationId == resource.data.evaluationId
           && request.resource.data.studentId == resource.data.studentId
           && request.resource.data.classId == resource.data.classId
           && request.resource.data.subjectId == resource.data.subjectId
-          && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.maxScore))
           && request.resource.data.version > resource.data.version
           && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
         )
-      ) && hasSchoolAccess(request.resource.data.schoolId);
+      ) && hasSchoolAccess(request.resource.data.schoolId)
+        && (!isStrictGradePayload(request.resource.data) || request.resource.data.teacherId != '')
+        && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && (!('maxScore' in request.resource.data) || request.resource.data.score <= request.resource.data.maxScore)))
+        && (!isStrictGradePayload(request.resource.data) || !('resultStatus' in request.resource.data) || request.resource.data.resultStatus != 'scored' || ('score' in request.resource.data));
       
       allow delete: if false;
     }

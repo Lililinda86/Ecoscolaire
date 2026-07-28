@@ -16,8 +16,8 @@ export const buildPeriodId = (schoolId: string, academicYearId: string, name: st
   return "prd__" + safeEncode(schoolId) + "__" + safeEncode(academicYearId) + "__" + safeEncode(name);
 };
 
-export const buildEvaluationId = (schoolId: string, academicYearId: string, classSubjectId: string, title: string): string => {
-  return "ev__" + safeEncode(schoolId) + "__" + safeEncode(academicYearId) + "__" + safeEncode(classSubjectId) + "__" + safeEncode(title);
+export const buildEvaluationId = (schoolId: string, academicYearId: string, periodId: string, classId: string, classSubjectId: string, evalKey: string): string => {
+  return "ev__" + safeEncode(schoolId) + "__" + safeEncode(academicYearId) + "__" + safeEncode(periodId) + "__" + safeEncode(classId) + "__" + safeEncode(classSubjectId) + "__" + safeEncode(evalKey);
 };
 
 export const buildGradeId = (evaluationId: string, studentId: string): string => {

@@ -366,6 +366,7 @@ export interface Evaluation {
   createdBy: string;
   updatedAt: string;
   updatedBy: string;
+  version: number;
 }
 
 export type GradeResultStatus = 'scored' | 'absent' | 'excused' | 'exempt' | 'notSubmitted';

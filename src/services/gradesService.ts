@@ -4,44 +4,44 @@ export const validateGradeInput = (grade: Partial<Grade>): { isValid: boolean; e
   const errors: string[] = [];
   
   if (!grade.id) errors.push('L\'identifiant de la note est requis (id).');
-  if (!grade.schoolId) errors.push('L\'identifiant de l\'école est requis (schoolId).');
-  if (!grade.academicYearId) errors.push('L\'année académique est requise (academicYearId).');
-  if (!grade.periodId) errors.push('La période est requise (periodId).');
-  if (!grade.evaluationId) errors.push('L\'évaluation est requise (evaluationId).');
+  if (!grade.schoolId) errors.push('L\'identifiant de l\'ï¿½cole est requis (schoolId).');
+  if (!grade.academicYearId) errors.push('L\'annï¿½e acadï¿½mique est requise (academicYearId).');
+  if (!grade.periodId) errors.push('La pï¿½riode est requise (periodId).');
+  if (!grade.evaluationId) errors.push('L\'ï¿½valuation est requise (evaluationId).');
   if (!grade.classId) errors.push('La classe est requise (classId).');
-  if (!grade.classSubjectId) errors.push('La matière de la classe est requise (classSubjectId).');
-  if (!grade.subjectId) errors.push('La matière est requise (subjectId).');
-  if (!grade.studentId) errors.push('L\'élève est requis (studentId).');
+  if (!grade.classSubjectId) errors.push('La matiï¿½re de la classe est requise (classSubjectId).');
+  if (!grade.subjectId) errors.push('La matiï¿½re est requise (subjectId).');
+  if (!grade.studentId) errors.push('L\'ï¿½lï¿½ve est requis (studentId).');
   if (!grade.teacherId) errors.push('L\'enseignant est requis (teacherId).');
   if (!grade.status) errors.push('Le statut est requis (status).');
-  if (!grade.resultStatus) errors.push('Le statut de résultat est requis (resultStatus).');
-  if (!grade.createdAt) errors.push('La date de création est requise (createdAt).');
-  if (!grade.createdBy) errors.push('Le créateur est requis (createdBy).');
-  if (!grade.updatedAt) errors.push('La date de mise à jour est requise (updatedAt).');
-  if (!grade.updatedBy) errors.push('L\'auteur de la mise à jour est requis (updatedBy).');
+  if (!grade.resultStatus) errors.push('Le statut de rï¿½sultat est requis (resultStatus).');
+  if (!grade.createdAt) errors.push('La date de crï¿½ation est requise (createdAt).');
+  if (!grade.createdBy) errors.push('Le crï¿½ateur est requis (createdBy).');
+  if (!grade.updatedAt) errors.push('La date de mise ï¿½ jour est requise (updatedAt).');
+  if (!grade.updatedBy) errors.push('L\'auteur de la mise ï¿½ jour est requis (updatedBy).');
 
   if (typeof grade.maxScore !== 'number' || !Number.isFinite(grade.maxScore) || grade.maxScore <= 0) {
-    errors.push('La note maximale doit être un nombre strictement positif (maxScore).');
+    errors.push('La note maximale doit ï¿½tre un nombre strictement positif (maxScore).');
   }
 
   if (typeof grade.version !== 'number' || !Number.isInteger(grade.version) || grade.version < 1) {
-    errors.push('La version doit être un entier positif.');
+    errors.push('La version doit ï¿½tre un entier positif.');
   }
 
   if (grade.resultStatus === 'scored') {
     if (grade.score === undefined || grade.score === null) {
-      errors.push('Le score est obligatoire lorsque le statut est "Noté" (scored).');
+      errors.push('Le score est obligatoire lorsque le statut est "Notï¿½" (scored).');
     } else if (typeof grade.score !== 'number' || !Number.isFinite(grade.score)) {
-      errors.push('Le score doit être un nombre fini.');
+      errors.push('Le score doit ï¿½tre un nombre fini.');
     } else if (grade.score < 0 || grade.score > (grade.maxScore || 0)) {
-      errors.push('Le score doit être compris entre 0 et la note maximale.');
+      errors.push('Le score doit ï¿½tre compris entre 0 et la note maximale.');
     }
   } else if (['absent', 'excused', 'exempt', 'notSubmitted'].includes(grade.resultStatus || '')) {
     if (grade.score !== undefined) {
-      errors.push('Le score ne doit pas être renseigné pour ce statut de résultat.');
+      errors.push('Le score ne doit pas ï¿½tre renseignï¿½ pour ce statut de rï¿½sultat.');
     }
   } else if (grade.resultStatus) {
-    errors.push('Le statut de résultat est inconnu.');
+    errors.push('Le statut de rï¿½sultat est inconnu.');
   }
 
   if (grade.status && !['draft', 'submitted', 'validated', 'published', 'locked'].includes(grade.status)) {
@@ -65,7 +65,7 @@ export const analyzeLegacyGrade = (legacy: LegacyGrade): LegacyGradeAnalysis => 
 
   if (legacy.score !== undefined && legacy.maxScore !== undefined) {
     if (legacy.score > legacy.maxScore) {
-      warnings.push('Score est supérieur à la note maximale.');
+      warnings.push('Score est supï¿½rieur ï¿½ la note maximale.');
     }
   }
 
@@ -92,7 +92,7 @@ export const buildGradeCreateMutation = (input: CreateGradeInput, actorId: strin
 
 export const buildGradeUpdateMutation = (existing: Grade, input: UpdateGradeInput, actorId: string, now: string = new Date().toISOString()): Grade => {
   if (input.expectedVersion !== existing.version) {
-    throw new Error('Conflit de version détecté (expectedVersion != existante).');
+    throw new Error('Conflit de version dï¿½tectï¿½ (expectedVersion != existante).');
   }
 
   const updated: Grade = {
@@ -121,4 +121,16 @@ export const mapGradeError = (errorCode: string): string => {
     case 'not-found': return "Note introuvable.";
     default: return "Une erreur est survenue lors de l'enregistrement de la note.";
   }
+};
+
+export const validateEvaluationInput = (evaluation: { weight?: unknown }): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  if (evaluation.weight === undefined || evaluation.weight === null || evaluation.weight === '') {
+    errors.push('Le poids est requis (weight).');
+  } else if (typeof evaluation.weight !== 'number' || !Number.isFinite(evaluation.weight)) {
+    errors.push('Le poids doit tre un nombre (weight).');
+  } else if (evaluation.weight <= 0) {
+    errors.push('Le poids doit tre strictement positif (weight).');
+  }
+  return { isValid: errors.length === 0, errors };
 };
