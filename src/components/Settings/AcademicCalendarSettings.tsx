@@ -21,7 +21,7 @@ interface Props {
 
 export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, currentUser, academicYears, periods }) => {
   const { 
-    createAcademicYear, 
+    createAcademicYear, updateAcademicYearBounds,
     createAcademicPeriod, openAcademicPeriod, closeAcademicPeriod, publishAcademicPeriod
   } = useAppContext();
 
@@ -37,10 +37,12 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
   const openPeriod = activeYearPeriods.find(p => p.status === 'open');
 
   const [showYearModal, setShowYearModal] = useState(false);
+  const [showYearEditModal, setShowYearEditModal] = useState(false);
   const [showPeriodModal, setShowPeriodModal] = useState(false);
 
   // Forms State
   const [yearForm, setYearForm] = useState<Partial<AcademicYear>>({});
+  const [yearEditForm, setYearEditForm] = useState<{startDate: string, endDate: string}>({startDate: '', endDate: ''});
   const [periodForm, setPeriodForm] = useState<Partial<Period>>({ type: 'term', order: 1 });
   const [activateYearImmediately, setActivateYearImmediately] = useState(true);
 
@@ -102,7 +104,24 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
     }
   };
 
-
+  const handleUpdateYearBounds = async () => {
+    setError(null);
+    if (!yearEditForm.startDate || !yearEditForm.endDate) {
+      setError("Les dates de début et fin sont obligatoires.");
+      return;
+    }
+    if (!activeYear) return;
+    try {
+      setLoading(true);
+      await updateAcademicYearBounds(activeYear.id, yearEditForm.startDate, yearEditForm.endDate);
+      setShowYearEditModal(false);
+    } catch (err: unknown) {
+      if (err instanceof AcademicCalendarMutationCancelledError) return;
+      setError(err instanceof Error ? err.message : "Erreur lors de la modification de l'année.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePreFillLegacy = () => {
     if (currentSchool.academicYear) {
@@ -179,8 +198,16 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
       case 'NO_PERIODS':
         return (
           <div className="bg-orange-50 p-4 rounded-md mb-4 border border-orange-200">
-            <p className="text-sm text-orange-800 font-medium">L'année académique active "{activeYear?.name}" n'a aucune période.</p>
-            <p className="text-xs text-orange-700 mt-1">Ajoutez au moins une période avant de pouvoir saisir des notes.</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-orange-800 font-medium">L'année académique active "{activeYear?.name}" n'a aucune période.</p>
+                <p className="text-xs text-orange-700 mt-1">Du {activeYear?.startDate} au {activeYear?.endDate}</p>
+                <p className="text-xs text-orange-700 mt-1">Ajoutez au moins une période avant de pouvoir saisir des notes.</p>
+              </div>
+              {isManager && (
+                <button disabled={loading} onClick={() => { setYearEditForm({startDate: activeYear?.startDate || '', endDate: activeYear?.endDate || ''}); setShowYearEditModal(true); }} className="px-3 py-1 bg-white border border-orange-600 text-orange-700 rounded text-sm hover:bg-orange-50">Modifier les dates</button>
+              )}
+            </div>
             {isManager && (
               <div className="mt-4">
                 <button disabled={loading} onClick={() => setShowPeriodModal(true)} className="px-3 py-1 bg-orange-600 text-white rounded text-sm hover:bg-orange-700">Ajouter une période</button>
@@ -191,8 +218,16 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
       case 'NO_OPEN_PERIOD':
         return (
           <div className="bg-blue-50 p-4 rounded-md mb-4 border border-blue-200">
-            <p className="text-sm text-blue-800 font-medium">L'année académique active "{activeYear?.name}" a des périodes fermées.</p>
-            <p className="text-xs text-blue-700 mt-1">Aucune période de saisie n'est actuellement ouverte.</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-blue-800 font-medium">L'année académique active "{activeYear?.name}" a des périodes fermées.</p>
+                <p className="text-xs text-blue-700 mt-1">Du {activeYear?.startDate} au {activeYear?.endDate}</p>
+                <p className="text-xs text-blue-700 mt-1">Aucune période de saisie n'est actuellement ouverte.</p>
+              </div>
+              {isManager && (
+                <button disabled={loading} onClick={() => { setYearEditForm({startDate: activeYear?.startDate || '', endDate: activeYear?.endDate || ''}); setShowYearEditModal(true); }} className="px-3 py-1 bg-white border border-blue-600 text-blue-700 rounded text-sm hover:bg-blue-50">Modifier les dates</button>
+              )}
+            </div>
             {isManager && (
               <div className="mt-4 flex gap-2">
                 <button disabled={loading} onClick={() => setShowPeriodModal(true)} className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Ajouter une période</button>
@@ -206,10 +241,12 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm text-green-800 font-medium">Calendrier utilisable</p>
-                <p className="text-xs text-green-700 mt-1">
+                <p className="text-xs text-green-700 mt-1 flex items-center gap-2">
                   <span className="font-semibold bg-green-200 px-1 py-0.5 rounded">Année active</span> {activeYear?.name}
-                  <br />
-                  <span className="ml-1 text-gray-600 font-mono text-[10px]">Du {activeYear?.startDate} au {activeYear?.endDate}</span>
+                  <span className="text-gray-600 font-mono text-[10px]">Du {activeYear?.startDate} au {activeYear?.endDate}</span>
+                  {isManager && (
+                    <button disabled={loading} onClick={() => { setYearEditForm({startDate: activeYear?.startDate || '', endDate: activeYear?.endDate || ''}); setShowYearEditModal(true); }} className="px-2 py-0.5 text-[10px] bg-white border border-green-600 text-green-700 rounded hover:bg-green-50">Modifier</button>
+                  )}
                 </p>
                 <p className="text-xs text-green-700 mt-1">
                   <span className="font-semibold bg-green-200 px-1 py-0.5 rounded">Période ouverte</span> {openPeriod?.name}
@@ -305,6 +342,32 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
               <button disabled={loading} onClick={handleCreateYear} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">{loading ? 'Création...' : 'Créer'}</button>
             </div>
             {fieldErrors.general && <p className="text-sm text-red-600 mt-2 text-center">{fieldErrors.general}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Year Edit Bounds Modal */}
+      {showYearEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Modifier les dates de l'année scolaire</h3>
+            <p className="text-sm text-gray-500 mb-4">Les nouvelles dates doivent inclure toutes les périodes existantes.</p>
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700">Date de début</label>
+                  <input type="date" value={yearEditForm.startDate} onChange={e => setYearEditForm({...yearEditForm, startDate: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700">Date de fin</label>
+                  <input type="date" value={yearEditForm.endDate} onChange={e => setYearEditForm({...yearEditForm, endDate: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button disabled={loading} onClick={() => setShowYearEditModal(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Annuler</button>
+                <button disabled={loading} onClick={handleUpdateYearBounds} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">Enregistrer</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

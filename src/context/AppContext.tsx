@@ -5,7 +5,7 @@ import type { Database, DatabasePatch } from '../db/storage';
 import type { User, School, Student, Payment, Expense, Evaluation, Grade } from '../types';
 import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { AcademicCalendarMutationCancelledError } from '../services/academicCalendarConfiguration';
-import { createAcademicYear as createAY, activateAcademicYear as actAY, createPeriod as createP, openPeriod as openP, updatePeriodStatus as updatePStatus } from '../services/academicCalendarPersistence';
+import { createAcademicYear as createAY, activateAcademicYear as actAY, updateAcademicYearBounds as updateAYBounds, createPeriod as createP, openPeriod as openP, updatePeriodStatus as updatePStatus } from '../services/academicCalendarPersistence';
 import { db as firestoreDb } from '../db/firebase';
 import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
@@ -89,6 +89,7 @@ interface AppContextProps {
   isSchoolSuspended: boolean;
   createAcademicYear: (year: Omit<AcademicYear, 'id' | 'createdAt' | 'updatedAt'>, activateImmediately?: boolean) => Promise<void>;
   activateAcademicYear: (yearId: string) => Promise<void>;
+  updateAcademicYearBounds: (yearId: string, startDate: string, endDate: string) => Promise<void>;
   createAcademicPeriod: (period: Omit<Period, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   openAcademicPeriod: (periodId: string) => Promise<void>;
   closeAcademicPeriod: (periodId: string) => Promise<void>;
@@ -117,6 +118,19 @@ const upsertCanonicalPeriods = (existing: Period[], updates: Period[]) => {
   });
   return merged;
 };
+
+export const replaceAcademicYearByCanonicalResult = (
+  existingYears: AcademicYear[],
+  result: { academicYearId: string; startDate: string; endDate: string }
+): AcademicYear[] => {
+  return existingYears.map(y => {
+    if (y.id === result.academicYearId) {
+      return { ...y, startDate: result.startDate, endDate: result.endDate };
+    }
+    return y;
+  });
+};
+
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [db, setDb] = useState<Database | null>(null);
@@ -989,6 +1003,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const updateAcademicYearBounds = async (yearId: string, startDate: string, endDate: string) => {
+    if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
+
+    try {
+      const result = await updateAYBounds({
+        schoolId: currentSchool.id,
+        academicYearId: yearId,
+        startDate,
+        endDate
+      });
+
+      if (result.success) {
+        setDb(prev => {
+          if (!prev || !prev.academicYears) return prev;
+          const updatedYears = replaceAcademicYearByCanonicalResult(prev.academicYears, result);
+          return { ...prev, academicYears: updatedYears };
+        });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur lors de la modification des dates de l\'année académique.';
+      throw new Error(message);
+    }
+  };
+
   const createAcademicPeriod = async (period: Omit<Period, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!db) throw new Error('Database not initialized');
     if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
@@ -1053,7 +1091,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{ 
       db, updateLocalState, updateStudentLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, saveStructuredGrades, currentUser, currentSchool,
-      createAcademicYear, activateAcademicYear, createAcademicPeriod, openAcademicPeriod, closeAcademicPeriod, publishAcademicPeriod,
+      createAcademicYear, activateAcademicYear, updateAcademicYearBounds, createAcademicPeriod, openAcademicPeriod, closeAcademicPeriod, publishAcademicPeriod,
       isSupervising, enterSupervision, exitSupervision, 
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended

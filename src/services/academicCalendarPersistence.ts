@@ -1,4 +1,5 @@
 import { Firestore, collection, doc, runTransaction, writeBatch } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { AcademicYear, Period, School } from '../types';
 
 export type CreateAcademicYearResult = {
@@ -341,4 +342,31 @@ export async function updatePeriodStatus(
     transaction.update(periodRef, { ...updatedPeriod });
     return { updatedPeriod };
   });
+}
+
+export type UpdateAcademicYearBoundsInput = {
+  schoolId: string;
+  academicYearId: string;
+  startDate: string;
+  endDate: string;
+};
+
+export type UpdateAcademicYearBoundsOutput = {
+  success: boolean;
+  academicYearId: string;
+  startDate: string;
+  endDate: string;
+};
+
+export async function updateAcademicYearBounds(
+  payload: UpdateAcademicYearBoundsInput
+): Promise<UpdateAcademicYearBoundsOutput> {
+  const functions = getFunctions();
+  const callable = httpsCallable<UpdateAcademicYearBoundsInput, UpdateAcademicYearBoundsOutput>(
+    functions,
+    'updateAcademicYearBounds'
+  );
+  
+  const result = await callable(payload);
+  return result.data;
 }
