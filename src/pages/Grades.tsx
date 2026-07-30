@@ -11,6 +11,14 @@ import { Plus, Printer, Trophy } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
+export const ACADEMIC_CALENDAR_SETTINGS_HASH = '#/settings?section=academic-calendar';
+
+export const getCalendarActionUrl = (hasAcademicYears: boolean, hasSelectedYear: boolean, openPeriodsCount: number): string | null => {
+  if (!hasAcademicYears) return ACADEMIC_CALENDAR_SETTINGS_HASH;
+  if (hasSelectedYear && openPeriodsCount === 0) return ACADEMIC_CALENDAR_SETTINGS_HASH;
+  return null;
+};
+
 export const getAppreciation = (score: number, max: number = 20) => {
   const normalized = (score / max) * 20;
   if (normalized >= 18) return 'Excellent';
@@ -576,7 +584,7 @@ const Grades: React.FC = () => {
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <p style={{ marginBottom: '1rem', color: 'var(--danger-color)', fontWeight: 'bold' }}>Aucun calendrier académique n’est configuré pour cette école.</p>
             <p style={{ marginBottom: '2rem' }}>Configurez l'année scolaire et ses périodes avant la saisie des notes.</p>
-            <button type="button" onClick={() => window.location.href = '#/settings'}>Configurer le calendrier académique</button>
+            <button type="button" onClick={() => window.location.href = ACADEMIC_CALENDAR_SETTINGS_HASH}>Configurer le calendrier académique</button>
             <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>* Note: L'écran de configuration complet du calendrier académique fera l'objet d'un lot séparé. Pour l'instant, naviguez vers les paramètres.</p>
           </div>
         ) : (
@@ -601,7 +609,10 @@ const Grades: React.FC = () => {
                 ))}
               </select>
               {selectedAcademicYearId && dropdownPeriods.length === 0 && (
-                <small style={{ color: 'var(--danger-color)', display: 'block', marginTop: '0.5rem' }}>Aucune période de saisie n'est actuellement ouverte pour cette année scolaire.</small>
+                <div style={{ marginTop: '0.5rem' }}>
+                  <small style={{ color: 'var(--danger-color)', display: 'block', marginBottom: '0.5rem' }}>Aucune période de saisie n'est actuellement ouverte pour cette année scolaire.</small>
+                  <button type="button" onClick={() => window.location.href = ACADEMIC_CALENDAR_SETTINGS_HASH}>Ouvrir une période de saisie</button>
+                </div>
               )}
             </div>
           </div>
