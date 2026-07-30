@@ -45,6 +45,11 @@ interface ClassProgramSubjectPickerProps {
 
 type PickerStep = 'classes' | 'subjects';
 
+type SortableClass = Omit<ClassSection, 'section' | 'cycle'> & {
+  section: string;
+  cycle: string;
+};
+
 export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps> = ({
   catalogSubjects,
   activeSubjects,
@@ -123,10 +128,16 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
        });
     }
 
-    // Sort classes
-    filtered = sortClassesPedagogically(filtered, currentClassSection);
+    // Sort classes by dynamically populating section and cycle if missing
+    const mappedForSort: SortableClass[] = filtered.map(c => ({
+      ...c,
+      section: normalizeClassSection(c),
+      cycle: normalizeClassCycle(c)
+    }));
+    
+    const sorted = sortClassesPedagogically(mappedForSort, currentClassSection);
 
-    return filtered;
+    return sorted as ClassSection[];
   }, [classes, schoolId, classSearchTerm, isClassFiltered, currentClassSection, currentClassCycle]);
 
   // Handlers for classes
@@ -171,10 +182,18 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         role="dialog"
         aria-modal="true"
         aria-labelledby="subject-picker-title"
-        className="class-program-picker-dialog bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex max-h-[90vh] flex-col overflow-hidden"
-        style={{ width: 'min(92vw, 760px)', maxHeight: 'min(90vh, 760px)' }}
+        className="class-program-picker-dialog bg-white dark:bg-gray-900 rounded-xl shadow-2xl"
+        style={{ 
+          width: 'min(92vw, 760px)', 
+          height: 'min(90vh, 760px)',
+          maxHeight: 'min(90vh, 760px)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+        data-testid="bulk-picker-dialog"
       >
-        <header className="shrink-0 p-4 border-b border-gray-200 dark:border-gray-800 flex items-start justify-between">
+        <header data-testid="picker-header" className="shrink-0 p-4 border-b border-gray-200 dark:border-gray-800 flex items-start justify-between">
           <div>
             <h2 id="subject-picker-title" className="text-base font-bold text-gray-950 dark:text-white">
               Ajouter des matières au programme
@@ -187,13 +206,18 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             type="button"
             aria-label="Fermer"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
+            className="shrink-0 rounded p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            style={{
+              width: 36,
+              height: 36,
+              background: 'transparent'
+            }}
           >
             ×
           </button>
         </header>
 
-        <nav role="tablist" className="shrink-0 flex gap-2 border-b border-gray-200 dark:border-gray-800 px-4 pt-4 bg-gray-50 dark:bg-gray-900/50">
+        <nav data-testid="picker-navigation" role="tablist" className="shrink-0 flex gap-2 border-b border-gray-200 dark:border-gray-800 px-4 pt-4 bg-gray-50 dark:bg-gray-900/50">
           <button 
             type="button"
             role="tab"
@@ -214,9 +238,9 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </button>
         </nav>
 
-        <main className="min-h-0 flex-1 overflow-hidden flex flex-col">
+        <main data-testid="picker-main" className="min-h-0 flex-1 overflow-hidden">
           {activeStep === 'classes' ? (
-            <section key="classes" data-testid="classes-step" className="flex flex-col h-full">
+            <section key="classes" data-testid="classes-step" className="flex h-full min-h-0 flex-col overflow-hidden">
               <div className="p-4 shrink-0">
                 <input
                   type="text"
@@ -232,6 +256,14 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                     id="filter-classes-cb"
                     checked={!isClassFiltered}
                     onChange={(e) => setIsClassFiltered(!e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      minWidth: 16,
+                      maxWidth: 16,
+                      margin: 0,
+                      flex: '0 0 16px'
+                    }}
                   />
                   <span>Afficher aussi les classes des autres sections et cycles</span>
                 </label>
@@ -251,8 +283,8 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 data-testid="classes-scroll-container"
                 className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pr-2 ml-4 mb-4"
                 style={{
-                  height: 'min(48vh, 430px)',
-                  scrollbarGutter: 'stable'
+                  scrollbarGutter: 'stable',
+                  overscrollBehavior: 'contain'
                 }}
               >
                 {availableClasses.map(c => {
@@ -269,6 +301,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                           height: 16,
                           minWidth: 16,
                           maxWidth: 16,
+                          margin: 0,
                           flex: '0 0 16px'
                         }}
                         checked={selectedClassIds.has(c.id)}
@@ -301,7 +334,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
               </div>
             </section>
           ) : (
-            <section key="subjects" data-testid="subjects-step" className="flex flex-col h-full">
+            <section key="subjects" data-testid="subjects-step" className="flex h-full min-h-0 flex-col overflow-hidden">
               <div className="p-4 shrink-0">
                 <input
                   type="text"
@@ -317,6 +350,14 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                     id="filter-subjects-cb"
                     checked={!isSubjectFiltered}
                     onChange={(e) => setIsSubjectFiltered(!e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      minWidth: 16,
+                      maxWidth: 16,
+                      margin: 0,
+                      flex: '0 0 16px'
+                    }}
                   />
                   <span>Afficher aussi les matières des autres sections et cycles</span>
                 </label>
@@ -336,8 +377,8 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 data-testid="subjects-scroll-container"
                 className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pr-2 ml-4 mb-4"
                 style={{
-                  height: 'min(48vh, 430px)',
-                  scrollbarGutter: 'stable'
+                  scrollbarGutter: 'stable',
+                  overscrollBehavior: 'contain'
                 }}
               >
                 {availableSubjects.map((s) => {
@@ -355,6 +396,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                           height: 16,
                           minWidth: 16,
                           maxWidth: 16,
+                          margin: 0,
                           flex: '0 0 16px'
                         }}
                         checked={selectedSubjectIds.has(s.id)}
