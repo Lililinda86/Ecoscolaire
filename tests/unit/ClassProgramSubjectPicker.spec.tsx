@@ -60,7 +60,7 @@ describe('ClassProgramSubjectPicker UX', () => {
     expect(html).toContain('Maternelle 1');
     expect(html).toMatch(/francophone(<!-- -->)? • (<!-- -->)?maternelle/);
 
-    // Contenu central défilable
-    expect(html).toContain('overflow-y-auto md:overflow-hidden');
+    // Contenu central avec grille
+    expect(html).toContain('grid grid-cols-1 md:grid-cols-2');
   });
 });

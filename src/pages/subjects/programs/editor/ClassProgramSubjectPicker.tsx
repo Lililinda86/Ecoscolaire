@@ -34,6 +34,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<Set<string>>(new Set());
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'classes' | 'subjects'>('classes');
 
   // Current class details for baseline
   const currentClassSection = useMemo(() => {
@@ -155,11 +156,29 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </button>
         </header>
 
-        <div className="p-4 flex flex-col md:flex-row gap-4 overflow-y-auto md:overflow-hidden flex-1">
+        {/* MOBILE TABS */}
+        <div className="md:hidden flex border-b border-gray-200 dark:border-gray-800 px-4 pt-2 flex-shrink-0">
+          <button
+            type="button"
+            className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'classes' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+            onClick={() => setActiveTab('classes')}
+          >
+            1. Classes
+          </button>
+          <button
+            type="button"
+            className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'subjects' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+            onClick={() => setActiveTab('subjects')}
+          >
+            2. Matières
+          </button>
+        </div>
+
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0 overflow-hidden flex-1">
 
           {/* CLASSES COLUMN */}
-          <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 pb-4 md:pb-0 md:pr-4 overflow-hidden min-h-[250px]">
-            <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">1. Classes concernées</h4>
+          <div className={`flex-col min-h-0 overflow-hidden md:border-r border-gray-200 dark:border-gray-800 md:pr-4 ${activeTab === 'classes' ? 'flex' : 'hidden'} md:flex`}>
+            <h4 className="hidden md:block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">1. Classes concernées</h4>
 
             <input
               type="text"
@@ -194,17 +213,17 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 const cSec = normalizeClassSection(c);
                 const cCyc = normalizeClassCycle(c);
                 return (
-                  <label key={c.id} className="flex items-start gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                  <label key={c.id} className="flex items-start gap-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
                     <input
                       type="checkbox"
                       className="mt-0.5"
                       checked={selectedClassIds.has(c.id)}
                       onChange={() => handleToggleClass(c.id)}
                     />
-                    <div className="flex flex-col">
+                    <span className="flex flex-col">
                       <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{c.name}</span>
                       <span className="text-[10px] text-gray-500">{cSec} • {cCyc}</span>
-                    </div>
+                    </span>
                   </label>
                 );
               })}
@@ -212,11 +231,21 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 <div className="text-xs text-gray-500 text-center mt-4">Aucune classe trouvée.</div>
               )}
             </div>
+
+            <div className="md:hidden mt-3 flex-shrink-0">
+              <button
+                type="button"
+                className="w-full py-2 text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 rounded"
+                onClick={() => setActiveTab('subjects')}
+              >
+                Continuer vers les matières
+              </button>
+            </div>
           </div>
 
           {/* SUBJECTS COLUMN */}
-          <div className="flex-1 flex flex-col overflow-hidden md:pl-2 min-h-[250px]">
-            <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">2. Matières à ajouter</h4>
+          <div className={`flex-col min-h-0 overflow-hidden md:pl-2 ${activeTab === 'subjects' ? 'flex' : 'hidden'} md:flex`}>
+            <h4 className="hidden md:block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">2. Matières à ajouter</h4>
 
             <input
               type="text"
@@ -248,46 +277,54 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
             <div className="overflow-y-auto flex-1 space-y-1">
               {availableSubjects.map((s) => (
-                <label key={s.id} className="flex items-start gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                <label key={s.id} className="flex items-start gap-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
                   <input
                     type="checkbox"
                     className="mt-0.5"
                     checked={selectedSubjectIds.has(s.id)}
                     onChange={() => handleToggleSubject(s.id)}
                   />
-                  <div className="flex flex-col">
+                  <span className="flex flex-col">
                     <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{s.name} {s.code ? `(${s.code})` : ''}</span>
                     <span className="text-[10px] text-gray-500">
                       {s.section === 'all' ? 'Toutes sections' : s.section}
                       {(s.cycles && s.cycles.length > 0) ? ` • ${s.cycles.join(',')}` : ''}
                     </span>
-                  </div>
+                  </span>
                 </label>
               ))}
               {availableSubjects.length === 0 && (
-                <div className="text-xs text-gray-500 text-center mt-4">Aucune matière trouvée.</div>
+                <div className="text-xs text-gray-500 text-center mt-4">
+                  Aucune matière compatible avec les classes sélectionnées.
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-lg flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={selectedClassIds.size === 0 || selectedSubjectIds.size === 0 || isSubmitting}
-            aria-disabled={selectedClassIds.size === 0 || selectedSubjectIds.size === 0 || isSubmitting}
-            className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
-          >
-            {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière(s) à ${selectedClassIds.size} classe(s)`}
-          </button>
-        </div>
-
+        {(() => {
+          const isDisabled = selectedClassIds.size === 0 || selectedSubjectIds.size === 0 || isSubmitting;
+          return (
+            <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-lg flex-shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isDisabled}
+                aria-disabled={isDisabled}
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
+              >
+                {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière(s) à ${selectedClassIds.size} classe(s)`}
+              </button>
+            </div>
+          );
+        })()}
       </section>
     </div>
   );
