@@ -5,11 +5,12 @@ import {
   canManageAcademicCalendar, 
   getCalendarConfigurationState,
   buildAcademicYearId,
-  buildPeriodId,
   validateAcademicYearInput,
-  validatePeriodInput,
-  AcademicCalendarMutationCancelledError
+  preparePeriodSubmission,
+  submitValidatedPeriod,
+  AcademicCalendarMutationCancelledError,
 } from '../../services/academicCalendarConfiguration';
+import type { PeriodFieldErrors } from '../../services/academicCalendarConfiguration';
 
 interface Props {
   currentSchool: School;
@@ -26,6 +27,8 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<PeriodFieldErrors>({});
+  const submittingRef = React.useRef(false);
 
   const isManager = canManageAcademicCalendar(currentUser.role);
   const state = getCalendarConfigurationState(academicYears, periods);
@@ -41,6 +44,14 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
   const [periodForm, setPeriodForm] = useState<Partial<Period>>({ type: 'term', order: 1 });
   const [activateYearImmediately, setActivateYearImmediately] = useState(true);
 
+  const clearPeriodFieldError = (fieldName: keyof PeriodFieldErrors) => {
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[fieldName];
+      return newErrors;
+    });
+  };
+
   const handleCreateYear = async () => {
     setError(null);
     if (!yearForm.startDate || !yearForm.endDate) {
@@ -51,7 +62,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
     const payload: AcademicYear = {
       id,
       schoolId: currentSchool.id,
-      name: yearForm.name || '',
+      name: yearForm.name?.trim() || '',
       startDate: yearForm.startDate,
       endDate: yearForm.endDate,
       status: activateYearImmediately ? 'active' : 'draft',
@@ -63,7 +74,17 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
 
     const validation = validateAcademicYearInput(payload, currentSchool.id);
     if (!validation.isValid) {
-      setError(validation.errors.join(" "));
+      const newFieldErrors: PeriodFieldErrors = {};
+      validation.errors.forEach(err => {
+        if (err.includes("nom")) newFieldErrors.name = err;
+        else if (err.includes("début est invalide")) newFieldErrors.startDate = err;
+        else if (err.includes("fin est invalide") || err.includes("postérieure")) newFieldErrors.endDate = err;
+        else newFieldErrors.general = err;
+      });
+      setFieldErrors(newFieldErrors);
+      if (newFieldErrors.name) document.getElementById('yearNameInput')?.focus();
+      else if (newFieldErrors.startDate) document.getElementById('yearStartDateInput')?.focus();
+      else if (newFieldErrors.endDate) document.getElementById('yearEndDateInput')?.focus();
       return;
     }
 
@@ -72,6 +93,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
       await createAcademicYear(payload, activateYearImmediately);
       setShowYearModal(false);
       setYearForm({});
+      setFieldErrors({});
     } catch (err: unknown) {
       if (err instanceof AcademicCalendarMutationCancelledError) return;
       setError(err instanceof Error ? err.message : "Erreur lors de la création de l'année.");
@@ -89,42 +111,47 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
   };
 
   const handleCreatePeriod = async () => {
-    setError(null);
-    if (!activeYear) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     
-    const id = buildPeriodId(activeYear.id, periodForm.order || 1);
-    const payload: Period = {
-      id,
-      schoolId: currentSchool.id,
-      academicYearId: activeYear.id,
-      name: periodForm.name || '',
-      type: (periodForm.type as Period['type']) || 'term',
-      order: periodForm.order || 1,
-      startDate: periodForm.startDate || '',
-      endDate: periodForm.endDate || '',
-      status: 'draft',
-      createdAt: new Date().toISOString(),
-      createdBy: currentUser.id,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentUser.id
-    };
-
-    const validation = validatePeriodInput(payload, activeYear, currentSchool.id);
-    if (!validation.isValid) {
-      setError(validation.errors.join(" "));
+    setError(null);
+    setFieldErrors({});
+    if (!activeYear) {
+      submittingRef.current = false;
       return;
     }
+    
+    const submission = preparePeriodSubmission({
+      input: periodForm,
+      academicYear: activeYear,
+      currentSchoolId: currentSchool.id,
+      currentUser
+    });
 
     try {
       setLoading(true);
-      await createAcademicPeriod(payload);
+      const success = await submitValidatedPeriod({
+        submission,
+        persist: createAcademicPeriod
+      });
+
+      if (!success) {
+        setFieldErrors(submission.fieldErrors);
+        if (submission.fieldErrors.name) document.getElementById('periodNameInput')?.focus();
+        else if (submission.fieldErrors.startDate) document.getElementById('periodStartDateInput')?.focus();
+        else if (submission.fieldErrors.endDate) document.getElementById('periodEndDateInput')?.focus();
+        return;
+      }
+
       setShowPeriodModal(false);
       setPeriodForm({ type: 'term', order: (periodForm.order || 1) + 1 });
+      setFieldErrors({});
     } catch (err: unknown) {
       if (err instanceof AcademicCalendarMutationCancelledError) return;
       setError(err instanceof Error ? err.message : "Erreur lors de la création de la période.");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
@@ -180,7 +207,9 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
               <div>
                 <p className="text-sm text-green-800 font-medium">Calendrier utilisable</p>
                 <p className="text-xs text-green-700 mt-1">
-                  <span className="font-semibold bg-green-200 px-1 py-0.5 rounded">Année active</span> {activeYear?.name} ({activeYear?.startDate} - {activeYear?.endDate})
+                  <span className="font-semibold bg-green-200 px-1 py-0.5 rounded">Année active</span> {activeYear?.name}
+                  <br />
+                  <span className="ml-1 text-gray-600 font-mono text-[10px]">Du {activeYear?.startDate} au {activeYear?.endDate}</span>
                 </p>
                 <p className="text-xs text-green-700 mt-1">
                   <span className="font-semibold bg-green-200 px-1 py-0.5 rounded">Période ouverte</span> {openPeriod?.name}
@@ -251,16 +280,19 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Nom de l'année</label>
-                <input type="text" value={yearForm.name || ''} onChange={e => setYearForm({...yearForm, name: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" placeholder="ex: 2026-2027" />
+                <input id="yearNameInput" type="text" value={yearForm.name || ''} onChange={e => setYearForm({...yearForm, name: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" placeholder="ex: 2026-2027" />
+                {fieldErrors.name && <p className="text-sm text-red-600 mt-1">{fieldErrors.name}</p>}
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">Date de début</label>
-                  <input type="date" value={yearForm.startDate || ''} onChange={e => setYearForm({...yearForm, startDate: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  <input id="yearStartDateInput" type="date" value={yearForm.startDate || ''} onChange={e => { setYearForm({...yearForm, startDate: e.target.value}); clearPeriodFieldError('startDate'); }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  {fieldErrors.startDate && <p className="text-sm text-red-600 mt-1">{fieldErrors.startDate}</p>}
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">Date de fin</label>
-                  <input type="date" value={yearForm.endDate || ''} onChange={e => setYearForm({...yearForm, endDate: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  <input id="yearEndDateInput" type="date" value={yearForm.endDate || ''} onChange={e => { setYearForm({...yearForm, endDate: e.target.value}); clearPeriodFieldError('endDate'); }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  {fieldErrors.endDate && <p className="text-sm text-red-600 mt-1">{fieldErrors.endDate}</p>}
                 </div>
               </div>
               <div className="flex items-center mt-2">
@@ -269,9 +301,10 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button disabled={loading} onClick={() => setShowYearModal(false)} className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Annuler</button>
-              <button disabled={loading} onClick={handleCreateYear} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">Créer</button>
+              <button disabled={loading} onClick={() => { setShowYearModal(false); setFieldErrors({}); }} className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Annuler</button>
+              <button disabled={loading} onClick={handleCreateYear} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">{loading ? 'Création...' : 'Créer'}</button>
             </div>
+            {fieldErrors.general && <p className="text-sm text-red-600 mt-2 text-center">{fieldErrors.general}</p>}
           </div>
         </div>
       )}
@@ -284,7 +317,8 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Nom de la période</label>
-                <input type="text" value={periodForm.name || ''} onChange={e => setPeriodForm({...periodForm, name: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" placeholder="ex: 1er Trimestre" />
+                <input id="periodNameInput" type="text" value={periodForm.name || ''} onChange={e => { setPeriodForm({...periodForm, name: e.target.value}); clearPeriodFieldError('name'); }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" placeholder="ex: 1er Trimestre" />
+                {fieldErrors.name && <p className="text-sm text-red-600 mt-1">{fieldErrors.name}</p>}
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
@@ -301,21 +335,25 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
                   <input type="number" min="1" value={periodForm.order || 1} onChange={e => setPeriodForm({...periodForm, order: parseInt(e.target.value)})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
                 </div>
               </div>
+              {fieldErrors.academicYear && <p className="text-sm text-red-600 mt-1">{fieldErrors.academicYear}</p>}
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">Date de début</label>
-                  <input type="date" value={periodForm.startDate || ''} onChange={e => setPeriodForm({...periodForm, startDate: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  <input id="periodStartDateInput" type="date" value={periodForm.startDate || ''} onChange={e => { setPeriodForm({...periodForm, startDate: e.target.value}); clearPeriodFieldError('startDate'); }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  {fieldErrors.startDate && <p className="text-sm text-red-600 mt-1">{fieldErrors.startDate}</p>}
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">Date de fin</label>
-                  <input type="date" value={periodForm.endDate || ''} onChange={e => setPeriodForm({...periodForm, endDate: e.target.value})} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  <input id="periodEndDateInput" type="date" value={periodForm.endDate || ''} onChange={e => { setPeriodForm({...periodForm, endDate: e.target.value}); clearPeriodFieldError('endDate'); }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" />
+                  {fieldErrors.endDate && <p className="text-sm text-red-600 mt-1">{fieldErrors.endDate}</p>}
                 </div>
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button disabled={loading} onClick={() => setShowPeriodModal(false)} className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Annuler</button>
-              <button disabled={loading} onClick={handleCreatePeriod} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">Créer</button>
+              <button disabled={loading} onClick={() => { setShowPeriodModal(false); setFieldErrors({}); }} className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Annuler</button>
+              <button disabled={loading} onClick={handleCreatePeriod} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">{loading ? 'Création...' : 'Créer'}</button>
             </div>
+            {fieldErrors.general && <p className="text-sm text-red-600 mt-2 text-center">{fieldErrors.general}</p>}
           </div>
         </div>
       )}

@@ -12,6 +12,26 @@ export function canManageAcademicCalendar(role: GlobalRole | undefined): boolean
   return role === 'owner' || role === 'director' || role === 'superAdmin';
 }
 
+export function isValidISODateOnly(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (month < 1 || month > 12) return false;
+
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  return day >= 1 && day <= daysInMonth;
+}
+
+export function normalizeDateToISO(dateValue: string | undefined | null): string | null {
+  if (!dateValue) return null;
+  return isValidISODateOnly(dateValue) ? dateValue : null;
+}
+
 export function validateAcademicYearInput(
   input: Partial<AcademicYear>,
   currentSchoolId: string
@@ -24,15 +44,20 @@ export function validateAcademicYearInput(
   if (!input.name || input.name.trim() === '') {
     errors.push("Le nom de l'année académique est obligatoire.");
   }
-  if (!input.startDate || isNaN(Date.parse(input.startDate))) {
+
+  const startISO = normalizeDateToISO(input.startDate);
+  const endISO = normalizeDateToISO(input.endDate);
+
+  if (!startISO) {
     errors.push("La date de début est invalide.");
   }
-  if (!input.endDate || isNaN(Date.parse(input.endDate))) {
+  if (!endISO) {
     errors.push("La date de fin est invalide.");
   }
-  if (input.startDate && input.endDate && new Date(input.endDate) <= new Date(input.startDate)) {
+  if (startISO && endISO && endISO <= startISO) {
     errors.push("La date de fin doit être postérieure à la date de début.");
   }
+  
   if (!input.status || !['draft', 'active', 'closed', 'archived'].includes(input.status)) {
     errors.push("Le statut initial est invalide.");
   }
@@ -62,20 +87,33 @@ export function validatePeriodInput(
   if (typeof input.order !== 'number' || input.order < 1) {
     errors.push("L'ordre de la période doit être un entier positif.");
   }
-  if (!input.startDate || isNaN(Date.parse(input.startDate))) {
+
+  const startISO = normalizeDateToISO(input.startDate);
+  const endISO = normalizeDateToISO(input.endDate);
+  const yearStartISO = normalizeDateToISO(academicYear.startDate);
+  const yearEndISO = normalizeDateToISO(academicYear.endDate);
+
+  if (!yearStartISO) {
+    errors.push("La date de début de l'année académique est invalide. Corrigez l'année avant d'ajouter une période.");
+  }
+  if (!yearEndISO) {
+    errors.push("La date de fin de l'année académique est invalide. Corrigez l'année avant d'ajouter une période.");
+  }
+
+  if (!startISO) {
     errors.push("La date de début est invalide.");
   }
-  if (!input.endDate || isNaN(Date.parse(input.endDate))) {
+  if (!endISO) {
     errors.push("La date de fin est invalide.");
   }
-  if (input.startDate && input.endDate && new Date(input.endDate) <= new Date(input.startDate)) {
+  if (startISO && endISO && endISO <= startISO) {
     errors.push("La date de fin doit être postérieure à la date de début.");
   }
   
-  if (input.startDate && academicYear.startDate && new Date(input.startDate) < new Date(academicYear.startDate)) {
+  if (startISO && yearStartISO && startISO < yearStartISO) {
     errors.push("La date de début de la période ne peut pas être antérieure à celle de l'année académique.");
   }
-  if (input.endDate && academicYear.endDate && new Date(input.endDate) > new Date(academicYear.endDate)) {
+  if (endISO && yearEndISO && endISO > yearEndISO) {
     errors.push("La date de fin de la période ne peut pas être postérieure à celle de l'année académique.");
   }
 
@@ -92,14 +130,12 @@ export function detectAcademicYearOverlap(
   existingYears: AcademicYear[],
   excludeYearId?: string
 ): boolean {
-  const start = new Date(newYearStart).getTime();
-  const end = new Date(newYearEnd).getTime();
-
+  if (!isValidISODateOnly(newYearStart) || !isValidISODateOnly(newYearEnd)) {
+    throw new Error("Toutes les dates doivent être ISO valides pour vérifier le chevauchement.");
+  }
   return existingYears.some(year => {
     if (excludeYearId && year.id === excludeYearId) return false;
-    const yearStart = new Date(year.startDate).getTime();
-    const yearEnd = new Date(year.endDate).getTime();
-    return start < yearEnd && end > yearStart;
+    return newYearStart < year.endDate && newYearEnd > year.startDate;
   });
 }
 
@@ -109,19 +145,17 @@ export function detectPeriodOverlap(
   existingPeriods: Period[],
   excludePeriodId?: string
 ): boolean {
-  const start = new Date(newPeriodStart).getTime();
-  const end = new Date(newPeriodEnd).getTime();
-
+  if (!isValidISODateOnly(newPeriodStart) || !isValidISODateOnly(newPeriodEnd)) {
+    throw new Error("Toutes les dates doivent être ISO valides pour vérifier le chevauchement.");
+  }
   return existingPeriods.some(period => {
     if (excludePeriodId && period.id === excludePeriodId) return false;
-    const pStart = new Date(period.startDate).getTime();
-    const pEnd = new Date(period.endDate).getTime();
-    return start < pEnd && end > pStart;
+    return newPeriodStart < period.endDate && newPeriodEnd > period.startDate;
   });
 }
 
 export function buildAcademicYearId(schoolId: string, startDate: string, endDate: string): string {
-  const yearStr = `${new Date(startDate).getFullYear()}-${new Date(endDate).getFullYear()}`;
+  const yearStr = `${startDate.substring(0, 4)}-${endDate.substring(0, 4)}`;
   const randomSuffix = Math.random().toString(36).substring(2, 6);
   return `ay_${schoolId}_${yearStr}_${randomSuffix}`;
 }
@@ -178,3 +212,96 @@ export function getPermittedAcademicYearTransitions(currentStatus: AcademicYear[
       return [];
   }
 }
+export interface PeriodSubmissionInput {
+  input: Partial<Period>;
+  academicYear: AcademicYear;
+  currentSchoolId: string;
+  currentUser: { id: string };
+}
+
+export interface PeriodFieldErrors {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  academicYear?: string;
+  general?: string;
+}
+
+export function preparePeriodSubmission(params: PeriodSubmissionInput): {
+  normalizedInput: Period | null;
+  fieldErrors: PeriodFieldErrors;
+  isValid: boolean;
+} {
+  const { input, academicYear, currentSchoolId, currentUser } = params;
+  
+  let typeValue: Period['type'] = 'term';
+  if (input.type === 'term' || input.type === 'semester' || input.type === 'sequence' || input.type === 'custom') {
+    typeValue = input.type;
+  }
+
+  let statusValue: Period['status'] = 'draft';
+  if (input.status === 'draft' || input.status === 'open' || input.status === 'closed' || input.status === 'published' || input.status === 'archived') {
+    statusValue = input.status;
+  }
+
+  const payload: Partial<Period> = {
+    schoolId: currentSchoolId,
+    academicYearId: academicYear.id,
+    name: input.name?.trim() || '',
+    type: typeValue,
+    order: input.order || 1,
+    startDate: input.startDate || '',
+    endDate: input.endDate || '',
+    status: statusValue,
+  };
+
+  const validation = validatePeriodInput(payload, academicYear, currentSchoolId);
+  const fieldErrors: PeriodFieldErrors = {};
+
+  if (!validation.isValid) {
+    validation.errors.forEach(err => {
+      if (err.includes("nom")) fieldErrors.name = err;
+      else if (err.includes("l'année académique est invalide")) fieldErrors.academicYear = err;
+      else if (err.includes("début est invalide") || err.includes("antérieure à celle de l'année")) fieldErrors.startDate = err;
+      else if (err.includes("fin est invalide") || err.includes("postérieure à la date de début") || err.includes("postérieure à celle de l'année")) fieldErrors.endDate = err;
+      else fieldErrors.general = err;
+    });
+    return { normalizedInput: null, fieldErrors, isValid: false };
+  }
+
+  const id = input.id || buildPeriodId(academicYear.id, payload.order as number);
+  const finalPayload: Period = {
+    ...payload,
+    id,
+    type: typeValue,
+    order: payload.order as number,
+    schoolId: payload.schoolId as string,
+    academicYearId: payload.academicYearId as string,
+    name: payload.name as string,
+    startDate: payload.startDate as string,
+    endDate: payload.endDate as string,
+    status: statusValue,
+    createdAt: input.createdAt || new Date().toISOString(),
+    createdBy: input.createdBy || currentUser.id,
+    updatedAt: new Date().toISOString(),
+    updatedBy: currentUser.id
+  };
+
+  return { normalizedInput: finalPayload, fieldErrors: {}, isValid: true };
+}
+
+export async function submitValidatedPeriod({
+  submission,
+  persist
+}: {
+  submission: ReturnType<typeof preparePeriodSubmission>;
+  persist: (period: Period) => Promise<void>;
+}): Promise<boolean> {
+  if (!submission.isValid || !submission.normalizedInput) {
+    return false;
+  }
+
+  await persist(submission.normalizedInput);
+  return true;
+}
+
