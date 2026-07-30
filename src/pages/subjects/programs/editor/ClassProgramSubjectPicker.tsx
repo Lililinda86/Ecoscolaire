@@ -92,6 +92,31 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
        });
     }
 
+    // Sort classes
+    filtered.sort((a, b) => {
+      const aCyc = normalizeClassCycle(a);
+      const bCyc = normalizeClassCycle(b);
+      const aSec = normalizeClassSection(a);
+      const bSec = normalizeClassSection(b);
+      
+      const cycleOrder = { maternelle: 1, primaire: 2, secondaire: 3, unknown: 4 };
+      const secOrder = { francophone: 1, anglophone: 2, unknown: 3 };
+
+      const cA = cycleOrder[aCyc] || 4;
+      const cB = cycleOrder[bCyc] || 4;
+      if (cA !== cB) return cA - cB;
+
+      const sA = secOrder[aSec] || 3;
+      const sB = secOrder[bSec] || 3;
+      if (sA !== sB) return sA - sB;
+
+      const aLevel = (a.level || '').toLowerCase();
+      const bLevel = (b.level || '').toLowerCase();
+      if (aLevel && bLevel && aLevel !== bLevel) return aLevel.localeCompare(bLevel);
+
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
     return filtered;
   }, [classes, schoolId, classSearchTerm, isClassFiltered, currentClassSection, currentClassCycle]);
 
@@ -157,16 +182,24 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         </header>
 
         {/* MOBILE TABS */}
-        <div className="md:hidden flex border-b border-gray-200 dark:border-gray-800 px-4 pt-2 flex-shrink-0">
-          <button
+        <div role="tablist" className="md:hidden flex border-b border-gray-200 dark:border-gray-800 px-4 pt-2 flex-shrink-0">
+          <button 
             type="button"
+            role="tab"
+            id="tab-classes"
+            aria-selected={activeTab === 'classes'}
+            aria-controls="panel-classes"
             className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'classes' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
             onClick={() => setActiveTab('classes')}
           >
             1. Classes
           </button>
-          <button
+          <button 
             type="button"
+            role="tab"
+            id="tab-subjects"
+            aria-selected={activeTab === 'subjects'}
+            aria-controls="panel-subjects"
             className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'subjects' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
             onClick={() => setActiveTab('subjects')}
           >
@@ -177,7 +210,12 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0 overflow-hidden flex-1">
 
           {/* CLASSES COLUMN */}
-          <div className={`flex-col min-h-0 overflow-hidden md:border-r border-gray-200 dark:border-gray-800 md:pr-4 ${activeTab === 'classes' ? 'flex' : 'hidden'} md:flex`}>
+          <div 
+            id="panel-classes" 
+            role="tabpanel" 
+            aria-labelledby="tab-classes" 
+            className={`flex-col min-h-0 overflow-hidden md:border-r border-gray-200 dark:border-gray-800 md:pr-4 ${activeTab === 'classes' ? 'flex' : 'hidden'} md:flex`}
+          >
             <h4 className="hidden md:block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">1. Classes concernées</h4>
 
             <input
@@ -213,16 +251,16 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 const cSec = normalizeClassSection(c);
                 const cCyc = normalizeClassCycle(c);
                 return (
-                  <label key={c.id} className="flex items-start gap-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                  <label key={c.id} className="grid grid-cols-[auto_1fr] items-start gap-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
                     <input
                       type="checkbox"
                       className="mt-0.5"
                       checked={selectedClassIds.has(c.id)}
                       onChange={() => handleToggleClass(c.id)}
                     />
-                    <span className="flex flex-col">
-                      <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{c.name}</span>
-                      <span className="text-[10px] text-gray-500">{cSec} • {cCyc}</span>
+                    <span className="min-w-0 flex flex-col">
+                      <span className="block font-medium text-xs text-gray-800 dark:text-gray-200">{c.name}</span>
+                      <span className="block text-[10px] text-gray-500">{cSec} • {cCyc}</span>
                     </span>
                   </label>
                 );
@@ -244,7 +282,12 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </div>
 
           {/* SUBJECTS COLUMN */}
-          <div className={`flex-col min-h-0 overflow-hidden md:pl-2 ${activeTab === 'subjects' ? 'flex' : 'hidden'} md:flex`}>
+          <div 
+            id="panel-subjects" 
+            role="tabpanel" 
+            aria-labelledby="tab-subjects" 
+            className={`flex-col min-h-0 overflow-hidden md:pl-2 ${activeTab === 'subjects' ? 'flex' : 'hidden'} md:flex`}
+          >
             <h4 className="hidden md:block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">2. Matières à ajouter</h4>
 
             <input
@@ -277,16 +320,16 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
             <div className="overflow-y-auto flex-1 space-y-1">
               {availableSubjects.map((s) => (
-                <label key={s.id} className="flex items-start gap-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                <label key={s.id} className="grid grid-cols-[auto_1fr] items-start gap-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
                   <input
                     type="checkbox"
                     className="mt-0.5"
                     checked={selectedSubjectIds.has(s.id)}
                     onChange={() => handleToggleSubject(s.id)}
                   />
-                  <span className="flex flex-col">
-                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{s.name} {s.code ? `(${s.code})` : ''}</span>
-                    <span className="text-[10px] text-gray-500">
+                  <span className="min-w-0 flex flex-col">
+                    <span className="block font-medium text-xs text-gray-800 dark:text-gray-200">{s.name} {s.code ? `(${s.code})` : ''}</span>
+                    <span className="block text-[10px] text-gray-500">
                       {s.section === 'all' ? 'Toutes sections' : s.section}
                       {(s.cycles && s.cycles.length > 0) ? ` • ${s.cycles.join(',')}` : ''}
                     </span>

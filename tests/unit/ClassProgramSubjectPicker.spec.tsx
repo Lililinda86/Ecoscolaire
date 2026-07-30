@@ -1,6 +1,10 @@
+/**
+ * @vitest-environment jsdom
+ */
 import React from 'react';
-import { renderToString } from 'react-dom/server';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, within, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ClassProgramSubjectPicker } from '../../src/pages/subjects/programs/editor/ClassProgramSubjectPicker';
 
 describe('ClassProgramSubjectPicker UX', () => {
@@ -16,34 +20,13 @@ describe('ClassProgramSubjectPicker UX', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ] as any;
 
-  it('affiche le pied de modale et désactive le bouton si 0 matière', () => {
-    const html = renderToString(
-      <ClassProgramSubjectPicker
-        schoolId="school-1"
-        classId="c1"
-        selectedClass={mockClasses[0]}
-        classes={mockClasses}
-        catalogSubjects={mockSubjects}
-        activeSubjects={[]}
-        onBulkSelect={vi.fn()}
-        onClose={vi.fn()}
-      />
-    );
-
-    // c1 est présélectionné, mais 0 matière par défaut (attention aux commentaires HTML de React)
-    expect(html).toMatch(/1(<!-- -->)? classe\(s\) sélectionnée\(s\)/);
-    expect(html).toMatch(/0(<!-- -->)? matière\(s\) sélectionnée\(s\)/);
-
-    // Bouton de validation contient disabled=""
-    expect(html).toContain('Ajouter 0 matière(s) à 1 classe(s)');
-    expect(html).toContain('aria-disabled="true"');
-
-    // Pied de modale
-    expect(html).toContain('Annuler');
+  afterEach(() => {
+    cleanup();
   });
 
-  it('vérifie le libellé espacé et la structure de défilement', () => {
-    const html = renderToString(
+  it('affiche les onglets et permet la navigation sur mobile', async () => {
+    const user = userEvent.setup();
+    render(
       <ClassProgramSubjectPicker
         schoolId="school-1"
         classId="c1"
@@ -56,11 +39,90 @@ describe('ClassProgramSubjectPicker UX', () => {
       />
     );
 
-    // Libellé correctement espacé
-    expect(html).toContain('Maternelle 1');
-    expect(html).toMatch(/francophone(<!-- -->)? • (<!-- -->)?maternelle/);
+    // Vérifie que les boutons d'onglets sont présents
+    const tabClasses = screen.getByRole('tab', { name: /1\. Classes/i });
+    const tabSubjects = screen.getByRole('tab', { name: /2\. Matières/i });
+    expect(tabClasses).toBeDefined();
+    expect(tabSubjects).toBeDefined();
 
-    // Contenu central avec grille
-    expect(html).toContain('grid grid-cols-1 md:grid-cols-2');
+    // Par défaut, l'onglet Classes est sélectionné
+    expect(tabClasses.getAttribute('aria-selected')).toBe('true');
+    
+    const panelClasses = screen.getByRole('tabpanel', { name: /1\. Classes/i });
+    const panelSubjects = screen.getByRole('tabpanel', { name: /2\. Matières/i });
+    
+    expect(panelClasses.className).toContain('flex');
+    expect(panelSubjects.className).toContain('hidden');
+
+    // Clic sur l'onglet "2. Matières"
+    await user.click(tabSubjects);
+    expect(tabSubjects.getAttribute('aria-selected')).toBe('true');
+    expect(panelClasses.className).toContain('hidden');
+    expect(panelSubjects.className).toContain('flex');
+
+    // Clic pour revenir
+    await user.click(tabClasses);
+    expect(tabClasses.getAttribute('aria-selected')).toBe('true');
+
+    // Bouton "Continuer vers les matières"
+    const btnContinue = screen.getByRole('button', { name: /Continuer vers les matières/i });
+    await user.click(btnContinue);
+    expect(tabSubjects.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('affiche correctement les libellés et gère la sélection', async () => {
+    const user = userEvent.setup();
+    render(
+      <ClassProgramSubjectPicker
+        schoolId="school-1"
+        classId="c1"
+        selectedClass={mockClasses[0]}
+        classes={mockClasses}
+        catalogSubjects={mockSubjects}
+        activeSubjects={[]}
+        onBulkSelect={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    // Libellés séparés
+    const classNameEl = screen.getByText('Maternelle 1');
+    const classMetaEl = screen.getAllByText(/francophone/)[0];
+    expect(classNameEl).toBeDefined();
+    expect(classMetaEl).toBeDefined();
+
+    // Bouton ajouter est désactivé au départ (1 classe, 0 matière)
+    const btnSubmit = screen.getByRole('button', { name: /Ajouter/i });
+    expect(btnSubmit.hasAttribute('disabled')).toBe(true);
+    expect(btnSubmit.getAttribute('aria-disabled')).toBe('true');
+    expect(btnSubmit.textContent).toContain('Ajouter 0 matière(s) à 1 classe(s)');
+
+    // Sélection d'une matière
+    const dessinLabel = screen.getByText('Dessin').closest('label');
+    const dessinCheckbox = within(dessinLabel as HTMLElement).getByRole('checkbox');
+    await user.click(dessinCheckbox);
+
+    // Le bouton doit être activé
+    expect(btnSubmit.hasAttribute('disabled')).toBe(false);
+    expect(btnSubmit.getAttribute('aria-disabled')).toBe('false');
+    expect(btnSubmit.textContent).toContain('Ajouter 1 matière(s) à 1 classe(s)');
+  });
+
+  it('affiche un état vide explicite si aucune matière', () => {
+    render(
+      <ClassProgramSubjectPicker
+        schoolId="school-1"
+        classId="c1"
+        selectedClass={mockClasses[0]}
+        classes={mockClasses}
+        catalogSubjects={[]}
+        activeSubjects={[]}
+        onBulkSelect={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    const emptyText = screen.getByText('Aucune matière compatible avec les classes sélectionnées.');
+    expect(emptyText).toBeDefined();
   });
 });
