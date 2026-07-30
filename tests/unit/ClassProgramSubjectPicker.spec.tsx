@@ -131,8 +131,26 @@ describe('ClassProgramSubjectPicker UX', () => {
     const firstChild = label?.firstElementChild;
     expect(firstChild?.tagName.toLowerCase()).toBe('input');
     expect(firstChild?.getAttribute('type')).toBe('checkbox');
-    // Vérifier largeur 16px via style
-    expect((firstChild as HTMLElement).style.width).toBe('16px');
+    expect(firstChild?.className).toContain('checkbox');
+
+    // Vérifier l'ordre du DOM pour la grille
+    const dialog = screen.getByTestId('bulk-picker-dialog');
+    const header = screen.getByTestId('picker-header');
+    const nav = screen.getByTestId('picker-navigation');
+    const main = screen.getByTestId('picker-main');
+    const footer = screen.getByTestId('picker-footer');
+
+    // Verify they are all direct children of dialog
+    expect(header.parentElement).toBe(dialog);
+    expect(nav.parentElement).toBe(dialog);
+    expect(main.parentElement).toBe(dialog);
+    expect(footer.parentElement).toBe(dialog);
+
+    // Verify DOM order
+    expect(dialog.children[0]).toBe(header);
+    expect(dialog.children[1]).toBe(nav);
+    expect(dialog.children[2]).toBe(main);
+    expect(dialog.children[3]).toBe(footer);
 
     // Nom et métadonnées séparés
     const classMetaEls = screen.getAllByText('francophone • maternelle');

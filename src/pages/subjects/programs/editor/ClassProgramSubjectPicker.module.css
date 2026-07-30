@@ -1,0 +1,142 @@
+.dialog {
+  width: min(92vw, 760px);
+  height: min(90vh, 760px);
+  max-height: min(90vh, 760px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  background: white;
+  border-radius: 16px;
+}
+
+.header,
+.navigation,
+.footer {
+  min-width: 0;
+}
+
+.closeButton {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #4b5563;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.closeButton:hover {
+  background: #f3f4f6;
+}
+
+.main {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.step {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.stepControls {
+  min-width: 0;
+}
+
+.scrollList {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f3f4f6;
+}
+
+.scrollList::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scrollList::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 8px;
+}
+
+.scrollList::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 8px;
+}
+
+.optionRow {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 12px;
+  padding: 9px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.optionRow:hover {
+  background: #f9fafb;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.optionText {
+  min-width: 0;
+}
+
+.optionName {
+  display: block;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.optionMeta {
+  display: block;
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.25;
+}
+
+.inlineCheckbox {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  cursor: pointer;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+  z-index: 2;
+}

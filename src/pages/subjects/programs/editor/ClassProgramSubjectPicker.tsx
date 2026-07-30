@@ -3,6 +3,7 @@ import type { Subject, ClassSubject, ClassSection } from '../../../../types';
 import { normalizeClassSection, normalizeClassCycle } from '../../../../utils/classClassification';
 import { filterAvailableSubjectsForClass } from './classProgramSubjectFilters';
 import { sortClassesPedagogically, cleanClassName } from '../../../../utils/pedagogicalSort';
+import styles from './ClassProgramSubjectPicker.module.css';
 
 const translateSectionLabel = (val: string): string => {
   const v = (val || '').toLowerCase();
@@ -182,20 +183,12 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         role="dialog"
         aria-modal="true"
         aria-labelledby="subject-picker-title"
-        className="class-program-picker-dialog bg-white dark:bg-gray-900 rounded-xl shadow-2xl"
-        style={{ 
-          width: 'min(92vw, 760px)', 
-          height: 'min(90vh, 760px)',
-          maxHeight: 'min(90vh, 760px)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}
+        className={styles.dialog}
         data-testid="bulk-picker-dialog"
       >
-        <header data-testid="picker-header" className="shrink-0 p-4 border-b border-gray-200 dark:border-gray-800 flex items-start justify-between">
+        <header data-testid="picker-header" className={styles.header + " p-4 border-b border-gray-200 flex items-start justify-between bg-white"}>
           <div>
-            <h2 id="subject-picker-title" className="text-base font-bold text-gray-950 dark:text-white">
+            <h2 id="subject-picker-title" className="text-base font-bold text-gray-950">
               Ajouter des matières au programme
             </h2>
             <p className="text-[10px] text-gray-500 mt-0.5">
@@ -206,24 +199,19 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             type="button"
             aria-label="Fermer"
             onClick={onClose}
-            className="shrink-0 rounded p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-            style={{
-              width: 36,
-              height: 36,
-              background: 'transparent'
-            }}
+            className={styles.closeButton}
           >
             ×
           </button>
         </header>
 
-        <nav data-testid="picker-navigation" role="tablist" className="shrink-0 flex gap-2 border-b border-gray-200 dark:border-gray-800 px-4 pt-4 bg-gray-50 dark:bg-gray-900/50">
+        <nav data-testid="picker-navigation" role="tablist" className={styles.navigation + " flex gap-2 border-b border-gray-200 px-4 pt-4 bg-gray-50"}>
           <button 
             type="button"
             role="tab"
             aria-selected={activeStep === 'classes'}
             onClick={() => setActiveStep('classes')}
-            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'classes' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700'}`}
+            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'classes' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300'}`}
           >
             1. Classes
           </button>
@@ -232,38 +220,31 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             role="tab"
             aria-selected={activeStep === 'subjects'}
             onClick={() => setActiveStep('subjects')}
-            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'subjects' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700'}`}
+            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'subjects' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300'}`}
           >
             2. Matières
           </button>
         </nav>
 
-        <main data-testid="picker-main" className="min-h-0 flex-1 overflow-hidden">
+        <main data-testid="picker-main" className={styles.main}>
           {activeStep === 'classes' ? (
-            <section key="classes" data-testid="classes-step" className="flex h-full min-h-0 flex-col overflow-hidden">
-              <div className="p-4 shrink-0">
+            <section key="classes" data-testid="classes-step" className={styles.step}>
+              <div className={styles.stepControls + " p-4"}>
                 <input
                   type="text"
                   placeholder="Rechercher une classe..."
                   value={classSearchTerm}
                   onChange={(e) => setClassSearchTerm(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-xs mb-2"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs mb-2"
                 />
 
-                <label className="flex items-center gap-2 mb-2 cursor-pointer text-xs text-gray-600 dark:text-gray-400">
+                <label className={styles.inlineCheckbox + " mb-2 text-xs text-gray-600"}>
                   <input
                     type="checkbox"
                     id="filter-classes-cb"
                     checked={!isClassFiltered}
                     onChange={(e) => setIsClassFiltered(!e.target.checked)}
-                    style={{
-                      width: 16,
-                      height: 16,
-                      minWidth: 16,
-                      maxWidth: 16,
-                      margin: 0,
-                      flex: '0 0 16px'
-                    }}
+                    className={styles.checkbox}
                   />
                   <span>Afficher aussi les classes des autres sections et cycles</span>
                 </label>
@@ -281,37 +262,25 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
               <div
                 data-testid="classes-scroll-container"
-                className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pr-2 ml-4 mb-4"
-                style={{
-                  scrollbarGutter: 'stable',
-                  overscrollBehavior: 'contain'
-                }}
+                className={styles.scrollList + " ml-4 mb-4"}
               >
                 {availableClasses.map(c => {
                   const cSec = normalizeClassSection(c);
                   const cCyc = normalizeClassCycle(c);
                   const displayName = cleanClassName(c.name, cSec);
                   return (
-                    <label key={c.id} className="flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <label key={c.id} className={styles.optionRow}>
                       <input
                         type="checkbox"
-                        className="mt-1 shrink-0 grow-0"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          minWidth: 16,
-                          maxWidth: 16,
-                          margin: 0,
-                          flex: '0 0 16px'
-                        }}
+                        className={styles.checkbox}
                         checked={selectedClassIds.has(c.id)}
                         onChange={() => handleToggleClass(c.id)}
                       />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium leading-tight text-gray-800 dark:text-gray-200">
+                      <div className={styles.optionText}>
+                        <div className={styles.optionName}>
                           {displayName}
                         </div>
-                        <div className="mt-1 text-sm text-gray-500">
+                        <div className={styles.optionMeta}>
                           {translateSectionLabel(cSec)} • {translateCycleLabel(cCyc)}
                         </div>
                       </div>
@@ -322,10 +291,10 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                   <div className="text-xs text-gray-500 text-center mt-4">Aucune classe trouvée.</div>
                 )}
                 
-                <div className="mt-4 flex-shrink-0">
+                <div className="mt-4 flex-shrink-0 mr-4">
                   <button
                     type="button"
-                    className="w-full py-2 text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 rounded"
+                    className="w-full py-2 text-xs font-bold text-blue-600 bg-blue-50 rounded"
                     onClick={() => setActiveStep('subjects')}
                   >
                     Continuer vers les matières
@@ -334,30 +303,23 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
               </div>
             </section>
           ) : (
-            <section key="subjects" data-testid="subjects-step" className="flex h-full min-h-0 flex-col overflow-hidden">
-              <div className="p-4 shrink-0">
+            <section key="subjects" data-testid="subjects-step" className={styles.step}>
+              <div className={styles.stepControls + " p-4"}>
                 <input
                   type="text"
                   placeholder="Rechercher une matière..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-xs mb-2"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs mb-2"
                 />
 
-                <label className="flex items-center gap-2 mb-2 cursor-pointer text-xs text-gray-600 dark:text-gray-400">
+                <label className={styles.inlineCheckbox + " mb-2 text-xs text-gray-600"}>
                   <input
                     type="checkbox"
                     id="filter-subjects-cb"
                     checked={!isSubjectFiltered}
                     onChange={(e) => setIsSubjectFiltered(!e.target.checked)}
-                    style={{
-                      width: 16,
-                      height: 16,
-                      minWidth: 16,
-                      maxWidth: 16,
-                      margin: 0,
-                      flex: '0 0 16px'
-                    }}
+                    className={styles.checkbox}
                   />
                   <span>Afficher aussi les matières des autres sections et cycles</span>
                 </label>
@@ -375,11 +337,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
               <div
                 data-testid="subjects-scroll-container"
-                className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pr-2 ml-4 mb-4"
-                style={{
-                  scrollbarGutter: 'stable',
-                  overscrollBehavior: 'contain'
-                }}
+                className={styles.scrollList + " ml-4 mb-4"}
               >
                 {availableSubjects.map((s) => {
                   const sSec = s.section || 'all';
@@ -387,31 +345,23 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                   const displayName = cleanClassName(s.name, s.section || '');
                   
                   return (
-                    <label key={s.id} className="flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <label key={s.id} className={styles.optionRow}>
                       <input
                         type="checkbox"
-                        className="mt-1 shrink-0 grow-0"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          minWidth: 16,
-                          maxWidth: 16,
-                          margin: 0,
-                          flex: '0 0 16px'
-                        }}
+                        className={styles.checkbox}
                         checked={selectedSubjectIds.has(s.id)}
                         onChange={() => handleToggleSubject(s.id)}
                       />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium leading-tight text-gray-800 dark:text-gray-200">
+                      <div className={styles.optionText}>
+                        <div className={styles.optionName}>
                           {displayName}
                         </div>
                         {s.code && (
-                          <div className="mt-1 text-xs text-gray-500">
+                          <div className={styles.optionMeta}>
                             Code : {s.code}
                           </div>
                         )}
-                        <div className="mt-1 text-sm text-gray-500">
+                        <div className={styles.optionMeta}>
                           {translateSectionLabel(sSec)}{sCyc ? ` • ${sCyc}` : ''}
                         </div>
                       </div>
@@ -428,15 +378,12 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           )}
         </main>
 
-        <footer
-          data-testid="picker-footer"
-          className="shrink-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 flex justify-end gap-3"
-        >
+        <footer data-testid="picker-footer" className={styles.footer}>
           {activeStep === 'subjects' && (
             <button
               type="button"
               onClick={() => setActiveStep('classes')}
-              className="px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg mr-auto"
+              className="px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-lg mr-auto"
             >
               Retour aux classes
             </button>
@@ -444,7 +391,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
+            className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 rounded-lg"
           >
             Annuler
           </button>
