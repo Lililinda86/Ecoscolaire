@@ -4,6 +4,34 @@ import { normalizeClassSection, normalizeClassCycle } from '../../../../utils/cl
 import { filterAvailableSubjectsForClass } from './classProgramSubjectFilters';
 import { sortClassesPedagogically, cleanClassName } from '../../../../utils/pedagogicalSort';
 
+const translateSectionLabel = (val: string): string => {
+  const v = (val || '').toLowerCase();
+  if (v === 'french' || v === 'francophone') return 'francophone';
+  if (v === 'english' || v === 'anglophone') return 'anglophone';
+  if (v === 'all' || v === 'toutes sections') return 'toutes sections';
+  return val;
+};
+
+const translateCycleLabel = (val: string): string => {
+  const v = (val || '').toLowerCase();
+  if (v.includes('primary')) return 'primaire';
+  if (v.includes('secondary')) return 'secondaire';
+  if (v.includes('nursery')) return 'maternelle';
+  return val;
+};
+
+const getSubjectCountLabel = (count: number): string => {
+  if (count === 0) return '0 matière sélectionnée';
+  if (count === 1) return '1 matière sélectionnée';
+  return `${count} matières sélectionnées`;
+};
+
+const getClassCountLabel = (count: number): string => {
+  if (count === 0) return '0 classe sélectionnée';
+  if (count === 1) return '1 classe sélectionnée';
+  return `${count} classes sélectionnées`;
+};
+
 interface ClassProgramSubjectPickerProps {
   catalogSubjects: Subject[];
   activeSubjects: ClassSubject[];
@@ -144,33 +172,34 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         aria-modal="true"
         aria-labelledby="subject-picker-title"
         className="class-program-picker-dialog bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex max-h-[90vh] flex-col overflow-hidden"
-        style={{ width: '90vw', maxWidth: '500px' }}
+        style={{ width: 'min(92vw, 760px)', maxHeight: 'min(90vh, 760px)' }}
       >
-        <header className="shrink-0 p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-start">
-          <div className="flex flex-col">
-            <h3 id="subject-picker-title" className="text-base font-bold text-gray-950 dark:text-white">
+        <header className="shrink-0 p-4 border-b border-gray-200 dark:border-gray-800 flex items-start justify-between">
+          <div>
+            <h2 id="subject-picker-title" className="text-base font-bold text-gray-950 dark:text-white">
               Ajouter des matières au programme
-            </h3>
-            <span className="text-[10px] text-gray-500 mt-0.5">
+            </h2>
+            <p className="text-[10px] text-gray-500 mt-0.5">
               Sélectionnez les classes cibles et les matières à ajouter.
-            </span>
+            </p>
           </div>
           <button
             type="button"
+            aria-label="Fermer"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
           >
             ×
           </button>
         </header>
 
-        <nav role="tablist" className="shrink-0 flex border-b border-gray-200 dark:border-gray-800 px-4 pt-2">
+        <nav role="tablist" className="shrink-0 flex gap-2 border-b border-gray-200 dark:border-gray-800 px-4 pt-4 bg-gray-50 dark:bg-gray-900/50">
           <button 
             type="button"
             role="tab"
             aria-selected={activeStep === 'classes'}
             onClick={() => setActiveStep('classes')}
-            className={`flex-1 pb-2 text-xs font-bold ${activeStep === 'classes' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'classes' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700'}`}
           >
             1. Classes
           </button>
@@ -179,7 +208,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             role="tab"
             aria-selected={activeStep === 'subjects'}
             onClick={() => setActiveStep('subjects')}
-            className={`flex-1 pb-2 text-xs font-bold ${activeStep === 'subjects' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'subjects' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700'}`}
           >
             2. Matières
           </button>
@@ -197,19 +226,19 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                   className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-xs mb-2"
                 />
 
-                <div className="flex items-center mb-2 gap-2 text-xs">
+                <label className="flex items-center gap-2 mb-2 cursor-pointer text-xs text-gray-600 dark:text-gray-400">
                   <input
                     type="checkbox"
                     id="filter-classes-cb"
                     checked={!isClassFiltered}
                     onChange={(e) => setIsClassFiltered(!e.target.checked)}
                   />
-                  <label htmlFor="filter-classes-cb" className="text-gray-600 dark:text-gray-400">Afficher autres sections/cycles</label>
-                </div>
+                  <span>Afficher aussi les classes des autres sections et cycles</span>
+                </label>
 
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-wrap justify-between items-center mb-2 gap-2">
                    <div className="text-[10px] text-gray-500 font-medium">
-                     {selectedClassIds.size} classe(s) sélectionnée(s)
+                     {getClassCountLabel(selectedClassIds.size)}
                    </div>
                    <div className="flex gap-3">
                      <button type="button" onClick={handleSelectAllClasses} className="text-[10px] font-semibold text-blue-600 hover:underline">Tout sélectionner</button>
@@ -220,7 +249,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
               <div
                 data-testid="classes-scroll-container"
-                className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden px-4 pb-4"
+                className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pr-2 ml-4 mb-4"
                 style={{
                   height: 'min(48vh, 430px)',
                   scrollbarGutter: 'stable'
@@ -231,10 +260,10 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                   const cCyc = normalizeClassCycle(c);
                   const displayName = cleanClassName(c.name, cSec);
                   return (
-                    <label key={c.id} className="flex w-full items-start gap-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1.5">
+                    <label key={c.id} className="flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800">
                       <input
                         type="checkbox"
-                        className="mt-0.5 shrink-0 grow-0"
+                        className="mt-1 shrink-0 grow-0"
                         style={{
                           width: 16,
                           height: 16,
@@ -246,11 +275,11 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                         onChange={() => handleToggleClass(c.id)}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-gray-800 dark:text-gray-200">
+                        <div className="font-medium leading-tight text-gray-800 dark:text-gray-200">
                           {displayName}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {cSec} • {cCyc}
+                        <div className="mt-1 text-sm text-gray-500">
+                          {translateSectionLabel(cSec)} • {translateCycleLabel(cCyc)}
                         </div>
                       </div>
                     </label>
@@ -282,19 +311,19 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                   className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-xs mb-2"
                 />
 
-                <div className="flex items-center mb-2 gap-2 text-xs">
+                <label className="flex items-center gap-2 mb-2 cursor-pointer text-xs text-gray-600 dark:text-gray-400">
                   <input
                     type="checkbox"
                     id="filter-subjects-cb"
                     checked={!isSubjectFiltered}
                     onChange={(e) => setIsSubjectFiltered(!e.target.checked)}
                   />
-                  <label htmlFor="filter-subjects-cb" className="text-gray-600 dark:text-gray-400">Afficher autres sections/cycles</label>
-                </div>
+                  <span>Afficher aussi les matières des autres sections et cycles</span>
+                </label>
 
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-wrap justify-between items-center mb-2 gap-2">
                    <div className="text-[10px] text-gray-500 font-medium">
-                     {selectedSubjectIds.size} matière(s) sélectionnée(s)
+                     {getSubjectCountLabel(selectedSubjectIds.size)}
                    </div>
                    <div className="flex gap-3">
                      <button type="button" onClick={handleSelectAllSubjects} className="text-[10px] font-semibold text-blue-600 hover:underline">Tout sélectionner</button>
@@ -305,22 +334,22 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
               <div
                 data-testid="subjects-scroll-container"
-                className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden px-4 pb-4"
+                className="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pr-2 ml-4 mb-4"
                 style={{
                   height: 'min(48vh, 430px)',
                   scrollbarGutter: 'stable'
                 }}
               >
                 {availableSubjects.map((s) => {
-                  const sSec = s.section === 'all' ? 'Toutes sections' : s.section;
-                  const sCyc = (s.cycles && s.cycles.length > 0) ? ` • ${s.cycles.join(',')}` : '';
+                  const sSec = s.section || 'all';
+                  const sCyc = (s.cycles && s.cycles.length > 0) ? s.cycles.map(translateCycleLabel).join(', ') : '';
                   const displayName = cleanClassName(s.name, s.section || '');
                   
                   return (
-                    <label key={s.id} className="flex w-full items-start gap-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1.5">
+                    <label key={s.id} className="flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800">
                       <input
                         type="checkbox"
-                        className="mt-0.5 shrink-0 grow-0"
+                        className="mt-1 shrink-0 grow-0"
                         style={{
                           width: 16,
                           height: 16,
@@ -332,11 +361,16 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                         onChange={() => handleToggleSubject(s.id)}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-gray-800 dark:text-gray-200">
-                          {displayName} {s.code ? `(${s.code})` : ''}
+                        <div className="font-medium leading-tight text-gray-800 dark:text-gray-200">
+                          {displayName}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {sSec}{sCyc}
+                        {s.code && (
+                          <div className="mt-1 text-xs text-gray-500">
+                            Code : {s.code}
+                          </div>
+                        )}
+                        <div className="mt-1 text-sm text-gray-500">
+                          {translateSectionLabel(sSec)}{sCyc ? ` • ${sCyc}` : ''}
                         </div>
                       </div>
                     </label>
@@ -354,8 +388,17 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
         <footer
           data-testid="picker-footer"
-          className="shrink-0 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 flex justify-end gap-3"
+          className="shrink-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 flex justify-end gap-3"
         >
+          {activeStep === 'subjects' && (
+            <button
+              type="button"
+              onClick={() => setActiveStep('classes')}
+              className="px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg mr-auto"
+            >
+              Retour aux classes
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -370,7 +413,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             aria-disabled={isSubmitDisabled}
             className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
           >
-            {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière(s) à ${selectedClassIds.size} classe(s)`}
+            {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière${selectedSubjectIds.size > 1 ? 's' : ''} à ${selectedClassIds.size} classe${selectedClassIds.size > 1 ? 's' : ''}`}
           </button>
         </footer>
       </section>

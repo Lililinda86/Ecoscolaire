@@ -17,8 +17,8 @@ describe('ClassProgramSubjectPicker UX', () => {
   ] as any;
 
   const mockSubjects = [
-    { id: 's1', name: 'Dessin', schoolId: 'school-1', section: 'all', cycles: ['maternelle'] },
-    { id: 's2', name: 'Chant', schoolId: 'school-1', section: 'all', cycles: ['maternelle'] }
+    { id: 's1', name: 'Arts et culture', code: 'FR-PRI-ART', schoolId: 'school-1', section: 'francophone', cycles: ['primary'] },
+    { id: 's2', name: 'Chant', schoolId: 'school-1', section: 'all', cycles: ['nursery'] }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ] as any;
 
@@ -139,7 +139,7 @@ describe('ClassProgramSubjectPicker UX', () => {
     expect(classMetaEls.length).toBeGreaterThan(0);
 
     // Afficher toutes les classes pour voir CP et CE1
-    const filterClassesCb = screen.getByLabelText('Afficher autres sections/cycles');
+    const filterClassesCb = screen.getByLabelText('Afficher aussi les classes des autres sections et cycles');
     if (!(filterClassesCb as HTMLInputElement).checked) {
       await user.click(filterClassesCb);
     }
@@ -158,14 +158,38 @@ describe('ClassProgramSubjectPicker UX', () => {
     const tabSubjects = screen.getByRole('tab', { name: /2\. Matières/i });
     await user.click(tabSubjects);
 
+    const filterSubjectsCb = screen.getByLabelText('Afficher aussi les matières des autres sections et cycles');
+    expect(filterSubjectsCb).not.toBeNull();
+    if (!(filterSubjectsCb as HTMLInputElement).checked) {
+      await user.click(filterSubjectsCb);
+    }
+
+    // Checking translated metadata and separated rendering
+    const metaEls = screen.getAllByText(/francophone • primaire/i);
+    expect(metaEls.length).toBeGreaterThan(0);
+    expect(screen.queryByText(/primary/i)).toBeNull(); // Translated properly
+
+    // Check code separated
+    expect(screen.getByText('Code : FR-PRI-ART')).not.toBeNull();
+
     const btnSubmit = screen.getByRole('button', { name: /Ajouter/i });
     expect(btnSubmit.hasAttribute('disabled')).toBe(true);
 
-    const dessinLabel = screen.getByText('Dessin').closest('label');
+    const dessinLabel = screen.getByText('Arts et culture').closest('label');
     const dessinCheckbox = within(dessinLabel as HTMLElement).getByRole('checkbox');
     await user.click(dessinCheckbox);
 
     expect(btnSubmit.hasAttribute('disabled')).toBe(false);
-    expect(btnSubmit.textContent).toContain('Ajouter 1 matière(s) à 1 classe(s)');
+    expect(btnSubmit.textContent).toContain('Ajouter 1 matière à 1 classe');
+    
+    // Check Close button
+    const closeBtn = screen.getByRole('button', { name: 'Fermer' });
+    expect(closeBtn).not.toBeNull();
+
+    // Check 'Retour aux classes'
+    const returnBtn = screen.getByRole('button', { name: 'Retour aux classes' });
+    expect(returnBtn).not.toBeNull();
+    await user.click(returnBtn);
+    expect(screen.queryByTestId('classes-step')).not.toBeNull();
   });
 });
