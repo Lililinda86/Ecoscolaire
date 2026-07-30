@@ -186,7 +186,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         className={styles.dialog}
         data-testid="bulk-picker-dialog"
       >
-        <header data-testid="picker-header" className={styles.header + " p-4 border-b border-gray-200 flex items-start justify-between bg-white"}>
+        <header data-testid="picker-header" className={styles.header + " p-4 border-b border-gray-200 bg-white"}>
           <div>
             <h2 id="subject-picker-title" className="text-base font-bold text-gray-950">
               Ajouter des matières au programme
@@ -211,7 +211,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             role="tab"
             aria-selected={activeStep === 'classes'}
             onClick={() => setActiveStep('classes')}
-            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'classes' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300'}`}
+            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg ${activeStep === 'classes' ? styles.activeTab : styles.inactiveTab}`}
           >
             1. Classes
           </button>
@@ -220,7 +220,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             role="tab"
             aria-selected={activeStep === 'subjects'}
             onClick={() => setActiveStep('subjects')}
-            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg border-t border-x ${activeStep === 'subjects' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-800 border-gray-300'}`}
+            className={`flex-1 py-2 px-4 text-xs font-bold rounded-t-lg ${activeStep === 'subjects' ? styles.activeTab : styles.inactiveTab}`}
           >
             2. Matières
           </button>
@@ -290,16 +290,6 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 {availableClasses.length === 0 && (
                   <div className="text-xs text-gray-500 text-center mt-4">Aucune classe trouvée.</div>
                 )}
-                
-                <div className="mt-4 flex-shrink-0 mr-4">
-                  <button
-                    type="button"
-                    className="w-full py-2 text-xs font-bold text-blue-600 bg-blue-50 rounded"
-                    onClick={() => setActiveStep('subjects')}
-                  >
-                    Continuer vers les matières
-                  </button>
-                </div>
               </div>
             </section>
           ) : (
@@ -379,31 +369,50 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         </main>
 
         <footer data-testid="picker-footer" className={styles.footer}>
-          {activeStep === 'subjects' && (
-            <button
-              type="button"
-              onClick={() => setActiveStep('classes')}
-              className="px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-lg mr-auto"
-            >
-              Retour aux classes
-            </button>
+          {activeStep === 'classes' ? (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 rounded-lg mr-auto"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveStep('subjects')}
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+              >
+                Continuer vers les matières
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveStep('classes')}
+                className="px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-lg mr-auto"
+              >
+                Retour aux classes
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 rounded-lg"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitDisabled}
+                aria-disabled={isSubmitDisabled}
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
+              >
+                {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière${selectedSubjectIds.size > 1 ? 's' : ''} à ${selectedClassIds.size} classe${selectedClassIds.size > 1 ? 's' : ''}`}
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 rounded-lg"
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitDisabled}
-            aria-disabled={isSubmitDisabled}
-            className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
-          >
-            {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière${selectedSubjectIds.size > 1 ? 's' : ''} à ${selectedClassIds.size} classe${selectedClassIds.size > 1 ? 's' : ''}`}
-          </button>
         </footer>
       </section>
     </div>

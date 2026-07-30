@@ -49,16 +49,27 @@ describe('ClassProgramSubjectPicker UX', () => {
     const tabSubjects = screen.getByRole('tab', { name: /2\. Matières/i });
 
     expect(tabClasses.getAttribute('aria-selected')).toBe('true');
+    expect(tabClasses.className).toContain('activeTab');
     expect(tabSubjects.getAttribute('aria-selected')).toBe('false');
+    expect(tabSubjects.className).toContain('inactiveTab');
 
-    // 2. Clic sur "2. Matières"
+    // 2. Footer dans l'étape classes contient "Continuer vers les matières" et "Annuler"
+    const footer = screen.getByTestId('picker-footer');
+    expect(within(footer).getByRole('button', { name: /Continuer vers les matières/i })).not.toBeNull();
+    expect(within(footer).getByRole('button', { name: /Annuler/i })).not.toBeNull();
+    // ne contient pas le bouton "Ajouter"
+    expect(within(footer).queryByRole('button', { name: /Ajouter/i })).toBeNull();
+
+    // 3. Clic sur "2. Matières"
     await user.click(tabSubjects);
     
     // classes-step absent, subjects-step présent
     expect(screen.queryByTestId('classes-step')).toBeNull();
     expect(screen.queryByTestId('subjects-step')).not.toBeNull();
     expect(tabClasses.getAttribute('aria-selected')).toBe('false');
+    expect(tabClasses.className).toContain('inactiveTab');
     expect(tabSubjects.getAttribute('aria-selected')).toBe('true');
+    expect(tabSubjects.className).toContain('activeTab');
 
     // 3. Clic sur "1. Classes"
     await user.click(tabClasses);
@@ -76,6 +87,12 @@ describe('ClassProgramSubjectPicker UX', () => {
     await user.click(btnContinue);
     expect(screen.queryByTestId('subjects-step')).not.toBeNull();
     expect(screen.queryByTestId('classes-step')).toBeNull();
+
+    // 6. Footer dans l'étape matières contient "Retour aux classes", "Annuler" et "Ajouter"
+    const subjectsFooter = screen.getByTestId('picker-footer');
+    expect(within(subjectsFooter).getByRole('button', { name: /Retour aux classes/i })).not.toBeNull();
+    expect(within(subjectsFooter).getByRole('button', { name: /Annuler/i })).not.toBeNull();
+    expect(within(subjectsFooter).getByRole('button', { name: /Ajouter/i })).not.toBeNull();
   });
 
   it('affiche un état vide explicite et garde le footer fixe', async () => {
@@ -109,6 +126,7 @@ describe('ClassProgramSubjectPicker UX', () => {
 
   it('alignement, structure et matières sélectionnables', async () => {
     const user = userEvent.setup();
+    const onCloseMock = vi.fn();
     render(
       <ClassProgramSubjectPicker
         schoolId="school-1"
@@ -118,7 +136,7 @@ describe('ClassProgramSubjectPicker UX', () => {
         catalogSubjects={mockSubjects}
         activeSubjects={[]}
         onBulkSelect={vi.fn()}
-        onClose={vi.fn()}
+        onClose={onCloseMock}
       />
     );
 
@@ -145,6 +163,12 @@ describe('ClassProgramSubjectPicker UX', () => {
     expect(nav.parentElement).toBe(dialog);
     expect(main.parentElement).toBe(dialog);
     expect(footer.parentElement).toBe(dialog);
+
+    // Verify close button is the last direct child of header
+    const closeBtn = within(header).getByRole('button', { name: 'Fermer' });
+    expect(closeBtn).not.toBeNull();
+    expect(header.lastElementChild).toBe(closeBtn);
+    expect(closeBtn.parentElement).toBe(header);
 
     // Verify DOM order
     expect(dialog.children[0]).toBe(header);
@@ -200,10 +224,11 @@ describe('ClassProgramSubjectPicker UX', () => {
     expect(btnSubmit.hasAttribute('disabled')).toBe(false);
     expect(btnSubmit.textContent).toContain('Ajouter 1 matière à 1 classe');
     
-    // Check Close button
-    const closeBtn = screen.getByRole('button', { name: 'Fermer' });
-    expect(closeBtn).not.toBeNull();
-
+    // Check Close button triggers onClose
+    const closeBtnFooter = within(screen.getByTestId('picker-footer')).getByRole('button', { name: 'Annuler' });
+    await user.click(closeBtnFooter);
+    expect(onCloseMock).toHaveBeenCalled();
+    
     // Check 'Retour aux classes'
     const returnBtn = screen.getByRole('button', { name: 'Retour aux classes' });
     expect(returnBtn).not.toBeNull();

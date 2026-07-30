@@ -9,7 +9,13 @@
   border-radius: 16px;
 }
 
-.header,
+.header {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
 .navigation,
 .footer {
   min-width: 0;
@@ -139,4 +145,16 @@
   border-top: 1px solid #e5e7eb;
   background: white;
   z-index: 2;
+}
+
+.activeTab {
+  background: #2563eb;
+  color: white;
+  border: 1px solid #2563eb;
+}
+
+.inactiveTab {
+  background: #f3f4f6;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
 }
