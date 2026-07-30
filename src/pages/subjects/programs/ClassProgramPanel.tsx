@@ -234,6 +234,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
             academicYearId={normalizedYear}
             classId={selectedClassId}
             selectedClass={selectedClass}
+            classes={classes}
             userId={currentUser.id || ''}
             userRole={currentUser.role}
             catalogSubjects={db.subjects || []}

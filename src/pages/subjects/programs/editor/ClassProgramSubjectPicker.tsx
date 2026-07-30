@@ -9,7 +9,8 @@ interface ClassProgramSubjectPickerProps {
   schoolId: string;
   classId: string;
   selectedClass?: ClassSection | null;
-  onSelect: (subject: Subject) => void;
+  classes?: ClassSection[];
+  onBulkSelect: (selectedClassIds: string[], selectedSubjectIds: string[]) => void;
   onClose: () => void;
 }
 
@@ -19,14 +20,23 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
   schoolId,
   classId,
   selectedClass,
-  onSelect,
+  classes = [],
+  onBulkSelect,
   onClose
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isFiltered, setIsFiltered] = useState(true);
+  const [isSubjectFiltered, setIsSubjectFiltered] = useState(true);
 
-  // Extract class details using classClassification helpers
-  const classSection = useMemo(() => {
+  const [classSearchTerm, setClassSearchTerm] = useState('');
+  const [isClassFiltered, setIsClassFiltered] = useState(true);
+
+  const [selectedClassIds, setSelectedClassIds] = useState<Set<string>>(new Set([classId]));
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<Set<string>>(new Set());
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Current class details for baseline
+  const currentClassSection = useMemo(() => {
     if (selectedClass) {
       return normalizeClassSection(selectedClass);
     }
@@ -37,7 +47,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
     return 'francophone';
   }, [selectedClass, classId]);
 
-  const classCycle = useMemo(() => {
+  const currentClassCycle = useMemo(() => {
     if (selectedClass) {
       return normalizeClassCycle(selectedClass);
     }
@@ -51,17 +61,72 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
     return 'primaire';
   }, [selectedClass, classId]);
 
+  // Available subjects for current class logic (as baseline)
   const availableSubjects = useMemo(() => {
     return filterAvailableSubjectsForClass({
       catalogSubjects,
-      activeSubjects,
+      activeSubjects, // Active subjects of current class
       schoolId,
-      classSection,
-      classCycle,
-      isFiltered,
+      classSection: currentClassSection,
+      classCycle: currentClassCycle,
+      isFiltered: isSubjectFiltered,
       searchTerm
     });
-  }, [catalogSubjects, activeSubjects, schoolId, classSection, classCycle, isFiltered, searchTerm]);
+  }, [catalogSubjects, activeSubjects, schoolId, currentClassSection, currentClassCycle, isSubjectFiltered, searchTerm]);
+
+  // Available classes logic
+  const availableClasses = useMemo(() => {
+    let filtered = classes.filter(c => c.schoolId === schoolId || c.schoolId === undefined || c.schoolId === '');
+
+    if (classSearchTerm) {
+      const q = classSearchTerm.toLowerCase();
+      filtered = filtered.filter(c => c.name.toLowerCase().includes(q));
+    }
+
+    if (isClassFiltered) {
+       filtered = filtered.filter(c => {
+         const cSection = normalizeClassSection(c);
+         const cCycle = normalizeClassCycle(c);
+         return cSection === currentClassSection && cCycle === currentClassCycle;
+       });
+    }
+
+    return filtered;
+  }, [classes, schoolId, classSearchTerm, isClassFiltered, currentClassSection, currentClassCycle]);
+
+  // Handlers for classes
+  const handleToggleClass = (id: string) => {
+    const next = new Set(selectedClassIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedClassIds(next);
+  };
+  const handleSelectAllClasses = () => setSelectedClassIds(new Set(availableClasses.map(c => c.id)));
+  const handleClearClasses = () => setSelectedClassIds(new Set());
+
+  // Handlers for subjects
+  const handleToggleSubject = (id: string) => {
+    const next = new Set(selectedSubjectIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedSubjectIds(next);
+  };
+  const handleSelectAllSubjects = () => setSelectedSubjectIds(new Set(availableSubjects.map(s => s.id)));
+  const handleClearSubjects = () => setSelectedSubjectIds(new Set());
+
+  const handleSubmit = () => {
+    if (isSubmitting) return; // Verrou anti-double clic
+    if (selectedClassIds.size > 0 && selectedSubjectIds.size > 0) {
+      setIsSubmitting(true);
+      onBulkSelect(Array.from(selectedClassIds), Array.from(selectedSubjectIds));
+    }
+  };
 
   return (
     <div className="class-program-picker-overlay">
@@ -70,6 +135,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         aria-modal="true"
         aria-labelledby="subject-picker-title"
         className="class-program-picker-dialog"
+        style={{ maxWidth: '800px', width: '90vw', display: 'flex', flexDirection: 'column' }}
       >
         <header className="class-program-picker-header">
           <div className="flex flex-col">
@@ -77,120 +143,138 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
               Ajouter des matières au programme
             </h3>
             <span className="text-[10px] text-gray-500 mt-0.5">
-              Classe : <span className="font-semibold text-gray-700 dark:text-gray-300">{(selectedClass?.name || classId.split('__').pop() || '').toUpperCase()}</span> ({classSection.toUpperCase()} • {classCycle.toUpperCase()})
+              Sélectionnez les classes cibles et les matières à ajouter.
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer la liste des matières"
-            title="Fermer la liste des matières"
             className="class-program-picker-close"
           >
             ×
           </button>
         </header>
 
-        <div className="class-program-picker-controls">
-          <input
-            type="text"
-            placeholder="Rechercher une matière par son nom ou son code..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-          />
+        <div className="p-4 flex gap-4 overflow-hidden flex-1" style={{ maxHeight: '60vh' }}>
 
-          <div className="class-program-picker-options">
+          {/* CLASSES COLUMN */}
+          <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-800 pr-4 overflow-hidden">
+            <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">1. Classes concernées</h4>
+
             <input
-              type="checkbox"
-              id="show-other-subjects-checkbox"
-              checked={!isFiltered}
-              onChange={(e) => setIsFiltered(!e.target.checked)}
+              type="text"
+              placeholder="Rechercher une classe..."
+              value={classSearchTerm}
+              onChange={(e) => setClassSearchTerm(e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-xs mb-2"
             />
 
-            <div className="class-program-picker-option-text">
-              <label htmlFor="show-other-subjects-checkbox">
-                Afficher aussi les matières des autres sections et cycles
-              </label>
+            <div className="flex items-center mb-2 gap-2 text-xs">
+              <input
+                type="checkbox"
+                id="filter-classes-cb"
+                checked={!isClassFiltered}
+                onChange={(e) => setIsClassFiltered(!e.target.checked)}
+              />
+              <label htmlFor="filter-classes-cb" className="text-gray-600 dark:text-gray-400">Afficher autres sections/cycles</label>
+            </div>
 
-              <p id="show-other-subjects-help">
-                Utilisez cette option uniquement pour ajouter une matière exceptionnelle.
-              </p>
+            <div className="flex justify-between items-center mb-2">
+               <button onClick={handleSelectAllClasses} className="text-[10px] font-semibold text-blue-600">Tout sélectionner</button>
+               <button onClick={handleClearClasses} className="text-[10px] font-semibold text-red-600">Effacer</button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-1">
+              {availableClasses.map(c => {
+                const cSec = normalizeClassSection(c);
+                const cCyc = normalizeClassCycle(c);
+                return (
+                  <label key={c.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedClassIds.has(c.id)}
+                      onChange={() => handleToggleClass(c.id)}
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{c.name}</span>
+                      <span className="text-[10px] text-gray-500">{cSec} • {cCyc}</span>
+                    </div>
+                  </label>
+                );
+              })}
+              {availableClasses.length === 0 && (
+                <div className="text-xs text-gray-500 text-center mt-4">Aucune classe trouvée.</div>
+              )}
+            </div>
+          </div>
+
+          {/* SUBJECTS COLUMN */}
+          <div className="flex-1 flex flex-col overflow-hidden pl-2">
+            <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">2. Matières à ajouter</h4>
+
+            <input
+              type="text"
+              placeholder="Rechercher une matière..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-750 bg-white dark:bg-gray-900 text-gray-950 dark:text-white rounded-lg text-xs mb-2"
+            />
+
+            <div className="flex items-center mb-2 gap-2 text-xs">
+              <input
+                type="checkbox"
+                id="filter-subjects-cb"
+                checked={!isSubjectFiltered}
+                onChange={(e) => setIsSubjectFiltered(!e.target.checked)}
+              />
+              <label htmlFor="filter-subjects-cb" className="text-gray-600 dark:text-gray-400">Afficher autres sections/cycles</label>
+            </div>
+
+            <div className="flex justify-between items-center mb-2">
+               <button onClick={handleSelectAllSubjects} className="text-[10px] font-semibold text-blue-600">Tout sélectionner</button>
+               <button onClick={handleClearSubjects} className="text-[10px] font-semibold text-red-600">Effacer</button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-1">
+              {availableSubjects.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedSubjectIds.has(s.id)}
+                    onChange={() => handleToggleSubject(s.id)}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{s.name} {s.code ? `(${s.code})` : ''}</span>
+                    <span className="text-[10px] text-gray-500">
+                      {s.section === 'all' ? 'Toutes sections' : s.section}
+                      {(s.cycles && s.cycles.length > 0) ? ` • ${s.cycles.join(',')}` : ''}
+                    </span>
+                  </div>
+                </label>
+              ))}
+              {availableSubjects.length === 0 && (
+                <div className="text-xs text-gray-500 text-center mt-4">Aucune matière trouvée.</div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="class-program-picker-list">
-          {availableSubjects.length === 0 ? (
-            <div className="text-center py-8 px-4 text-gray-500 dark:text-gray-400">
-              {searchTerm ? (
-                <p className="text-sm">Aucune matière ne correspond à votre recherche.</p>
-              ) : isFiltered ? (
-                <>
-                  <p className="text-sm">Aucune matière recommandée pour cette section et ce cycle.</p>
-                  <button
-                    type="button"
-                    onClick={() => setIsFiltered(false)}
-                    className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-semibold"
-                  >
-                     Afficher aussi les matières des autres sections et cycles
-                  </button>
-                </>
-              ) : (
-                <p className="text-sm">Toutes les matières disponibles ont déjà été ajoutées au programme.</p>
-              )}
-            </div>
-          ) : (
-            <div>
-              {availableSubjects.map((s) => (
-                <div
-                  key={s.id}
-                  className="class-program-picker-item"
-                >
-                  <div className="class-program-picker-item-content">
-                    <span className="class-program-picker-item-name">
-                      {s.name}
-                    </span>
-                    {s.code && (
-                      <div className="class-program-picker-item-code">
-                        Code : {s.code}
-                      </div>
-                    )}
-                    {((s.section && s.section !== 'all' && s.section !== classSection) ||
-                      (s.cycles && s.cycles.length > 0 && !s.cycles.some(c => {
-                        const mapped = c === 'nursery' ? 'maternelle' : c === 'primary' ? 'primaire' : c === 'secondary' ? 'secondaire' : c;
-                        return mapped === classCycle;
-                      }))) && (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400 font-medium">
-                          {s.section === 'francophone' ? 'Francophone' : s.section === 'anglophone' ? 'Anglophone' : 'Tous'}
-                        </span>
-                        <span className="text-gray-300 dark:text-gray-600">•</span>
-                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400 font-medium">
-                          {(s.cycles || []).map(c => {
-                            if (c === 'nursery') return 'Maternelle';
-                            if (c === 'primary') return 'Primaire';
-                            if (c === 'secondary') return 'Secondaire';
-                            return c;
-                          }).join(', ') || 'Tous'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => onSelect(s)}
-                    className="class-program-picker-add class-program-btn-add"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Ajouter
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={selectedClassIds.size === 0 || selectedSubjectIds.size === 0 || isSubmitting}
+            className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
+          >
+            {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière(s) à ${selectedClassIds.size} classe(s)`}
+          </button>
         </div>
+
       </section>
     </div>
   );

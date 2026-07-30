@@ -3,6 +3,7 @@ import { useClassProgramDraft } from '../../../../hooks/useClassProgramDraft';
 import type { ClassProgram, ClassSubject, Subject, ClassSection } from '../../../../types';
 import { ClassProgramDraftToolbar } from './ClassProgramDraftToolbar';
 import { ClassProgramDraftSummary } from './ClassProgramDraftSummary';
+import { bulkAddSubjectsToClasses, type BulkAddSubjectsResult } from '../../../../services/bulkClassSubjects';
 import { ClassProgramSubjectRow } from './ClassProgramSubjectRow';
 import { ClassProgramSubjectPicker } from './ClassProgramSubjectPicker';
 import { ClassProgramEditorState } from './ClassProgramEditorState';
@@ -23,6 +24,7 @@ interface ClassProgramEditorProps {
   onClose: () => void;
   onSaveSuccess: (updatedProgram: ClassProgram, updatedSubjects: ClassSubject[]) => void;
   onDirtyChange?: (isDirty: boolean) => void;
+  classes?: ClassSection[];
 }
 
 export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
@@ -37,7 +39,8 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   catalogSubjects,
   onClose,
   onSaveSuccess,
-  onDirtyChange
+  onDirtyChange,
+  classes = []
 }) => {
   const {
     program,
@@ -48,7 +51,6 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     draftStateToken,
     isTokenCalculating,
     tokenError,
-    addSubject,
     updateSubjectFields,
     removeSubject,
     reorderSubjects,
@@ -72,6 +74,9 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkAddSubjectsResult | null>(null);
 
   const handlePublish = async () => {
     if (isPublishing || !program) return;
@@ -102,6 +107,37 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     }
   };
 
+  const handleBulkSelect = async (selectedClassIds: string[], selectedSubjectIds: string[]) => {
+    setIsPickerOpen(false);
+    setIsBulkAdding(true);
+    setBulkResult(null);
+
+    try {
+      const result = await bulkAddSubjectsToClasses({
+        schoolId,
+        academicYearId,
+        classIds: selectedClassIds,
+        subjectIds: selectedSubjectIds
+      });
+      setBulkResult(result);
+    } catch (err: unknown) {
+      setBulkResult({
+        classesProcessed: 0,
+        totalSubjectsAdded: 0,
+        totalDuplicatesIgnored: 0,
+        details: [{ classId: 'erreur', status: 'error', added: 0, ignored: 0, error: err instanceof Error ? err.message : String(err) }]
+      });
+    } finally {
+      setIsBulkAdding(false);
+    }
+  };
+
+  const closeBulkResult = () => {
+    setBulkResult(null);
+    onSaveSuccess(program!, subjects);
+    onClose();
+  };
+
   const handleClose = () => {
     if (isDirty) {
       setShowExitConfirm(true);
@@ -119,7 +155,6 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     await createInitialProgram();
   };
 
-  // If no program exists yet
   if (!program) {
     return (
       <div className="p-6 text-center">
@@ -146,7 +181,6 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     );
   }
 
-  // If the program is published and there's no active draft (revision numbers match and hasUnpublishedChanges is false)
   const isPublishedWithoutDraft =
     program.status === 'published' &&
     !program.hasUnpublishedChanges &&
@@ -253,12 +287,72 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
           schoolId={schoolId}
           classId={classId}
           selectedClass={selectedClass}
-          onSelect={(s) => {
-            addSubject(s);
-            setIsPickerOpen(false);
-          }}
+          classes={classes}
+          onBulkSelect={handleBulkSelect}
           onClose={() => setIsPickerOpen(false)}
         />
+      )}
+
+      {/* Bulk Add Result Modal */}
+      {(isBulkAdding || bulkResult) && (
+        <Modal
+          isOpen={true}
+          onClose={isBulkAdding ? () => {} : closeBulkResult}
+          title="Ajout groupé de matières"
+          closeOnBackdrop={false}
+        >
+          <div className="p-4">
+             {isBulkAdding ? (
+                <div className="flex flex-col items-center justify-center p-8">
+                   <svg className="animate-spin h-8 w-8 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24">
+                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                   </svg>
+                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Traitement en cours...</p>
+                </div>
+             ) : bulkResult ? (
+                <div className="flex flex-col">
+                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-lg mb-4">
+                     <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-2">Résumé</h4>
+                     <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                       <li>Classes traitées : <strong>{bulkResult.classesProcessed}</strong></li>
+                       <li>Matières ajoutées au total : <strong>{bulkResult.totalSubjectsAdded}</strong></li>
+                       <li>Doublons ignorés : <strong>{bulkResult.totalDuplicatesIgnored}</strong></li>
+                     </ul>
+                   </div>
+
+                   <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase">Détails par classe</h4>
+                   <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-750 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
+                      {bulkResult.details.map((d, idx) => (
+                        <div key={idx} className="p-2 flex items-center justify-between">
+                           <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                             {classes.find(c => c.id === d.classId)?.name || d.classId}
+                           </span>
+                           {d.status === 'success' ? (
+                             <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium">
+                               {d.added} ajout(s), {d.ignored} ignoré(s)
+                             </span>
+                           ) : (
+                             <span className="text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded font-medium truncate max-w-xs" title={d.error || 'Erreur'}>
+                               Erreur : {d.error}
+                             </span>
+                           )}
+                        </div>
+                      ))}
+                   </div>
+
+                   <div className="mt-6 flex justify-end">
+                      <button
+                        onClick={closeBulkResult}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                      >
+                        Fermer et recharger
+                      </button>
+                   </div>
+                </div>
+             ) : null}
+          </div>
+        </Modal>
       )}
 
       {/* 6. Unsaved Changes confirmation Modal */}
