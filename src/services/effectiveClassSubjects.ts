@@ -20,6 +20,11 @@ export interface EffectiveClassSubject {
   displayOrder: number;
 }
 
+export interface EffectiveClassSubjectsResult {
+  status: 'no_program' | 'empty' | 'success';
+  subjects: EffectiveClassSubject[];
+}
+
 export function getEffectiveClassSubjects({
   classId,
   classes,
@@ -27,26 +32,33 @@ export function getEffectiveClassSubjects({
   classSubjects,
   subjects,
   activeAcademicYearId
-}: GetEffectiveClassSubjectsParams): EffectiveClassSubject[] {
+}: GetEffectiveClassSubjectsParams): EffectiveClassSubjectsResult {
   // 1 & 2. Récupérer la classe réelle
   const studentClass = classes.find(c => c.id === classId);
-  if (!studentClass) return [];
+  if (!studentClass) return { status: 'no_program', subjects: [] };
 
   // 3. Sélectionner uniquement le programme publié de cette classe
   const program = classPrograms.find(
     p =>
+      p.schoolId === studentClass.schoolId &&
       p.classId === studentClass.id &&
       p.academicYearId === activeAcademicYearId &&
+      p.status === 'published' &&
       p.publishedRevisionId != null
   );
 
-  if (!program) return [];
+  if (!program) return { status: 'no_program', subjects: [] };
 
   // 4 & 5. Filtrer les classSubjects par revisionId publié et actifs
   const effectiveSubjects = classSubjects
-    .filter(cs => cs.revisionId === program.publishedRevisionId && cs.isActive)
+    .filter(cs => 
+      cs.schoolId === studentClass.schoolId &&
+      cs.classId === studentClass.id &&
+      cs.revisionId === program.publishedRevisionId && 
+      cs.isActive
+    )
     .map(cs => {
-      const baseSubject = subjects.find(s => s.id === cs.subjectId);
+      const baseSubject = subjects.find(s => s.id === cs.subjectId && s.schoolId === studentClass.schoolId);
       
       // 6. Conserver les champs stricts
       return {
@@ -62,6 +74,10 @@ export function getEffectiveClassSubjects({
     });
 
   // 7. Trier par l'ordre du programme
-  return effectiveSubjects.sort((a, b) => a.displayOrder - b.displayOrder);
+  effectiveSubjects.sort((a, b) => a.displayOrder - b.displayOrder);
+
+  if (effectiveSubjects.length === 0) return { status: 'empty', subjects: [] };
+
+  return { status: 'success', subjects: effectiveSubjects };
 }
 

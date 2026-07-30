@@ -85,8 +85,9 @@ describe('effectiveClassSubjects service', () => {
       subjects: mockSubjects,
       activeAcademicYearId: 'ay-1'
     });
-    expect(res).toHaveLength(2);
-    expect(res.map(s => s.subjectId)).toEqual(['sub-math', 'sub-civic']);
+    expect(res.status).toBe('success');
+    expect(res.subjects).toHaveLength(2);
+    expect(res.subjects.map(s => s.subjectId)).toEqual(['sub-math', 'sub-civic']);
   });
 
   test('18. matière inactive exclue', () => {
@@ -98,7 +99,7 @@ describe('effectiveClassSubjects service', () => {
       subjects: mockSubjects,
       activeAcademicYearId: 'ay-1'
     });
-    expect(res.find(s => s.subjectId === 'sub-sport')).toBeUndefined();
+    expect(res.subjects.find(s => s.subjectId === 'sub-sport')).toBeUndefined();
   });
 
   test('19. matière d\'une autre classe exclue', () => {
@@ -110,7 +111,7 @@ describe('effectiveClassSubjects service', () => {
       subjects: mockSubjects,
       activeAcademicYearId: 'ay-1'
     });
-    expect(res.find(s => s.classSubjectId === 'cs-other')).toBeUndefined();
+    expect(res.subjects.find(s => s.classSubjectId === 'cs-other')).toBeUndefined();
   });
 
   test('20. matière d\'une autre école exclue (impliqué par le program publié pour cette classe unique)', () => {
@@ -126,8 +127,8 @@ describe('effectiveClassSubjects service', () => {
       subjects: mockSubjects,
       activeAcademicYearId: 'ay-1'
     });
-    expect(res[0].subjectId).toBe('sub-math');
-    expect(res[1].subjectId).toBe('sub-civic');
+    expect(res.subjects[0].subjectId).toBe('sub-math');
+    expect(res.subjects[1].subjectId).toBe('sub-civic');
   });
 
   test('22. programme non publié refusé', () => {
@@ -142,6 +143,7 @@ describe('effectiveClassSubjects service', () => {
       subjects: mockSubjects,
       activeAcademicYearId: 'ay-1'
     });
-    expect(res).toHaveLength(0);
+    expect(res.status).toBe('no_program');
+    expect(res.subjects).toHaveLength(0);
   });
 });

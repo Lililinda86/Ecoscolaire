@@ -116,7 +116,9 @@ const Grades: React.FC = () => {
       return;
     }
 
-    const effSub = getEffectiveClassSubjects({ classId: selectedClassId, classes: db.classes, classPrograms: db.classPrograms || [], classSubjects: db.classSubjects || [], subjects: db.subjects, activeAcademicYearId: selectedAcademicYearId }).find(s => s.classSubjectId === selectedClassSubjectId);
+    if (!db.classPrograms || !db.classSubjects || !db.subjects) return;
+    const effResult = getEffectiveClassSubjects({ classId: selectedClassId, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: selectedAcademicYearId });
+    const effSub = effResult.subjects.find(s => s.classSubjectId === selectedClassSubjectId);
     if (!effSub) return;
     
     const activeAssignment = (db.teacherAssignments || []).find(a => 
@@ -335,7 +337,9 @@ const Grades: React.FC = () => {
                 if (activeYear) {
                   const activePer = db.periods?.find(p => p.schoolId === currentSchool?.id && p.academicYearId === activeYear.id && p.status === 'open');
                   if (activePer) {
-                    const effSubjects = getEffectiveClassSubjects({ classId: studentClass.id, classes: db.classes, classPrograms: db.classPrograms || [], classSubjects: db.classSubjects || [], subjects: db.subjects, activeAcademicYearId: activeYear.id });
+                    if (!db.classPrograms || !db.classSubjects || !db.subjects) return null;
+                    const effResult = getEffectiveClassSubjects({ classId: studentClass.id, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: activeYear.id });
+                    const effSubjects = effResult.subjects;
                     const stGrades = (db.gradesStrict || []).filter(g => 
                       g.studentId === student.id && g.academicYearId === activeYear.id && g.periodId === activePer.id
                     );
@@ -621,7 +625,10 @@ const Grades: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               <div className="form-group">
                 <label>Classe</label>
-                <select required value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)}>
+                <select required value={selectedClassId} onChange={e => {
+                    setSelectedClassId(e.target.value);
+                    setSelectedClassSubjectId('');
+                  }}>
                   <option value="">-- Choisir --</option>
                   {sortClasses(db.classes.filter(c => c.schoolId === currentSchool?.id)).map(c => (
                     <option key={c.id} value={c.id}>{c.name} ({c.type})</option>
@@ -632,12 +639,31 @@ const Grades: React.FC = () => {
               {selectedClassId && (
                 <div className="form-group">
                   <label>Matière</label>
-                  <select required value={selectedClassSubjectId} onChange={e => setSelectedClassSubjectId(e.target.value)}>
-                    <option value="">-- Choisir --</option>
-                    {getEffectiveClassSubjects({ classId: selectedClassId, classes: db.classes, classPrograms: db.classPrograms || [], classSubjects: db.classSubjects || [], subjects: db.subjects, activeAcademicYearId: selectedAcademicYearId }).map(s => (
-                      <option key={s.classSubjectId} value={s.classSubjectId}>{s.name} (Coeff {s.coefficient})</option>
-                    ))}
-                  </select>
+                  {(() => {
+                    if (firestoreError) return <div style={{ fontSize: '0.85rem', color: 'var(--danger-color)' }}>Impossible de charger les matières. Réessayer.</div>;
+                    if (!db.classPrograms || !db.classSubjects || !db.subjects) return <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Chargement des matières...</div>;
+
+                    const effResult = getEffectiveClassSubjects({ 
+                      classId: selectedClassId, 
+                      classes: db.classes, 
+                      classPrograms: db.classPrograms, 
+                      classSubjects: db.classSubjects, 
+                      subjects: db.subjects, 
+                      activeAcademicYearId: selectedAcademicYearId
+                    });
+                    
+                    if (effResult.status === 'no_program') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Le programme de cette classe n’est pas encore publié.</div>;
+                    if (effResult.status === 'empty') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Aucune matière active dans le programme publié de cette classe.</div>;
+                    
+                    return (
+                      <select required value={selectedClassSubjectId} onChange={e => setSelectedClassSubjectId(e.target.value)}>
+                        <option value="">-- Choisir --</option>
+                        {effResult.subjects.map(s => (
+                          <option key={s.classSubjectId} value={s.classSubjectId}>{s.name} (Coeff {s.coefficient})</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </div>
               )}
             </div>
