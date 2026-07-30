@@ -3192,3 +3192,199 @@ describe('Evaluations & Grades Lot 2A', () => {
   });
 
 });
+
+test.describe('Academic Calendar Pointers Security Rules', () => {
+  const schoolId = 'school_ACAD';
+  const yearId = 'year_ACAD';
+  const periodId = 'period_ACAD';
+
+  test.beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, 'schools', schoolId), {
+        id: schoolId,
+        name: 'Test School ACAD',
+        version: 1
+      });
+      await setDoc(doc(adminDb, 'schools', 'school_hist'), {
+        id: 'school_hist',
+        name: 'Historic School'
+      });
+      await setDoc(doc(adminDb, 'schools', 'school_v4'), {
+        id: 'school_v4',
+        name: 'V4 School',
+        version: 4
+      });
+      await setDoc(doc(adminDb, 'academicYears', yearId), {
+        id: yearId,
+        schoolId: schoolId,
+        name: '2026',
+        status: 'active',
+        version: 1
+      });
+      await setDoc(doc(adminDb, 'academicYears', 'ay_hist'), {
+        id: 'ay_hist',
+        schoolId: schoolId,
+        name: 'Hist AY',
+        status: 'active'
+      });
+      await setDoc(doc(adminDb, 'academicYears', 'ay_v2'), {
+        id: 'ay_v2',
+        schoolId: schoolId,
+        name: 'V2 AY',
+        status: 'active',
+        version: 2
+      });
+      // Seed users
+      await setDoc(doc(adminDb, 'users', 'owner_1'), { schoolId: schoolId, role: 'owner', active: true });
+      await setDoc(doc(adminDb, 'users', 'dir_1'), { schoolId: schoolId, role: 'director', active: true });
+      await setDoc(doc(adminDb, 'users', 'teacher_1'), { schoolId: schoolId, role: 'teacher', active: true });
+      await setDoc(doc(adminDb, 'users', 'dir_2'), { schoolId: 'other_school', role: 'director', active: true });
+      await setDoc(doc(adminDb, 'users', 'parent_1'), { schoolId: schoolId, role: 'parent', active: true });
+      await setDoc(doc(adminDb, 'users', 'superadmin_1'), { role: 'superAdmin', active: true });
+      await setDoc(doc(adminDb, 'users', 'owner_hist'), { schoolId: 'school_hist', role: 'owner', active: true });
+    });
+  });
+
+  // School.activeAcademicYearId
+  test('owner même école autorisé (activeAcademicYearId)', async () => {
+    const db = testEnv.authenticatedContext('owner_1', { email: 'owner@test.com' }).firestore();
+    const docRef = doc(db, 'schools', schoolId);
+    await assertSucceeds(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'owner_1', version: 2 }));
+  });
+
+  test('School historique sans clé version (ajout activeAcademicYearId, version 1)', async () => {
+    const db = testEnv.authenticatedContext('owner_hist').firestore();
+    const docRef = doc(db, 'schools', 'school_hist');
+    await assertSucceeds(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'owner_hist', version: 1 }));
+  });
+
+  test('School historique sans clé version : nouvelle écriture sans version refusée', async () => {
+    const db = testEnv.authenticatedContext('owner_hist').firestore();
+    const docRef = doc(db, 'schools', 'school_hist');
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'owner_hist' }));
+  });
+
+  test('School version 4 : écriture version 4 refusée', async () => {
+    const db = testEnv.authenticatedContext('owner_1').firestore();
+    const docRef = doc(db, 'schools', 'school_v4');
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'owner_1', version: 4 }));
+  });
+
+  test('School version 4 : écriture version 6 refusée', async () => {
+    const db = testEnv.authenticatedContext('owner_1').firestore();
+    const docRef = doc(db, 'schools', 'school_v4');
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'owner_1', version: 6 }));
+  });
+
+  test('School historique : ajout pointeur avec modification simultanée d’un champ financier refusé', async () => {
+    const db = testEnv.authenticatedContext('owner_1').firestore();
+    const docRef = doc(db, 'schools', 'school_hist');
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', subscriptionPlan: 'premium', updatedAt: 'now', updatedBy: 'owner_1', version: 1 }));
+  });
+
+
+  test('director même école autorisé pour les seuls champs académiques', async () => {
+    const db = testEnv.authenticatedContext('dir_1', { email: 'dir@test.com' }).firestore();
+    const docRef = doc(db, 'schools', schoolId);
+    await assertSucceeds(updateDoc(docRef, { activeAcademicYearId: 'year3', updatedAt: 'now', updatedBy: 'dir_1', version: 2 }));
+  });
+
+  test('teacher refusé (activeAcademicYearId)', async () => {
+    const db = testEnv.authenticatedContext('teacher_1', { email: 't@test.com' }).firestore();
+    const docRef = doc(db, 'schools', schoolId);
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'teacher_1', version: 2 }));
+  });
+
+  test('modification simultanée d’un champ financier refusée', async () => {
+    const db = testEnv.authenticatedContext('dir_1', { email: 'dir@test.com' }).firestore();
+    const docRef = doc(db, 'schools', schoolId);
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', subscriptionPlan: 'premium', updatedAt: 'now', updatedBy: 'dir_1', version: 2 }));
+  });
+
+  test('autre école refusée (activeAcademicYearId)', async () => {
+    const db = testEnv.authenticatedContext('dir_2', { email: 'dir2@test.com' }).firestore();
+    const docRef = doc(db, 'schools', schoolId);
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'dir_2', version: 2 }));
+  });
+
+  test('parent refusé (activeAcademicYearId)', async () => {
+    const db = testEnv.authenticatedContext('parent_1', { email: 'parent@test.com' }).firestore();
+    const docRef = doc(db, 'schools', schoolId);
+    await assertFails(updateDoc(docRef, { activeAcademicYearId: 'year2', updatedAt: 'now', updatedBy: 'parent_1', version: 2 }));
+  });
+
+  test('delete refusé (schools)', async () => {
+    const db = testEnv.authenticatedContext('owner_1', { email: 'owner@test.com' }).firestore();
+    const docRef = doc(db, 'schools', schoolId);
+    await assertFails(deleteDoc(docRef));
+  });
+
+  // AcademicYear.openPeriodId
+  test('director même école autorisé (openPeriodId)', async () => {
+    const db = testEnv.authenticatedContext('dir_1', { email: 'dir@test.com' }).firestore();
+    const docRef = doc(db, 'academicYears', yearId);
+    await assertSucceeds(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 2 }));
+  });
+
+  test('AcademicYear historique sans version (ajout openPeriodId, version 1 autorisé)', async () => {
+    const db = testEnv.authenticatedContext('dir_1').firestore();
+    const docRef = doc(db, 'academicYears', 'ay_hist');
+    await assertSucceeds(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 1 }));
+  });
+
+  test('AcademicYear historique sans version : nouvelle écriture sans version refusée', async () => {
+    const db = testEnv.authenticatedContext('dir_1').firestore();
+    const docRef = doc(db, 'academicYears', 'ay_hist');
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1' }));
+  });
+
+  test('AcademicYear version 2 : même version refusée', async () => {
+    const db = testEnv.authenticatedContext('dir_1').firestore();
+    const docRef = doc(db, 'academicYears', 'ay_v2');
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 2 }));
+  });
+
+  test('AcademicYear version 2 : saut à version 4 refusé', async () => {
+    const db = testEnv.authenticatedContext('dir_1').firestore();
+    const docRef = doc(db, 'academicYears', 'ay_v2');
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 4 }));
+  });
+
+  test('AcademicYear : modification simultanée d’un champ structurel interdit refusée', async () => {
+    const db = testEnv.authenticatedContext('dir_1').firestore();
+    const docRef = doc(db, 'academicYears', 'ay_v2');
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', name: 'New Name', updatedAt: 'now', updatedBy: 'dir_1', version: 3 }));
+  });
+
+
+  test('teacher refusé (openPeriodId)', async () => {
+    const db = testEnv.authenticatedContext('teacher_1', { email: 't@test.com' }).firestore();
+    const docRef = doc(db, 'academicYears', yearId);
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'teacher_1', version: 2 }));
+  });
+
+  test('version incorrecte refusée (openPeriodId)', async () => {
+    const db = testEnv.authenticatedContext('dir_1', { email: 'dir@test.com' }).firestore();
+    const docRef = doc(db, 'academicYears', yearId);
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 99 }));
+  });
+
+  test('autre école refusée (openPeriodId)', async () => {
+    const db = testEnv.authenticatedContext('dir_2', { email: 'dir2@test.com' }).firestore();
+    const docRef = doc(db, 'academicYears', yearId);
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_2', version: 2 }));
+  });
+
+  test('parent refusé (openPeriodId)', async () => {
+    const db = testEnv.authenticatedContext('parent_1', { email: 'parent@test.com' }).firestore();
+    const docRef = doc(db, 'academicYears', yearId);
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'parent_1', version: 2 }));
+  });
+
+  test('delete refusé (academicYears)', async () => {
+    const db = testEnv.authenticatedContext('dir_1', { email: 'dir@test.com' }).firestore();
+    const docRef = doc(db, 'academicYears', yearId);
+    await assertFails(deleteDoc(docRef));
+  });
+});

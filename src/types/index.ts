@@ -16,10 +16,14 @@ export interface CycleAccreditationNumbers {
 }
 
 export interface School {
+  updatedAt?: string;
+  updatedBy?: string;
+  version?: number;
   id: string; // schoolId
   schoolCode: string;
   name: string; // schoolName
   academicYear: string;
+  activeAcademicYearId?: string;
   logoUrl?: string | null; // Image en Base64 ; null = logo supprimé explicitement
   logoFileName?: string;
   logoUpdatedAt?: string;
@@ -319,12 +323,14 @@ export interface StaffAttendance {
 }
 
 export interface AcademicYear {
+  version?: number;
   id: string;
   schoolId: string;
   name: string;
   startDate: string;
   endDate: string;
   status: 'draft' | 'active' | 'closed' | 'archived';
+  openPeriodId?: string;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -332,6 +338,7 @@ export interface AcademicYear {
 }
 
 export interface Period {
+  version?: number;
   id: string;
   schoolId: string;
   academicYearId: string;

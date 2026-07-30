@@ -7,6 +7,7 @@ import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 import type { School, EducationCycle } from '../types';
+import { AcademicCalendarSettings } from '../components/Settings/AcademicCalendarSettings';
 
 const Settings: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
@@ -105,6 +106,15 @@ const Settings: React.FC = () => {
     initDraftsFromSchool(school);
     initializedSchoolIdRef.current = school.id;
   }, [db.school, initDraftsFromSchool]);
+
+  useEffect(() => {
+    if (window.location.hash === '#/settings?section=academic-calendar' || window.location.hash === '#academic-calendar') {
+      setTimeout(() => {
+        const el = document.getElementById('academic-calendar');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 500);
+    }
+  }, []);
 
   if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return null;
 
@@ -842,6 +852,15 @@ const Settings: React.FC = () => {
            );
         })()}
       </Modal>
+
+      {db.school && currentUser && (
+        <AcademicCalendarSettings 
+          currentSchool={db.school} 
+          currentUser={currentUser} 
+          academicYears={db.academicYears || []} 
+          periods={db.periods || []} 
+        />
+      )}
     </div>
   );
 };
