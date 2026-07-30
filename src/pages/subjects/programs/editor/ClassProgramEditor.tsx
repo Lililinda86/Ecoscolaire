@@ -77,6 +77,8 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
 
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [bulkResult, setBulkResult] = useState<BulkAddSubjectsResult | null>(null);
+  const [bulkPendingInfo, setBulkPendingInfo] = useState<{ classes: number, subjects: number } | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
 
   const handlePublish = async () => {
     if (isPublishing || !program) return;
@@ -109,6 +111,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
 
   const handleBulkSelect = async (selectedClassIds: string[], selectedSubjectIds: string[]) => {
     setIsPickerOpen(false);
+    setBulkPendingInfo({ classes: selectedClassIds.length, subjects: selectedSubjectIds.length });
     setIsBulkAdding(true);
     setBulkResult(null);
 
@@ -133,9 +136,8 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   };
 
   const closeBulkResult = () => {
-    setBulkResult(null);
-    onSaveSuccess(program!, subjects);
-    onClose();
+    setIsReloading(true);
+    window.location.reload();
   };
 
   const handleClose = () => {
@@ -303,39 +305,51 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
         >
           <div className="p-4">
              {isBulkAdding ? (
-                <div className="flex flex-col items-center justify-center p-8">
-                   <svg className="animate-spin h-8 w-8 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24">
-                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                   </svg>
-                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Traitement en cours...</p>
+                <div className="flex flex-col items-center justify-center p-8 text-center">
+                   <div className="relative flex justify-center items-center mb-4">
+                     <svg className="animate-spin h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" role="status" aria-label="Traitement en cours">
+                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                     </svg>
+                   </div>
+                   <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">Traitement en cours...</p>
+                   {bulkPendingInfo && (
+                     <p className="text-xs text-gray-500">
+                       Ajout de {bulkPendingInfo.subjects} matière{bulkPendingInfo.subjects > 1 ? 's' : ''} à {bulkPendingInfo.classes} classe{bulkPendingInfo.classes > 1 ? 's' : ''}.
+                     </p>
+                   )}
                 </div>
              ) : bulkResult ? (
                 <div className="flex flex-col">
-                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-lg mb-4">
+                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg mb-4">
                      <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-2">Résumé</h4>
-                     <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
-                       <li>Classes traitées : <strong>{bulkResult.classesProcessed}</strong></li>
-                       <li>Matières ajoutées au total : <strong>{bulkResult.totalSubjectsAdded}</strong></li>
-                       <li>Doublons ignorés : <strong>{bulkResult.totalDuplicatesIgnored}</strong></li>
+                     <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-2">
+                       <li>Classes traitées : <strong className="font-bold">{bulkResult.classesProcessed}</strong></li>
+                       <li>Matières ajoutées : <strong className="font-bold">{bulkResult.totalSubjectsAdded}</strong></li>
+                       <li>Doublons ignorés : <strong className="font-bold">{bulkResult.totalDuplicatesIgnored}</strong></li>
                      </ul>
                    </div>
 
-                   <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase">Détails par classe</h4>
-                   <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-750 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
+                   <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">Détails par classe</h4>
+                   <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-750 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
                       {bulkResult.details.map((d, idx) => (
-                        <div key={idx} className="p-2 flex items-center justify-between">
-                           <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        <div key={idx} className="p-3 flex flex-col gap-1.5">
+                           <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
                              {classes.find(c => c.id === d.classId)?.name || d.classId}
                            </span>
                            {d.status === 'success' ? (
-                             <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium">
-                               {d.added} ajout(s), {d.ignored} ignoré(s)
-                             </span>
+                             <div className="text-xs text-gray-600 dark:text-gray-400">
+                               <div className="font-medium text-green-700 dark:text-green-400">
+                                 {d.added} matière{d.added > 1 ? 's' : ''} ajoutée{d.added > 1 ? 's' : ''}
+                               </div>
+                               <div>
+                                 {d.ignored === 0 ? 'Aucun doublon' : `${d.ignored} doublon${d.ignored > 1 ? 's' : ''} ignoré${d.ignored > 1 ? 's' : ''}`}
+                               </div>
+                             </div>
                            ) : (
-                             <span className="text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded font-medium truncate max-w-xs" title={d.error || 'Erreur'}>
+                             <div className="text-xs font-medium text-red-600 dark:text-red-400">
                                Erreur : {d.error}
-                             </span>
+                             </div>
                            )}
                         </div>
                       ))}
@@ -344,9 +358,10 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
                    <div className="mt-6 flex justify-end">
                       <button
                         onClick={closeBulkResult}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                        disabled={isReloading}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition shadow-sm flex items-center justify-center min-w-[160px]"
                       >
-                        Fermer et recharger
+                        {isReloading ? 'Rechargement...' : 'Fermer et recharger'}
                       </button>
                    </div>
                 </div>
