@@ -98,13 +98,39 @@ interface AppContextProps {
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
+export const isCompleteAcademicYear = (
+  value: Partial<AcademicYear> & { id: string }
+): value is AcademicYear => {
+  const isNonEmptyString = (str: unknown): str is string => typeof str === 'string' && str.trim() !== '';
+  return (
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.schoolId) &&
+    isNonEmptyString(value.name) &&
+    isNonEmptyString(value.startDate) &&
+    isNonEmptyString(value.endDate) &&
+    isNonEmptyString(value.createdAt) &&
+    isNonEmptyString(value.createdBy) &&
+    isNonEmptyString(value.updatedAt) &&
+    isNonEmptyString(value.updatedBy) &&
+    ['draft', 'active', 'closed', 'archived'].includes(value.status as string)
+  );
+};
 
-const upsertCanonicalAcademicYears = (existing: AcademicYear[], updates: AcademicYear[]) => {
+export const upsertCanonicalAcademicYears = (existing: AcademicYear[], updates: Array<Partial<AcademicYear> & { id: string }>) => {
   const updateMap = new Map(updates.map(u => [u.id, u]));
-  const merged = existing.map(y => updateMap.has(y.id) ? updateMap.get(y.id)! : y);
+  const merged = existing.map(y => {
+    if (!updateMap.has(y.id)) return y;
+    const update = updateMap.get(y.id)!;
+    const cleanUpdate = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));
+    return { ...y, ...cleanUpdate } as AcademicYear;
+  });
   const existingIds = new Set(existing.map(y => y.id));
   updates.forEach(u => {
-    if (!existingIds.has(u.id)) merged.push(u);
+    if (!existingIds.has(u.id)) {
+      if (isCompleteAcademicYear(u)) {
+        merged.push(u);
+      }
+    }
   });
   return merged;
 };
