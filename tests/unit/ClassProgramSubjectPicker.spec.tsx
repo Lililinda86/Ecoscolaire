@@ -47,10 +47,10 @@ describe('ClassProgramSubjectPicker UX', () => {
 
     // Par défaut, l'onglet Classes est sélectionné
     expect(tabClasses.getAttribute('aria-selected')).toBe('true');
-    
+
     const panelClasses = screen.getByRole('tabpanel', { name: /1\. Classes/i });
     const panelSubjects = screen.getByRole('tabpanel', { name: /2\. Matières/i });
-    
+
     expect(panelClasses.className).toContain('flex');
     expect(panelSubjects.className).toContain('hidden');
 
@@ -90,6 +90,13 @@ describe('ClassProgramSubjectPicker UX', () => {
     const classMetaEl = screen.getAllByText(/francophone/)[0];
     expect(classNameEl).toBeDefined();
     expect(classMetaEl).toBeDefined();
+    expect(classMetaEl.textContent).toContain('francophone • maternelle');
+
+    // Checkbox is first element in the label
+    const label = classNameEl.closest('label');
+    expect(label).toBeDefined();
+    const firstChild = label?.firstElementChild;
+    expect(firstChild?.tagName.toLowerCase()).toBe('input');
 
     // Bouton ajouter est désactivé au départ (1 classe, 0 matière)
     const btnSubmit = screen.getByRole('button', { name: /Ajouter/i });
