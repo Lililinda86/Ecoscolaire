@@ -135,9 +135,9 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
         aria-modal="true"
         aria-labelledby="subject-picker-title"
         className="class-program-picker-dialog"
-        style={{ maxWidth: '800px', width: '90vw', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: '800px', width: '90vw', maxHeight: 'min(90vh, 760px)', display: 'flex', flexDirection: 'column' }}
       >
-        <header className="class-program-picker-header">
+        <header className="class-program-picker-header flex-shrink-0">
           <div className="flex flex-col">
             <h3 id="subject-picker-title" className="text-base font-bold text-gray-950 dark:text-white">
               Ajouter des matières au programme
@@ -155,10 +155,10 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </button>
         </header>
 
-        <div className="p-4 flex gap-4 overflow-hidden flex-1" style={{ maxHeight: '60vh' }}>
+        <div className="p-4 flex flex-col md:flex-row gap-4 overflow-y-auto md:overflow-hidden flex-1">
 
           {/* CLASSES COLUMN */}
-          <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-800 pr-4 overflow-hidden">
+          <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 pb-4 md:pb-0 md:pr-4 overflow-hidden min-h-[250px]">
             <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">1. Classes concernées</h4>
 
             <input
@@ -180,8 +180,13 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             </div>
 
             <div className="flex justify-between items-center mb-2">
-               <button onClick={handleSelectAllClasses} className="text-[10px] font-semibold text-blue-600">Tout sélectionner</button>
-               <button onClick={handleClearClasses} className="text-[10px] font-semibold text-red-600">Effacer</button>
+               <div className="text-[10px] text-gray-500 font-medium">
+                 {selectedClassIds.size} classe(s) sélectionnée(s)
+               </div>
+               <div className="flex gap-3">
+                 <button onClick={handleSelectAllClasses} className="text-[10px] font-semibold text-blue-600 hover:underline">Tout sélectionner</button>
+                 <button onClick={handleClearClasses} className="text-[10px] font-semibold text-red-600 hover:underline">Effacer</button>
+               </div>
             </div>
 
             <div className="overflow-y-auto flex-1 space-y-1">
@@ -189,9 +194,10 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 const cSec = normalizeClassSection(c);
                 const cCyc = normalizeClassCycle(c);
                 return (
-                  <label key={c.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                  <label key={c.id} className="flex items-start gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
                     <input
                       type="checkbox"
+                      className="mt-0.5"
                       checked={selectedClassIds.has(c.id)}
                       onChange={() => handleToggleClass(c.id)}
                     />
@@ -209,7 +215,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </div>
 
           {/* SUBJECTS COLUMN */}
-          <div className="flex-1 flex flex-col overflow-hidden pl-2">
+          <div className="flex-1 flex flex-col overflow-hidden md:pl-2 min-h-[250px]">
             <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">2. Matières à ajouter</h4>
 
             <input
@@ -231,15 +237,21 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
             </div>
 
             <div className="flex justify-between items-center mb-2">
-               <button onClick={handleSelectAllSubjects} className="text-[10px] font-semibold text-blue-600">Tout sélectionner</button>
-               <button onClick={handleClearSubjects} className="text-[10px] font-semibold text-red-600">Effacer</button>
+               <div className="text-[10px] text-gray-500 font-medium">
+                 {selectedSubjectIds.size} matière(s) sélectionnée(s)
+               </div>
+               <div className="flex gap-3">
+                 <button onClick={handleSelectAllSubjects} className="text-[10px] font-semibold text-blue-600 hover:underline">Tout sélectionner</button>
+                 <button onClick={handleClearSubjects} className="text-[10px] font-semibold text-red-600 hover:underline">Effacer</button>
+               </div>
             </div>
 
             <div className="overflow-y-auto flex-1 space-y-1">
               {availableSubjects.map((s) => (
-                <label key={s.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
+                <label key={s.id} className="flex items-start gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer">
                   <input
                     type="checkbox"
+                    className="mt-0.5"
                     checked={selectedSubjectIds.has(s.id)}
                     onChange={() => handleToggleSubject(s.id)}
                   />
@@ -259,7 +271,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-lg">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-lg flex-shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
@@ -269,6 +281,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
           <button
             onClick={handleSubmit}
             disabled={selectedClassIds.size === 0 || selectedSubjectIds.size === 0 || isSubmitting}
+            aria-disabled={selectedClassIds.size === 0 || selectedSubjectIds.size === 0 || isSubmitting}
             className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
           >
             {isSubmitting ? 'Préparation...' : `Ajouter ${selectedSubjectIds.size} matière(s) à ${selectedClassIds.size} classe(s)`}
