@@ -1,5 +1,12 @@
-export function getPedagogicalClassRank(className: string, section: string, ): number {
-  const normName = className.toLowerCase().replace(/[-éèê]/g, 'e').replace(/\s+/g, '');
+export function cleanClassName(name: string, section: string): string {
+  if (!name || !section || section === 'unknown' || section === 'all') return name;
+  const regex = new RegExp(section + '$', 'i');
+  return name.replace(regex, '').trim();
+}
+
+export function getPedagogicalClassRank(className: string, section: string): number {
+  const cleanedName = cleanClassName(className, section);
+  const normName = cleanedName.toLowerCase().replace(/[-éèê]/g, 'e').replace(/\s+/g, '');
   const normSection = section.toLowerCase();
   
   if (normSection === 'francophone' || normSection === 'all') {
@@ -81,6 +88,8 @@ export function sortClassesPedagogically<T extends { name: string, section?: str
     if (rankA !== rankB) return rankA - rankB;
     
     // 5. nom avec localeCompare
-    return a.name.localeCompare(b.name, 'fr');
+    const cleanA = cleanClassName(a.name, a.section || '');
+    const cleanB = cleanClassName(b.name, b.section || '');
+    return cleanA.localeCompare(cleanB, 'fr');
   });
 }
