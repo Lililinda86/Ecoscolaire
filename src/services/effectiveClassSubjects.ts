@@ -7,6 +7,7 @@ export interface GetEffectiveClassSubjectsParams {
   classSubjects: ClassSubject[];
   subjects: Subject[];
   activeAcademicYearId: string;
+  equivalentAcademicYearIds: string[];
 }
 
 export interface EffectiveClassSubject {
@@ -21,7 +22,7 @@ export interface EffectiveClassSubject {
 }
 
 export interface EffectiveClassSubjectsResult {
-  status: 'no_program' | 'empty' | 'success';
+  status: 'no_program' | 'empty' | 'success' | 'ambiguous_program';
   subjects: EffectiveClassSubject[];
 }
 
@@ -31,23 +32,41 @@ export function getEffectiveClassSubjects({
   classPrograms,
   classSubjects,
   subjects,
-  activeAcademicYearId
+  activeAcademicYearId,
+  equivalentAcademicYearIds
 }: GetEffectiveClassSubjectsParams): EffectiveClassSubjectsResult {
   // 1 & 2. Récupérer la classe réelle
   const studentClass = classes.find(c => c.id === classId);
   if (!studentClass) return { status: 'no_program', subjects: [] };
 
-  // 3. Sélectionner uniquement le programme publié de cette classe
-  const program = classPrograms.find(
+  const publishedPrograms = classPrograms.filter(
     p =>
       p.schoolId === studentClass.schoolId &&
       p.classId === studentClass.id &&
-      p.academicYearId === activeAcademicYearId &&
       p.status === 'published' &&
       p.publishedRevisionId != null
   );
 
-  if (!program) return { status: 'no_program', subjects: [] };
+  const exactPrograms = publishedPrograms.filter(p => p.academicYearId === activeAcademicYearId);
+
+  let program: ClassProgramDraft | undefined;
+
+  if (exactPrograms.length === 1) {
+    program = exactPrograms[0];
+  } else if (exactPrograms.length > 1) {
+    return { status: 'ambiguous_program', subjects: [] };
+  } else {
+    // aucun sur l'ID sélectionné : chercher sur les autres IDs équivalents
+    const fallbackPrograms = publishedPrograms.filter(p => equivalentAcademicYearIds.includes(p.academicYearId));
+    
+    if (fallbackPrograms.length === 1) {
+      program = fallbackPrograms[0];
+    } else if (fallbackPrograms.length > 1) {
+      return { status: 'ambiguous_program', subjects: [] };
+    } else {
+      return { status: 'no_program', subjects: [] };
+    }
+  }
 
   // 4 & 5. Filtrer les classSubjects par revisionId publié et actifs
   const effectiveSubjects = classSubjects

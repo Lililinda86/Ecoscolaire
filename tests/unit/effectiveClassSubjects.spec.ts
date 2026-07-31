@@ -83,7 +83,8 @@ describe('effectiveClassSubjects service', () => {
       classPrograms: mockPrograms,
       classSubjects: mockClassSubjects,
       subjects: mockSubjects,
-      activeAcademicYearId: 'ay-1'
+      activeAcademicYearId: 'ay-1',
+      equivalentAcademicYearIds: ['ay-1']
     });
     expect(res.status).toBe('success');
     expect(res.subjects).toHaveLength(2);
@@ -97,7 +98,8 @@ describe('effectiveClassSubjects service', () => {
       classPrograms: mockPrograms,
       classSubjects: mockClassSubjects,
       subjects: mockSubjects,
-      activeAcademicYearId: 'ay-1'
+      activeAcademicYearId: 'ay-1',
+      equivalentAcademicYearIds: ['ay-1']
     });
     expect(res.subjects.find(s => s.subjectId === 'sub-sport')).toBeUndefined();
   });
@@ -109,7 +111,8 @@ describe('effectiveClassSubjects service', () => {
       classPrograms: mockPrograms,
       classSubjects: mockClassSubjects,
       subjects: mockSubjects,
-      activeAcademicYearId: 'ay-1'
+      activeAcademicYearId: 'ay-1',
+      equivalentAcademicYearIds: ['ay-1']
     });
     expect(res.subjects.find(s => s.classSubjectId === 'cs-other')).toBeUndefined();
   });
@@ -125,7 +128,8 @@ describe('effectiveClassSubjects service', () => {
       classPrograms: mockPrograms,
       classSubjects: mockClassSubjects,
       subjects: mockSubjects,
-      activeAcademicYearId: 'ay-1'
+      activeAcademicYearId: 'ay-1',
+      equivalentAcademicYearIds: ['ay-1']
     });
     expect(res.subjects[0].subjectId).toBe('sub-math');
     expect(res.subjects[1].subjectId).toBe('sub-civic');
@@ -141,9 +145,72 @@ describe('effectiveClassSubjects service', () => {
       classPrograms: unpublishedPrograms,
       classSubjects: mockClassSubjects,
       subjects: mockSubjects,
-      activeAcademicYearId: 'ay-1'
+      activeAcademicYearId: 'ay-1',
+      equivalentAcademicYearIds: ['ay-1']
     });
     expect(res.status).toBe('no_program');
     expect(res.subjects).toHaveLength(0);
+  });
+
+  test('Fallback sur une année équivalente si absent sur l\'ID sélectionné', () => {
+    const res = getEffectiveClassSubjects({
+      classId: mockStudent.classId,
+      classes: mockClasses,
+      classPrograms: mockPrograms,
+      classSubjects: mockClassSubjects,
+      subjects: mockSubjects,
+      activeAcademicYearId: 'ay-new',
+      equivalentAcademicYearIds: ['ay-new', 'ay-1']
+    });
+    expect(res.status).toBe('success');
+    expect(res.subjects).toHaveLength(2);
+  });
+
+  test('Programme sur selectedAcademicYearId prioritaire, ne devient pas ambigu avec un vieux doublon', () => {
+    const conflictingPrograms: ClassProgramDraft[] = [
+      ...mockPrograms,
+      { ...mockPrograms[0], id: 'prog-2', academicYearId: 'ay-2' }
+    ];
+    // mockPrograms[0] est sur 'ay-1'. Donc on le sélectionne via activeAcademicYearId.
+    const res = getEffectiveClassSubjects({
+      classId: mockStudent.classId,
+      classes: mockClasses,
+      classPrograms: conflictingPrograms,
+      classSubjects: mockClassSubjects,
+      subjects: mockSubjects,
+      activeAcademicYearId: 'ay-1',
+      equivalentAcademicYearIds: ['ay-1', 'ay-2']
+    });
+    expect(res.status).toBe('success');
+  });
+
+  test('Statut ambigu si plusieurs programmes sur les années équivalentes UNIQUEMENT (fallback multiple)', () => {
+    const conflictingPrograms: ClassProgramDraft[] = [
+      { ...mockPrograms[0], id: 'prog-2', academicYearId: 'ay-2' },
+      { ...mockPrograms[0], id: 'prog-3', academicYearId: 'ay-3' }
+    ];
+    const res = getEffectiveClassSubjects({
+      classId: mockStudent.classId,
+      classes: mockClasses,
+      classPrograms: conflictingPrograms,
+      classSubjects: mockClassSubjects,
+      subjects: mockSubjects,
+      activeAcademicYearId: 'ay-new',
+      equivalentAcademicYearIds: ['ay-new', 'ay-2', 'ay-3']
+    });
+    expect(res.status).toBe('ambiguous_program');
+  });
+
+  test('Aucun programme si absent de toutes les années équivalentes', () => {
+    const res = getEffectiveClassSubjects({
+      classId: mockStudent.classId,
+      classes: mockClasses,
+      classPrograms: mockPrograms,
+      classSubjects: mockClassSubjects,
+      subjects: mockSubjects,
+      activeAcademicYearId: 'ay-new',
+      equivalentAcademicYearIds: ['ay-new', 'ay-3']
+    });
+    expect(res.status).toBe('no_program');
   });
 });

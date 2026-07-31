@@ -136,4 +136,79 @@ describe('Grades - Filtrage des matières', () => {
     await user.selectOptions(classSelect, 'c3');
     expect(screen.getByText(/Aucune matière active dans le programme publié/i)).not.toBeNull();
   });
+
+  it('gère les années masquées et le statut ambigu', async () => {
+    const user = userEvent.setup();
+    const customDb = {
+      academicYears: [
+        { id: 'ay1', schoolId: 's1', name: '2026-2027', startDate: '', endDate: '', status: 'active' },
+        { id: 'ay2', schoolId: 's1', name: '2026-2027', startDate: '', endDate: '', status: 'planned' },
+      ],
+      classPrograms: [
+        { id: 'p1', schoolId: 's1', classId: 'c1', academicYearId: 'ay2', status: 'published', publishedRevisionId: 'rev1' }, // Program on hidden ID
+      ],
+      classSubjects: [
+        { id: 'cs1', schoolId: 's1', classId: 'c1', revisionId: 'rev1', subjectId: 'sub1', isActive: true, coefficient: 2, displayOrder: 1 },
+        { id: 'cs2', schoolId: 's1', classId: 'c1', revisionId: 'rev1', subjectId: 'sub2', isActive: true, coefficient: 3, displayOrder: 2 },
+      ]
+    };
+    
+    setupTest(customDb);
+    const addButton = screen.getByText(/Saisir des Notes/i);
+    await user.click(addButton);
+    const modal = screen.getByTestId('modal');
+
+    // Select Academic Year
+    const yearSelect = modal.querySelectorAll('select')[0];
+    const yearOptions = Array.from(yearSelect.querySelectorAll('option')).filter(o => o.value !== "");
+    // Exactement une option 2026-2027
+    expect(yearOptions).toHaveLength(1);
+    expect(yearOptions[0].textContent).toBe('2026-2027');
+    await user.selectOptions(yearSelect, 'ay1'); // Selection of canonical ID
+    
+    // Select Period
+    const periodSelect = modal.querySelectorAll('select')[1];
+    await user.selectOptions(periodSelect, 'p1');
+
+    // Select Class (c1) - which has its program on ay2 (the hidden equivalent)
+    const classSelect = modal.querySelectorAll('select')[2];
+    await user.selectOptions(classSelect, 'c1');
+
+    // The Subject select should be visible and contain the 2 subjects because of fallback
+    const subjectSelect = modal.querySelectorAll('select')[3];
+    expect(subjectSelect).not.toBeNull();
+    const options = Array.from(subjectSelect.querySelectorAll('option'));
+    expect(options).toHaveLength(3); // Choisir + 2 matières
+  });
+
+  it('affiche une erreur si plusieurs programmes sont publiés sur les années équivalentes', async () => {
+    const user = userEvent.setup();
+    const customDb = {
+      academicYears: [
+        { id: 'ay1', schoolId: 's1', name: '2026-2027', startDate: '', endDate: '', status: 'active' },
+        { id: 'ay2', schoolId: 's1', name: '2026-2027', startDate: '', endDate: '', status: 'planned' },
+        { id: 'ay3', schoolId: 's1', name: '2026-2027', startDate: '', endDate: '', status: 'planned' },
+      ],
+      classPrograms: [
+        { id: 'p1', schoolId: 's1', classId: 'c1', academicYearId: 'ay2', status: 'published', publishedRevisionId: 'rev1' }, 
+        { id: 'p2', schoolId: 's1', classId: 'c1', academicYearId: 'ay3', status: 'published', publishedRevisionId: 'rev2' }, 
+      ],
+      classSubjects: []
+    };
+    
+    setupTest(customDb);
+    const addButton = screen.getByText(/Saisir des Notes/i);
+    await user.click(addButton);
+    const modal = screen.getByTestId('modal');
+
+    const yearSelect = modal.querySelectorAll('select')[0];
+    await user.selectOptions(yearSelect, 'ay1');
+    const periodSelect = modal.querySelectorAll('select')[1];
+    await user.selectOptions(periodSelect, 'p1');
+    const classSelect = modal.querySelectorAll('select')[2];
+    await user.selectOptions(classSelect, 'c1');
+
+    // Should see ambiguous message
+    expect(screen.getByText(/Plusieurs programmes publiés existent/i)).not.toBeNull();
+  });
 });

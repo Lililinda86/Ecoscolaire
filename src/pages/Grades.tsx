@@ -4,7 +4,7 @@ import { useI18n } from '../context/I18nContext';
 import type { Grade, Evaluation } from '../types';
 import { getLegacyGradeNormalizedValue } from '../utils/legacyGrades';
 import { getEffectiveClassSubjects } from '../services/effectiveClassSubjects';
-import { deduplicateAcademicYears } from '../utils/academicYearDeduplication';
+import { deduplicateAcademicYears, getEquivalentAcademicYearIds } from '../utils/academicYearDeduplication';
 import { groupGradesByClassSubject, calculateSubjectAverage, calculateWeightedGeneralAverage } from '../services/gradeCalculations';
 import { buildEvaluationId, buildGradeId } from '../utils/gradeIds';
 import Modal from '../components/Modal';
@@ -141,7 +141,8 @@ const Grades: React.FC = () => {
     }
 
     if (!db.classPrograms || !db.classSubjects || !db.subjects) return;
-    const effResult = getEffectiveClassSubjects({ classId: selectedClassId, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: selectedAcademicYearId });
+    const equivalentAcademicYearIds = getEquivalentAcademicYearIds(db.academicYears || [], currentSchool.id, selectedAcademicYearId);
+    const effResult = getEffectiveClassSubjects({ classId: selectedClassId, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: selectedAcademicYearId, equivalentAcademicYearIds });
     const effSub = effResult.subjects.find(s => s.classSubjectId === selectedClassSubjectId);
     if (!effSub) return;
     
@@ -362,7 +363,8 @@ const Grades: React.FC = () => {
                   const activePer = db.periods?.find(p => p.schoolId === currentSchool?.id && p.academicYearId === activeYear.id && p.status === 'open');
                   if (activePer) {
                     if (!db.classPrograms || !db.classSubjects || !db.subjects) return null;
-                    const effResult = getEffectiveClassSubjects({ classId: studentClass.id, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: activeYear.id });
+                    const equivalentAcademicYearIds = getEquivalentAcademicYearIds(db.academicYears || [], currentSchool?.id, activeYear.id);
+                    const effResult = getEffectiveClassSubjects({ classId: studentClass.id, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: activeYear.id, equivalentAcademicYearIds });
                     const effSubjects = effResult.subjects;
                     const stGrades = (db.gradesStrict || []).filter(g => 
                       g.studentId === student.id && g.academicYearId === activeYear.id && g.periodId === activePer.id
@@ -623,9 +625,11 @@ const Grades: React.FC = () => {
               <label>Année Scolaire</label>
               <select required value={selectedAcademicYearId} onChange={e => handleAcademicYearChange(e.target.value)}>
                 <option value="">-- Choisir --</option>
-                {validAcademicYears.map(y => (
-                  <option key={y.id} value={y.id}>{y.name}</option>
-                ))}
+                {validAcademicYears.map(y => {
+                  const isDuplicate = validAcademicYears.filter(ay => ay.name === y.name).length > 1;
+                  const label = isDuplicate && y.startDate && y.endDate ? `${y.name} (${y.startDate} - ${y.endDate})` : y.name;
+                  return <option key={y.id} value={y.id}>{label}</option>;
+                })}
               </select>
             </div>
             <div className="form-group">
@@ -667,15 +671,18 @@ const Grades: React.FC = () => {
                     if (firestoreError) return <div style={{ fontSize: '0.85rem', color: 'var(--danger-color)' }}>Impossible de charger les matières. Réessayer.</div>;
                     if (!db.classPrograms || !db.classSubjects || !db.subjects) return <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Chargement des matières...</div>;
 
+                    const equivalentAcademicYearIds = getEquivalentAcademicYearIds(db.academicYears || [], currentSchool?.id, selectedAcademicYearId);
                     const effResult = getEffectiveClassSubjects({ 
                       classId: selectedClassId, 
                       classes: db.classes, 
                       classPrograms: db.classPrograms, 
                       classSubjects: db.classSubjects, 
                       subjects: db.subjects, 
-                      activeAcademicYearId: selectedAcademicYearId
+                      activeAcademicYearId: selectedAcademicYearId,
+                      equivalentAcademicYearIds 
                     });
                     
+                    if (effResult.status === 'ambiguous_program') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Plusieurs programmes publiés existent pour cette année scolaire.<br/>Une correction administrative est nécessaire.</div>;
                     if (effResult.status === 'no_program') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Le programme de cette classe n’est pas encore publié.</div>;
                     if (effResult.status === 'empty') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Aucune matière active dans le programme publié de cette classe.</div>;
                     
