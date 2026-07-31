@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { describe, test, beforeAll, beforeEach, afterAll, expect } from 'vitest';
 import { initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, Firestore } from 'firebase/firestore';
-import { activateAcademicYear, openPeriod } from '../../src/services/academicCalendarPersistence';
+import { createAcademicYear, activateAcademicYear, openPeriod } from '../../src/services/academicCalendarPersistence';
 import * as fs from 'fs';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
@@ -10,7 +10,7 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
 
 let testEnv: RulesTestEnvironment;
 
-test.beforeAll(async () => {
+beforeAll(async () => {
   const host = process.env.FIRESTORE_EMULATOR_HOST!.split(':')[0];
   const port = parseInt(process.env.FIRESTORE_EMULATOR_HOST!.split(':')[1] || '8080', 10);
   testEnv = await initializeTestEnvironment({
@@ -23,15 +23,15 @@ test.beforeAll(async () => {
   });
 });
 
-test.beforeEach(async () => {
+beforeEach(async () => {
   await testEnv.clearFirestore();
 });
 
-test.afterAll(async () => {
+afterAll(async () => {
   await testEnv.cleanup();
 });
 
-test.describe('Academic Calendar Transactions (Emulator)', () => {
+describe('Academic Calendar Transactions (Emulator)', () => {
 
   test('Deux activations concurrentes (Scénario Historique sans version)', async () => {
     const adminId = 'admin_123';
@@ -236,6 +236,69 @@ test.describe('Academic Calendar Transactions (Emulator)', () => {
       expect(ayDoc.data()!.openPeriodId).toBe('period_new');
       const pDoc = await getDoc(doc(adminDb, 'periods', 'period_new'));
       expect(pDoc.data()!.status).toBe('open');
+    });
+  });
+
+  test('Création concurrente d\'une année académique (idempotence vs collision)', async () => {
+    const adminId = 'admin_123';
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'schools', 'school_create'), {
+        id: 'school_create',
+        name: 'School Create'
+      });
+      await setDoc(doc(db, 'users', adminId), {
+        id: adminId,
+        role: 'director',
+        schoolId: 'school_create',
+        active: true
+      });
+    });
+
+    const authedContext = testEnv.authenticatedContext(adminId);
+    const db = authedContext.firestore() as Firestore;
+    
+    const payload1 = {
+      id: 'ay_create_concurrent',
+      schoolId: 'school_create',
+      name: '2026-2027',
+      startDate: '2026-09-01',
+      endDate: '2027-06-30',
+      status: 'draft' as const,
+      createdAt: '2023-01-01',
+      createdBy: 'admin',
+      updatedAt: '2023-01-01',
+      updatedBy: 'admin'
+    };
+    
+    const payload2 = {
+      ...payload1,
+      name: '2026-2027' // Same data = idempotent
+    };
+
+    const payload3 = {
+      ...payload1,
+      name: 'Diff Name' // Different data = collision
+    };
+
+    // 1. Concurrency with same data
+    const results = await Promise.allSettled([
+      createAcademicYear(db, 'school_create', payload1),
+      createAcademicYear(db, 'school_create', payload2)
+    ]);
+    
+    // Both should succeed (one creates, one returns existing)
+    const fulfilled = results.filter(r => r.status === 'fulfilled');
+    expect(fulfilled.length).toBe(2);
+
+    // 2. Subsequent call with different data
+    await expect(createAcademicYear(db, 'school_create', payload3)).rejects.toThrow(/données différentes/);
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      const docs = await getDoc(doc(adminDb, 'academicYears', 'ay_create_concurrent'));
+      expect(docs.exists()).toBe(true);
+      expect(docs.data()!.name).toBe('2026-2027');
     });
   });
 });

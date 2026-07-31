@@ -1,4 +1,5 @@
 import type { AcademicYear, Period, GlobalRole } from '../types';
+import { buildPeriodId } from '../utils/gradeIds';
 
 export class AcademicCalendarMutationCancelledError extends Error {
   constructor(message: string = "Action annulée.") {
@@ -154,16 +155,7 @@ export function detectPeriodOverlap(
   });
 }
 
-export function buildAcademicYearId(schoolId: string, startDate: string, endDate: string): string {
-  const yearStr = `${startDate.substring(0, 4)}-${endDate.substring(0, 4)}`;
-  const randomSuffix = Math.random().toString(36).substring(2, 6);
-  return `ay_${schoolId}_${yearStr}_${randomSuffix}`;
-}
 
-export function buildPeriodId(academicYearId: string, order: number): string {
-  const randomSuffix = Math.random().toString(36).substring(2, 6);
-  return `per_${academicYearId}_${order}_${randomSuffix}`;
-}
 
 export function getCalendarConfigurationState(
   academicYears: AcademicYear[],

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import type { Grade, Evaluation } from '../types';
 import { getLegacyGradeNormalizedValue } from '../utils/legacyGrades';
 import { getEffectiveClassSubjects } from '../services/effectiveClassSubjects';
+import { deduplicateAcademicYears } from '../utils/academicYearDeduplication';
 import { groupGradesByClassSubject, calculateSubjectAverage, calculateWeightedGeneralAverage } from '../services/gradeCalculations';
 import { buildEvaluationId, buildGradeId } from '../utils/gradeIds';
 import Modal from '../components/Modal';
@@ -53,13 +54,36 @@ const Grades: React.FC = () => {
   const [evaluationWeight, setEvaluationWeight] = useState<string>('1');
   const [gradeEntryRows, setGradeEntryRows] = useState<Record<string, {score: string}>>({});
 
+  const validAcademicYears = useMemo(() => {
+    return deduplicateAcademicYears(db.academicYears || [], currentSchool?.id, currentSchool?.activeAcademicYearId);
+  }, [db.academicYears, currentSchool?.id, currentSchool?.activeAcademicYearId]);
+
+  const pointerYear = validAcademicYears.find(year => year.id === currentSchool?.activeAcademicYearId);
+  const activeYear = useMemo(() => {
+    return pointerYear ?? validAcademicYears.find(year => year.status === 'active') ?? validAcademicYears[0];
+  }, [pointerYear, validAcademicYears]);
+
+  const hasAcademicYears = validAcademicYears.length > 0;
+
+  const dropdownPeriods = db.periods?.filter(p => p.schoolId === currentSchool?.id && p.academicYearId === selectedAcademicYearId && p.status === 'open').sort((a, b) => (a.order || 0) - (b.order || 0)) || [];
+
   const [selectedClassRank, setSelectedClassRank] = useState<string>('');
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
+  useEffect(() => {
+    if (validAcademicYears.length > 0 && !validAcademicYears.some(y => y.id === selectedAcademicYearId)) {
+      setSelectedAcademicYearId(activeYear?.id || validAcademicYears[0]?.id || '');
+    }
+  }, [validAcademicYears, selectedAcademicYearId, activeYear]);
 
-  const activeYear = db.academicYears?.find(y => y.schoolId === currentSchool?.id && y.status === 'active');
-  const dropdownPeriods = db.periods?.filter(p => p.schoolId === currentSchool?.id && p.academicYearId === selectedAcademicYearId && p.status === 'open').sort((a, b) => (a.order || 0) - (b.order || 0)) || [];
-  const hasAcademicYears = db.academicYears && db.academicYears.filter(y => y.schoolId === currentSchool?.id).length > 0;
+  const handleAcademicYearChange = (yearId: string) => {
+    setSelectedAcademicYearId(yearId);
+    setSelectedPeriodId('');
+    setSelectedClassId('');
+    setSelectedClassSubjectId('');
+    setGradeEntryRows({});
+  };
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
 
   const handleOpenModal = () => {
     setSelectedAcademicYearId(activeYear?.id || '');
@@ -597,9 +621,9 @@ const Grades: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
             <div className="form-group">
               <label>Année Scolaire</label>
-              <select required value={selectedAcademicYearId} onChange={e => setSelectedAcademicYearId(e.target.value)}>
+              <select required value={selectedAcademicYearId} onChange={e => handleAcademicYearChange(e.target.value)}>
                 <option value="">-- Choisir --</option>
-                {db.academicYears?.filter(y => y.schoolId === currentSchool?.id).map(y => (
+                {validAcademicYears.map(y => (
                   <option key={y.id} value={y.id}>{y.name}</option>
                 ))}
               </select>

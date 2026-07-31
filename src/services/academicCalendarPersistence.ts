@@ -1,4 +1,4 @@
-import { Firestore, collection, doc, runTransaction, writeBatch } from 'firebase/firestore';
+import { Firestore, collection, doc, runTransaction } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { AcademicYear, Period, School } from '../types';
 
@@ -55,6 +55,19 @@ export async function createAcademicYear(
       if (!schoolSnap.exists()) throw new Error("%cole introuvable.");
       
       const schoolData = schoolSnap.data() as School;
+      const yearSnap = await transaction.get(yearRef);
+      if (yearSnap.exists()) {
+        const existingData = yearSnap.data() as AcademicYear;
+        if (
+          existingData.schoolId === payload.schoolId &&
+          existingData.startDate === payload.startDate &&
+          existingData.endDate === payload.endDate &&
+          existingData.name.trim().toLowerCase() === payload.name.trim().toLowerCase()
+        ) {
+          return { createdYear: existingData, activatedYear: null, closedYear: null, updatedSchool: null };
+        }
+        throw new Error("Cette année académique existe déjà pour cette école avec des données différentes.");
+      }
       const currentActiveYearId = schoolData.activeAcademicYearId;
       let closedYear: AcademicYear | null = null;
       
@@ -90,11 +103,24 @@ export async function createAcademicYear(
       return { createdYear, activatedYear: createdYear, closedYear, updatedSchool };
     });
   } else {
-    const createdYear = { ...payload, version: 1 };
-    const batch = writeBatch(firestore);
-    batch.set(yearRef, createdYear);
-    await batch.commit();
-    return { createdYear, activatedYear: null, closedYear: null, updatedSchool: null };
+    return runTransaction(firestore, async (transaction) => {
+      const yearSnap = await transaction.get(yearRef);
+      if (yearSnap.exists()) {
+        const existingData = yearSnap.data() as AcademicYear;
+        if (
+          existingData.schoolId === payload.schoolId &&
+          existingData.startDate === payload.startDate &&
+          existingData.endDate === payload.endDate &&
+          existingData.name.trim().toLowerCase() === payload.name.trim().toLowerCase()
+        ) {
+          return { createdYear: existingData, activatedYear: null, closedYear: null, updatedSchool: null };
+        }
+        throw new Error("Cette année académique existe déjà pour cette école avec des données différentes.");
+      }
+      const createdYear = { ...payload, version: 1 };
+      transaction.set(yearRef, createdYear);
+      return { createdYear, activatedYear: null, closedYear: null, updatedSchool: null };
+    });
   }
 }
 

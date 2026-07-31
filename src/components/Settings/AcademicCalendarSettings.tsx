@@ -4,12 +4,12 @@ import { useAppContext } from '../../context/AppContext';
 import { 
   canManageAcademicCalendar, 
   getCalendarConfigurationState,
-  buildAcademicYearId,
   validateAcademicYearInput,
   preparePeriodSubmission,
   submitValidatedPeriod,
   AcademicCalendarMutationCancelledError,
 } from '../../services/academicCalendarConfiguration';
+import { buildAcademicYearId } from '../../utils/gradeIds';
 import type { PeriodFieldErrors } from '../../services/academicCalendarConfiguration';
 
 interface Props {
