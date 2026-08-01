@@ -1,4 +1,5 @@
 import type { ClassSection as Class, ClassProgram as ClassProgramDraft, ClassSubject, Subject } from '../types';
+import { resolveClassProgram } from './classProgramResolver';
 
 export interface GetEffectiveClassSubjectsParams {
   classId: string;
@@ -39,34 +40,19 @@ export function getEffectiveClassSubjects({
   const studentClass = classes.find(c => c.id === classId);
   if (!studentClass) return { status: 'no_program', subjects: [] };
 
-  const publishedPrograms = classPrograms.filter(
-    p =>
-      p.schoolId === studentClass.schoolId &&
-      p.classId === studentClass.id &&
-      p.status === 'published' &&
-      p.publishedRevisionId != null
-  );
+  const resolved = resolveClassProgram({
+    classPrograms,
+    schoolId: studentClass.schoolId!,
+    classId: studentClass.id!,
+    academicYearIds: [activeAcademicYearId, ...equivalentAcademicYearIds.filter(id => id !== activeAcademicYearId)],
+    mode: 'published'
+  });
 
-  const exactPrograms = publishedPrograms.filter(p => p.academicYearId === activeAcademicYearId);
-
-  let program: ClassProgramDraft | undefined;
-
-  if (exactPrograms.length === 1) {
-    program = exactPrograms[0];
-  } else if (exactPrograms.length > 1) {
-    return { status: 'ambiguous_program', subjects: [] };
-  } else {
-    // aucun sur l'ID sélectionné : chercher sur les autres IDs équivalents
-    const fallbackPrograms = publishedPrograms.filter(p => equivalentAcademicYearIds.includes(p.academicYearId));
-    
-    if (fallbackPrograms.length === 1) {
-      program = fallbackPrograms[0];
-    } else if (fallbackPrograms.length > 1) {
-      return { status: 'ambiguous_program', subjects: [] };
-    } else {
-      return { status: 'no_program', subjects: [] };
-    }
+  if (resolved.status !== 'success' || !resolved.program) {
+    return { status: resolved.status as EffectiveClassSubjectsResult['status'], subjects: [] };
   }
+
+  const program = resolved.program;
 
   // 4 & 5. Filtrer les classSubjects par revisionId publié et actifs
   const effectiveSubjects = classSubjects

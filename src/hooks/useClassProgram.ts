@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ClassProgram, ClassSubject, ClassSection, GlobalRole, Subject } from '../types';
 import {
-  getClassProgramByIdentity,
-  getClassSubjectsByRevision
+  getClassSubjectsByRevision,
+  ClassProgramServiceError
 } from '../services/classPrograms';
 import type { ClassProgramErrorType } from '../services/classPrograms';
 import { resolveClassProgramHookState } from '../services/classProgramHookStateResolver';
+import { useAppContext } from '../context/AppContext';
+import { resolveClassProgram } from '../services/classProgramResolver';
+import { getEquivalentAcademicYearIds } from '../utils/academicYearDeduplication';
 
 export interface UseClassProgramProps {
   schoolId: string | undefined;
@@ -63,6 +66,8 @@ export function useClassProgram({
   const classId = selectedClass?.id;
   const legacySubjectsString = selectedClass?.subjects?.join(',') || '';
 
+  const { db } = useAppContext();
+
   useEffect(() => {
     // 1. Reset state immediately on inputs change to avoid displaying stale data
     setStatus('idle');
@@ -79,7 +84,7 @@ export function useClassProgram({
       return;
     }
 
-    if (!schoolId || !academicYearId || !classId) {
+    if (!schoolId || !academicYearId || !classId || !db.classPrograms || !db.academicYears) {
       return;
     }
 
@@ -91,17 +96,21 @@ export function useClassProgram({
 
     async function loadData() {
       try {
-        // Fetch ClassProgram using query identity instead of direct getDoc
         let prog: ClassProgram | null = null;
-        try {
-          prog = await getClassProgramByIdentity({
-            schoolId: schoolId!,
-            academicYearId: academicYearId!,
-            classId: classId!
-          });
-        } catch (err: unknown) {
-          if (currentSeq !== requestSeq.current) return;
-          throw err;
+
+        const equivalentAcademicYearIds = getEquivalentAcademicYearIds(db.academicYears || [], schoolId!, academicYearId!);
+        const resolved = resolveClassProgram({
+          classPrograms: db.classPrograms || [],
+          schoolId: schoolId!,
+          classId: classId!,
+          academicYearIds: [academicYearId!, ...equivalentAcademicYearIds.filter(id => id !== academicYearId)],
+          mode: requestedView === 'published' ? 'published' : 'any'
+        });
+
+        if (resolved.status === 'success' && resolved.program) {
+          prog = resolved.program;
+        } else if (resolved.status === 'ambiguous_program') {
+          throw new ClassProgramServiceError('PROGRAM_INTEGRITY_ERROR', 'Les données du programme de cette classe sont incohérentes.');
         }
 
         if (currentSeq !== requestSeq.current) return;
@@ -165,7 +174,17 @@ export function useClassProgram({
     }
 
     loadData();
-  }, [schoolId, academicYearId, classId, legacySubjectsString, currentRole, requestedView, retryTrigger]);
+  }, [
+    schoolId,
+    academicYearId,
+    classId,
+    legacySubjectsString,
+    currentRole,
+    requestedView,
+    retryTrigger,
+    db.academicYears,
+    db.classPrograms
+  ]);
 
   const hasPublishedVersion = !!program?.publishedRevisionId && program.publishedRevisionId !== '';
   const hasDraftVersion = !!program?.draftRevisionId && program.draftRevisionId !== '';

@@ -148,7 +148,7 @@ const Grades: React.FC = () => {
 
     const activeAssignment = (db.teacherAssignments || []).find(a =>
       a.schoolId === currentSchool.id &&
-      a.academicYearId === selectedAcademicYearId &&
+      equivalentAcademicYearIds.includes(a.academicYearId) &&
       a.classId === selectedClassId &&
       a.sourceClassSubjectId === selectedClassSubjectId &&
       a.isActive === true
