@@ -11,8 +11,9 @@ import {
   type TeacherAssignmentCandidate
 } from '../../../services/teacherAssignmentFunctions';
 import Modal from '../../../components/Modal';
-import { ShieldAlert, AlertTriangle, Check, UserMinus } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Check, UserMinus, Info } from 'lucide-react';
 import type { Staff } from '../../../types';
+import { TeacherSelectDropdown } from '../../../components/TeacherSelectDropdown';
 
 export const TeacherAssignmentsPanel: React.FC = () => {
   const { db, currentUser } = useAppContext();
@@ -58,6 +59,7 @@ export const TeacherAssignmentsPanel: React.FC = () => {
   const [candidates, setCandidates] = useState<TeacherAssignmentCandidate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [modalErrorMsg, setModalErrorMsg] = useState<string | null>(null);
 
   // Modals state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -102,10 +104,7 @@ export const TeacherAssignmentsPanel: React.FC = () => {
     loadAssignmentsData();
   }, [loadAssignmentsData, program, programStatus]);
 
-  // List of active eligible teachers in the school
-  const eligibleTeachers = React.useMemo(() => {
-    return candidates.filter((c) => c.isEligible);
-  }, [candidates]);
+  // Handle Tab filter reset
 
   // Handle Tab filter reset
   const handleClassSelect = (classId: string) => {
@@ -118,6 +117,11 @@ export const TeacherAssignmentsPanel: React.FC = () => {
     setSelectedSubjectId(subjectId);
     setSelectedSubjectName(subjectName);
     setChosenTeacherStaffId(currentTeacherStaffId || '');
+    if (!normalizedYear) {
+      setModalErrorMsg('Impossible d’identifier l’année scolaire sélectionnée.');
+    } else {
+      setModalErrorMsg(null);
+    }
     setIsAssignModalOpen(true);
   };
 
@@ -132,8 +136,13 @@ export const TeacherAssignmentsPanel: React.FC = () => {
   // Submit setPrimaryTeacherAssignment
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!schoolId || !normalizedYear || !selectedClassId || !selectedSubjectId || !chosenTeacherStaffId) return;
+    if (!normalizedYear) {
+      setModalErrorMsg('Impossible d’identifier l’année scolaire sélectionnée.');
+      return;
+    }
+    if (!schoolId || !selectedClassId || !selectedSubjectId || !chosenTeacherStaffId) return;
 
+    setModalErrorMsg(null);
     setActionInProgress(true);
     try {
       await setPrimaryTeacherAssignment({
@@ -144,10 +153,17 @@ export const TeacherAssignmentsPanel: React.FC = () => {
         teacherStaffId: chosenTeacherStaffId
       });
       setIsAssignModalOpen(false);
+      alert('Enseignant affecté avec succès.');
       await loadAssignmentsData();
     } catch (err: unknown) {
-      const errMessage = err instanceof Error ? err.message : 'Erreur lors de l\'affectation.';
-      alert(errMessage);
+      console.error(err);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const error = err as Record<string, any>;
+      if (error?.details?.businessCode === 'PERMISSION_DENIED') {
+        setModalErrorMsg('Vous n’êtes pas autorisé à effectuer cette affectation.');
+      } else {
+        setModalErrorMsg('Impossible d’enregistrer l’affectation. Réessayez.');
+      }
     } finally {
       setActionInProgress(false);
     }
@@ -334,8 +350,8 @@ export const TeacherAssignmentsPanel: React.FC = () => {
                               <AlertTriangle size={12} /> Liaison inactive
                             </span>
                           ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#fffbeb', color: '#b45309', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
-                              <AlertTriangle size={12} /> Non lié
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#ffedd5', color: '#9a3412', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
+                              Sans compte
                             </span>
                           )
                         ) : (
@@ -416,53 +432,35 @@ export const TeacherAssignmentsPanel: React.FC = () => {
       )}
 
       {/* Assignment & Replacement Modal */}
-      <Modal isOpen={isAssignModalOpen} onClose={() => !actionInProgress && setIsAssignModalOpen(false)} title="Affectation d'enseignant">
-        <form onSubmit={handleAssignSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '320px' }}>
+      <Modal isOpen={isAssignModalOpen} onClose={() => !actionInProgress && setIsAssignModalOpen(false)} title="Affecter un enseignant">
+        <form onSubmit={handleAssignSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '360px' }}>
           <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0 }}>
-            Matière : <strong>{selectedSubjectName}</strong>
+            {selectedSubjectName} · {selectedClass?.name} · {activeYearName}
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Enseignant disponible</label>
-            <select
-              required
+            <TeacherSelectDropdown
+              candidates={candidates}
               value={chosenTeacherStaffId}
-              onChange={(e) => setChosenTeacherStaffId(e.target.value)}
-              style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
-            >
-              <option value="" disabled={eligibleTeachers.length === 0 || !!errorMsg}>
-                {errorMsg 
-                  ? "Impossible de charger les enseignants disponibles." 
-                  : eligibleTeachers.length === 0 
-                  ? "Aucun enseignant actif n’est disponible." 
-                  : "-- Choisir un enseignant --"}
-              </option>
-              {eligibleTeachers.map((t) => {
-                const isLinked = t.accountStatus === 'linked';
-                const statusSuffix = t.operationalStatus ? ` (${t.operationalStatus})` : '';
-                return (
-                  <option key={t.teacherStaffId} value={t.teacherStaffId}>
-                    {t.name} {isLinked ? '✓ Compte lié' : '✗ Pas de compte'}{statusSuffix}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={setChosenTeacherStaffId}
+              disabled={actionInProgress}
+              errorMsg={errorMsg}
+            />
           </div>
 
-          {chosenTeacherStaffId && getTeacherLinkStatus(chosenTeacherStaffId) === 'unlinked' && (
-            <div style={{ display: 'flex', gap: '0.5rem', background: '#fffbeb', border: '1px solid #fde68a', padding: '0.75rem', borderRadius: '8px', color: '#b45309', fontSize: '0.85rem' }}>
+          {modalErrorMsg && (
+            <div style={{ display: 'flex', gap: '0.5rem', background: '#fee2e2', border: '1px solid #fecaca', padding: '0.75rem', borderRadius: '8px', color: '#991b1b', fontSize: '0.85rem' }}>
               <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-              <span>
-                Cet enseignant n’a pas encore de compte utilisateur lié. Il pourra être affecté, mais il ne pourra pas accéder à son espace enseignant tant que son compte ne sera pas configuré.
-              </span>
+              <span>{modalErrorMsg}</span>
             </div>
           )}
 
-          {chosenTeacherStaffId && getTeacherLinkStatus(chosenTeacherStaffId) === 'inactive' && (
-            <div style={{ display: 'flex', gap: '0.5rem', background: '#fffbeb', border: '1px solid #fde68a', padding: '0.75rem', borderRadius: '8px', color: '#b45309', fontSize: '0.85rem' }}>
-              <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+          {chosenTeacherStaffId && getTeacherLinkStatus(chosenTeacherStaffId) === 'unlinked' && (
+            <div style={{ display: 'flex', gap: '0.5rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem', borderRadius: '8px', color: '#166534', fontSize: '0.85rem' }}>
+              <Info size={16} style={{ flexShrink: 0, color: '#16a34a' }} />
               <span>
-                La liaison de cet enseignant est actuellement inactive. Il pourra être affecté, mais il ne pourra pas accéder à son espace enseignant tant que le lien ne sera pas réactivé.
+                Cet enseignant peut être affecté immédiatement. Son accès à l’espace enseignant sera disponible après la création ou la liaison de son compte.
               </span>
             </div>
           )}

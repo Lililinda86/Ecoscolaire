@@ -206,16 +206,36 @@ async function runAllTests() {
 
   await runTest('non authentifié', async () => {
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, {}),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, {}),
       'unauthenticated',
       'UNAUTHENTICATED'
+    );
+  });
+
+  
+
+  await runTest('format academicYearId legacy refusé', async () => {
+    setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
+    await assertThrowsBusinessError(
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      'invalid-argument',
+      'INVALID_ARGUMENT'
+    );
+  });
+
+  await runTest('format academicYearId vide refusé', async () => {
+    setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
+    await assertThrowsBusinessError(
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      'invalid-argument',
+      'INVALID_ARGUMENT'
     );
   });
 
   await runTest('rôle non autorisé (teacher)', async () => {
     setDocState('users', 'op_teacher', true, { role: 'teacher', isActive: true, schoolId: 'S1' });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_teacher' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_teacher' } }),
       'permission-denied',
       'PERMISSION_DENIED'
     );
@@ -225,17 +245,17 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
-    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res.assigned, true);
   });
 
   await runTest('autre école refusée', async () => {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S2' });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'permission-denied',
       'SCHOOL_MISMATCH'
     );
@@ -244,7 +264,7 @@ async function runAllTests() {
   await runTest('gestionnaire inactif', async () => {
     setDocState('users', 'op_inactive', true, { role: 'secretary', isActive: false, schoolId: 'S1' });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_inactive' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_inactive' } }),
       'permission-denied',
       'PERMISSION_DENIED'
     );
@@ -257,7 +277,7 @@ async function runAllTests() {
   await runTest('classe absente', async () => {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C_ABSENT', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C_ABSENT', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'not-found',
       'CLASS_NOT_FOUND'
     );
@@ -267,7 +287,7 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S2', isActive: true });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'permission-denied',
       'SCHOOL_MISMATCH'
     );
@@ -277,7 +297,7 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: false });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'failed-precondition',
       'CLASS_INACTIVE'
     );
@@ -291,7 +311,7 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST_ABSENT' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST_ABSENT' }, { auth: { uid: 'op_sec' } }),
       'not-found',
       'TEACHER_NOT_FOUND'
     );
@@ -302,7 +322,7 @@ async function runAllTests() {
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'accountant', isActive: true });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'failed-precondition',
       'TEACHER_NOT_ELIGIBLE'
     );
@@ -313,7 +333,7 @@ async function runAllTests() {
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: false });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'failed-precondition',
       'TEACHER_INACTIVE'
     );
@@ -323,10 +343,10 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
-    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res.assigned, true);
 
     const hist = docs[`teacherAssignments/${res.assignmentId}`]._data;
@@ -337,15 +357,15 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
     // Link setup
     setDocState('staffUserLinkByStaff', 'S1__ST1', true, { userId: 'U1', staffId: 'ST1', schoolId: 'S1', linkId: 'L1', isActive: true });
     setDocState('staffUserLinkByUser', 'U1', true, { userId: 'U1', staffId: 'ST1', schoolId: 'S1', linkId: 'L1', isActive: true });
     setDocState('staffUserLinks', 'L1', true, { userId: 'U1', staffId: 'ST1', schoolId: 'S1', isActive: true });
 
-    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res.assigned, true);
 
     const hist = docs[`teacherAssignments/${res.assignmentId}`]._data;
@@ -361,7 +381,7 @@ async function runAllTests() {
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'not-found',
       'PROGRAM_NOT_FOUND'
     );
@@ -371,10 +391,10 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1' }); // no publishedRevisionId
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1' }); // no publishedRevisionId
 
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'failed-precondition',
       'PROGRAM_NOT_PUBLISHED'
     );
@@ -384,10 +404,10 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
 
     await assertThrowsBusinessError(
-      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB_ABSENT', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
+      () => setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB_ABSENT', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } }),
       'not-found',
       'SUBJECT_NOT_IN_PUBLISHED_PROGRAM'
     );
@@ -401,10 +421,10 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
-    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res.assigned, true);
 
     // Validate slot document
@@ -419,15 +439,15 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
     // Initial assignment
-    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res1.assigned, true);
 
     // Call again with same inputs
-    const res2 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res2 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res2.assigned, false);
     assert.strictEqual(res2.alreadyAssigned, true);
     assert.strictEqual(res2.assignmentId, res1.assignmentId);
@@ -438,14 +458,14 @@ async function runAllTests() {
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
     setDocState('staff', 'ST2', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
     // Assign ST1
-    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
 
     // Replace with ST2
-    const res2 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST2' }, { auth: { uid: 'op_sec' } });
+    const res2 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST2' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res2.assigned, true);
 
     // Check old assignment is deactivated
@@ -466,14 +486,14 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
     // Assign ST1
-    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
 
     // Deactivate assignment
-    const res2 = await deactivateTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', reason: 'Congé maladie' }, { auth: { uid: 'op_sec' } });
+    const res2 = await deactivateTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', reason: 'Congé maladie' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res2.deactivated, true);
 
     // Check slot is marked inactive
@@ -490,15 +510,15 @@ async function runAllTests() {
     setDocState('users', 'op_sec', true, { role: 'secretary', isActive: true, schoolId: 'S1' });
     setDocState('classes', 'C1', true, { schoolId: 'S1', isActive: true });
     setDocState('staff', 'ST1', true, { schoolId: 'S1', role: 'teacher', isActive: true });
-    setDocState('classPrograms', 'S1__2026-2027__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
-    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__2026-2027__C1', isActive: true });
+    setDocState('classPrograms', 'S1__ay_S1_2026-2027_m__C1', true, { schoolId: 'S1', publishedRevisionId: 'REV1' });
+    setDocState('classSubjects', 'REV1__SUB1', true, { schoolId: 'S1', programId: 'S1__ay_S1_2026-2027_m__C1', isActive: true });
 
-    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
+    const res1 = await setPrimaryTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1', teacherStaffId: 'ST1' }, { auth: { uid: 'op_sec' } });
 
-    const res2 = await deactivateTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1' }, { auth: { uid: 'op_sec' } });
+    const res2 = await deactivateTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res2.deactivated, true);
 
-    const res3 = await deactivateTeacherAssignment({ schoolId: 'S1', academicYearId: '2026-2027', classId: 'C1', subjectId: 'SUB1' }, { auth: { uid: 'op_sec' } });
+    const res3 = await deactivateTeacherAssignment({ schoolId: 'S1', academicYearId: 'ay_S1_2026-2027_m', classId: 'C1', subjectId: 'SUB1' }, { auth: { uid: 'op_sec' } });
     assert.strictEqual(res3.deactivated, false);
     assert.strictEqual(res3.alreadyDeactivated, true);
   });

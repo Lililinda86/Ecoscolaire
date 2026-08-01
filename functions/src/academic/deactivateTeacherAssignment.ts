@@ -17,7 +17,7 @@ export const deactivateTeacherAssignment = functions.https.onCall(async (data, c
   if (typeof schoolId !== 'string' || schoolId.trim() === '' || schoolId.includes('/') || schoolId.length > 100) {
     throw new functions.https.HttpsError('invalid-argument', 'schoolId invalide.', { businessCode: 'INVALID_ARGUMENT' });
   }
-  if (typeof academicYearId !== 'string' || !/^\d{4}-\d{4}$/.test(academicYearId)) {
+  if (typeof academicYearId !== 'string' || academicYearId.trim() === '' || academicYearId.includes('/') || academicYearId.length > 100) {
     throw new functions.https.HttpsError('invalid-argument', 'academicYearId invalide.', { businessCode: 'INVALID_ARGUMENT' });
   }
   if (typeof classId !== 'string' || classId.trim() === '' || classId.includes('/') || classId.length > 100) {
@@ -64,6 +64,17 @@ export const deactivateTeacherAssignment = functions.https.onCall(async (data, c
       }
       if (operator.role !== 'superAdmin' && operator.schoolId !== cleanSchoolId) {
         throw new functions.https.HttpsError('permission-denied', 'L\'opérateur n\'appartient pas à l\'école.', { businessCode: 'SCHOOL_MISMATCH' });
+      }
+
+      // 1.5 Read AcademicYear
+      const academicYearRef = db.collection('academicYears').doc(cleanAcademicYearId);
+      const academicYearSnap = await transaction.get(academicYearRef);
+      if (!academicYearSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Année scolaire introuvable.', { businessCode: 'ACADEMIC_YEAR_NOT_FOUND' });
+      }
+      const academicYearData = academicYearSnap.data()!;
+      if (academicYearData.schoolId !== cleanSchoolId) {
+        throw new functions.https.HttpsError('permission-denied', 'L\'année scolaire ne correspond pas à l\'école.', { businessCode: 'SCHOOL_MISMATCH' });
       }
 
       // 2. Read slot
