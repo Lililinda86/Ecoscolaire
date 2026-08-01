@@ -158,9 +158,17 @@ export const TeacherAssignmentsPanel: React.FC = () => {
     } catch (err: unknown) {
       console.error(err);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const error = err as Record<string, any>;
-      if (error?.details?.businessCode === 'PERMISSION_DENIED') {
+      const error = err as any;
+      const code = error?.businessCode || error?.details?.businessCode;
+
+      if (code === 'PERMISSION_DENIED' || code === 'SCHOOL_MISMATCH' || code === 'UNAUTHENTICATED') {
         setModalErrorMsg('Vous n’êtes pas autorisé à effectuer cette affectation.');
+      } else if (code === 'TEACHER_NOT_ELIGIBLE' || code === 'TEACHER_INACTIVE' || code === 'TEACHER_NOT_FOUND') {
+        setModalErrorMsg('Cet enseignant n’est plus disponible pour une nouvelle affectation.');
+      } else if (code === 'SUBJECT_NOT_IN_PUBLISHED_PROGRAM' || code === 'PROGRAM_NOT_FOUND' || code === 'PROGRAM_NOT_PUBLISHED' || code === 'PUBLISHED_SUBJECT_INACTIVE') {
+        setModalErrorMsg('Cette matière ne fait pas partie du programme publié de la classe.');
+      } else if (error?.code === 'functions/internal' || error?.code === 'functions/unavailable' || error?.message?.includes('network')) {
+        setModalErrorMsg('Impossible de joindre le service d’affectation. Réessayez.');
       } else {
         setModalErrorMsg('Impossible d’enregistrer l’affectation. Réessayez.');
       }

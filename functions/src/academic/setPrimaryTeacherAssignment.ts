@@ -94,10 +94,16 @@ export const setPrimaryTeacherAssignment = functions.https.onCall(async (data, c
       if (staffData.schoolId !== cleanSchoolId) {
         throw new functions.https.HttpsError('permission-denied', 'L\'école de l\'enseignant ne correspond pas.', { businessCode: 'SCHOOL_MISMATCH' });
       }
-      if (staffData.role !== 'teacher') {
+      const staffType = staffData.staffType || staffData.role || 'other';
+      const teachingEnabled = staffData.teachingEnabled === true;
+      const isEligible = staffType === 'teacher' || teachingEnabled;
+
+      if (!isEligible) {
         throw new functions.https.HttpsError('failed-precondition', 'Le membre du personnel n\'est pas un enseignant.', { businessCode: 'TEACHER_NOT_ELIGIBLE' });
       }
-      if (staffData.isActive === false || staffData.active === false) {
+
+      const employmentStatus = staffData.employmentStatus || (staffData.isActive === false || staffData.active === false ? 'inactive' : (staffData.isActive === true || staffData.active === true ? 'active' : 'inactive'));
+      if (employmentStatus !== 'active' && staffData.status !== 'actif' && staffData.status !== 'active') {
         throw new functions.https.HttpsError('failed-precondition', 'L\'enseignant est inactif.', { businessCode: 'TEACHER_INACTIVE' });
       }
 
