@@ -129,7 +129,7 @@ export interface ClassSection {
   subjects?: string[]; // Allowed subjects for this class
   capacity?: number;
   level?: 'maternelle' | 'primaire' | 'secondaire';
-  
+
   // Réf. classes prédéfinies
   section?: SectionType;
   cycle?: 'preschool' | 'nursery' | 'primary' | 'secondary';
@@ -289,15 +289,33 @@ export interface StudentImportJob {
 
 export interface Staff {
   id: string;
-  schoolId?: string;
-  name: string;
-  role: 'teacher' | 'driver' | 'assistant' | 'director' | 'secretary';
-  assignedClassId?: string;
+  schoolId: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: 'M' | 'F' | 'other';
+  dateOfBirth?: string;
   phone?: string;
+  email?: string;
+  staffType?: 'teacher' | 'director' | 'secretary' | 'accountant' | 'supervisor' | 'driver' | 'maintenance' | 'other';
+  teachingEnabled?: boolean;
+  employmentStatus?: 'active' | 'inactive' | 'suspended' | 'departed';
+  hireDate?: string;
+  departureDate?: string;
+  departureReason?: string;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  updatedBy?: string;
+  name?: string;
+  role?: string;
+  status?: string;
+  active?: boolean;
+  isActive?: boolean;
+  assignedClassId?: string;
   licenseNumber?: string;
   assignedBusId?: string;
-  status?: 'actif' | 'absent' | 'remplacé';
-  isActive?: boolean;
+  position?: string;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'left_early';

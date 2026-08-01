@@ -1,12 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ==========================================
     // UTILS : FONCTIONS DE SÉCURITÉ
     // ==========================================
-    
-    
+
+
     function isStrictGradePayload(data) {
       return data.keys().hasAll(['academicYearId', 'periodId', 'evaluationId', 'classId', 'classSubjectId']);
     }
@@ -82,19 +82,19 @@ service cloud.firestore {
 
     function isUpdatingSaasFields() {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny([
-        'subscriptionPlan', 
-        'subscriptionStatus', 
-        'subscriptionStartDate', 
-        'subscriptionEndDate', 
-        'subscriptionRenewalDate', 
-        'nextPaymentDate', 
-        'isInternalSchool', 
-        'studentLimit', 
+        'subscriptionPlan',
+        'subscriptionStatus',
+        'subscriptionStartDate',
+        'subscriptionEndDate',
+        'subscriptionRenewalDate',
+        'nextPaymentDate',
+        'isInternalSchool',
+        'studentLimit',
         'studentsCount',
         'studentCount',
         'pilot',
-        'billingStatus', 
-        'billingCycle', 
+        'billingStatus',
+        'billingCycle',
         'trialEndsAt'
       ]);
     }
@@ -103,15 +103,15 @@ service cloud.firestore {
       let isAllowedRole = isSuperAdmin() || (hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector()));
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
       let onlyAllowedKeysChanged = affectedKeys.hasOnly(['activeAcademicYearId', 'updatedAt', 'updatedBy', 'version']);
-      
-      let validActiveYearId = !affectedKeys.hasAny(['activeAcademicYearId']) || 
-                              request.resource.data.activeAcademicYearId == null || 
+
+      let validActiveYearId = !affectedKeys.hasAny(['activeAcademicYearId']) ||
+                              request.resource.data.activeAcademicYearId == null ||
                               (request.resource.data.activeAcademicYearId is string && request.resource.data.activeAcademicYearId.size() > 0);
-                              
+
       let validUpdatedBy = !affectedKeys.hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid;
-      
-      let validVersion = affectedKeys.hasAll(['version']) && 
-                         request.resource.data.version is number && 
+
+      let validVersion = affectedKeys.hasAll(['version']) &&
+                         request.resource.data.version is number &&
                          request.resource.data.version == (('version' in resource.data ? resource.data.version : 0) + 1);
 
       return isAllowedRole && onlyAllowedKeysChanged && validActiveYearId && validUpdatedBy && validVersion;
@@ -121,15 +121,15 @@ service cloud.firestore {
       let isAllowedRole = isSuperAdmin() || (hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector()));
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
       let onlyAllowedKeysChanged = affectedKeys.hasOnly(['openPeriodId', 'status', 'updatedAt', 'updatedBy', 'version']);
-      
-      let validOpenPeriodId = !affectedKeys.hasAny(['openPeriodId']) || 
-                              request.resource.data.openPeriodId == null || 
+
+      let validOpenPeriodId = !affectedKeys.hasAny(['openPeriodId']) ||
+                              request.resource.data.openPeriodId == null ||
                               (request.resource.data.openPeriodId is string && request.resource.data.openPeriodId.size() > 0);
-                              
+
       let validUpdatedBy = !affectedKeys.hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid;
-      
-      let validVersion = affectedKeys.hasAll(['version']) && 
-                         request.resource.data.version is number && 
+
+      let validVersion = affectedKeys.hasAll(['version']) &&
+                         request.resource.data.version is number &&
                          request.resource.data.version == (('version' in resource.data ? resource.data.version : 0) + 1);
 
       let schoolIdImmutable = request.resource.data.schoolId == resource.data.schoolId;
@@ -150,7 +150,7 @@ service cloud.firestore {
     }
 
     function isPromotingToSuperAdmin() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) 
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
              && request.resource.data.role == 'superAdmin';
     }
 
@@ -247,8 +247,8 @@ service cloud.firestore {
       let isInternal = school.get('isInternalSchool', false) == true;
       let plan = school.get('subscriptionPlan', 'starter');
       let count = school.get('studentsCount', 0);
-      
-      return isInternal 
+
+      return isInternal
           || plan == 'premium'
           || (plan == 'pilot' && count < 1000)
           || (plan == 'standard' && count < 1000)
@@ -256,7 +256,7 @@ service cloud.firestore {
     }
 
     function isAccountantRegistrationFeeUpdate() {
-      return isAccountant() 
+      return isAccountant()
           && hasSchoolAccess(resource.data.schoolId)
           && request.resource.data.schoolId == resource.data.schoolId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -269,7 +269,7 @@ service cloud.firestore {
     }
 
     function isAccountantTuitionUpdate() {
-      return isAccountant() 
+      return isAccountant()
           && hasSchoolAccess(resource.data.schoolId)
           && request.resource.data.schoolId == resource.data.schoolId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -282,7 +282,7 @@ service cloud.firestore {
     }
 
     function isAccountantTransportUpdate() {
-      return isAccountant() 
+      return isAccountant()
           && hasSchoolAccess(resource.data.schoolId)
           && request.resource.data.schoolId == resource.data.schoolId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -346,7 +346,7 @@ service cloud.firestore {
 
       // Autorise superAdmin/owner à créer, OU le premier superAdmin via email, OU Auto-inscription Parent via Invitation
       allow create: if isAuthenticated() && (
-        isSuperAdmin() || isOwner() || 
+        isSuperAdmin() || isOwner() ||
         (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId) ||
         (
           request.auth.uid == userId &&
@@ -360,7 +360,7 @@ service cloud.firestore {
         )
       );
       allow update: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         (
           (request.auth.uid == userId || (isOwner() && hasSchoolAccess(resource.data.schoolId))) &&
           !isUpdatingSensitiveUserFields()
@@ -372,12 +372,12 @@ service cloud.firestore {
     // --- SCHOOLS ---
     match /schools/{schoolId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
-      
+
       // Seul le superAdmin peut créer ou supprimer des écoles
       allow create, delete: if isAuthenticated() && isSuperAdmin();
       // Le propriétaire peut modifier son école (mais pas l'abonnement SaaS ni le pointeur de manière non atomique)
       allow update: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         (canManageSchool(schoolId) && !isUpdatingSaasFields() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeAcademicYearId'])) ||
         isAcademicCalendarPointerUpdate(schoolId)
       );
@@ -395,12 +395,12 @@ service cloud.firestore {
       allow get: if resource.data.status == 'pending' && resource.data.expiresAt > request.time; // Not fully possible to compare string ISO with toMillis simply in rules if it's stored as string. Wait, ISO strings can be compared directly in lexicographical order!
       // Better yet, just check pending. The client checks expiration, or we can check string:
       // allow get: if resource.data.status == 'pending'; (the UI will check expiration)
-      
+
       allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(request.resource.data.schoolId);
-      
+
       allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
-      
-      allow update: if isAuthenticated() && 
+
+      allow update: if isAuthenticated() &&
                     (request.auth.token.email == resource.data.parentEmailLower || request.auth.token.email == resource.data.parentEmail) &&
                     resource.data.status == 'pending' &&
                     request.resource.data.status == 'used' &&
@@ -410,14 +410,14 @@ service cloud.firestore {
     // --- STUDENTS & PARENTS ---
     match /students/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
       );
       // Création par Owner, Director, Secretary AVEC limite et validation stricte de classe
-      allow create: if isAuthenticated() 
-                    && isActive() 
-                    && canManagePedagogy(request.resource.data.schoolId) 
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
                     && canCreateStudentWithinLimits(request.resource.data.schoolId)
                     && hasValidStudentClass(request.resource.data);
       // Update
@@ -425,7 +425,7 @@ service cloud.firestore {
         !(isSecretary() && isUpdatingStudentActiveStatusFields())
         && (
           (
-            canManagePedagogy(request.resource.data.schoolId) 
+            canManagePedagogy(request.resource.data.schoolId)
             && request.resource.data.schoolId == resource.data.schoolId
             && (
               !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
@@ -746,7 +746,7 @@ service cloud.firestore {
 
     match /periods/{periodId} {
       allow read: if isAuthenticated() && isActive() && (resource == null || hasSchoolAccess(resource.data.schoolId));
-      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && 
+      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) &&
         hasSchoolAccess(request.resource.data.schoolId) &&
         request.resource.data.keys().hasAll(['schoolId', 'academicYearId', 'name', 'type', 'order', 'startDate', 'endDate', 'status', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']);
       allow delete: if false;
@@ -756,14 +756,14 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       allow create: if isAuthenticated() && isActive() && (
         (isAdminOrOwner() || (isDirector() && isValidEvaluationStatusTransition('NEW', request.resource.data.status, 'director'))) ||
-        (isTeacher() 
+        (isTeacher()
           && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
           && isValidEvaluationStatusTransition('NEW', request.resource.data.status, 'teacher')
         )
       ) && hasSchoolAccess(request.resource.data.schoolId) && request.resource.data.weight > 0;
       allow update: if isAuthenticated() && isActive() && (
         (isAdminOrOwner() || (isDirector() && isValidEvaluationStatusTransition(resource.data.status, request.resource.data.status, 'director'))) ||
-        (isTeacher() 
+        (isTeacher()
           && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
           && isValidEvaluationStatusTransition(resource.data.status, request.resource.data.status, 'teacher')
           && resource.data.status != 'locked'
@@ -774,12 +774,12 @@ service cloud.firestore {
 
     match /grades/{gradeId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isTeacher()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published') ||
         (isStudent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published' && resource.data.studentId == request.auth.uid)
       );
-      
+
       allow create: if isAuthenticated() && isActive() && (
         (isAdminOrOwner() || (isDirector() && isValidGradeStatusTransition('NEW', request.resource.data.status, 'director'))) ||
         (
@@ -793,7 +793,7 @@ service cloud.firestore {
         && (!isStrictGradePayload(request.resource.data) || request.resource.data.teacherId != '')
         && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && (!('maxScore' in request.resource.data) || request.resource.data.score <= request.resource.data.maxScore)))
         && (!isStrictGradePayload(request.resource.data) || !('resultStatus' in request.resource.data) || request.resource.data.resultStatus != 'scored' || ('score' in request.resource.data));
-      
+
       allow update: if isAuthenticated() && isActive() && (
         (isAdminOrOwner() || (isDirector() && isValidGradeStatusTransition(resource.data.status, request.resource.data.status, 'director'))) ||
         (
@@ -813,7 +813,7 @@ service cloud.firestore {
         && (!isStrictGradePayload(request.resource.data) || request.resource.data.teacherId != '')
         && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && (!('maxScore' in request.resource.data) || request.resource.data.score <= request.resource.data.maxScore)))
         && (!isStrictGradePayload(request.resource.data) || !('resultStatus' in request.resource.data) || request.resource.data.resultStatus != 'scored' || ('score' in request.resource.data));
-      
+
       allow delete: if false;
     }
 
@@ -823,7 +823,17 @@ service cloud.firestore {
     }
     match /staff/{staffId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.schoolId is string
+                    && (!('staffType' in request.resource.data) || request.resource.data.staffType in ['teacher', 'director', 'secretary', 'accountant', 'supervisor', 'driver', 'maintenance', 'other'])
+                    && (!('employmentStatus' in request.resource.data) || request.resource.data.employmentStatus in ['active', 'inactive', 'suspended', 'departed']);
+      allow update: if isAuthenticated() && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && (!('staffType' in request.resource.data) || request.resource.data.staffType in ['teacher', 'director', 'secretary', 'accountant', 'supervisor', 'driver', 'maintenance', 'other'])
+                    && (!('employmentStatus' in request.resource.data) || request.resource.data.employmentStatus in ['active', 'inactive', 'suspended', 'departed']);
+      allow delete: if false;
     }
     match /staffAttendance/{attendanceId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
@@ -864,7 +874,7 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
@@ -881,7 +891,7 @@ service cloud.firestore {
     }
     match /receipts/{receiptId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );

@@ -4,11 +4,16 @@ import * as admin from 'firebase-admin';
 interface TeacherStaffDoc {
   id: string;
   schoolId: string;
-  name: string;
-  role: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+  staffType?: string;
+  teachingEnabled?: boolean;
   isActive?: boolean;
   active?: boolean;
   status?: string;
+  employmentStatus?: string;
 }
 
 interface StaffUserLinkByStaffDoc {
@@ -32,6 +37,44 @@ interface StaffUserLinkDoc {
   staffId: string;
   userId: string;
   isActive?: boolean;
+}
+
+function getEffectiveStaffType(staff: Partial<TeacherStaffDoc>): string {
+  if (staff.staffType) return staff.staffType;
+  if (staff.role) return staff.role;
+  return 'other';
+}
+
+function getEffectiveEmploymentStatus(staff: Partial<TeacherStaffDoc>): string {
+  if (staff.employmentStatus) return staff.employmentStatus;
+
+  if (staff.isActive === false || staff.active === false) {
+    return 'inactive';
+  }
+  if (staff.status) {
+    const s = staff.status.toLowerCase();
+    if (s === 'actif' || s === 'active') return 'active';
+    if (s === 'absent' || s === 'remplacé' || s === 'inactive') return 'inactive'; // Mapping legacy
+  }
+  if (staff.isActive === true || staff.active === true) {
+    return 'active';
+  }
+
+  // Default fallback if nothing is set
+  return 'inactive';
+}
+
+function getStaffDisplayName(staff: Partial<TeacherStaffDoc>): string {
+  if (staff.firstName || staff.lastName) {
+    const parts = [];
+    if (staff.lastName) parts.push(staff.lastName.trim());
+    if (staff.firstName) parts.push(staff.firstName.trim());
+    return parts.join(' ');
+  }
+  if (staff.name) {
+    return staff.name.trim();
+  }
+  return 'Personnel inconnu';
 }
 
 export const getTeacherAssignmentCandidates = functions.https.onCall(async (data, context) => {
@@ -91,21 +134,27 @@ export const getTeacherAssignmentCandidates = functions.https.onCall(async (data
     );
   }
 
-  // 2. Fetch all teachers of the school
+  // 2. Fetch all staff of the school (since we need to check staffType OR teachingEnabled)
   const staffSnap = await db.collection('staff')
     .where('schoolId', '==', cleanSchoolId)
-    .where('role', '==', 'teacher')
     .get();
 
-  const teachers = staffSnap.docs.map(doc => ({
+  const allStaff = staffSnap.docs.map(doc => ({
     id: doc.id,
     schoolId: doc.data().schoolId || '',
     name: doc.data().name || '',
+    firstName: doc.data().firstName || '',
+    lastName: doc.data().lastName || '',
     role: doc.data().role || '',
+    staffType: doc.data().staffType || '',
+    teachingEnabled: doc.data().teachingEnabled,
     isActive: doc.data().isActive,
     active: doc.data().active,
-    status: doc.data().status
+    status: doc.data().status,
+    employmentStatus: doc.data().employmentStatus
   })) as TeacherStaffDoc[];
+
+  const teachers = filterEligibleTeachers(allStaff, cleanSchoolId);
 
   // 3. Fetch all staff-user link pointers for the school
   const linkByStaffSnap = await db.collection('staffUserLinkByStaff')
@@ -172,6 +221,38 @@ export const getTeacherAssignmentCandidates = functions.https.onCall(async (data
     });
   }
 
+  const candidates = buildTeacherAssignmentCandidates(
+    teachers,
+    cleanSchoolId,
+    linksByStaffMap,
+    byUserSnapshots,
+    linkDocSnapshots
+  );
+
+  return { candidates };
+});
+
+export function filterEligibleTeachers(allStaff: TeacherStaffDoc[], cleanSchoolId: string): TeacherStaffDoc[] {
+  return allStaff.filter(staff => {
+    if (staff.schoolId !== cleanSchoolId) return false;
+    const status = getEffectiveEmploymentStatus(staff);
+    if (status !== 'active') return false;
+
+    const type = getEffectiveStaffType(staff);
+    if (type === 'teacher') return true;
+    if (staff.teachingEnabled === true) return true;
+
+    return false;
+  });
+}
+
+export function buildTeacherAssignmentCandidates(
+  teachers: TeacherStaffDoc[],
+  cleanSchoolId: string,
+  linksByStaffMap: Map<string, StaffUserLinkByStaffDoc>,
+  byUserSnapshots: Map<string, StaffUserLinkByUserDoc>,
+  linkDocSnapshots: Map<string, StaffUserLinkDoc>
+) {
   const candidates = [];
 
   for (const teacher of teachers) {
@@ -222,23 +303,20 @@ export const getTeacherAssignmentCandidates = functions.https.onCall(async (data
       }
     }
 
-    const isStaffActive = teacher.isActive !== false && teacher.active !== false;
-    const isEligible = isStaffActive && accountStatus !== 'inconsistent';
-
-    // Map operational status (must support 'actif' | 'absent' | 'remplacé')
-    let operationalStatus: 'actif' | 'absent' | 'remplacé' | undefined = undefined;
-    if (teacher.status === 'actif' || teacher.status === 'absent' || teacher.status === 'remplacé') {
-      operationalStatus = teacher.status;
-    }
+    const isEligible = accountStatus !== 'inconsistent';
+    const operationalStatus = getEffectiveEmploymentStatus(teacher);
 
     candidates.push({
       teacherStaffId: staffId,
-      name: teacher.name,
+      name: getStaffDisplayName(teacher),
       operationalStatus,
       isEligible,
       accountStatus
     });
   }
 
-  return { candidates };
-});
+  // Trier par nom puis prénom de manière déterministe
+  candidates.sort((a, b) => a.name.localeCompare(b.name));
+
+  return candidates;
+}
