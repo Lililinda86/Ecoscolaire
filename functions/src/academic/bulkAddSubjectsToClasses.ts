@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { resolveAcademicYear, resolveClassProgram } from './academicResolvers';
 
 export const bulkAddSubjectsToClasses = functions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.uid) {
@@ -12,7 +13,7 @@ export const bulkAddSubjectsToClasses = functions.https.onCall(async (data, cont
   if (typeof schoolId !== 'string' || !schoolId.trim()) {
     throw new functions.https.HttpsError('invalid-argument', 'schoolId invalide.');
   }
-  if (typeof academicYearId !== 'string' || !/^\d{4}-\d{4}$/.test(academicYearId)) {
+  if (typeof academicYearId !== 'string' || academicYearId.trim() === '' || academicYearId.includes('/') || academicYearId.length > 100) {
     throw new functions.https.HttpsError('invalid-argument', 'academicYearId invalide.');
   }
   if (!Array.isArray(classIds) || classIds.length === 0 || classIds.length > 50) {
@@ -101,10 +102,23 @@ export const bulkAddSubjectsToClasses = functions.https.onCall(async (data, cont
         if (classCycle === 'primary') classCycle = 'primaire';
         if (classCycle === 'secondary') classCycle = 'secondaire';
 
-        const programId = `${cleanSchoolId}__${cleanAcademicYearId}__${cleanClassId}`;
-        const programRef = db.collection('classPrograms').doc(programId);
-        const programSnap = await transaction.get(programRef);
-        const program = programSnap.exists ? programSnap.data()! : null;
+        // B. Resolve AcademicYear and ClassProgram safely
+        const resolvedYear = await resolveAcademicYear(transaction, db, cleanSchoolId, cleanAcademicYearId);
+        const resolvedProgram = await resolveClassProgram(transaction, db, cleanSchoolId, cleanClassId, resolvedYear);
+
+        let programId: string;
+        let programRef: admin.firestore.DocumentReference;
+        let program: admin.firestore.DocumentData | null = null;
+
+        if (resolvedProgram) {
+          programId = resolvedProgram.id;
+          programRef = db.collection('classPrograms').doc(programId);
+          program = resolvedProgram.data;
+        } else {
+          programId = `${cleanSchoolId}__${resolvedYear.name}__${cleanClassId}`;
+          programRef = db.collection('classPrograms').doc(programId);
+          program = null;
+        }
 
         let draftRevisionId = '';
         let draftRevisionNumber = 1;
@@ -170,7 +184,7 @@ export const bulkAddSubjectsToClasses = functions.https.onCall(async (data, cont
           transaction.create(programRef, {
             id: programId,
             schoolId: cleanSchoolId,
-            academicYearId: cleanAcademicYearId,
+            academicYearId: resolvedYear.id,
             classId: cleanClassId,
             status: 'draft',
             draftRevisionId,
@@ -241,7 +255,7 @@ export const bulkAddSubjectsToClasses = functions.https.onCall(async (data, cont
               programId,
               schoolId: cleanSchoolId,
               classId: cleanClassId,
-              academicYearId: cleanAcademicYearId,
+              academicYearId: resolvedYear.id,
               subjectId: subjId,
               revisionId: draftRevisionId,
               revisionNumber: draftRevisionNumber,
