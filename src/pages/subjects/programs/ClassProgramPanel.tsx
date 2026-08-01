@@ -427,7 +427,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
                     <button
                       type="button"
                       onClick={handleCreateDraft}
-                      disabled={isCreatingDraft}
+                      disabled={isCreatingDraft || !!draftError}
                       style={{
                         border: 'none',
                         backgroundColor: 'var(--primary-color)',
@@ -452,7 +452,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
                     <button
                       type="button"
                       onClick={handleCreateDraft}
-                      disabled={isCreatingDraft}
+                      disabled={isCreatingDraft || !!draftError}
                       style={{
                         border: 'none',
                         backgroundColor: 'var(--primary-color)',
@@ -478,7 +478,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
           </div>
 
           {/* 5. Empty program state or legacy explanation */}
-          {source === 'none' && (
+          {source === 'none' && !draftError && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', width: '105%' }}>
               <div style={{ width: '95%' }}>
                 <ClassProgramEmptyState

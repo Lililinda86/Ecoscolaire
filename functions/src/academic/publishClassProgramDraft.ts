@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { computeDraftStateToken, DraftSubjectInput } from './draftStateToken';
+import { resolveAcademicYear, resolveClassProgram } from './academicResolvers';
 
 export const publishClassProgramDraft = functions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.uid) {
@@ -23,10 +24,10 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
     );
   }
 
-  if (typeof academicYearId !== 'string' || !/^\d{4}-\d{4}$/.test(academicYearId)) {
+  if (typeof academicYearId !== 'string' || academicYearId.trim() === '' || academicYearId.includes('/') || academicYearId.length > 100) {
     throw new functions.https.HttpsError(
       'invalid-argument',
-      'academicYearId doit respecter le format YYYY-YYYY.',
+      'academicYearId invalide.',
       { businessCode: 'INVALID_ARGUMENT' }
     );
   }
@@ -58,15 +59,6 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
   const cleanSchoolId = schoolId.trim();
   const cleanAcademicYearId = academicYearId.trim();
   const cleanClassId = classId.trim();
-  const programId = `${cleanSchoolId}__${cleanAcademicYearId}__${cleanClassId}`;
-
-  if (!expectedDraftRevisionId.startsWith(`${programId}__v`)) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'expectedDraftRevisionId ne correspond pas au programme spécifié.',
-      { businessCode: 'INVALID_ARGUMENT' }
-    );
-  }
 
   const db = admin.firestore();
   const nowIso = new Date().toISOString();
@@ -126,17 +118,29 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
         );
       }
 
-      // 3. Read ClassProgram document
-      const programRef = db.collection('classPrograms').doc(programId);
-      const programSnap = await transaction.get(programRef);
-      if (!programSnap.exists) {
+      // 3. Resolve Academic Year and Class Program
+      const resolvedYear = await resolveAcademicYear(transaction, db, cleanSchoolId, cleanAcademicYearId);
+      const resolvedProgram = await resolveClassProgram(transaction, db, cleanSchoolId, cleanClassId, resolvedYear);
+
+      if (!resolvedProgram) {
         throw new functions.https.HttpsError(
           'not-found',
           'Programme introuvable.',
           { businessCode: 'PROGRAM_NOT_FOUND' }
         );
       }
-      const program = programSnap.data()!;
+
+      const programId = resolvedProgram.id;
+      const programRef = db.collection('classPrograms').doc(programId);
+      const program = resolvedProgram.data;
+
+      if (!expectedDraftRevisionId.startsWith(`${programId}__v`)) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'expectedDraftRevisionId ne correspond pas au programme spécifié.',
+          { businessCode: 'INVALID_ARGUMENT' }
+        );
+      }
 
       // 3.5 Optimistic Locking check (revision ID) before query
       if (expectedDraftRevisionId !== program.draftRevisionId) {

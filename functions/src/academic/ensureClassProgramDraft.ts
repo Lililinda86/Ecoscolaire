@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { resolveAcademicYear, resolveClassProgram } from './academicResolvers';
 
 export const ensureClassProgramDraft = functions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.uid) {
@@ -22,10 +23,10 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
     );
   }
 
-  if (typeof academicYearId !== 'string' || !/^\d{4}-\d{4}$/.test(academicYearId)) {
+  if (typeof academicYearId !== 'string' || academicYearId.trim() === '' || academicYearId.includes('/') || academicYearId.length > 100) {
     throw new functions.https.HttpsError(
       'invalid-argument',
-      'academicYearId doit respecter le format YYYY-YYYY.',
+      'academicYearId invalide.',
       { businessCode: 'INVALID_ARGUMENT' }
     );
   }
@@ -41,8 +42,6 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
   const cleanSchoolId = schoolId.trim();
   const cleanAcademicYearId = academicYearId.trim();
   const cleanClassId = classId.trim();
-  const programId = `${cleanSchoolId}__${cleanAcademicYearId}__${cleanClassId}`;
-
   const db = admin.firestore();
   const nowIso = new Date().toISOString();
 
@@ -101,12 +100,27 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
         );
       }
 
-      // 3. Read ClassProgram document
-      const programRef = db.collection('classPrograms').doc(programId);
-      const programSnap = await transaction.get(programRef);
+      // 3. Resolve Academic Year and Class Program
+      const resolvedYear = await resolveAcademicYear(transaction, db, cleanSchoolId, cleanAcademicYearId);
+      const resolvedProgram = await resolveClassProgram(transaction, db, cleanSchoolId, cleanClassId, resolvedYear);
+
+      let programId: string;
+      let programRef: admin.firestore.DocumentReference;
+      let program: admin.firestore.DocumentData = {} as admin.firestore.DocumentData;
+      let programExists = false;
+
+      if (resolvedProgram) {
+        programId = resolvedProgram.id;
+        programRef = db.collection('classPrograms').doc(programId);
+        program = resolvedProgram.data;
+        programExists = true;
+      } else {
+        programId = `${cleanSchoolId}__${resolvedYear.name}__${cleanClassId}`;
+        programRef = db.collection('classPrograms').doc(programId);
+      }
 
       // Case A: Program does not exist
-      if (!programSnap.exists) {
+      if (!programExists) {
         const initialDraftRevisionNumber = 1;
         const initialDraftRevisionId = `${programId}__v${initialDraftRevisionNumber}`;
 
@@ -138,7 +152,7 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
         const newProgramPayload = {
           id: programId,
           schoolId: cleanSchoolId,
-          academicYearId: cleanAcademicYearId,
+          academicYearId: resolvedYear.id,
           classId: cleanClassId,
           status: 'draft',
           draftRevisionId: initialDraftRevisionId,
@@ -161,8 +175,6 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           mode: 'initial'
         };
       }
-
-      const program = programSnap.data()!;
 
       // Case B/D: Brouillon actif existant (avec ou sans version publiée)
       const hasValidDraft =

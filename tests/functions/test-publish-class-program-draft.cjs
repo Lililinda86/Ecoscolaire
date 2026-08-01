@@ -23,6 +23,7 @@ const dbMock = {
           _data: null,
           mockGet: function() {
             return {
+              id: this.id,
               exists: this.exists,
               data: () => this._data
             };
@@ -133,6 +134,11 @@ async function runTests() {
     for (const key in docs) {
       delete docs[key];
     }
+    // Inject mock academic year for all tests to satisfy resolveAcademicYear
+    dbMock.collection('academicYears').doc('legacy-2026-2027').setState(true, {
+      schoolId: 'school-1',
+      name: '2026-2027'
+    });
     try {
       setup();
       const result = await execute();
