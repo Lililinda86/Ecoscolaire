@@ -278,7 +278,7 @@ const Grades: React.FC = () => {
     });
   };
 
-  const classStudents = db.students.filter(s => s.classId === selectedClassRank);
+  const classStudents = db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === selectedClassRank && s.schoolingStatus !== 'inactive');
   const rankingData = classStudents.map(s => {
     const sGrades = db.grades.filter(g => g.studentId === s.id);
     const validSGrades = sGrades.map(g => getLegacyGradeNormalizedValue(g)).filter(v => v.calculable) as { calculable: true, value: number }[];
@@ -290,7 +290,7 @@ const Grades: React.FC = () => {
   const currentRankClass = db.classes.find(c => c.id === selectedClassRank);
 
   const schoolRankingData = db.classes.map(c => {
-    const cStudents = db.students.filter(s => s.classId === c.id);
+    const cStudents = db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === c.id && s.schoolingStatus !== 'inactive');
       const validStudentAvgs = cStudents.map(s => {
         const sGrades = db.grades.filter(g => g.studentId === s.id);
         const validSGrades = sGrades.map(g => getLegacyGradeNormalizedValue(g)).filter(v => v.calculable) as { calculable: true, value: number }[];
@@ -634,7 +634,19 @@ const Grades: React.FC = () => {
             </div>
             <div className="form-group">
               <label>Période</label>
-              <select required value={selectedPeriodId} onChange={e => setSelectedPeriodId(e.target.value)}>
+              <select required value={selectedPeriodId} onChange={e => {
+                const val = e.target.value;
+                setSelectedPeriodId(val);
+                const p = dropdownPeriods.find(x => x.id === val);
+                if (p && p.startDate && p.endDate) {
+                  const today = new Date().toISOString().split('T')[0];
+                  if (today >= p.startDate && today <= p.endDate) {
+                    setEvaluationDate(today);
+                  } else {
+                    setEvaluationDate(p.startDate);
+                  }
+                }
+              }}>
                 <option value="">-- Choisir --</option>
                 {dropdownPeriods.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -747,7 +759,7 @@ const Grades: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label>Date</label>
-                    <input type="date" required value={evaluationDate} onChange={e => setEvaluationDate(e.target.value)} />
+                    <input type="date" required value={evaluationDate} min={dropdownPeriods.find(p => p.id === selectedPeriodId)?.startDate} max={dropdownPeriods.find(p => p.id === selectedPeriodId)?.endDate} onChange={e => setEvaluationDate(e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label>Note sur (Max)</label>
@@ -764,34 +776,40 @@ const Grades: React.FC = () => {
           
           {(evaluationMode === 'new' || (evaluationMode === 'existing' && selectedEvaluationId)) && (
             <div style={{ maxHeight: '400px', overflowY: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Élève</th>
-                    <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '100px' }}>Statut</th>
-                    <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '120px' }}>Note / {evaluationMaxScore}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {db.students.filter(s => s.classId === selectedClassId).map(stu => {
-                    const currentVal = gradeEntryRows[stu.id]?.score || '';
-                    return (
-                      <tr key={stu.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.75rem 0' }}>{stu.name}</td>
-                        <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>Scored</td>
-                        <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>
-                          <input 
-                            type="number" step="0.25" min="0" max={evaluationMaxScore} placeholder="Note"
-                            style={{ width: '80px', textAlign: 'center' }} 
-                            value={currentVal} 
-                            onChange={e => handleUpdateGradeEntry(stu.id, e.target.value)} 
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              {db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === selectedClassId && s.schoolingStatus !== 'inactive').length === 0 ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  Aucun élève actif n’est actuellement affecté à cette classe.
+                </p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Élève</th>
+                      <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '100px' }}>Statut</th>
+                      <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '120px' }}>Note / {evaluationMaxScore}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === selectedClassId && s.schoolingStatus !== 'inactive').map(stu => {
+                      const currentVal = gradeEntryRows[stu.id]?.score || '';
+                      return (
+                        <tr key={stu.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.75rem 0' }}>{stu.name}</td>
+                          <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>Scored</td>
+                          <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>
+                            <input
+                              type="number" step="0.25" min="0" max={evaluationMaxScore} placeholder="Note"
+                              style={{ width: '80px', textAlign: 'center' }}
+                              value={currentVal}
+                              onChange={e => handleUpdateGradeEntry(stu.id, e.target.value)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 
