@@ -2,8 +2,12 @@
  * @vitest-environment jsdom
  */
 import React from 'react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
+
+beforeAll(() => {
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+});
 import userEvent from '@testing-library/user-event';
 
 // Mock Modal since Grades uses it and might cause issues if not mocked
@@ -60,7 +64,7 @@ describe('Grades - Filtrage des matières', () => {
       students: [],
       ...customDb
     };
-    
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (useAppContext as any).mockReturnValue({
       db: mockDb,
@@ -94,9 +98,9 @@ describe('Grades - Filtrage des matières', () => {
         { id: 'cs6', schoolId: 's1', classId: 'c3', revisionId: 'rev3', subjectId: 'sub1', isActive: false, coefficient: 2, displayOrder: 1 },
       ]
     };
-    
+
     setupTest(customDb);
-    
+
     // Find "Saisir des Notes" button and click it to open modal
     const addButton = screen.getByText(/Saisir des Notes/i);
     await user.click(addButton);
@@ -106,7 +110,7 @@ describe('Grades - Filtrage des matières', () => {
     // Select Academic Year
     const yearSelect = modal.querySelectorAll('select')[0];
     await user.selectOptions(yearSelect, 'ay1');
-    
+
     // Select Period
     const periodSelect = modal.querySelectorAll('select')[1];
     await user.selectOptions(periodSelect, 'p1');
@@ -115,12 +119,14 @@ describe('Grades - Filtrage des matières', () => {
     const classSelect = modal.querySelectorAll('select')[2];
     await user.selectOptions(classSelect, 'c1');
 
-    // The Subject select should now be visible and contain Maths and Français
-    const subjectSelect = modal.querySelectorAll('select')[3];
-    expect(subjectSelect).not.toBeNull();
-    
-    // Option length should be 4: "-- Choisir --", "Maths (Coeff 2)", "Français (Coeff 3)", "Inconnu (Coeff 1)"
-    const options = Array.from(subjectSelect.querySelectorAll('option'));
+    // The Subject dropdown button should now be visible and contain Maths and Français
+    const subjectButton = screen.getAllByRole('button', { name: /-- Choisir --/i })[0];
+    expect(subjectButton).not.toBeNull();
+
+    // Open the dropdown
+    await user.click(subjectButton);
+    const listbox = screen.getByRole('listbox');
+    const options = Array.from(listbox.querySelectorAll('li'));
     expect(options).toHaveLength(4);
     expect(options[1].textContent).toContain('Maths');
     expect(options[2].textContent).toContain('Français');
@@ -128,10 +134,10 @@ describe('Grades - Filtrage des matières', () => {
 
     // Change class to c2 (which has no published program)
     await user.selectOptions(classSelect, 'c2');
-    
+
     // Should see "Le programme de cette classe n’est pas encore publié."
     expect(screen.getByText(/Le programme de cette classe n’est pas encore publié/i)).not.toBeNull();
-    
+
     // Test empty program
     await user.selectOptions(classSelect, 'c3');
     expect(screen.getByText(/Aucune matière active dans le programme publié/i)).not.toBeNull();
@@ -152,7 +158,7 @@ describe('Grades - Filtrage des matières', () => {
         { id: 'cs2', schoolId: 's1', classId: 'c1', revisionId: 'rev1', subjectId: 'sub2', isActive: true, coefficient: 3, displayOrder: 2 },
       ]
     };
-    
+
     setupTest(customDb);
     const addButton = screen.getByText(/Saisir des Notes/i);
     await user.click(addButton);
@@ -165,7 +171,7 @@ describe('Grades - Filtrage des matières', () => {
     expect(yearOptions).toHaveLength(1);
     expect(yearOptions[0].textContent).toBe('2026-2027');
     await user.selectOptions(yearSelect, 'ay1'); // Selection of canonical ID
-    
+
     // Select Period
     const periodSelect = modal.querySelectorAll('select')[1];
     await user.selectOptions(periodSelect, 'p1');
@@ -175,9 +181,12 @@ describe('Grades - Filtrage des matières', () => {
     await user.selectOptions(classSelect, 'c1');
 
     // The Subject select should be visible and contain the 2 subjects because of fallback
-    const subjectSelect = modal.querySelectorAll('select')[3];
-    expect(subjectSelect).not.toBeNull();
-    const options = Array.from(subjectSelect.querySelectorAll('option'));
+    const subjectButton = screen.getAllByRole('button', { name: /-- Choisir --/i })[0];
+    expect(subjectButton).not.toBeNull();
+
+    await user.click(subjectButton);
+    const listbox = screen.getByRole('listbox');
+    const options = Array.from(listbox.querySelectorAll('li'));
     expect(options).toHaveLength(3); // Choisir + 2 matières
   });
 
@@ -190,12 +199,12 @@ describe('Grades - Filtrage des matières', () => {
         { id: 'ay3', schoolId: 's1', name: '2026-2027', startDate: '', endDate: '', status: 'planned' },
       ],
       classPrograms: [
-        { id: 'p1', schoolId: 's1', classId: 'c1', academicYearId: 'ay2', status: 'published', publishedRevisionId: 'rev1' }, 
-        { id: 'p2', schoolId: 's1', classId: 'c1', academicYearId: 'ay3', status: 'published', publishedRevisionId: 'rev2' }, 
+        { id: 'p1', schoolId: 's1', classId: 'c1', academicYearId: 'ay2', status: 'published', publishedRevisionId: 'rev1' },
+        { id: 'p2', schoolId: 's1', classId: 'c1', academicYearId: 'ay3', status: 'published', publishedRevisionId: 'rev2' },
       ],
       classSubjects: []
     };
-    
+
     setupTest(customDb);
     const addButton = screen.getByText(/Saisir des Notes/i);
     await user.click(addButton);

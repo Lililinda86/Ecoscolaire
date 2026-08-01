@@ -127,3 +127,33 @@ export function getEquivalentAcademicYearIds(
   if (!targetGroup) return [];
   return targetGroup.map(y => y.id);
 }
+
+export function getActiveAcademicYearId(
+  academicYears: AcademicYear[] | undefined,
+  school: { id: string; activeAcademicYearId?: string; academicYear?: string } | null | undefined
+): string {
+  if (!academicYears || !school) return '';
+
+  if (school.activeAcademicYearId) {
+    const activeMatch = academicYears.find(y => y.schoolId === school.id && y.id === school.activeAcademicYearId);
+    if (activeMatch) return activeMatch.id;
+  }
+
+  if (school.academicYear) {
+    const exactIdMatch = academicYears.find(y => y.schoolId === school.id && y.id === school.academicYear);
+    if (exactIdMatch) return exactIdMatch.id;
+
+    const validYears = deduplicateAcademicYears(academicYears, school.id, undefined);
+    const nameNorm = normalizeName(school.academicYear);
+    const matchingByName = validYears.filter(y => normalizeName(y.name) === nameNorm);
+
+    if (matchingByName.length === 1) {
+      return matchingByName[0].id;
+    } else if (matchingByName.length > 1) {
+      console.warn(`[WARNING] Ambiguous school.academicYear label: ${school.academicYear}. Matches multiple distinct canonical years.`);
+      return '';
+    }
+  }
+
+  return '';
+}

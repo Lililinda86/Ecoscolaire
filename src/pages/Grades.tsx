@@ -12,6 +12,8 @@ import { Plus, Printer, Trophy } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
+import { SubjectSelectDropdown } from '../components/SubjectSelectDropdown';
+
 export const ACADEMIC_CALENDAR_SETTINGS_HASH = '#/settings?section=academic-calendar';
 
 export const getCalendarActionUrl = (hasAcademicYears: boolean, hasSelectedYear: boolean, openPeriodsCount: number): string | null => {
@@ -735,12 +737,11 @@ const Grades: React.FC = () => {
                     if (effResult.status === 'empty') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Aucune matière active dans le programme publié de cette classe.</div>;
 
                     return (
-                      <select required value={selectedClassSubjectId} onChange={e => setSelectedClassSubjectId(e.target.value)}>
-                        <option value="">-- Choisir --</option>
-                        {effResult.subjects.map(s => (
-                          <option key={s.classSubjectId} value={s.classSubjectId}>{s.name} (Coeff {s.coefficient})</option>
-                        ))}
-                      </select>
+                      <SubjectSelectDropdown
+                        subjects={effResult.subjects}
+                        value={selectedClassSubjectId}
+                        onChange={setSelectedClassSubjectId}
+                      />
                     );
                   })()}
                 </div>

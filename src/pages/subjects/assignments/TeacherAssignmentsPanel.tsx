@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useClassProgram } from '../../../hooks/useClassProgram';
-import { normalizeAcademicYearId } from '../../../utils/academicYear';
+import { getActiveAcademicYearId } from '../../../utils/academicYearDeduplication';
 import { ClassProgramSelectors } from '../programs/ClassProgramSelectors';
 import { getClassTeacherAssignmentSlots, type TeacherAssignmentSlot } from '../../../services/teacherAssignments';
 import {
@@ -28,8 +28,16 @@ export const TeacherAssignmentsPanel: React.FC = () => {
 
   // School information
   const schoolId = db?.school?.id;
+  const normalizedYear = React.useMemo(() => {
+    return getActiveAcademicYearId(db?.academicYears, db?.school);
+  }, [db?.academicYears, db?.school]);
+
   const rawAcademicYear = db?.school?.academicYear || '';
-  const normalizedYear = normalizeAcademicYearId(rawAcademicYear);
+  const activeYearName = React.useMemo(() => {
+    if (!normalizedYear || !db?.academicYears) return rawAcademicYear;
+    const y = db.academicYears.find(y => y.id === normalizedYear);
+    return y ? y.name : rawAcademicYear;
+  }, [normalizedYear, db?.academicYears, rawAcademicYear]);
 
   // Hook for class program
   const {
@@ -197,7 +205,7 @@ export const TeacherAssignmentsPanel: React.FC = () => {
 
       {/* Selector Controls */}
       <ClassProgramSelectors
-        academicYearLabel={rawAcademicYear}
+        academicYearLabel={activeYearName}
         sectionFilter={sectionFilter}
         setSectionFilter={setSectionFilter}
         cycleFilter={cycleFilter}

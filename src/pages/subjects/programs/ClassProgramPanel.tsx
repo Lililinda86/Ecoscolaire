@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useClassProgram } from '../../../hooks/useClassProgram';
 import { canManageAcademicPrograms } from '../../../utils/academicPermissions';
-import { normalizeAcademicYearId } from '../../../utils/academicYear';
+import { getActiveAcademicYearId } from '../../../utils/academicYearDeduplication';
 import { normalizeClassCycle } from '../../../utils/classClassification';
 import { ClassProgramSelectors } from './ClassProgramSelectors';
 import { ClassProgramSummary } from './ClassProgramSummary';
@@ -30,11 +30,19 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
   const [draftError, setDraftError] = useState<string | null>(null);
 
   const schoolId = db?.school?.id;
-  const rawAcademicYear = db?.school?.academicYear || '';
-  const normalizedYear = normalizeAcademicYearId(rawAcademicYear);
+  const normalizedYear = React.useMemo(() => {
+    return getActiveAcademicYearId(db?.academicYears, db?.school);
+  }, [db?.academicYears, db?.school]);
 
   const classes = React.useMemo(() => db?.classes || [], [db?.classes]);
   const selectedClass = classes.find((c) => c.id === selectedClassId) || null;
+
+  const rawAcademicYear = db?.school?.academicYear || '';
+  const activeYearName = React.useMemo(() => {
+    if (!normalizedYear || !db?.academicYears) return rawAcademicYear;
+    const y = db.academicYears.find(y => y.id === normalizedYear);
+    return y ? y.name : rawAcademicYear;
+  }, [normalizedYear, db?.academicYears, rawAcademicYear]);
 
   const handleClassSelect = (classId: string) => {
     setSelectedClassId(classId);
@@ -155,7 +163,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem 0' }}>
       {/* 1. Selector fields */}
       <ClassProgramSelectors
-        academicYearLabel={rawAcademicYear}
+        academicYearLabel={activeYearName}
         sectionFilter={sectionFilter}
         setSectionFilter={handleSectionFilterChange}
         cycleFilter={cycleFilter}
