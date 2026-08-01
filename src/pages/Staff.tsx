@@ -5,10 +5,10 @@ import type { Staff } from '../types';
 import Modal from '../components/Modal';
 import { Plus, Edit2, Printer } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
-import { getEffectiveStaffType, getEffectiveEmploymentStatus, getStaffDisplayName } from '../utils/staffHelpers';
+import { getEffectiveStaffType, getEffectiveEmploymentStatus, getStaffDisplayName, buildStaffWritePayload } from '../utils/staffHelpers';
 
 const StaffPage: React.FC = () => {
-  const { db, safeMergeDB, currentSchool, isSchoolSuspended, currentUser } = useAppContext();
+  const { db, updateLocalState, safeMergeDB, currentSchool, isSchoolSuspended, currentUser } = useAppContext();
   const { t } = useI18n();
   const [isModalOpen, setModalOpen] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<Partial<Staff>>({});
@@ -43,50 +43,47 @@ const StaffPage: React.FC = () => {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     if (!currentSchool?.id) return;
 
+    if (!currentSchool) return;
+
     setIsSubmitting(true);
 
-    // Clean undefined fields
-    const cleanedStaff = Object.fromEntries(
-      Object.entries(currentStaff).filter(([k, v]) => k !== undefined && v !== undefined)
-    );
+    try {
+      const isEdit = !!currentStaff.id;
+      const payload = buildStaffWritePayload(currentStaff, currentSchool, currentUser, isEdit);
+      const staffId = currentStaff.id || crypto.randomUUID();
+      const finalPayload = { id: staffId, ...payload };
 
-    const now = new Date().toISOString();
-    const newDb = { ...db };
+      const { db: firestoreDb } = await import('../db/firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
 
-    if (currentStaff.id) {
-      newDb.staff = newDb.staff.map(s => {
-        if (s.id === currentStaff.id) {
-          // Patch edit
-          return {
-            ...s,
-            ...cleanedStaff,
-            updatedAt: now,
-            updatedBy: currentUser?.id
-          } as Staff;
-        }
-        return s;
-      });
-    } else {
-      const newStaff: Staff = {
-        ...(cleanedStaff as Omit<Staff, 'id' | 'schoolId'>),
-        id: crypto.randomUUID(),
-        schoolId: currentSchool.id,
-        createdAt: now,
-        createdBy: currentUser?.id,
-        updatedAt: now,
-        updatedBy: currentUser?.id
-      };
-      newDb.staff.push(newStaff);
+      await setDoc(doc(firestoreDb, 'staff', staffId), finalPayload, { merge: true });
+
+      const newDb = { ...db };
+      if (isEdit) {
+        newDb.staff = newDb.staff.map(s => s.id === staffId ? { ...s, ...finalPayload } as Staff : s);
+      } else {
+        newDb.staff.push(finalPayload as Staff);
+      }
+      updateLocalState({ staff: newDb.staff });
+
+      setModalOpen(false);
+      alert('Le personnel a été enregistré avec succès.');
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
+      console.error('Erreur lors de l’enregistrement du personnel :', err);
+      if (err.code === 'permission-denied') {
+        alert('Enregistrement refusé par les règles de sécurité. La fiche n’a pas été enregistrée.');
+      } else {
+        alert('Impossible d’enregistrer le membre du personnel dans la base staging.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-
-    safeMergeDB(newDb);
-    setModalOpen(false);
-    setIsSubmitting(false);
   };
 
 

@@ -52,3 +52,44 @@ export function isStaffEligibleForTeaching(staff: Staff | Partial<Staff>, school
 
   return false;
 }
+
+export function buildStaffWritePayload(
+  form: Partial<Staff>,
+  currentSchool: { id: string },
+  currentUser: { id: string } | null,
+  isEdit: boolean
+): Omit<Staff, 'id'> {
+  const now = new Date().toISOString();
+  
+  const payload: Partial<Staff> = {
+    schoolId: currentSchool.id,
+    firstName: form.firstName?.trim() || '',
+    lastName: form.lastName?.trim() || '',
+    staffType: form.staffType || 'other',
+    employmentStatus: form.employmentStatus || 'active',
+  };
+
+  if (form.phone) payload.phone = form.phone.trim();
+  if (form.email) payload.email = form.email.trim();
+  if (form.teachingEnabled !== undefined) payload.teachingEnabled = form.teachingEnabled;
+  if (form.hireDate) payload.hireDate = form.hireDate;
+  
+  if (payload.employmentStatus === 'departed') {
+    if (form.departureDate) payload.departureDate = form.departureDate;
+    if (form.departureReason) payload.departureReason = form.departureReason;
+  }
+
+  if (isEdit) {
+    payload.updatedAt = now;
+    if (currentUser) payload.updatedBy = currentUser.id;
+  } else {
+    payload.createdAt = now;
+    payload.updatedAt = now;
+    if (currentUser) {
+      payload.createdBy = currentUser.id;
+      payload.updatedBy = currentUser.id;
+    }
+  }
+
+  return payload as Omit<Staff, 'id'>;
+}

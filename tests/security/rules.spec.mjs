@@ -3388,3 +3388,117 @@ test.describe('Academic Calendar Pointers Security Rules', () => {
     await assertFails(deleteDoc(docRef));
   });
 });
+
+describe('Staff Creation Rules (buildStaffWritePayload exact format)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', 'director1'), { role: 'director', schoolId: 'school-1', active: true });
+    });
+  });
+  it('1. Directeur autoris� dans sa propre �cole', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', 'director1'), { role: 'director', schoolId: 'school-1', active: true });
+    });
+    const ctx = testEnv.authenticatedContext('director1');
+    const now = new Date().toISOString();
+    const payload = {
+      schoolId: 'school-1',
+      firstName: 'John',
+      lastName: 'Doe',
+      staffType: 'teacher',
+      employmentStatus: 'active',
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'director1',
+      updatedBy: 'director1'
+    };
+    await assertSucceeds(setDoc(doc(ctx.firestore(), 'staff', 's1'), payload));
+  });
+
+  it('2. Autre �cole refus�e', async () => {
+    const ctx = testEnv.authenticatedContext('director1');
+    const payload = {
+      schoolId: 'school-2',
+      firstName: 'John',
+      lastName: 'Doe',
+      staffType: 'teacher',
+      employmentStatus: 'active'
+    };
+    await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's2'), payload));
+  });
+
+  it('3. schoolId absent refus�', async () => {
+    const ctx = testEnv.authenticatedContext('director1');
+    const payload = {
+      firstName: 'John',
+      lastName: 'Doe',
+      staffType: 'teacher',
+      employmentStatus: 'active'
+    };
+    await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's3'), payload));
+  });
+
+  it('4. schoolId modifi� refus�', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'staff', 's4'), { schoolId: 'school-1', firstName: 'John' });
+    });
+    const ctx = testEnv.authenticatedContext('director1');
+    await assertFails(updateDoc(doc(ctx.firestore(), 'staff', 's4'), { schoolId: 'school-2' }));
+  });
+
+  it('5. staffType invalide refus�', async () => {
+    const ctx = testEnv.authenticatedContext('director1');
+    const payload = {
+      schoolId: 'school-1',
+      firstName: 'John',
+      lastName: 'Doe',
+      staffType: 'invalid_type',
+      employmentStatus: 'active'
+    };
+    await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's5'), payload));
+  });
+
+  it('6. employmentStatus invalide refus�', async () => {
+    const ctx = testEnv.authenticatedContext('director1');
+    const payload = {
+      schoolId: 'school-1',
+      firstName: 'John',
+      lastName: 'Doe',
+      staffType: 'teacher',
+      employmentStatus: 'invalid_status'
+    };
+    await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's6'), payload));
+  });
+
+  it('7. payload canonique enseignant actif accept�', async () => {
+    const ctx = testEnv.authenticatedContext('director1');
+    const payload = {
+      schoolId: 'school-1',
+      firstName: 'John',
+      lastName: 'Doe',
+      staffType: 'teacher',
+      employmentStatus: 'active'
+    };
+    await assertSucceeds(setDoc(doc(ctx.firestore(), 'staff', 's7'), payload));
+  });
+
+  it('8. userId absent accept�', async () => {
+    const ctx = testEnv.authenticatedContext('director1');
+    const payload = {
+      schoolId: 'school-1',
+      firstName: 'John',
+      lastName: 'Doe',
+      staffType: 'teacher',
+      employmentStatus: 'active'
+    };
+    await assertSucceeds(setDoc(doc(ctx.firestore(), 'staff', 's8'), payload));
+  });
+
+  it('9. suppression refus�e', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'staff', 's9'), { schoolId: 'school-1', firstName: 'John' });
+    });
+    const ctx = testEnv.authenticatedContext('director1');
+    await assertFails(deleteDoc(doc(ctx.firestore(), 'staff', 's9')));
+  });
+});

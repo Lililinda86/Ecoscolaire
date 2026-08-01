@@ -430,7 +430,13 @@ export const TeacherAssignmentsPanel: React.FC = () => {
               onChange={(e) => setChosenTeacherStaffId(e.target.value)}
               style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
             >
-              <option value="">-- Choisir un enseignant --</option>
+              <option value="" disabled={eligibleTeachers.length === 0 || !!errorMsg}>
+                {errorMsg 
+                  ? "Impossible de charger les enseignants disponibles." 
+                  : eligibleTeachers.length === 0 
+                  ? "Aucun enseignant actif n’est disponible." 
+                  : "-- Choisir un enseignant --"}
+              </option>
               {eligibleTeachers.map((t) => {
                 const isLinked = t.accountStatus === 'linked';
                 const statusSuffix = t.operationalStatus ? ` (${t.operationalStatus})` : '';
