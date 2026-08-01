@@ -1,6 +1,55 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 
+function resolvePublishedClassProgram(programDocuments: { id: string, data: admin.firestore.DocumentData }[]) {
+  if (!programDocuments || programDocuments.length === 0) {
+    throw new functions.https.HttpsError('not-found', 'Programme de classe introuvable.', { businessCode: 'PROGRAM_NOT_FOUND' });
+  }
+  const publishedPrograms = programDocuments.filter(p => p.data.status === 'published');
+  if (publishedPrograms.length === 0) {
+    throw new functions.https.HttpsError('failed-precondition', 'Le programme de cette classe n\'est pas publié.', { businessCode: 'PROGRAM_NOT_PUBLISHED' });
+  }
+  if (publishedPrograms.length > 1) {
+    throw new functions.https.HttpsError('failed-precondition', 'Plusieurs programmes publiés ont été trouvés.', { businessCode: 'PROGRAM_INTEGRITY_ERROR' });
+  }
+  return {
+    programId: publishedPrograms[0].id,
+    programData: publishedPrograms[0].data
+  };
+}
+
+function resolvePublishedProgramSubject(params: { publishedSubjects: { id: string, data: admin.firestore.DocumentData }[], requestedSubjectId: string }) {
+  const { publishedSubjects, requestedSubjectId } = params;
+
+  // Chercher par catalogSubjectId d'abord, sinon subjectId (fallback)
+  const matches = publishedSubjects.filter(s =>
+    s.data.catalogSubjectId === requestedSubjectId || s.data.subjectId === requestedSubjectId
+  );
+
+  if (matches.length === 0) {
+    throw new functions.https.HttpsError('not-found', 'Matière absente du programme publié.', { businessCode: 'SUBJECT_NOT_IN_PUBLISHED_PROGRAM' });
+  }
+
+  if (matches.length > 1) {
+    throw new functions.https.HttpsError('failed-precondition', 'Plusieurs matières correspondent à cet identifiant.', { businessCode: 'PROGRAM_INTEGRITY_ERROR' });
+  }
+
+  const subjectData = matches[0].data;
+
+  if (subjectData.isActive === false) {
+    throw new functions.https.HttpsError('failed-precondition', 'La matière publiée est inactive.', { businessCode: 'PUBLISHED_SUBJECT_INACTIVE' });
+  }
+
+  return {
+    programSubjectId: matches[0].id,
+    canonicalSubjectId: requestedSubjectId,
+    catalogSubjectId: subjectData.catalogSubjectId,
+    code: subjectData.subjectCodeSnapshot,
+    name: subjectData.subjectNameSnapshot,
+    programId: subjectData.programId
+  };
+}
+
 export const setPrimaryTeacherAssignment = functions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError(
@@ -150,14 +199,17 @@ export const setPrimaryTeacherAssignment = functions.https.onCall(async (data, c
         }
       }
 
-      // 5. Read ClassProgram
-      const programId = `${cleanSchoolId}__${cleanAcademicYearId}__${cleanClassId}`;
-      const programRef = db.collection('classPrograms').doc(programId);
-      const programSnap = await transaction.get(programRef);
-      if (!programSnap.exists) {
-        throw new functions.https.HttpsError('not-found', 'Programme de classe introuvable.', { businessCode: 'PROGRAM_NOT_FOUND' });
-      }
-      const programData = programSnap.data()!;
+      // 5. Read ClassProgram by fields instead of reconstructed ID
+      const programQuery = await transaction.get(
+        db.collection('classPrograms')
+          .where('schoolId', '==', cleanSchoolId)
+          .where('classId', '==', cleanClassId)
+          .where('academicYearId', '==', cleanAcademicYearId)
+      );
+
+      const programDocuments = programQuery.docs.map(doc => ({ id: doc.id, data: doc.data() }));
+      const { programId, programData } = resolvePublishedClassProgram(programDocuments);
+
       if (programData.schoolId !== cleanSchoolId) {
         throw new functions.https.HttpsError('permission-denied', 'Programme d\'une autre école.', { businessCode: 'SCHOOL_MISMATCH' });
       }
@@ -166,18 +218,20 @@ export const setPrimaryTeacherAssignment = functions.https.onCall(async (data, c
         throw new functions.https.HttpsError('failed-precondition', 'Le programme de cette classe n\'est pas publié.', { businessCode: 'PROGRAM_NOT_PUBLISHED' });
       }
 
-      // 6. Read ClassSubject published
-      const classSubjectId = `${publishedRevisionId}__${cleanSubjectId}`;
-      const classSubjectRef = db.collection('classSubjects').doc(classSubjectId);
-      const classSubjectSnap = await transaction.get(classSubjectRef);
-      if (!classSubjectSnap.exists) {
-        throw new functions.https.HttpsError('not-found', 'Matière absente du programme publié.', { businessCode: 'SUBJECT_NOT_IN_PUBLISHED_PROGRAM' });
-      }
-      const classSubjectData = classSubjectSnap.data()!;
-      if (classSubjectData.isActive === false) {
-        throw new functions.https.HttpsError('failed-precondition', 'La matière publiée est inactive.', { businessCode: 'PUBLISHED_SUBJECT_INACTIVE' });
-      }
-      if (classSubjectData.programId !== programId || classSubjectData.schoolId !== cleanSchoolId) {
+      // 6. Read ClassSubjects from the published revision
+      const classSubjectsQuery = await transaction.get(
+        db.collection('classSubjects')
+          .where('programId', '==', programId)
+          .where('revisionId', '==', publishedRevisionId)
+      );
+
+      const publishedSubjects = classSubjectsQuery.docs.map(doc => ({ id: doc.id, data: doc.data() }));
+      const resolvedSubject = resolvePublishedProgramSubject({
+        publishedSubjects,
+        requestedSubjectId: cleanSubjectId
+      });
+
+      if (resolvedSubject.programId !== programId) {
         throw new functions.https.HttpsError('failed-precondition', 'Incohérence d\'intégrité du programme.', { businessCode: 'PROGRAM_INTEGRITY_ERROR' });
       }
 
@@ -237,12 +291,12 @@ export const setPrimaryTeacherAssignment = functions.https.onCall(async (data, c
         schoolId: cleanSchoolId,
         academicYearId: cleanAcademicYearId,
         classId: cleanClassId,
-        subjectId: cleanSubjectId,
+        subjectId: resolvedSubject.canonicalSubjectId,
         teacherStaffId: cleanTeacherStaffId,
         assignmentRole: 'primary',
         sourceProgramId: programId,
         sourcePublishedRevisionId: publishedRevisionId,
-        sourceClassSubjectId: classSubjectId,
+        sourceClassSubjectId: resolvedSubject.programSubjectId,
         isActive: true,
         startedAt: nowIso,
         createdAt: nowIso,
@@ -261,12 +315,12 @@ export const setPrimaryTeacherAssignment = functions.https.onCall(async (data, c
         schoolId: cleanSchoolId,
         academicYearId: cleanAcademicYearId,
         classId: cleanClassId,
-        subjectId: cleanSubjectId,
+        subjectId: resolvedSubject.canonicalSubjectId,
         teacherStaffId: cleanTeacherStaffId,
         assignmentRole: 'primary',
         sourceProgramId: programId,
         sourcePublishedRevisionId: publishedRevisionId,
-        sourceClassSubjectId: classSubjectId,
+        sourceClassSubjectId: resolvedSubject.programSubjectId,
         isActive: true,
         updatedAt: nowIso,
         updatedBy: uid,
