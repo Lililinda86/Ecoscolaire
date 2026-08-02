@@ -942,28 +942,42 @@ service cloud.firestore {
     }
 
     // --- TRANSPORT ---
+    function isDriverBreakdownCreation(data) {
+      return data.status == 'signalée'
+          && !('actualCost' in data)
+          && (!('estimatedCost' in data) || data.estimatedCost == 0)
+          && data.busId is string;
+    }
+
     match /buses/{busId} {
-      // Driver voit le transport
-      allow read: if isAuthenticated() && isActive() && (
-        hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isSecretary() || isAccountant() || isDriver())
-      );
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || isAccountant() || isDriver());
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary());
+      allow delete: if false;
     }
     match /busRoutes/{routeId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary());
+      allow delete: if false;
     }
     match /fuelExpenses/{expId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow delete: if false;
     }
     match /maintenances/{mId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow delete: if false;
     }
     match /breakdowns/{bId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isDriver());
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || (isDriver() && isDriverBreakdownCreation(request.resource.data)));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector());
+      allow delete: if false;
     }
 
     match /validation_requests/{reqId} {

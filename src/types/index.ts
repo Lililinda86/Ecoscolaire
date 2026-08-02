@@ -473,6 +473,7 @@ export interface Bus {
   capacity?: number;
   status?: 'actif' | 'en_panne' | 'en_entretien';
   routeId?: string;
+  isActive?: boolean;
 }
 
 export interface BusRoute {
@@ -482,6 +483,7 @@ export interface BusRoute {
   areas: string;
   departureTime: string;
   returnTime: string;
+  isActive?: boolean;
 }
 
 export interface FuelExpense {

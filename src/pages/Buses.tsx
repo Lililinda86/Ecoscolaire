@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import type { Bus, Staff, BusRoute, FuelExpense, Maintenance, Breakdown } from '../types';
+import type { Bus, BusRoute, FuelExpense, Maintenance, Breakdown } from '../types';
 import Modal from '../components/Modal';
 import { Plus, Edit2, Trash2, Bus as BusIcon, Map as RouteIcon, Fuel, PenTool as Tool, AlertTriangle, Users, LayoutDashboard } from 'lucide-react';
 
 const Buses: React.FC = () => {
-  const { db, safeMergeDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentUser, currentSchool } = useAppContext();
+  const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'fleet' | 'drivers' | 'routes' | 'fuel' | 'maintenance' | 'breakdowns'>('dashboard');
 
   // Modal states
   const [isBusModalOpen, setBusModalOpen] = useState(false);
   const [currentBus, setCurrentBus] = useState<Partial<Bus>>({});
-
-  const [isDriverModalOpen, setDriverModalOpen] = useState(false);
-  const [currentDriver, setCurrentDriver] = useState<Partial<Staff>>({});
 
   const [isRouteModalOpen, setRouteModalOpen] = useState(false);
   const [currentRoute, setCurrentRoute] = useState<Partial<BusRoute>>({});
@@ -31,30 +30,105 @@ const Buses: React.FC = () => {
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role)) return null;
 
   // Ensure arrays exist
-  const buses = db.buses || [];
-  const drivers = (db.staff || []).filter(s => s.role === 'driver');
-  const routes = db.busRoutes || [];
+  const buses = (db.buses || []).filter(b => b.isActive !== false);
+  const drivers = (db.staff || []).filter(s =>
+    s.staffType === 'driver' &&
+    s.schoolId === currentSchool?.id &&
+    s.employmentStatus !== 'inactive' &&
+    s.employmentStatus !== 'departed' &&
+    s.isActive !== false &&
+    s.active !== false
+  );
+  const routes = (db.busRoutes || []).filter(r => r.isActive !== false);
   const fuelExpenses = db.fuelExpenses || [];
   const maintenances = db.maintenances || [];
   const breakdowns = db.breakdowns || [];
 
   // --- Helpers for Saves ---
-  const saveEntity = <T extends { id: string }>(collectionName: keyof typeof db, entity: Partial<T>) => {
-    const newDb = { ...db };
-    const collection = (newDb[collectionName] as T[]) || [];
-    if (entity.id) {
-        newDb[collectionName] = collection.map(item => item.id === entity.id ? entity : item) as never;
-    } else {
-        newDb[collectionName] = [...collection, { ...entity, id: crypto.randomUUID() }] as never;
+  const saveEntity = async <T extends { id: string, schoolId?: string }>(collectionName: keyof typeof db, entity: Partial<T>) => {
+    if (!currentSchool?.id) {
+      window.alert('Aucune école active sélectionnée.');
+      return false;
     }
-    safeMergeDB(newDb);
+
+    try {
+      const newDb = { ...db };
+      const collection = (newDb[collectionName] as T[]) || [];
+      let finalEntity: T;
+
+      if (entity.id) {
+        const existing = collection.find(item => item.id === entity.id);
+        if (!existing) {
+          window.alert('Document introuvable.');
+          return false;
+        }
+        if (existing.schoolId && existing.schoolId !== currentSchool.id) {
+          window.alert('Erreur: Ce document appartient à une autre école.');
+          return false;
+        }
+        finalEntity = {
+          ...existing,
+          ...entity,
+          id: existing.id,
+          schoolId: existing.schoolId || currentSchool.id
+        } as T;
+      } else {
+        finalEntity = {
+          ...entity,
+          id: crypto.randomUUID(),
+          schoolId: currentSchool.id
+        } as T;
+
+        if (collectionName === 'buses' || collectionName === 'busRoutes') {
+          (finalEntity as unknown as { isActive: boolean }).isActive = true;
+        }
+      }
+
+      Object.keys(finalEntity).forEach(key => {
+        if (finalEntity[key as keyof T] === undefined) {
+          delete finalEntity[key as keyof T];
+        }
+      });
+
+      if (entity.id) {
+        newDb[collectionName] = collection.map(item => item.id === entity.id ? finalEntity : item) as never;
+      } else {
+        newDb[collectionName] = [...collection, finalEntity] as never;
+      }
+
+      await safeMergeDB(newDb);
+      return true;
+    } catch (err: unknown) {
+      console.error(err);
+      if ((err as { code?: string })?.code === 'permission-denied') {
+        window.alert("Permission refusée : Vous n'avez pas les droits pour cette opération.");
+      } else {
+        window.alert("Une erreur est survenue lors de la sauvegarde.");
+      }
+      return false;
+    }
   };
 
-  const deleteEntity = <T extends { id: string }>(collectionName: keyof typeof db, id: string) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
-      const newDb = { ...db };
-      newDb[collectionName] = ((newDb[collectionName] as T[]) || []).filter(item => item.id !== id) as never;
-      safeMergeDB(newDb);
+  const deactivateEntity = async <T extends { id: string, isActive?: boolean }>(collectionName: 'buses' | 'busRoutes', id: string) => {
+    if (window.confirm('Êtes-vous sûr de vouloir désactiver cet élément ?')) {
+      try {
+        const newDb = { ...db };
+        const collection = (newDb[collectionName] as unknown as T[]) || [];
+        const existing = collection.find(item => item.id === id);
+        if (!existing) return;
+
+        const finalEntity = { ...existing, isActive: false };
+        newDb[collectionName] = collection.map(item => item.id === id ? finalEntity : item) as never;
+
+        await safeMergeDB(newDb);
+      } catch (err: unknown) {
+        console.error(err);
+        if ((err as { code?: string })?.code === 'permission-denied') {
+          window.alert("Permission refusée.");
+        } else {
+          window.alert("Une erreur est survenue lors de la désactivation.");
+        }
+      }
     }
   };
 
@@ -152,7 +226,7 @@ const Buses: React.FC = () => {
                   <td style={{ padding: '1rem' }}>{b.status}</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
                     <button className="secondary" onClick={() => { setCurrentBus(b); setBusModalOpen(true); }} style={{ marginRight: '0.5rem' }}><Edit2 size={16} /></button>
-                    <button className="danger" onClick={() => deleteEntity('buses', b.id)}><Trash2 size={16} /></button>
+                    <button className="danger" onClick={() => deactivateEntity('buses', b.id)} title="Désactiver"><Trash2 size={16} /></button>
                   </td>
                 </tr>
               ))}
@@ -165,23 +239,19 @@ const Buses: React.FC = () => {
       {activeTab === 'drivers' && (
         <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
-            <button onClick={() => { setCurrentDriver({ role: 'driver' }); setDriverModalOpen(true); }}><Plus size={18} /> Ajouter Conducteur</button>
+            <button onClick={() => navigate('/staff')}><Plus size={18} /> Ajouter un conducteur dans Personnel</button>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ background: 'var(--bg-color)' }}>
-              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Nom</th><th style={{ padding: '1rem', textAlign: 'left' }}>Téléphone</th><th style={{ padding: '1rem', textAlign: 'left' }}>Permis</th><th style={{ padding: '1rem', textAlign: 'left' }}>Statut</th><th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th></tr>
+              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Nom</th><th style={{ padding: '1rem', textAlign: 'left' }}>Téléphone</th><th style={{ padding: '1rem', textAlign: 'left' }}>Permis</th><th style={{ padding: '1rem', textAlign: 'left' }}>Statut</th></tr>
             </thead>
             <tbody>
               {drivers.map(d => (
                 <tr key={d.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{d.name}</td>
+                  <td style={{ padding: '1rem' }}>{d.name || (d.firstName && (d.firstName + ' ' + (d.lastName || '')))}</td>
                   <td style={{ padding: '1rem' }}>{d.phone}</td>
                   <td style={{ padding: '1rem' }}>{d.licenseNumber}</td>
-                  <td style={{ padding: '1rem' }}>{d.status}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button className="secondary" onClick={() => { setCurrentDriver(d); setDriverModalOpen(true); }} style={{ marginRight: '0.5rem' }}><Edit2 size={16} /></button>
-                    <button className="danger" onClick={() => deleteEntity('staff', d.id)}><Trash2 size={16} /></button>
-                  </td>
+                  <td style={{ padding: '1rem' }}>{d.status || d.employmentStatus}</td>
                 </tr>
               ))}
             </tbody>
@@ -207,7 +277,7 @@ const Buses: React.FC = () => {
                   <td style={{ padding: '1rem' }}>{r.departureTime} - {r.returnTime}</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
                     <button className="secondary" onClick={() => { setCurrentRoute(r); setRouteModalOpen(true); }} style={{ marginRight: '0.5rem' }}><Edit2 size={16} /></button>
-                    <button className="danger" onClick={() => deleteEntity('busRoutes', r.id)}><Trash2 size={16} /></button>
+                    <button className="danger" onClick={() => deactivateEntity('busRoutes', r.id)} title="Désactiver"><Trash2 size={16} /></button>
                   </td>
                 </tr>
               ))}
@@ -234,7 +304,7 @@ const Buses: React.FC = () => {
                   <td style={{ padding: '1rem' }}>{f.liters} L / {f.amount} FCFA</td>
                   <td style={{ padding: '1rem' }}>{f.mileage} km</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button className="danger" onClick={() => deleteEntity('fuelExpenses', f.id)}><Trash2 size={16} /></button>
+                    {/* Suppression masquée (historique) */}
                   </td>
                 </tr>
               ))}
@@ -262,7 +332,7 @@ const Buses: React.FC = () => {
                   <td style={{ padding: '1rem' }}>{m.amount} FCFA</td>
                   <td style={{ padding: '1rem' }}>{m.nextMaintenanceDate}</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button className="danger" onClick={() => deleteEntity('maintenances', m.id)}><Trash2 size={16} /></button>
+                    {/* Suppression masquée (historique) */}
                   </td>
                 </tr>
               ))}
@@ -291,7 +361,7 @@ const Buses: React.FC = () => {
                   <td style={{ padding: '1rem' }}>{b.actualCost || 0} FCFA</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
                     <button className="secondary" onClick={() => { setCurrentBreakdown(b); setBreakdownModalOpen(true); }} style={{ marginRight: '0.5rem' }}><Edit2 size={16} /></button>
-                    <button className="danger" onClick={() => deleteEntity('breakdowns', b.id)}><Trash2 size={16} /></button>
+                    {/* Suppression masquée (historique) */}
                   </td>
                 </tr>
               ))}
@@ -304,7 +374,11 @@ const Buses: React.FC = () => {
       {/* MODALS */}
       {/* Bus Modal */}
       <Modal isOpen={isBusModalOpen} onClose={() => setBusModalOpen(false)} title="Flotte - Bus">
-        <form onSubmit={e => { e.preventDefault(); saveEntity('buses', currentBus); setBusModalOpen(false); }}>
+        <form onSubmit={async e => {
+          e.preventDefault();
+          const success = await saveEntity('buses', currentBus);
+          if (success) setBusModalOpen(false);
+        }}>
           <div className="form-group"><label>Nom/Numéro</label><input required value={currentBus.name || ''} onChange={e => setCurrentBus({...currentBus, name: e.target.value})} /></div>
           <div className="form-group"><label>Immatriculation</label><input required value={currentBus.plate || ''} onChange={e => setCurrentBus({...currentBus, plate: e.target.value})} /></div>
           <div className="form-group"><label>Places</label><input type="number" required value={currentBus.capacity || ''} onChange={e => setCurrentBus({...currentBus, capacity: parseInt(e.target.value)})} /></div>
@@ -323,30 +397,15 @@ const Buses: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Driver Modal */}
-      <Modal isOpen={isDriverModalOpen} onClose={() => setDriverModalOpen(false)} title="Conducteur">
-        <form onSubmit={e => { e.preventDefault(); saveEntity('staff', currentDriver); setDriverModalOpen(false); }}>
-          <div className="form-group"><label>Nom & Prénom</label><input required value={currentDriver.name || ''} onChange={e => setCurrentDriver({...currentDriver, name: e.target.value})} /></div>
-          <div className="form-group"><label>Téléphone</label><input required value={currentDriver.phone || ''} onChange={e => setCurrentDriver({...currentDriver, phone: e.target.value})} /></div>
-          <div className="form-group"><label>Permis</label><input required value={currentDriver.licenseNumber || ''} onChange={e => setCurrentDriver({...currentDriver, licenseNumber: e.target.value})} /></div>
-          <div className="form-group"><label>Statut</label>
-            <select required value={currentDriver.status || 'actif'} onChange={e => setCurrentDriver({...currentDriver, status: e.target.value as Staff['status']})}>
-              <option value="actif">Actif</option><option value="absent">Absent</option><option value="remplacé">Remplacé</option>
-            </select>
-          </div>
-          <div className="form-group"><label>Bus affecté</label>
-            <select value={currentDriver.assignedBusId || ''} onChange={e => setCurrentDriver({...currentDriver, assignedBusId: e.target.value})}>
-              <option value="">-- Aucun --</option>
-              {buses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}><button type="button" className="secondary" onClick={() => setDriverModalOpen(false)}>Annuler</button><button type="submit">Sauvegarder</button></div>
-        </form>
-      </Modal>
+
 
       {/* Route Modal */}
       <Modal isOpen={isRouteModalOpen} onClose={() => setRouteModalOpen(false)} title="Ligne / Trajet">
-        <form onSubmit={e => { e.preventDefault(); saveEntity('busRoutes', currentRoute); setRouteModalOpen(false); }}>
+        <form onSubmit={async e => {
+          e.preventDefault();
+          const success = await saveEntity('busRoutes', currentRoute);
+          if (success) setRouteModalOpen(false);
+        }}>
           <div className="form-group"><label>Nom Ligne</label><input required value={currentRoute.name || ''} onChange={e => setCurrentRoute({...currentRoute, name: e.target.value})} /></div>
           <div className="form-group"><label>Quartiers Desservis</label><input required value={currentRoute.areas || ''} onChange={e => setCurrentRoute({...currentRoute, areas: e.target.value})} /></div>
           <div className="form-group"><label>Heure Départ Matin</label><input type="time" required value={currentRoute.departureTime || ''} onChange={e => setCurrentRoute({...currentRoute, departureTime: e.target.value})} /></div>
@@ -357,7 +416,11 @@ const Buses: React.FC = () => {
 
       {/* Fuel Modal */}
       <Modal isOpen={isFuelModalOpen} onClose={() => setFuelModalOpen(false)} title="Dépense Carburant">
-        <form onSubmit={e => { e.preventDefault(); saveEntity('fuelExpenses', currentFuel); setFuelModalOpen(false); }}>
+        <form onSubmit={async e => {
+          e.preventDefault();
+          const success = await saveEntity('fuelExpenses', currentFuel);
+          if (success) setFuelModalOpen(false);
+        }}>
           <div className="form-group"><label>Date</label><input type="date" required value={currentFuel.date || ''} onChange={e => setCurrentFuel({...currentFuel, date: e.target.value})} /></div>
           <div className="form-group"><label>Bus</label>
             <select required value={currentFuel.busId || ''} onChange={e => setCurrentFuel({...currentFuel, busId: e.target.value})}>
@@ -374,7 +437,11 @@ const Buses: React.FC = () => {
 
       {/* Maintenance Modal */}
       <Modal isOpen={isMaintModalOpen} onClose={() => setMaintModalOpen(false)} title="Fiche d'Entretien">
-        <form onSubmit={e => { e.preventDefault(); saveEntity('maintenances', currentMaint); setMaintModalOpen(false); }}>
+        <form onSubmit={async e => {
+          e.preventDefault();
+          const success = await saveEntity('maintenances', currentMaint);
+          if (success) setMaintModalOpen(false);
+        }}>
           <div className="form-group"><label>Date</label><input type="date" required value={currentMaint.date || ''} onChange={e => setCurrentMaint({...currentMaint, date: e.target.value})} /></div>
           <div className="form-group"><label>Bus</label>
             <select required value={currentMaint.busId || ''} onChange={e => setCurrentMaint({...currentMaint, busId: e.target.value})}>
@@ -391,7 +458,11 @@ const Buses: React.FC = () => {
 
       {/* Breakdown Modal */}
       <Modal isOpen={isBreakdownModalOpen} onClose={() => setBreakdownModalOpen(false)} title="Signalement Panne">
-        <form onSubmit={e => { e.preventDefault(); saveEntity('breakdowns', currentBreakdown); setBreakdownModalOpen(false); }}>
+        <form onSubmit={async e => {
+          e.preventDefault();
+          const success = await saveEntity('breakdowns', currentBreakdown);
+          if (success) setBreakdownModalOpen(false);
+        }}>
           <div className="form-group"><label>Date</label><input type="date" required value={currentBreakdown.date || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, date: e.target.value})} /></div>
           <div className="form-group"><label>Bus</label>
             <select required value={currentBreakdown.busId || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, busId: e.target.value})}>
