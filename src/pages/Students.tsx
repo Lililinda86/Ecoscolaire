@@ -629,7 +629,9 @@ const Students: React.FC = () => {
           throw new Error("QUOTA_EXCEEDED");
         }
 
-        await setDoc(studentRef, finalStudent, { merge: true });
+        const studentToSave = Object.fromEntries(Object.entries(finalStudent).filter(([, v]) => v !== undefined));
+
+        await setDoc(studentRef, studentToSave, { merge: true });
 
         // Mutate local state
         db.students.push(finalStudent);
@@ -2044,15 +2046,29 @@ const Students: React.FC = () => {
                         const cId = e.target.value;
                         const matchedClass = sortedClasses.find(c => c.id === cId);
                         if (matchedClass) {
-                          const fees = getDefaultFeesForClass(matchedClass.name, currentStudent.section || 'francophone');
-                          setCurrentStudent(prev => ({
-                            ...prev,
-                            classId: cId,
-                            feeT1: fees.t1,
-                            feeT2: fees.t2,
-                            feeT3: fees.t3,
-                            registrationFeeExpected: fees.registration,
-                          }));
+                          const fees = getDefaultFeesForClass(matchedClass.name, currentStudent.section || 'francophone', db.school);
+                          if (fees) {
+                            setCurrentStudent(prev => ({
+                              ...prev,
+                              classId: cId,
+                              feeT1: fees.t1,
+                              feeT2: fees.t2,
+                              feeT3: fees.t3,
+                              tuitionExpected: fees.tuition,
+                              registrationFeeExpected: fees.registration,
+                            }));
+                          } else {
+                            // Frais non configurés
+                            setCurrentStudent(prev => ({
+                              ...prev,
+                              classId: cId,
+                              feeT1: undefined,
+                              feeT2: undefined,
+                              feeT3: undefined,
+                              tuitionExpected: undefined,
+                              registrationFeeExpected: undefined,
+                            }));
+                          }
                         } else {
                           setCurrentStudent(prev => ({ ...prev, classId: cId }));
                         }

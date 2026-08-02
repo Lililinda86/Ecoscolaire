@@ -58,6 +58,7 @@ const Settings: React.FC = () => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [draftTransportPolicy, setDraftTransportPolicy] = useState(false);
+  const [draftClassFees, setDraftClassFees] = useState<Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }>>({});
 
   // 3. Draft initialization strategy: Keep track of initialized school id via ref to avoid overwriting modified drafts on contextual reload of db.school.
   const initializedSchoolIdRef = useRef<string | null>(null);
@@ -93,6 +94,22 @@ const Settings: React.FC = () => {
         feeUniforms: String(school.globalFees?.feeUniforms ?? 0)
       });
       setDraftTransportPolicy(school.transportPolicy?.secretaryManageAll === true);
+      
+      const feesInit: Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }> = {};
+      if (school.classFees) {
+        Object.keys(school.classFees).forEach(className => {
+          const config = school.classFees![className];
+          feesInit[className] = {
+            registration: config.registration?.toString() || '',
+            tuition: config.tuition?.toString() || '',
+            t1: config.t1?.toString() || '',
+            t2: config.t2?.toString() || '',
+            t3: config.t3?.toString() || ''
+          };
+        });
+      }
+      setDraftClassFees(feesInit);
+      
       initializedSchoolIdRef.current = school.id;
     },
     []
@@ -252,6 +269,29 @@ const Settings: React.FC = () => {
           secretaryManageAll: draftTransportPolicy
         }
       };
+
+      const classFeesToSave: Record<string, { registration?: number; tuition?: number; t1?: number; t2?: number; t3?: number }> = {};
+      for (const [className, fees] of Object.entries(draftClassFees)) {
+        const classFee: { registration?: number; tuition?: number; t1?: number; t2?: number; t3?: number } = {};
+        if (fees.registration?.trim()) classFee.registration = normalizeFee(`Inscription (${className})`, fees.registration);
+        if (fees.tuition?.trim()) classFee.tuition = normalizeFee(`Scolarité (${className})`, fees.tuition);
+        if (fees.t1?.trim()) classFee.t1 = normalizeFee(`T1 (${className})`, fees.t1);
+        if (fees.t2?.trim()) classFee.t2 = normalizeFee(`T2 (${className})`, fees.t2);
+        if (fees.t3?.trim()) classFee.t3 = normalizeFee(`T3 (${className})`, fees.t3);
+        
+        if (Object.keys(classFee).length > 0) {
+           if (classFee.tuition !== undefined) {
+               const tTotal = (classFee.t1 || 0) + (classFee.t2 || 0) + (classFee.t3 || 0);
+               if (tTotal > 0 && tTotal !== classFee.tuition) {
+                   throw new Error(`Le total des tranches (${tTotal}) ne correspond pas à la scolarité (${classFee.tuition}) pour la classe ${className}.`);
+               }
+           }
+           classFeesToSave[className] = classFee;
+        }
+      }
+      updatedSchool.classFees = classFeesToSave;
+
+      await setDoc(doc(firestoreDb, 'schools', db.school.id), updatedSchool, { merge: true });     
       await safeMergeDB({
         ...db,
         school: updatedSchool
@@ -788,6 +828,40 @@ const Settings: React.FC = () => {
                   }}
                 />
              </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Frais scolaires par classe</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+          Définissez les frais applicables à chaque classe.
+        </p>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                <th style={{ padding: '0.75rem' }}>Classe</th>
+                <th style={{ padding: '0.75rem' }}>Inscription</th>
+                <th style={{ padding: '0.75rem' }}>Scolarité</th>
+                <th style={{ padding: '0.75rem' }}>T1</th>
+                <th style={{ padding: '0.75rem' }}>T2</th>
+                <th style={{ padding: '0.75rem' }}>T3</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortClasses(db.classes).map(c => (
+                <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{c.name}</td>
+                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.registration || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], registration: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.tuition || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], tuition: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t1 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t1: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t2 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t2: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t3 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t3: e.target.value } }))} /></td>
+                </tr>
+              ))}
+              {db.classes.length === 0 && <tr><td colSpan={6} style={{ padding: '1rem', color: 'var(--text-muted)', textAlign: 'center' }}>Aucune classe</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
 

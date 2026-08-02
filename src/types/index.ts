@@ -57,6 +57,13 @@ export interface School {
     feeTransport: number;
     feeUniforms: number;
   };
+  classFees?: Record<string, {
+    registration?: number;
+    tuition?: number;
+    t1?: number;
+    t2?: number;
+    t3?: number;
+  }>;
   transportPolicy?: {
     secretaryManageAll?: boolean;
   };

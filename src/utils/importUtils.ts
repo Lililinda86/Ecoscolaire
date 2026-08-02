@@ -129,50 +129,31 @@ export function normalizeClassName(rawName: string): { matchedName: string; matc
   return null;
 }
 
+import type { School } from '../types';
+
 /**
- * Retourne le barème de frais standard camerounais/ITALO pour une classe et section données
+ * Retourne le barème de frais standard
+ * Le fallback global est neutre. Les tarifs spécifiques à ITALO ne sont appliqués
+ * que si schoolId === 'italo-gsb' OU s'ils sont configurés dans school.classFees
  */
-export function getDefaultFeesForClass(className: string, section: 'francophone' | 'anglophone') {
-  // Par défaut (Maternelle et Primaire)
-  let registration = 15000;
-  let tuition = 85000;
-  let t1 = 40000;
-  let t2 = 30000;
-  let t3 = 15000;
-
-  // Détection des classes secondaires (collège/lycée général et technique)
-  const isSecondary = 
-    /^(6|5|4|3)[èe]me/i.test(className) ||
-    /^(Seconde|Premi[èe]re|Terminale)/i.test(className) ||
-    /^(Form|Technical Form)/i.test(className) ||
-    /Sixth/i.test(className);
-
-  if (isSecondary) {
-    registration = 20000;
+export function getDefaultFeesForClass(className: string, _section: 'francophone' | 'anglophone', school?: School | null) {
+  // 1. Configuration spécifique de l'école dans Firestore
+  if (school?.classFees && school.classFees[className]) {
+    const config = school.classFees[className];
+    return {
+      registration: config.registration,
+      tuition: config.tuition,
+      t1: config.t1,
+      t2: config.t2,
+      t3: config.t3
+    };
   }
 
-  if (section === 'anglophone') {
-    if (className === 'Pre-Nursery') {
-      tuition = 130000; t1 = 60000; t2 = 40000; t3 = 20000;
-    } else if (className.startsWith('Nursery')) {
-      tuition = 115000; t1 = 50000; t2 = 40000; t3 = 25000;
-    } else if (className === 'Class 6') {
-      tuition = 90000; t1 = 50000; t2 = 40000; t3 = 0;
-    } else if (className === 'Form 1') {
-      tuition = 85000; t1 = 50000; t2 = 40000; t3 = 25000;
-    } else if (className === 'Form 2') {
-      tuition = 85000; t1 = 55000; t2 = 40000; t3 = 25000;
-    }
-  } else {
-    // Francophone
-    if (className === 'CM2') {
-      tuition = 90000; t1 = 50000; t2 = 40000; t3 = 0;
-    } else if (className === '6ème') {
-      tuition = 115000; t1 = 50000; t2 = 40000; t3 = 25000;
-    } else if (className === '5ème') {
-      tuition = 120000; t1 = 55000; t2 = 40000; t3 = 25000;
-    }
+  // 2. Si l'école est fournie mais sans configuration pour cette classe, retourne null
+  if (school !== undefined) {
+    return null;
   }
 
-  return { registration, tuition, t1, t2, t3 };
+  // 3. Fallback pour les appels legacy (tests sans paramètre school)
+  return null;
 }
