@@ -960,9 +960,18 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
 // 6. mockConfirmPayment
 // Callable function to manually confirm a pending payment in MOCK mode.
 // ----------------------------------------------------------------------
+export function assertMockPaymentAllowed(projectId?: string, isEmulator?: boolean, isTestEnv?: boolean) {
+  if (projectId !== 'ecoscolaire-staging' && !isEmulator && !isTestEnv) {
+    throw new Error('mockConfirmPayment is disabled outside test environment');
+  }
+}
+
 export const mockConfirmPayment = functions.https.onCall(async (data, context) => {
-  if (process.env.FUNCTIONS_EMULATOR !== 'true' && process.env.NODE_ENV !== 'test') {
-    throw new functions.https.HttpsError('failed-precondition', 'mockConfirmPayment is disabled outside test environment');
+  const runtimeProjectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || (process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).projectId : undefined);
+  try {
+    assertMockPaymentAllowed(runtimeProjectId, process.env.FUNCTIONS_EMULATOR === 'true', process.env.NODE_ENV === 'test');
+  } catch (err: unknown) {
+    throw new functions.https.HttpsError('failed-precondition', (err as Error).message);
   }
 
   if (!context.auth || !context.auth.uid) {

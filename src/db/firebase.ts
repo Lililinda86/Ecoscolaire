@@ -23,6 +23,18 @@ for (const key of requiredKeys) {
   }
 }
 
+// Sécurité : Vérifier l'adéquation entre l'environnement et le projet Firebase
+if (import.meta.env.MODE === 'production') {
+  if (firebaseConfig.projectId === 'ecoscolaire-staging') {
+    throw new Error('CRITICAL: Le mode Production ne doit JAMAIS utiliser le projet ecoscolaire-staging');
+  }
+} else if (import.meta.env.MODE === 'staging') {
+  if (firebaseConfig.projectId === 'ecoscolaire-c5861') {
+    throw new Error('CRITICAL: Le mode Staging ne doit JAMAIS utiliser le projet ecoscolaire-c5861');
+  }
+}
+
+
 if (!isConfigValid) {
   console.warn("Using fallback dummy Firebase configuration to prevent app crash. Auth and Firestore will not work.");
   firebaseConfig.apiKey = firebaseConfig.apiKey || "dummy-api-key";

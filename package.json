@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:staging": "node scripts/validate-firebase-environment.mjs --mode staging && tsc -b && vite build --mode staging",
+    "build:production": "node scripts/validate-firebase-environment.mjs --mode production && tsc -b && vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
