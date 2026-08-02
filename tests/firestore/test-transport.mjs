@@ -20,13 +20,16 @@ async function runTests() {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
     // Ecoles
-    await db.collection('schools').doc('schoolA').set({ name: 'School A' });
+    await db.collection('schools').doc('schoolA').set({ name: 'School A', transportPolicy: { secretaryManageAll: true }, version: 1 });
     await db.collection('schools').doc('schoolB').set({ name: 'School B' });
 
     // Utilisateurs
     await db.collection('users').doc('directorA').set({ role: 'director', schoolId: 'schoolA', active: true });
     await db.collection('users').doc('directorB').set({ role: 'director', schoolId: 'schoolB', active: true });
     await db.collection('users').doc('driverA').set({ role: 'driver', schoolId: 'schoolA', active: true });
+    await db.collection('users').doc('secNoPermB').set({ role: 'secretary', schoolId: 'schoolB', active: true });
+    await db.collection('users').doc('secPermA').set({ role: 'secretary', schoolId: 'schoolA', active: true });
+    await db.collection('users').doc('secMulti').set({ role: 'secretary', schoolId: 'schoolA', schoolIds: ['schoolA', 'schoolB'], active: true });
 
     // Données existantes école B
     await db.collection('buses').doc('busB').set({ schoolId: 'schoolB', name: 'Bus B' });
@@ -37,6 +40,9 @@ async function runTests() {
   const dbDirectorA = testEnv.authenticatedContext('directorA').firestore();
   const dbDirectorB = testEnv.authenticatedContext('directorB').firestore();
   const dbDriverA = testEnv.authenticatedContext('driverA').firestore();
+  const dbSecNoPermB = testEnv.authenticatedContext('secNoPermB').firestore();
+  const dbSecPermA = testEnv.authenticatedContext('secPermA').firestore();
+  const dbSecMulti = testEnv.authenticatedContext('secMulti').firestore();
 
   try {
     // 1. Un utilisateur de l'école A ne peut pas lire un document de l'école B.
@@ -152,7 +158,77 @@ async function runTests() {
     // 24. Les rôles administratifs autorisés conservent leurs opérations légitimes.
     await assertSucceeds(dbDirectorA.collection('breakdowns').doc('bd1').update({ status: 'en_réparation' }));
 
-    console.log("✅ TEST EXTRA : Conducteur avec liste blanche et validations strictes -> PASS");
+    // --- Nouveaux Tests : ÉTAPE 7 - PROTECTION POLITIQUE TRANSPORT ---
+    const dbOwnerA = testEnv.authenticatedContext('ownerA').firestore();
+    const dbSuperAdmin = testEnv.authenticatedContext('superAdmin1').firestore();
+    const dbAccountantA = testEnv.authenticatedContext('accountantA').firestore();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('users').doc('ownerA').set({ role: 'owner', schoolId: 'schoolA', active: true });
+      await context.firestore().collection('users').doc('superAdmin1').set({ role: 'superAdmin', active: true });
+      await context.firestore().collection('users').doc('accountantA').set({ role: 'accountant', schoolId: 'schoolA', active: true });
+    });
+
+    // Owner
+    await assertSucceeds(dbOwnerA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: true } }));
+    await assertSucceeds(dbOwnerA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: false } }));
+    await assertFails(dbOwnerA.collection('schools').doc('schoolB').update({ transportPolicy: { secretaryManageAll: true } }));
+
+    // SuperAdmin
+    await assertSucceeds(dbSuperAdmin.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: true } }));
+
+    // Rôles refusés
+    await assertFails(dbSecPermA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: true } }));
+    await assertFails(dbSecPermA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: false } }));
+    await assertFails(dbDirectorA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: false } }));
+    await assertFails(dbAccountantA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: false } }));
+    await assertFails(dbDriverA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: true } }));
+    await assertFails(dbTeacherA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: true } }));
+
+    // Structure
+    await assertFails(dbOwnerA.collection('schools').doc('schoolA').update({ transportPolicy: { secretaryManageAll: 'yes' } }));
+    await assertFails(dbOwnerA.collection('schools').doc('schoolA').update({ transportPolicy: { unknownKey: true } }));
+
+    // Non-régression
+    await assertFails(dbOwnerA.collection('schools').doc('schoolA').update({ schoolId: 'hacked' })); // 4. Owner ne peut pas changer schoolId
+    // Director updating another field allowed (calendar pointer)
+    await assertSucceeds(dbDirectorA.collection('schools').doc('schoolA').update({ activeAcademicYearId: 'year2', updatedAt: '2026', updatedBy: 'directorA', version: 2 }));
+    // Director updating calendar pointer AND transportPolicy should fail
+    await assertFails(dbDirectorA.collection('schools').doc('schoolA').update({ activeAcademicYearId: 'year2', updatedAt: '2026', updatedBy: 'directorA', version: 2, transportPolicy: { secretaryManageAll: true } }));
+
+    console.log("✅ TESTS ÉTAPE 7 : Protection de la politique Transport sur le document School -> PASS");
+
+     // Nouveaux tests P1 - Capacité transportPolicy par école
+    // 1. École B sans politique (comportement limité)
+    await assertFails(dbSecNoPermB.collection('fuelExpenses').doc('fuelSec1').set({ schoolId: 'schoolB', amount: 5000 }));
+    await assertFails(dbSecNoPermB.collection('maintenances').doc('maintSec1').set({ schoolId: 'schoolB', amount: 5000 }));
+    await assertFails(dbSecNoPermB.collection('breakdowns').doc('breakSec1').set({ schoolId: 'schoolB', status: 'signalée' }));
+
+    // 2. École A avec politique (comportement complet)
+    await assertSucceeds(dbSecPermA.collection('buses').doc('busSec2').set({ schoolId: 'schoolA', name: 'Bus Sec' }));
+    await assertSucceeds(dbSecPermA.collection('busRoutes').doc('routeSec2').set({ schoolId: 'schoolA', name: 'Route Sec' }));
+    await assertSucceeds(dbSecPermA.collection('fuelExpenses').doc('fuelSec2').set({ schoolId: 'schoolA', amount: 5000 }));
+    await assertSucceeds(dbSecPermA.collection('maintenances').doc('maintSec2').set({ schoolId: 'schoolA', amount: 5000 }));
+    await assertSucceeds(dbSecPermA.collection('breakdowns').doc('breakSec2').set({ schoolId: 'schoolA', status: 'signalée', estimatedCost: 1000 }));
+    await assertSucceeds(dbSecPermA.collection('breakdowns').doc('breakSec2').update({ status: 'en_réparation', actualCost: 1200 }));
+
+    // 3. Utilisateur multi-écoles (secMulti) - a des droits dans A, mais échoue sur B (isolation/politique)
+    await assertSucceeds(dbSecMulti.collection('maintenances').doc('maintSecM').set({ schoolId: 'schoolA', amount: 100 }));
+    await assertFails(dbSecMulti.collection('maintenances').doc('maintSecMB').set({ schoolId: 'schoolB', amount: 100 }));
+
+    // 4. Isolation
+    await assertFails(dbSecPermA.collection('buses').doc('busB').get());
+    await assertFails(dbSecPermA.collection('fuelExpenses').doc('fuelSec2').update({ schoolId: 'schoolB' }));
+    await assertFails(dbSecNoPermB.collection('buses').doc('busSec2').update({ name: 'Hacked by B' }));
+
+    // 5. Suppression (Toujours refusée)
+    await assertFails(dbSecPermA.collection('buses').doc('busSec2').delete());
+    await assertFails(dbSecPermA.collection('fuelExpenses').doc('fuelSec2').delete());
+
+    // 6. Driver inchangé
+    await assertFails(dbDriverA.collection('buses').doc('busDriver').set({ schoolId: 'schoolA', name: 'Bus Driver' }));
+
+    console.log("✅ TESTS P1 : Politique Transport par école (transportPolicy) -> PASS");
+    console.log("✅ TESTS P1 : Gestion Transport par Secrétaire avec capacité manageAllTransport -> PASS");
 
     console.log("\n🚀 TOUS LES TESTS TRANSPORT ONT RÉUSSI.");
   } catch (err) {

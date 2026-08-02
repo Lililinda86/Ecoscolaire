@@ -57,6 +57,7 @@ const Settings: React.FC = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [draftTransportPolicy, setDraftTransportPolicy] = useState(false);
 
   // 3. Draft initialization strategy: Keep track of initialized school id via ref to avoid overwriting modified drafts on contextual reload of db.school.
   const initializedSchoolIdRef = useRef<string | null>(null);
@@ -91,6 +92,7 @@ const Settings: React.FC = () => {
         feeTransport: String(school.globalFees?.feeTransport ?? 0),
         feeUniforms: String(school.globalFees?.feeUniforms ?? 0)
       });
+      setDraftTransportPolicy(school.transportPolicy?.secretaryManageAll ?? false);
       initializedSchoolIdRef.current = school.id;
     },
     []
@@ -244,6 +246,10 @@ const Settings: React.FC = () => {
           feeT3: normalizedFees.feeT3,
           feeTransport: normalizedFees.feeTransport,
           feeUniforms: normalizedFees.feeUniforms
+        },
+        transportPolicy: {
+          ...(db.school.transportPolicy || {}),
+          secretaryManageAll: draftTransportPolicy
         }
       };
       await safeMergeDB({
@@ -782,6 +788,27 @@ const Settings: React.FC = () => {
                 />
              </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <h2>Politiques d'établissement</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+          <input
+            type="checkbox"
+            id="secretaryManageAllTransport"
+            checked={draftTransportPolicy}
+            onChange={e => setDraftTransportPolicy(e.target.checked)}
+            disabled={!['superAdmin', 'owner'].includes(currentUser.role)}
+          />
+          <label htmlFor="secretaryManageAllTransport" style={{ fontWeight: 500, cursor: 'pointer' }}>
+            Autoriser la secrétaire à gérer l'intégralité du module Transport
+          </label>
+        </div>
+        {!['superAdmin', 'owner'].includes(currentUser.role) && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            Seul un administrateur principal (Propriétaire/SuperAdmin) peut modifier cette politique.
+          </p>
+        )}
       </div>
 
       <div className="card">

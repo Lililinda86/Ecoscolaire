@@ -158,14 +158,15 @@ const Buses: React.FC = () => {
   );
 
   // --- Permissions UI ---
+  const secretaryCanManageAllTransport = currentUser?.role === 'secretary' && currentSchool?.transportPolicy?.secretaryManageAll === true;
   const canViewDashboard = !isDriver;
   const canViewFleet = !isDriver;
   const canViewDrivers = !isDriver;
-  const canActAdministrative = ['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role);
-  const canActFinancial = ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role);
-  const canViewBreakdowns = ['superAdmin', 'owner', 'director', 'driver'].includes(currentUser.role);
-  const canActBreakdown = ['superAdmin', 'owner', 'director', 'driver'].includes(currentUser.role);
-  const canEditBreakdown = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
+  const canActAdministrative = ['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) || secretaryCanManageAllTransport;
+  const canActFinancial = ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) || secretaryCanManageAllTransport;
+  const canViewBreakdowns = ['superAdmin', 'owner', 'director', 'driver'].includes(currentUser.role) || secretaryCanManageAllTransport;
+  const canActBreakdown = ['superAdmin', 'owner', 'director', 'driver'].includes(currentUser.role) || secretaryCanManageAllTransport;
+  const canEditBreakdown = ['superAdmin', 'owner', 'director'].includes(currentUser.role) || secretaryCanManageAllTransport;
 
   // --- Handling Loading State ---
   if (!currentSchool) {

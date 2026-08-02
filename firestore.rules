@@ -99,6 +99,17 @@ service cloud.firestore {
       ]);
     }
 
+    function isUpdatingTransportPolicy() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['transportPolicy']);
+    }
+
+    function isValidTransportPolicy() {
+      let policy = request.resource.data.get('transportPolicy', {});
+      let validKeys = policy.keys().hasOnly(['secretaryManageAll']);
+      let validTypes = !('secretaryManageAll' in policy) || policy.secretaryManageAll is bool;
+      return validKeys && validTypes;
+    }
+
     function isAcademicCalendarPointerUpdate(schoolId) {
       let isAllowedRole = isSuperAdmin() || (hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector()));
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
@@ -212,6 +223,13 @@ service cloud.firestore {
     }
     function canManagePedagogy(schoolId) {
       return hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
+    }
+
+    function canSecretaryManageAllTransport(schoolId) {
+      let schoolPath = /databases/$(database)/documents/schools/$(schoolId);
+      return isAuthenticated() && isActive() && isSecretary() && hasSchoolAccess(schoolId) &&
+             exists(schoolPath) &&
+             get(schoolPath).data.get('transportPolicy', {}).get('secretaryManageAll', false) == true;
     }
 
     function isAcademicProgramManager() {
@@ -374,13 +392,15 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
 
       // Seul le superAdmin peut créer ou supprimer des écoles
-      allow create, delete: if isAuthenticated() && isSuperAdmin();
+      allow create: if isAuthenticated() && isSuperAdmin() && isValidTransportPolicy();
+      allow delete: if isAuthenticated() && isSuperAdmin();
       // Le propriétaire peut modifier son école (mais pas l'abonnement SaaS ni le pointeur de manière non atomique)
       allow update: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
         (canManageSchool(schoolId) && !isUpdatingSaasFields() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeAcademicYearId'])) ||
-        isAcademicCalendarPointerUpdate(schoolId)
-      );
+        (isAcademicCalendarPointerUpdate(schoolId) && !isUpdatingTransportPolicy())
+      ) && (!isUpdatingTransportPolicy() || (isValidTransportPolicy() && (isOwner() || isSuperAdmin())))
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId']);
 
       match /secrets/{secretId} {
         allow read: if false;
@@ -957,33 +977,33 @@ service cloud.firestore {
     }
 
     match /buses/{busId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || isAccountant() || isDriver());
-      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
-      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary());
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || isAccountant() || isDriver() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /busRoutes/{routeId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
-      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
-      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary());
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /fuelExpenses/{expId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
-      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
-      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /maintenances/{mId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
-      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant());
-      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant());
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /breakdowns/{bId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isDriver());
-      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || (isDriver() && isDriverBreakdownCreation(request.resource.data, bId)));
-      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector());
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isDriver() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || canSecretaryManageAllTransport(request.resource.data.schoolId) || (isDriver() && isDriverBreakdownCreation(request.resource.data, bId)));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
 

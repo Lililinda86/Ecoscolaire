@@ -57,6 +57,9 @@ export interface School {
     feeTransport: number;
     feeUniforms: number;
   };
+  transportPolicy?: {
+    secretaryManageAll?: boolean;
+  };
   apiKeys?: { // DEPRECATED
     flutterwavePublic?: string;
     flutterwaveSecret?: string; // DEPRECATED
