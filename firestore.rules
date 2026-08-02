@@ -942,11 +942,18 @@ service cloud.firestore {
     }
 
     // --- TRANSPORT ---
-    function isDriverBreakdownCreation(data) {
-      return data.status == 'signalée'
-          && !('actualCost' in data)
-          && (!('estimatedCost' in data) || data.estimatedCost == 0)
-          && data.busId is string;
+    function isDriverBreakdownCreation(data, docId) {
+      return data.keys().hasOnly(['id', 'schoolId', 'date', 'busId', 'description', 'severity', 'status'])
+          && data.keys().hasAll(['id', 'schoolId', 'date', 'busId', 'description', 'severity', 'status'])
+          && data.id == docId
+          && data.schoolId is string && data.schoolId != '' && hasSchoolAccess(data.schoolId)
+          && data.busId is string && data.busId != ''
+          && data.description is string && data.description != ''
+          && data.severity in ['légère', 'moyenne', 'urgente']
+          && data.status == 'signalée'
+          && data.date is string && data.date != ''
+          && exists(/databases/$(database)/documents/buses/$(data.busId))
+          && get(/databases/$(database)/documents/buses/$(data.busId)).data.schoolId == data.schoolId;
     }
 
     match /buses/{busId} {
@@ -975,7 +982,7 @@ service cloud.firestore {
     }
     match /breakdowns/{bId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isDriver());
-      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || (isDriver() && isDriverBreakdownCreation(request.resource.data)));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || (isDriver() && isDriverBreakdownCreation(request.resource.data, bId)));
       allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector());
       allow delete: if false;
     }
