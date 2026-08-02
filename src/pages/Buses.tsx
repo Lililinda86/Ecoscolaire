@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import type { Bus, BusRoute, FuelExpense, Maintenance, Breakdown } from '../types';
 import Modal from '../components/Modal';
-import { Plus, Edit2, Trash2, Bus as BusIcon, Map as RouteIcon, Fuel, PenTool as Tool, AlertTriangle, Users, LayoutDashboard } from 'lucide-react';
+import { Bus as BusIcon, Map as RouteIcon, Fuel, PenTool as Tool, AlertTriangle, Users, LayoutDashboard } from 'lucide-react';
+import TransportOverview from '../components/transport/TransportOverview';
+import FleetTab from '../components/transport/FleetTab';
+import DriversTab from '../components/transport/DriversTab';
+import RoutesTab from '../components/transport/RoutesTab';
+import FuelTab from '../components/transport/FuelTab';
+import MaintenanceTab from '../components/transport/MaintenanceTab';
+import BreakdownsTab from '../components/transport/BreakdownsTab';
+import { calculateTransportMetrics } from '../utils/transportMetrics';
 
 const Buses: React.FC = () => {
   const { db, safeMergeDB, currentUser, currentSchool } = useAppContext();
-  const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'fleet' | 'drivers' | 'routes' | 'fuel' | 'maintenance' | 'breakdowns'>('dashboard');
 
@@ -26,6 +32,15 @@ const Buses: React.FC = () => {
 
   const [isBreakdownModalOpen, setBreakdownModalOpen] = useState(false);
   const [currentBreakdown, setCurrentBreakdown] = useState<Partial<Breakdown>>({});
+
+  const isDriver = currentUser?.role === 'driver';
+
+  // If driver, force active tab to breakdowns if it was dashboard
+  React.useEffect(() => {
+    if (isDriver && activeTab === 'dashboard') {
+      setActiveTab('breakdowns');
+    }
+  }, [isDriver, activeTab]);
 
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role)) return null;
 
@@ -132,19 +147,34 @@ const Buses: React.FC = () => {
     }
   };
 
-  // --- Stats Dashboard ---
-  const activeBuses = buses.filter(b => b.status === 'actif').length;
-  const brokenBuses = buses.filter(b => b.status === 'en_panne').length;
-  
-  const currentMonth = new Date().toISOString().substring(0, 7);
-  const monthlyFuelCost = fuelExpenses
-    .filter(f => f.date.startsWith(currentMonth))
-    .reduce((sum, f) => sum + (f.amount || 0), 0);
-  const monthlyMaintCost = maintenances
-    .filter(m => m.date.startsWith(currentMonth))
-    .reduce((sum, m) => sum + (m.amount || 0), 0);
-  
-  const totalTransportCost = monthlyFuelCost + monthlyMaintCost;
+  // --- Metrics ---
+  const metrics = calculateTransportMetrics(
+    buses,
+    breakdowns,
+    fuelExpenses,
+    maintenances,
+    db.payments || [],
+    db.students || []
+  );
+
+  // --- Permissions UI ---
+  const canViewDashboard = !isDriver;
+  const canViewFleet = !isDriver;
+  const canViewDrivers = !isDriver;
+  const canActAdministrative = ['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role);
+  const canActFinancial = ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role);
+  const canViewBreakdowns = ['superAdmin', 'owner', 'director', 'driver'].includes(currentUser.role);
+  const canActBreakdown = ['superAdmin', 'owner', 'director', 'driver'].includes(currentUser.role);
+  const canEditBreakdown = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
+
+  // --- Handling Loading State ---
+  if (!currentSchool) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <p style={{ color: 'var(--text-secondary)' }}>Aucune école sélectionnée.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
@@ -152,223 +182,85 @@ const Buses: React.FC = () => {
         <h1>Transport Scolaire</h1>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-        <button className={activeTab === 'dashboard' ? 'primary' : 'secondary'} onClick={() => setActiveTab('dashboard')}><LayoutDashboard size={18} /> Dashboard</button>
-        <button className={activeTab === 'fleet' ? 'primary' : 'secondary'} onClick={() => setActiveTab('fleet')}><BusIcon size={18} /> Flotte</button>
-        <button className={activeTab === 'drivers' ? 'primary' : 'secondary'} onClick={() => setActiveTab('drivers')}><Users size={18} /> Conducteurs</button>
-        <button className={activeTab === 'routes' ? 'primary' : 'secondary'} onClick={() => setActiveTab('routes')}><RouteIcon size={18} /> Lignes</button>
-        <button className={activeTab === 'fuel' ? 'primary' : 'secondary'} onClick={() => setActiveTab('fuel')}><Fuel size={18} /> Carburant</button>
-        <button className={activeTab === 'maintenance' ? 'primary' : 'secondary'} onClick={() => setActiveTab('maintenance')}><Tool size={18} /> Entretien</button>
-        <button className={activeTab === 'breakdowns' ? 'primary' : 'secondary'} onClick={() => setActiveTab('breakdowns')}><AlertTriangle size={18} /> Pannes</button>
+      <div role="tablist" aria-label="Onglets de Transport" style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', overflowX: 'auto', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+        {canViewDashboard && <button role="tab" aria-selected={activeTab === 'dashboard'} aria-controls="panel-dashboard" id="tab-dashboard" className={activeTab === 'dashboard' ? 'primary' : 'secondary'} onClick={() => setActiveTab('dashboard')}><LayoutDashboard size={18} /> Vue d'ensemble</button>}
+        {canViewFleet && <button role="tab" aria-selected={activeTab === 'fleet'} aria-controls="panel-fleet" id="tab-fleet" className={activeTab === 'fleet' ? 'primary' : 'secondary'} onClick={() => setActiveTab('fleet')}><BusIcon size={18} /> Flotte</button>}
+        {canViewDrivers && <button role="tab" aria-selected={activeTab === 'drivers'} aria-controls="panel-drivers" id="tab-drivers" className={activeTab === 'drivers' ? 'primary' : 'secondary'} onClick={() => setActiveTab('drivers')}><Users size={18} /> Conducteurs</button>}
+        {canActAdministrative && <button role="tab" aria-selected={activeTab === 'routes'} aria-controls="panel-routes" id="tab-routes" className={activeTab === 'routes' ? 'primary' : 'secondary'} onClick={() => setActiveTab('routes')}><RouteIcon size={18} /> Circuits</button>}
+        {canActFinancial && <button role="tab" aria-selected={activeTab === 'fuel'} aria-controls="panel-fuel" id="tab-fuel" className={activeTab === 'fuel' ? 'primary' : 'secondary'} onClick={() => setActiveTab('fuel')}><Fuel size={18} /> Carburant</button>}
+        {canActFinancial && <button role="tab" aria-selected={activeTab === 'maintenance'} aria-controls="panel-maintenance" id="tab-maintenance" className={activeTab === 'maintenance' ? 'primary' : 'secondary'} onClick={() => setActiveTab('maintenance')}><Tool size={18} /> Entretiens</button>}
+        {canViewBreakdowns && <button role="tab" aria-selected={activeTab === 'breakdowns'} aria-controls="panel-breakdowns" id="tab-breakdowns" className={activeTab === 'breakdowns' ? 'primary' : 'secondary'} onClick={() => setActiveTab('breakdowns')}><AlertTriangle size={18} /> Pannes</button>}
       </div>
 
-      {/* --- DASHBOARD --- */}
-      {activeTab === 'dashboard' && (
-        <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ background: 'rgba(79, 70, 229, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--primary)' }}><BusIcon size={32} /></div>
-              <div><h3 style={{ margin: 0, fontSize: '0.875rem' }}>Total Bus</h3><p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>{buses.length}</p></div>
-            </div>
-            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--success)' }}><BusIcon size={32} /></div>
-              <div><h3 style={{ margin: 0, fontSize: '0.875rem' }}>Bus Actifs</h3><p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>{activeBuses}</p></div>
-            </div>
-            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--danger)' }}><AlertTriangle size={32} /></div>
-              <div><h3 style={{ margin: 0, fontSize: '0.875rem' }}>En Panne</h3><p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>{brokenBuses}</p></div>
-            </div>
-            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--warning)' }}><Fuel size={32} /></div>
-              <div><h3 style={{ margin: 0, fontSize: '0.875rem' }}>Dépenses (Mois)</h3><p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>{totalTransportCost} FCFA</p></div>
-            </div>
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-            <div className="card">
-              <h3>Dernières Pannes Signalées</h3>
-              <ul>
-                {breakdowns.filter(b => b.status !== 'réparée').map(b => (
-                  <li key={b.id}>{b.date} - {buses.find(x => x.id === b.busId)?.name} : {b.description} ({b.severity})</li>
-                ))}
-                {breakdowns.filter(b => b.status !== 'réparée').length === 0 && <li>Aucune panne en cours.</li>}
-              </ul>
-            </div>
-            <div className="card">
-              <h3>Entretiens à prévoir</h3>
-              <ul>
-                {maintenances.filter(m => new Date(m.nextMaintenanceDate) >= new Date()).slice(0, 5).map(m => (
-                  <li key={m.id}>{buses.find(x => x.id === m.busId)?.name} : {m.type} le {m.nextMaintenanceDate}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
+      <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
+        {activeTab === 'dashboard' && canViewDashboard && (
+        <TransportOverview
+          metrics={metrics}
+          buses={buses}
+          breakdowns={breakdowns}
+          maintenances={maintenances}
+        />
       )}
 
-      {/* --- FLOTTE --- */}
-      {activeTab === 'fleet' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
-            <button onClick={() => { setCurrentBus({}); setBusModalOpen(true); }}><Plus size={18} /> Ajouter Bus</button>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: 'var(--bg-color)' }}>
-              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Nom/Numéro</th><th style={{ padding: '1rem', textAlign: 'left' }}>Immatriculation</th><th style={{ padding: '1rem', textAlign: 'left' }}>Places</th><th style={{ padding: '1rem', textAlign: 'left' }}>Statut</th><th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th></tr>
-            </thead>
-            <tbody>
-              {buses.map(b => (
-                <tr key={b.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{b.name}</td>
-                  <td style={{ padding: '1rem' }}>{b.plate}</td>
-                  <td style={{ padding: '1rem' }}>{b.capacity}</td>
-                  <td style={{ padding: '1rem' }}>{b.status}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button className="secondary" onClick={() => { setCurrentBus(b); setBusModalOpen(true); }} style={{ marginRight: '0.5rem' }}><Edit2 size={16} /></button>
-                    <button className="danger" onClick={() => deactivateEntity('buses', b.id)} title="Désactiver"><Trash2 size={16} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {activeTab === 'fleet' && canViewFleet && (
+        <FleetTab
+          buses={buses}
+          canAct={canActAdministrative}
+          onAddBus={() => { setCurrentBus({}); setBusModalOpen(true); }}
+          onEditBus={(b) => { setCurrentBus(b); setBusModalOpen(true); }}
+          onDeactivateBus={(id) => deactivateEntity('buses', id)}
+        />
       )}
 
-      {/* --- CONDUCTEURS --- */}
-      {activeTab === 'drivers' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
-            <button onClick={() => navigate('/staff')}><Plus size={18} /> Ajouter un conducteur dans Personnel</button>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: 'var(--bg-color)' }}>
-              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Nom</th><th style={{ padding: '1rem', textAlign: 'left' }}>Téléphone</th><th style={{ padding: '1rem', textAlign: 'left' }}>Permis</th><th style={{ padding: '1rem', textAlign: 'left' }}>Statut</th></tr>
-            </thead>
-            <tbody>
-              {drivers.map(d => (
-                <tr key={d.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{d.name || (d.firstName && (d.firstName + ' ' + (d.lastName || '')))}</td>
-                  <td style={{ padding: '1rem' }}>{d.phone}</td>
-                  <td style={{ padding: '1rem' }}>{d.licenseNumber}</td>
-                  <td style={{ padding: '1rem' }}>{d.status || d.employmentStatus}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {activeTab === 'drivers' && canViewDrivers && (
+        <DriversTab
+          drivers={drivers}
+          canAct={canActAdministrative}
+        />
       )}
 
-      {/* --- LIGNES --- */}
-      {activeTab === 'routes' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
-            <button onClick={() => { setCurrentRoute({}); setRouteModalOpen(true); }}><Plus size={18} /> Ajouter Ligne</button>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: 'var(--bg-color)' }}>
-              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Ligne</th><th style={{ padding: '1rem', textAlign: 'left' }}>Quartiers</th><th style={{ padding: '1rem', textAlign: 'left' }}>Horaires</th><th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th></tr>
-            </thead>
-            <tbody>
-              {routes.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{r.name}</td>
-                  <td style={{ padding: '1rem' }}>{r.areas}</td>
-                  <td style={{ padding: '1rem' }}>{r.departureTime} - {r.returnTime}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button className="secondary" onClick={() => { setCurrentRoute(r); setRouteModalOpen(true); }} style={{ marginRight: '0.5rem' }}><Edit2 size={16} /></button>
-                    <button className="danger" onClick={() => deactivateEntity('busRoutes', r.id)} title="Désactiver"><Trash2 size={16} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {activeTab === 'routes' && canActAdministrative && (
+        <RoutesTab
+          routes={routes}
+          buses={buses}
+          canAct={canActAdministrative}
+          onAddRoute={() => { setCurrentRoute({}); setRouteModalOpen(true); }}
+          onEditRoute={(r) => { setCurrentRoute(r); setRouteModalOpen(true); }}
+          onDeactivateRoute={(id) => deactivateEntity('busRoutes', id)}
+        />
       )}
 
-      {/* --- CARBURANT --- */}
-      {activeTab === 'fuel' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
-            <button onClick={() => { setCurrentFuel({}); setFuelModalOpen(true); }}><Plus size={18} /> Saisir Plein</button>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: 'var(--bg-color)' }}>
-              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Date</th><th style={{ padding: '1rem', textAlign: 'left' }}>Bus</th><th style={{ padding: '1rem', textAlign: 'left' }}>Litres / Montant</th><th style={{ padding: '1rem', textAlign: 'left' }}>Kilométrage</th><th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th></tr>
-            </thead>
-            <tbody>
-              {fuelExpenses.map(f => (
-                <tr key={f.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{f.date}</td>
-                  <td style={{ padding: '1rem' }}>{buses.find(b => b.id === f.busId)?.name || 'Inconnu'}</td>
-                  <td style={{ padding: '1rem' }}>{f.liters} L / {f.amount} FCFA</td>
-                  <td style={{ padding: '1rem' }}>{f.mileage} km</td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    {/* Suppression masquée (historique) */}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {activeTab === 'fuel' && canActFinancial && (
+        <FuelTab
+          fuelExpenses={fuelExpenses}
+          buses={buses}
+          canAct={canActFinancial}
+          onAddFuel={() => { setCurrentFuel({}); setFuelModalOpen(true); }}
+          onEditFuel={(f) => { setCurrentFuel(f); setFuelModalOpen(true); }}
+        />
       )}
 
-      {/* --- ENTRETIEN --- */}
-      {activeTab === 'maintenance' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
-            <button onClick={() => { setCurrentMaint({}); setMaintModalOpen(true); }}><Plus size={18} /> Nouvel Entretien</button>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: 'var(--bg-color)' }}>
-              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Date</th><th style={{ padding: '1rem', textAlign: 'left' }}>Bus</th><th style={{ padding: '1rem', textAlign: 'left' }}>Type</th><th style={{ padding: '1rem', textAlign: 'left' }}>Coût</th><th style={{ padding: '1rem', textAlign: 'left' }}>Prochain</th><th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th></tr>
-            </thead>
-            <tbody>
-              {maintenances.map(m => (
-                <tr key={m.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{m.date}</td>
-                  <td style={{ padding: '1rem' }}>{buses.find(b => b.id === m.busId)?.name || 'Inconnu'}</td>
-                  <td style={{ padding: '1rem' }}>{m.type}</td>
-                  <td style={{ padding: '1rem' }}>{m.amount} FCFA</td>
-                  <td style={{ padding: '1rem' }}>{m.nextMaintenanceDate}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    {/* Suppression masquée (historique) */}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {activeTab === 'maintenance' && canActFinancial && (
+        <MaintenanceTab
+          maintenances={maintenances}
+          buses={buses}
+          canAct={canActFinancial}
+          onAddMaintenance={() => { setCurrentMaint({}); setMaintModalOpen(true); }}
+          onEditMaintenance={(m) => { setCurrentMaint(m); setMaintModalOpen(true); }}
+        />
       )}
 
-      {/* --- PANNES --- */}
-      {activeTab === 'breakdowns' && (
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '1rem', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
-            <button onClick={() => { setCurrentBreakdown({}); setBreakdownModalOpen(true); }}><Plus size={18} /> Signaler Panne</button>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ background: 'var(--bg-color)' }}>
-              <tr><th style={{ padding: '1rem', textAlign: 'left' }}>Date</th><th style={{ padding: '1rem', textAlign: 'left' }}>Bus</th><th style={{ padding: '1rem', textAlign: 'left' }}>Gravité</th><th style={{ padding: '1rem', textAlign: 'left' }}>Statut</th><th style={{ padding: '1rem', textAlign: 'left' }}>Coût R.</th><th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th></tr>
-            </thead>
-            <tbody>
-              {breakdowns.map(b => (
-                <tr key={b.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{b.date}</td>
-                  <td style={{ padding: '1rem' }}>{buses.find(x => x.id === b.busId)?.name || 'Inconnu'}</td>
-                  <td style={{ padding: '1rem' }}>{b.severity}</td>
-                  <td style={{ padding: '1rem' }}>{b.status}</td>
-                  <td style={{ padding: '1rem' }}>{b.actualCost || 0} FCFA</td>
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button className="secondary" onClick={() => { setCurrentBreakdown(b); setBreakdownModalOpen(true); }} style={{ marginRight: '0.5rem' }}><Edit2 size={16} /></button>
-                    {/* Suppression masquée (historique) */}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {activeTab === 'breakdowns' && canViewBreakdowns && (
+        <BreakdownsTab
+          breakdowns={breakdowns}
+          buses={buses}
+          canAct={canActBreakdown}
+          canEdit={canEditBreakdown}
+          onAddBreakdown={() => { setCurrentBreakdown({}); setBreakdownModalOpen(true); }}
+          onEditBreakdown={(b) => { setCurrentBreakdown(b); setBreakdownModalOpen(true); }}
+        />
       )}
+      </div>
 
 
       {/* MODALS */}
@@ -460,7 +352,13 @@ const Buses: React.FC = () => {
       <Modal isOpen={isBreakdownModalOpen} onClose={() => setBreakdownModalOpen(false)} title="Signalement Panne">
         <form onSubmit={async e => {
           e.preventDefault();
-          const success = await saveEntity('breakdowns', currentBreakdown);
+          const dataToSave = { ...currentBreakdown };
+          if (isDriver) {
+            dataToSave.status = 'signalée';
+            delete dataToSave.estimatedCost;
+            delete dataToSave.actualCost;
+          }
+          const success = await saveEntity('breakdowns', dataToSave);
           if (success) setBreakdownModalOpen(false);
         }}>
           <div className="form-group"><label>Date</label><input type="date" required value={currentBreakdown.date || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, date: e.target.value})} /></div>
@@ -475,13 +373,18 @@ const Buses: React.FC = () => {
               <option value="légère">Légère</option><option value="moyenne">Moyenne</option><option value="urgente">Urgente</option>
             </select>
           </div>
-          <div className="form-group"><label>Statut</label>
-            <select required value={currentBreakdown.status || 'signalée'} onChange={e => setCurrentBreakdown({...currentBreakdown, status: e.target.value as Breakdown['status']})}>
-              <option value="signalée">Signalée</option><option value="en_réparation">En réparation</option><option value="réparée">Réparée</option>
-            </select>
-          </div>
-          <div className="form-group"><label>Coût Estimé</label><input type="number" required value={currentBreakdown.estimatedCost || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, estimatedCost: parseInt(e.target.value)})} /></div>
-          <div className="form-group"><label>Coût Réel (Optionnel)</label><input type="number" value={currentBreakdown.actualCost || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, actualCost: parseInt(e.target.value)})} /></div>
+
+          {!isDriver && (
+            <>
+              <div className="form-group"><label>Statut</label>
+                <select required value={currentBreakdown.status || 'signalée'} onChange={e => setCurrentBreakdown({...currentBreakdown, status: e.target.value as Breakdown['status']})}>
+                  <option value="signalée">Signalée</option><option value="en_réparation">En réparation</option><option value="réparée">Réparée</option>
+                </select>
+              </div>
+              <div className="form-group"><label>Coût Estimé</label><input type="number" required value={currentBreakdown.estimatedCost || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, estimatedCost: parseInt(e.target.value)})} /></div>
+              <div className="form-group"><label>Coût Réel (Optionnel)</label><input type="number" value={currentBreakdown.actualCost || ''} onChange={e => setCurrentBreakdown({...currentBreakdown, actualCost: parseInt(e.target.value)})} /></div>
+            </>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}><button type="button" className="secondary" onClick={() => setBreakdownModalOpen(false)}>Annuler</button><button type="submit">Sauvegarder</button></div>
         </form>
       </Modal>
