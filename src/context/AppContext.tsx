@@ -749,7 +749,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const canWriteSchool = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
       if (canWriteSchool && newDb.school && newDb.school.id) {
         const { id, ...dataToSave } = newDb.school;
-        const whitelist = ['name', 'address', 'phone', 'email', 'logoUrl', 'subscriptionStatus', 'isInternalSchool', 'directorName', 'accreditationNumber', 'adminPin', 'academicYear', 'globalFees', 'paymentSettings', 'educationCycles', 'founderName', 'principalName', 'cycleNames', 'cycleAccreditationNumbers'];
+        const whitelist = ['name', 'address', 'phone', 'email', 'logoUrl', 'subscriptionStatus', 'isInternalSchool', 'directorName', 'accreditationNumber', 'adminPin', 'academicYear', 'globalFees', 'paymentSettings', 'educationCycles', 'founderName', 'principalName', 'cycleNames', 'cycleAccreditationNumbers', 'transportPolicy'];
         const filteredData = Object.fromEntries(
             Object.entries(dataToSave).filter(([key]) => whitelist.includes(key))
         );

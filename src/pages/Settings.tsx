@@ -92,7 +92,7 @@ const Settings: React.FC = () => {
         feeTransport: String(school.globalFees?.feeTransport ?? 0),
         feeUniforms: String(school.globalFees?.feeUniforms ?? 0)
       });
-      setDraftTransportPolicy(school.transportPolicy?.secretaryManageAll ?? false);
+      setDraftTransportPolicy(school.transportPolicy?.secretaryManageAll === true);
       initializedSchoolIdRef.current = school.id;
     },
     []
@@ -261,6 +261,7 @@ const Settings: React.FC = () => {
     } catch (err) {
       console.error(err);
       alert("Une erreur est survenue lors de l'enregistrement.");
+      if (db.school) initDraftsFromSchool(db.school);
     } finally {
       setIsSaving(false);
     }
