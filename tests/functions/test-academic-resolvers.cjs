@@ -1,7 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { resolveAcademicYear, resolveClassProgram } = require('../../functions/lib/academic/academicResolvers');
-const admin = require('firebase-admin');
+const { resolveAcademicYear, resolveClassProgram } = require('../../functions/lib/academic/academicResolvers.js');
 
 const docs = {};
 
