@@ -58,6 +58,8 @@ const Settings: React.FC = () => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [draftTransportPolicy, setDraftTransportPolicy] = useState(false);
+
+  const canEditFees = ['owner', 'superAdmin'].includes(currentUser?.role || '');
   const [draftClassFees, setDraftClassFees] = useState<Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }>>({});
 
   // 3. Draft initialization strategy: Keep track of initialized school id via ref to avoid overwriting modified drafts on contextual reload of db.school.
@@ -782,6 +784,7 @@ const Settings: React.FC = () => {
                 <label>Scolarité T1</label>
                 <input
                   type="text"
+                  disabled={!canEditFees}
                   value={draftFees.feeT1}
                   onChange={e => {
                     setDraftFees(prev => ({ ...prev, feeT1: e.target.value }));
@@ -792,6 +795,7 @@ const Settings: React.FC = () => {
                 <label>Scolarité T2</label>
                 <input
                   type="text"
+                  disabled={!canEditFees}
                   value={draftFees.feeT2}
                   onChange={e => {
                     setDraftFees(prev => ({ ...prev, feeT2: e.target.value }));
@@ -802,6 +806,7 @@ const Settings: React.FC = () => {
                 <label>Scolarité T3</label>
                 <input
                   type="text"
+                  disabled={!canEditFees}
                   value={draftFees.feeT3}
                   onChange={e => {
                     setDraftFees(prev => ({ ...prev, feeT3: e.target.value }));
@@ -812,6 +817,7 @@ const Settings: React.FC = () => {
                 <label>Transport Bus</label>
                 <input
                   type="text"
+                  disabled={!canEditFees}
                   value={draftFees.feeTransport}
                   onChange={e => {
                     setDraftFees(prev => ({ ...prev, feeTransport: e.target.value }));
@@ -822,6 +828,7 @@ const Settings: React.FC = () => {
                 <label>Tenues Uniformes</label>
                 <input
                   type="text"
+                  disabled={!canEditFees}
                   value={draftFees.feeUniforms}
                   onChange={e => {
                     setDraftFees(prev => ({ ...prev, feeUniforms: e.target.value }));
@@ -852,11 +859,11 @@ const Settings: React.FC = () => {
               {sortClasses(db.classes).map(c => (
                 <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.75rem', fontWeight: 500 }}>{c.name}</td>
-                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.registration || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], registration: e.target.value } }))} /></td>
-                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.tuition || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], tuition: e.target.value } }))} /></td>
-                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t1 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t1: e.target.value } }))} /></td>
-                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t2 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t2: e.target.value } }))} /></td>
-                  <td style={{ padding: '0.25rem' }}><input placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t3 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t3: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.registration || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], registration: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.tuition || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], tuition: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t1 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t1: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t2 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t2: e.target.value } }))} /></td>
+                  <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t3 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t3: e.target.value } }))} /></td>
                 </tr>
               ))}
               {db.classes.length === 0 && <tr><td colSpan={6} style={{ padding: '1rem', color: 'var(--text-muted)', textAlign: 'center' }}>Aucune classe</td></tr>}
