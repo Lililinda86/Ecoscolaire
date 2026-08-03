@@ -7,8 +7,6 @@ import { useAppContext } from '../context/AppContext';
 const AIDirector: React.FC = () => {
   const { currentUser } = useAppContext();
   
-  if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return null;
-
   const [messages, setMessages] = useState<{role: 'user'|'assistant', content: string}[]>([
     { role: 'assistant', content: "Bonjour M./Mme le Directeur. Je suis votre assistant EcoScolaire IA. Je peux vous aider à analyser vos finances, surveiller les absences, ou suivre les paiements. Que souhaitez-vous savoir ?" }
   ]);
@@ -25,6 +23,8 @@ const AIDirector: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return null;
+
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim()) return;
@@ -39,8 +39,9 @@ const AIDirector: React.FC = () => {
       const response = await aiService.generateResponse(userMessage, { provider });
       
       setMessages(prev => [...prev, { role: 'assistant', content: response.content }]);
-    } catch (err: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Erreur: ${err.message}` }]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Erreur: ${message}` }]);
     } finally {
       setIsLoading(false);
     }

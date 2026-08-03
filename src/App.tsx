@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
+import type { DatabasePatch } from './db/storage';
 
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -14,6 +15,7 @@ import Settings from './pages/Settings';
 import Grades from './pages/Grades';
 import Payments from './pages/Payments';
 import Classes from './pages/Classes';
+import SubjectsProgram from './pages/SubjectsProgram';
 import Login from './pages/Login';
 import SuperAdmin from './pages/SuperAdmin';
 import ParentPortal from './pages/ParentPortal';
@@ -40,10 +42,12 @@ const ProtectedRouteForLogin = ({ children }: { children: React.ReactNode }) => 
 };
 
 function App() {
-  const { db, saveDB } = useAppContext();
+  const { db, safePatchDB, currentUser } = useAppContext();
 
   useEffect(() => {
-    if (!db || !db.school) return;
+    // Ce scrubbing écrit dans Firestore (classes) — restreint aux rôles autorisés à écrire dans classes
+    if (!db?.school || !db?.classes || !db?.students || !db?.staff) return;
+    if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return;
 
     let shouldSave = false;
     let newClasses = [...db.classes];
@@ -95,22 +99,22 @@ function App() {
     });
 
     if (shouldSave) {
-      const payload: any = { ...db, classes: deduplicatedClasses };
+      const patch: DatabasePatch = { classes: deduplicatedClasses };
       
       if (duplicateClassIdsToRemap.size > 0) {
-        payload.students = db.students.map((s: any) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
+        patch.students = db.students.map((s) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
           ? { ...s, classId: duplicateClassIdsToRemap.get(s.classId)! } 
           : s
         );
-        payload.staff = db.staff.map((s: any) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
+        patch.staff = db.staff.map((s) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
           ? { ...s, assignedClassId: duplicateClassIdsToRemap.get(s.assignedClassId)! }
           : s
         );
       }
 
-      saveDB(payload);
+      safePatchDB(patch);
     }
-  }, [db?.classes, db?.school, saveDB]);
+  }, [db?.classes, db?.school, db?.students, db?.staff, safePatchDB, currentUser]);
 
   return (
     <HashRouter>
@@ -164,13 +168,14 @@ function App() {
         
         <Route path="/students" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><Students /></Layout></ProtectedRoute>} />
         <Route path="/classes" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><Classes /></Layout></ProtectedRoute>} />
+        <Route path="/subjects-program" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><SubjectsProgram /></Layout></ProtectedRoute>} />
         <Route path="/staff" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'superAdmin']}><Layout><Staff /></Layout></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><Attendance /></Layout></ProtectedRoute>} />
         <Route path="/buses" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'driver']}><Layout><Buses /></Layout></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'accountant', 'superAdmin']}><Layout><Inventory /></Layout></ProtectedRoute>} />
         <Route path="/grades" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><Grades /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><Settings /></Layout></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'secretary', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director']}><Layout><UsersManagement /></Layout></ProtectedRoute>} />
         <Route path="/validations" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
         <Route path="/ai-director" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><AIDirector /></Layout></ProtectedRoute>} />

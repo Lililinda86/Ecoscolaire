@@ -53,7 +53,7 @@ export async function acquireZombieLease(
   });
 }
 
-export const sweepZombieImportJobs = onSchedule('every 15 minutes', async (event) => {
+export const sweepZombieImportJobs = onSchedule('every 15 minutes', async () => {
   const db = admin.firestore();
   console.log('Starting Zombie Sweeper Execution...');
 
@@ -70,7 +70,7 @@ export const sweepZombieImportJobs = onSchedule('every 15 minutes', async (event
   let zombiesDetected = 0;
   let skipped = 0;
   let leasesAcquired = 0;
-  const recoveryPromises: Promise<any>[] = [];
+  const recoveryPromises: Promise<void>[] = [];
 
   for (const doc of jobsSnap.docs) {
     scanned++;

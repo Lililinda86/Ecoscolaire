@@ -1,6 +1,23 @@
 const CAMPAY_BASE_URL_SANDBOX = process.env.CAMPAY_SANDBOX_URL || "https://demo.campay.net";
 const CAMPAY_BASE_URL_PRODUCTION = process.env.CAMPAY_PRODUCTION_URL || "https://campay.net";
 
+export type CampayServiceResponse = {
+  reference?: string;
+  status?: string;
+  transaction_status?: string;
+  amount?: string | number;
+  amount_paid?: string | number;
+  amount_collected?: string | number;
+  external_reference?: string;
+  externalReference?: string;
+  merchant_reference?: string;
+  payment_url?: string;
+  ussd_code?: string;
+  operator?: string;
+  message?: string;
+  [key: string]: unknown;
+};
+
 export class CampayService {
   private baseUrl: string;
 
@@ -28,7 +45,7 @@ export class CampayService {
       let errorData;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { message: response.statusText };
       }
       throw new Error(`Campay login failed [${response.status}]: ${JSON.stringify(errorData)}`);
@@ -48,7 +65,7 @@ export class CampayService {
     phoneNumber: string, 
     description: string, 
     externalReference: string
-  ): Promise<any> {
+  ): Promise<CampayServiceResponse> {
     const url = `${this.baseUrl}/api/collect/`;
     
     // Campay API requires amount as string, phone as '237...'
@@ -73,7 +90,7 @@ export class CampayService {
       let errorData;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { message: response.statusText };
       }
       throw new Error(`Campay requestToPay failed [${response.status}]: ${JSON.stringify(errorData)}`);
@@ -82,7 +99,7 @@ export class CampayService {
     return await response.json();
   }
 
-  async getTransactionStatus(token: string, reference: string): Promise<any> {
+  async getTransactionStatus(token: string, reference: string): Promise<CampayServiceResponse> {
     const url = `${this.baseUrl}/api/transaction/${reference}/`;
     
     const response = await fetch(url, {
@@ -97,7 +114,7 @@ export class CampayService {
       let errorData;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { message: response.statusText };
       }
       throw new Error(`Campay getTransactionStatus failed [${response.status}]: ${JSON.stringify(errorData)}`);

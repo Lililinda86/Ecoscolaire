@@ -3,7 +3,7 @@ import { NormalizedStudentRow, RowNormalizationResult } from './studentImportNor
 export interface DiscoveryResult {
   creates: NormalizedStudentRow[];
   updates: NormalizedStudentRow[];
-  skippedRows: any[]; // Appends internal duplicates to previously skipped rows
+  skippedRows: unknown[]; // Appends internal duplicates to previously skipped rows
   summary: {
     totalRows: number;
     validRows: number;

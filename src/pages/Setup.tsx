@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
+import { DEFAULT_CLASS_LEVELS } from '../constants/defaultClasses';
+import { buildStandardClassDocumentId } from '../utils/classCatalog';
 import setupBg from '../assets/setup-bg.png';
 
 const Setup: React.FC = () => {
-  const { saveDB, db } = useAppContext();
+  const { safeMergeDB, db } = useAppContext();
   const { t } = useI18n();
   const navigate = useNavigate();
   
@@ -26,27 +28,24 @@ const Setup: React.FC = () => {
       createdAt: new Date().toISOString()
     };
     
-    // Set default classes as per PRD "Sections/classes"
-    newDb.classes = [
-      { id: 'ang_nur1', name: 'Nursery 1', type: 'anglophone', capacity: 30, level: 'maternelle' },
-      { id: 'ang_nur2', name: 'Nursery 2', type: 'anglophone', capacity: 30, level: 'maternelle' },
-      { id: 'ang_nur3', name: 'Nursery 3', type: 'anglophone', capacity: 30, level: 'maternelle' },
-      { id: 'ang_c1', name: 'Class 1', type: 'anglophone', capacity: 40, level: 'primaire' },
-      { id: 'ang_c2', name: 'Class 2', type: 'anglophone', capacity: 40, level: 'primaire' },
-      { id: 'ang_c3', name: 'Class 3', type: 'anglophone', capacity: 40, level: 'primaire' },
-      { id: 'ang_c4', name: 'Class 4', type: 'anglophone', capacity: 40, level: 'primaire' },
-      { id: 'ang_c5', name: 'Class 5', type: 'anglophone', capacity: 40, level: 'primaire' },
-      { id: 'ang_c6', name: 'Class 6', type: 'anglophone', capacity: 40, level: 'primaire' },
-      { id: 'fra_mat1', name: 'Maternelle 1', type: 'francophone', capacity: 30, level: 'maternelle' },
-      { id: 'fra_mat2', name: 'Maternelle 2', type: 'francophone', capacity: 30, level: 'maternelle' },
-      { id: 'fra_mat3', name: 'Maternelle 3', type: 'francophone', capacity: 30, level: 'maternelle' },
-      { id: 'fra_sil', name: 'SIL', type: 'francophone', capacity: 40, level: 'primaire' },
-      { id: 'fra_cp', name: 'CP', type: 'francophone', capacity: 40, level: 'primaire' },
-      { id: 'fra_ce1', name: 'CE1', type: 'francophone', capacity: 40, level: 'primaire' },
-      { id: 'fra_ce2', name: 'CE2', type: 'francophone', capacity: 40, level: 'primaire' },
-      { id: 'fra_cm1', name: 'CM1', type: 'francophone', capacity: 40, level: 'primaire' },
-      { id: 'fra_cm2', name: 'CM2', type: 'francophone', capacity: 40, level: 'primaire' }
-    ];
+    const schoolId = newDb.school.id;
+
+    // Initialisation des 34 classes générales standards (Section 6 P0-35C)
+    newDb.classes = DEFAULT_CLASS_LEVELS
+      .filter(level => level.educationType === 'general')
+      .map(level => ({
+        id: buildStandardClassDocumentId(schoolId, level.catalogLevelId),
+        catalogLevelId: level.catalogLevelId,
+        schoolId: schoolId,
+        name: level.name,
+        type: level.section,
+        section: level.section,
+        cycle: level.cycle,
+        educationType: 'general' as const,
+        levelOrder: level.levelOrder,
+        isDefault: true as const,
+        isActive: true
+      }));
 
     newDb.subjects = [
       { id: crypto.randomUUID(), name: 'Mathématiques / Mathematics' },
@@ -60,7 +59,7 @@ const Setup: React.FC = () => {
       { id: crypto.randomUUID(), name: 'Arts Dramatiques ou Plastiques / Arts' },
     ];
     
-    saveDB(newDb);
+    safeMergeDB(newDb);
     navigate('/');
   };
 

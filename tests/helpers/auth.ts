@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { type Page } from '@playwright/test';
 
 export async function loginAs(page: Page, email: string, password: string = 'Test@2026Alpha!') {
   const logs: string[] = [];

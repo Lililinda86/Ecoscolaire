@@ -1,12 +1,57 @@
 import React, { useState, useMemo } from 'react';
 import { Download, TrendingUp, AlertTriangle, FileText, CheckCircle, Clock } from 'lucide-react';
-import type { Payment, PaymentTransaction, Student, School } from '../types';
+import type { Payment, Student, School } from '../types';
 import ReceiptAudit from './ReceiptAudit';
+
+type DateLike =
+  | string
+  | number
+  | Date
+  | {
+      seconds?: number;
+      toDate?: () => Date;
+    }
+  | null
+  | undefined;
+
+type ReceiptLike = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  method?: string;
+  date?: DateLike;
+  createdAt?: DateLike;
+  updatedAt?: DateLike;
+  receiptNumber?: string;
+  paymentId?: string;
+  studentId?: string;
+  studentName?: string;
+  parentName?: string;
+  [key: string]: unknown;
+};
+
+type TransactionLike = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  method?: string;
+  type?: string;
+  date?: DateLike;
+  createdAt?: DateLike;
+  updatedAt?: DateLike;
+  reference?: string;
+  receiptNumber?: string;
+  paymentId?: string;
+  studentId?: string;
+  schoolId?: string;
+  userId?: string;
+  [key: string]: unknown;
+};
 
 interface FinanceDashboardProps {
   payments: Payment[];
-  transactions: PaymentTransaction[];
-  receipts: any[];
+  transactions: TransactionLike[];
+  receipts: ReceiptLike[];
   students: Student[];
   school: School | null;
 }
@@ -29,9 +74,20 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ payments, transacti
       startDate.setDate(startDate.getDate() - 30);
     }
 
-    const filterByDate = (dateVal: any) => {
+    const filterByDate = (dateVal: DateLike) => {
       if (!dateVal) return false;
-      const d = dateVal.seconds ? new Date(dateVal.seconds * 1000) : new Date(dateVal);
+      let d: Date;
+      if (typeof dateVal === 'object' && dateVal !== null) {
+        if ('toDate' in dateVal && typeof dateVal.toDate === 'function') {
+          d = dateVal.toDate();
+        } else if ('seconds' in dateVal && typeof dateVal.seconds === 'number') {
+          d = new Date(dateVal.seconds * 1000);
+        } else {
+          d = new Date(dateVal as string | number | Date);
+        }
+      } else {
+        d = new Date(dateVal as string | number | Date);
+      }
       return d >= startDate && d <= now;
     };
 
@@ -68,11 +124,11 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ payments, transacti
       const dateStr = p.date ? new Date(p.date).toLocaleDateString('fr-FR') : '';
       
       const receipt = receipts.find(r => r.paymentId === p.id);
-      const receiptNum = receipt?.receiptNumber || '';
+      const receiptNum = receipt?.receiptNumber ?? '';
       
       const tx = transactions.find(t => t.id === p.transactionId);
-      const txId = p.transactionId || '';
-      const status = tx ? tx.status : 'SUCCESS'; // Cash payments without tx are success
+      const txId = p.transactionId ?? '';
+      const status = tx?.status ?? 'SUCCESS'; // Cash payments without tx are success
 
       rows.push([
         dateStr,

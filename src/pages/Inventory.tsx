@@ -6,10 +6,16 @@ import Modal from '../components/Modal';
 import { Plus, Edit2, AlertTriangle, ArrowRightLeft, Package, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 
 const Inventory: React.FC = () => {
-  const { db, saveDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, currentUser } = useAppContext();
   const { t } = useI18n();
 
   const allowedRoles = ['owner', 'director', 'secretary', 'accountant', 'superAdmin'];
+  const [isItemModalOpen, setItemModalOpen] = useState(false);
+  const [isTxModalOpen, setTxModalOpen] = useState(false);
+  
+  const [currentItem, setCurrentItem] = useState<Partial<InventoryItem>>({ quantity: 0, alertThreshold: 10 });
+  const [currentTx, setCurrentTx] = useState<Partial<InventoryTransaction>>({ type: 'IN', quantity: 1, date: new Date().toISOString().split('T')[0] });
+
   if (!currentUser || !allowedRoles.includes(currentUser.role)) {
     return (
       <div className="page-container" style={{ padding: '2rem' }}>
@@ -22,11 +28,6 @@ const Inventory: React.FC = () => {
       </div>
     );
   }
-  const [isItemModalOpen, setItemModalOpen] = useState(false);
-  const [isTxModalOpen, setTxModalOpen] = useState(false);
-  
-  const [currentItem, setCurrentItem] = useState<Partial<InventoryItem>>({ quantity: 0, alertThreshold: 10 });
-  const [currentTx, setCurrentTx] = useState<Partial<InventoryTransaction>>({ type: 'IN', quantity: 1, date: new Date().toISOString().split('T')[0] });
 
   const handleOpenItemModal = (item?: InventoryItem) => {
     if (item) setCurrentItem(item);
@@ -47,7 +48,7 @@ const Inventory: React.FC = () => {
     } else {
       newDb.inventory.push({ ...currentItem, id: crypto.randomUUID() } as InventoryItem);
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setItemModalOpen(false);
   };
 
@@ -69,7 +70,7 @@ const Inventory: React.FC = () => {
         if (newDb.inventory[itemIndex].quantity < 0) newDb.inventory[itemIndex].quantity = 0;
       }
     }
-    saveDB(newDb);
+    safeMergeDB(newDb);
     setTxModalOpen(false);
   };
 

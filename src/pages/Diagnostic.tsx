@@ -3,11 +3,15 @@ import { useAppContext } from '../context/AppContext';
 import { Activity, Database, Server, Users, Building, ChevronLeft, ShieldCheck, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 const Diagnostic: React.FC = () => {
   const { db, isFirestoreConnected, firestoreError, lastSyncDate, currentUser, supervisionSchoolId, currentSchool } = useAppContext();
   const navigate = useNavigate();
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [directFetchData, setDirectFetchData] = useState<any>(null);
+  type DiagnosticFetchResult = { count: number; docs: Array<{ id: string; name: string }> };
+  const [directFetchData, setDirectFetchData] = useState<DiagnosticFetchResult | null>(null);
 
   useEffect(() => {
     import('../db/firebase').then(async ({ db: firestoreDb }) => {
@@ -38,7 +42,7 @@ const Diagnostic: React.FC = () => {
       await setDoc(testRef, {
         message: "Test de connexion Vercel réussi !",
         timestamp: new Date().toISOString()
-      });
+      }, { merge: true });
       
       const snap = await getDoc(testRef);
       if (snap.exists()) {
@@ -47,8 +51,8 @@ const Diagnostic: React.FC = () => {
       } else {
         setTestResult("❌ Échec : Document introuvable après écriture.");
       }
-    } catch (err: any) {
-      setTestResult(`❌ Erreur : ${err.message}`);
+    } catch (err: unknown) {
+      setTestResult(`❌ Erreur : ${getErrorMessage(err)}`);
     }
   };
 
@@ -70,7 +74,7 @@ const Diagnostic: React.FC = () => {
         createdAt: new Date().toISOString()
       };
       
-      await setDoc(doc(firestoreDb, "schools", testSchool.id), testSchool);
+      await setDoc(doc(firestoreDb, "schools", testSchool.id), testSchool, { merge: true });
       
       const snap = await getDocs(collection(firestoreDb, "schools"));
       const docsInfo = snap.docs.map(d => ({id: d.id, name: d.data().name}));
@@ -80,8 +84,8 @@ Nombre d'écoles dans /schools : ${snap.docs.length}
 IDs trouvés : ${docsInfo.map(d => d.id).join(', ')}
 Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
 
-    } catch (err: any) {
-      setTestResult(`❌ Erreur : ${err.message}`);
+    } catch (err: unknown) {
+      setTestResult(`❌ Erreur : ${getErrorMessage(err)}`);
     }
   };
 
@@ -102,8 +106,8 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setTestResult(`✅ Export réussi ! ${data.length} école(s) sauvegardée(s).`);
-    } catch (e: any) {
-      setTestResult(`❌ Erreur d'export: ${e.message}`);
+    } catch (e: unknown) {
+      setTestResult(`❌ Erreur d'export: ${getErrorMessage(e)}`);
     }
   };
 
@@ -124,17 +128,17 @@ Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
           
           for (const school of schools) {
             if (school.id) {
-              await setDoc(doc(firestoreDb, 'schools', school.id), school);
+              await setDoc(doc(firestoreDb, 'schools', school.id), school, { merge: true });
             }
           }
           setTestResult(`✅ Restauration réussie ! ${schools.length} école(s) importée(s). Veuillez rafraîchir la page (F5).`);
-        } catch (err: any) {
-          setTestResult(`❌ Erreur de parsing JSON: ${err.message}`);
+        } catch (err: unknown) {
+          setTestResult(`❌ Erreur de parsing JSON: ${getErrorMessage(err)}`);
         }
       };
       reader.readAsText(file);
-    } catch (e: any) {
-      setTestResult(`❌ Erreur lors de l'import: ${e.message}`);
+    } catch (e: unknown) {
+      setTestResult(`❌ Erreur lors de l'import: ${getErrorMessage(e)}`);
     }
     event.target.value = ''; // Reset input
   };
@@ -180,8 +184,8 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
       } else {
         setTestResult(`⚠️ Réconciliation annulée. L'écart persiste (Actuel: ${currentCount}, Réel: ${realCount}).`);
       }
-    } catch (err: any) {
-      setTestResult(`❌ Erreur lors de la réconciliation : ${err.message}`);
+    } catch (err: unknown) {
+      setTestResult(`❌ Erreur lors de la réconciliation : ${getErrorMessage(err)}`);
     }
   };
 
@@ -314,7 +318,7 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
               <div style={{ fontFamily: 'monospace' }}>
                 <div style={{ marginBottom: '0.5rem' }}><strong>Écoles physiquement trouvées dans Firestore:</strong> <span style={{ fontSize: '1.2rem', color: '#15803d', fontWeight: 'bold' }}>{directFetchData.count}</span></div>
                 <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
-                  {directFetchData.docs.map((d: any, i: number) => (
+                  {directFetchData.docs.map((d, i: number) => (
                     <li key={i} style={{ padding: '0.5rem', background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                       <span style={{ color: '#0369a1' }}>ID: {d.id}</span> | <strong>Nom: {d.name}</strong>
                     </li>

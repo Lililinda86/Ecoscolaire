@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
+import { attachConsoleMonitor } from './helpers/console-monitor';
 
 test.describe('P0-022: Parent Portal Blockade Scenarios', () => {
 
@@ -8,6 +9,7 @@ test.describe('P0-022: Parent Portal Blockade Scenarios', () => {
   // but we can't easily manipulate the DB from within the Playwright test unless we run a node script before.
 
   test('Scénario 1 - Parent payé (T1 = 0 ou soldée)', async ({ page }) => {
+    const monitor = attachConsoleMonitor(page);
     // Requires alpha-student-1 to have feeT1 = 50000 and a payment of 50000
     // The default seed has feeT1=50000 and alpha-pay-1 (amount=50000)
     await loginAs(page, 'parent1.alpha@ecoscolaire.com', 'Test@2026Alpha!');
@@ -17,6 +19,7 @@ test.describe('P0-022: Parent Portal Blockade Scenarios', () => {
     await expect(page.getByRole('button', { name: 'Présences' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Finances' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Dossier Bloqué' })).not.toBeVisible();
+    monitor.assertNoCriticalErrors();
   });
 
 });

@@ -7,8 +7,6 @@ import { useAppContext } from '../context/AppContext';
 const AITeacher: React.FC = () => {
   const { currentUser } = useAppContext();
   
-  if (!currentUser || !['teacher'].includes(currentUser.role)) return null;
-
   const [messages, setMessages] = useState<{role: 'user'|'assistant', content: string}[]>([
     { role: 'assistant', content: "Bonjour cher Enseignant ! Je suis votre assistant pédagogique IA. Je peux vous aider à préparer une leçon, créer une évaluation, générer des remarques de bulletins, ou trouver des activités éducatives. Que souhaitez-vous préparer aujourd'hui ?" }
   ]);
@@ -25,6 +23,8 @@ const AITeacher: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  if (!currentUser || !['teacher'].includes(currentUser.role)) return null;
+
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim()) return;
@@ -37,8 +37,9 @@ const AITeacher: React.FC = () => {
     try {
       const response = await aiService.generateResponse(userMessage, { provider });
       setMessages(prev => [...prev, { role: 'assistant', content: response.content }]);
-    } catch (err: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Erreur: ${err.message}` }]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Erreur: ${message}` }]);
     } finally {
       setIsLoading(false);
     }

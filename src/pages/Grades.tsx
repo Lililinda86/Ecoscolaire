@@ -1,11 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
-import type { Grade } from '../types';
+import type { Grade, Evaluation } from '../types';
+import { getLegacyGradeNormalizedValue } from '../utils/legacyGrades';
+import { getEffectiveClassSubjects } from '../services/effectiveClassSubjects';
+import { deduplicateAcademicYears, getEquivalentAcademicYearIds } from '../utils/academicYearDeduplication';
+import { groupGradesByClassSubject, calculateSubjectAverage, calculateWeightedGeneralAverage } from '../services/gradeCalculations';
+import { buildEvaluationId, buildGradeId } from '../utils/gradeIds';
 import Modal from '../components/Modal';
 import { Plus, Printer, Trophy } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
+
+import { SubjectSelectDropdown } from '../components/SubjectSelectDropdown';
+
+export const ACADEMIC_CALENDAR_SETTINGS_HASH = '#/settings?section=academic-calendar';
+
+export const getCalendarActionUrl = (hasAcademicYears: boolean, hasSelectedYear: boolean, openPeriodsCount: number): string | null => {
+  if (!hasAcademicYears) return ACADEMIC_CALENDAR_SETTINGS_HASH;
+  if (hasSelectedYear && openPeriodsCount === 0) return ACADEMIC_CALENDAR_SETTINGS_HASH;
+  return null;
+};
 
 export const getAppreciation = (score: number, max: number = 20) => {
   const normalized = (score / max) * 20;
@@ -19,92 +34,262 @@ export const getAppreciation = (score: number, max: number = 20) => {
 };
 
 const Grades: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, saveStructuredGrades, currentUser, currentSchool, logAuditAction, isSchoolSuspended, firestoreError } = useAppContext();
   const { t } = useI18n();
-  
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
 
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
-  // Logic for Individual Tab
-  const [isModalOpen, setModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string>('');
-  const [bulkStudentId, setBulkStudentId] = useState<string>('');
-  const [bulkDate, setBulkDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [bulkGrades, setBulkGrades] = useState<Record<string, {score: string, maxScore: string}>>({});
 
-  // Logic for Ranking Tab
+  const [isModalOpen, setModalOpen] = useState(false);
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>('');
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedClassSubjectId, setSelectedClassSubjectId] = useState<string>('');
+  const [evaluationMode, setEvaluationMode] = useState<'existing'|'new'|''>('');
+  const [selectedEvaluationId, setSelectedEvaluationId] = useState<string>('');
+  const [newEvaluationKey, setNewEvaluationKey] = useState<string>('');
+  const [evaluationTitle, setEvaluationTitle] = useState<string>('');
+  const [evaluationType, setEvaluationType] = useState<string>('exam');
+  const [evaluationDate, setEvaluationDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [evaluationMaxScore, setEvaluationMaxScore] = useState<string>('20');
+  const [evaluationWeight, setEvaluationWeight] = useState<string>('1');
+  const [gradeEntryRows, setGradeEntryRows] = useState<Record<string, {score: string}>>({});
+
+  const validAcademicYears = useMemo(() => {
+    return deduplicateAcademicYears(db.academicYears || [], currentSchool?.id, currentSchool?.activeAcademicYearId);
+  }, [db.academicYears, currentSchool?.id, currentSchool?.activeAcademicYearId]);
+
+  const pointerYear = validAcademicYears.find(year => year.id === currentSchool?.activeAcademicYearId);
+  const activeYear = useMemo(() => {
+    return pointerYear ?? validAcademicYears.find(year => year.status === 'active') ?? validAcademicYears[0];
+  }, [pointerYear, validAcademicYears]);
+
+  const hasAcademicYears = validAcademicYears.length > 0;
+
+  const dropdownPeriods = db.periods?.filter(p => p.schoolId === currentSchool?.id && p.academicYearId === selectedAcademicYearId && p.status === 'open').sort((a, b) => (a.order || 0) - (b.order || 0)) || [];
+
   const [selectedClassRank, setSelectedClassRank] = useState<string>('');
 
+  useEffect(() => {
+    if (validAcademicYears.length > 0 && !validAcademicYears.some(y => y.id === selectedAcademicYearId)) {
+      setSelectedAcademicYearId(activeYear?.id || validAcademicYears[0]?.id || '');
+    }
+  }, [validAcademicYears, selectedAcademicYearId, activeYear]);
+
+  const handleAcademicYearChange = (yearId: string) => {
+    setSelectedAcademicYearId(yearId);
+    setSelectedPeriodId('');
+    setSelectedClassId('');
+    setSelectedClassSubjectId('');
+    setGradeEntryRows({});
+  };
+
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
+
   const handleOpenModal = () => {
-    setBulkStudentId(selectedStudent || '');
-    setBulkDate(new Date().toISOString().split('T')[0]);
-    setBulkGrades({});
+    setSelectedAcademicYearId(activeYear?.id || '');
+    setSelectedPeriodId('');
+    setSelectedClassId('');
+    setSelectedClassSubjectId('');
+    setEvaluationMode('');
+    setSelectedEvaluationId('');
+    setNewEvaluationKey('');
+    setEvaluationTitle('');
+    setEvaluationType('exam');
+    setEvaluationDate(new Date().toISOString().split('T')[0]);
+    setEvaluationMaxScore('20');
+    setEvaluationWeight('1');
+    setGradeEntryRows({});
     setModalOpen(true);
   };
 
-  const handleUpdateBulkGrade = (subjectId: string, field: 'score'|'maxScore', value: string) => {
-    setBulkGrades({
-      ...bulkGrades,
-      [subjectId]: {
-        ...(bulkGrades[subjectId] || { score: '', maxScore: '20' }),
-        [field]: value
-      }
+  const handleModeChange = (mode: 'existing'|'new') => {
+    setEvaluationMode(mode);
+    if (mode === 'new' && !newEvaluationKey) {
+      setNewEvaluationKey(crypto.randomUUID());
+    }
+  };
+
+  const handleExistingEvalChange = (evalId: string) => {
+    setSelectedEvaluationId(evalId);
+    const existing = db.evaluations?.find(e => e.id === evalId);
+    if (existing) {
+      setEvaluationMaxScore(existing.maxScore.toString());
+      setEvaluationWeight(existing.weight.toString());
+    }
+  };
+
+  const handleUpdateGradeEntry = (studentId: string, value: string) => {
+    setGradeEntryRows({
+      ...gradeEntryRows,
+      [studentId]: { score: value }
     });
   };
 
-  const handleSaveBulk = (e: React.FormEvent) => {
+  const handleSaveBulk = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bulkStudentId || !currentUser || !currentSchool) return;
-    
-    const canSaveDirectly = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
-    const newDb = { ...db };
-    let hasValidations = false;
+    if (!currentUser || !currentSchool) return;
 
-    Object.keys(bulkGrades).forEach(subjectId => {
-      const g = bulkGrades[subjectId];
-      if (g.score !== '') {
-        const gradeObj: Grade = {
-          id: crypto.randomUUID(),
-          studentId: bulkStudentId,
-          subjectId,
-          score: parseFloat(g.score),
-          maxScore: parseFloat(g.maxScore) || 20,
-          date: bulkDate
-        };
+    if (!selectedAcademicYearId || !selectedPeriodId || !selectedClassId || !selectedClassSubjectId) {
+      alert("Veuillez remplir tous les champs obligatoires du contexte.");
+      return;
+    }
 
-        if (canSaveDirectly) {
-          newDb.grades.push(gradeObj);
-          logAuditAction({
-            action: 'CREATE_GRADE',
-            targetType: 'GRADE',
-            targetId: gradeObj.id,
-            targetName: `Note de ${g.score} en ${subjectId}`
-          });
-        } else {
-          hasValidations = true;
-          newDb.validation_requests = [...(newDb.validation_requests || []), {
-            id: crypto.randomUUID(),
-            schoolId: currentSchool.id,
-            requesterId: currentUser.id,
-            requesterRole: currentUser.role,
-            actionType: 'UPDATE_GRADE',
-            targetCollection: 'grades',
-            targetDocumentId: gradeObj.id,
-            proposedData: gradeObj,
-            status: 'pending',
-            createdAt: new Date().toISOString()
-          }];
-        }
+    const activePeriod = dropdownPeriods.find(p => p.id === selectedPeriodId);
+    if (!activePeriod) {
+      alert("Aucune période de saisie n'est actuellement ouverte pour cette année scolaire.");
+      return;
+    }
+
+    if (!db.classPrograms || !db.classSubjects || !db.subjects) return;
+    const equivalentAcademicYearIds = getEquivalentAcademicYearIds(db.academicYears || [], currentSchool.id, selectedAcademicYearId);
+    const effResult = getEffectiveClassSubjects({ classId: selectedClassId, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: selectedAcademicYearId, equivalentAcademicYearIds });
+    const effSub = effResult.subjects.find(s => s.classSubjectId === selectedClassSubjectId);
+    if (!effSub) return;
+
+    const activeAssignment = (db.teacherAssignments || []).find(a =>
+      a.schoolId === currentSchool.id &&
+      equivalentAcademicYearIds.includes(a.academicYearId) &&
+      a.classId === selectedClassId &&
+      a.sourceClassSubjectId === selectedClassSubjectId &&
+      a.isActive === true
+    );
+
+    if (!activeAssignment) {
+      alert("Aucun enseignant actif n'est affecté à cette matière pour cette classe et cette année scolaire. Veuillez configurer l'affectation avant la saisie des notes.");
+      return;
+    }
+
+    if (evaluationMode === 'new') {
+      if (!evaluationTitle.trim()) {
+        alert("Le titre de l'évaluation est obligatoire.");
+        return;
       }
-    });
-    
-    saveDB(newDb);
-    setModalOpen(false);
-    if (hasValidations) {
-      alert("Les notes ont été soumises pour validation par le Directeur.");
+      if (!evaluationType) {
+        alert("Le type de l'évaluation est obligatoire.");
+        return;
+      }
+      const maxS = parseFloat(evaluationMaxScore);
+      if (!Number.isFinite(maxS) || maxS <= 0) {
+        alert("Le barème doit être strictement positif.");
+        return;
+      }
+      const w = parseFloat(evaluationWeight);
+      if (!Number.isFinite(w) || w <= 0) {
+        alert("Le coefficient doit être strictement positif.");
+        return;
+      }
+      const p = dropdownPeriods.find(x => x.id === selectedPeriodId);
+      if (p && (evaluationDate < p.startDate || evaluationDate > p.endDate)) {
+        alert("La date de l'évaluation doit être comprise dans la période sélectionnée.");
+        return;
+      }
+    }
+
+    let finalEvalId = '';
+    let theEval: Evaluation | undefined;
+
+    if (evaluationMode === 'new') {
+      if (!newEvaluationKey) return;
+      finalEvalId = buildEvaluationId(currentSchool.id, selectedAcademicYearId, selectedPeriodId, selectedClassId, selectedClassSubjectId, newEvaluationKey);
+      const newEval: Evaluation = {
+        id: finalEvalId,
+        schoolId: currentSchool.id,
+        academicYearId: selectedAcademicYearId,
+        periodId: selectedPeriodId,
+        classId: selectedClassId,
+        classSubjectId: selectedClassSubjectId,
+        subjectId: effSub.subjectId,
+        teacherId: activeAssignment.teacherStaffId,
+        title: evaluationTitle,
+        type: evaluationType as 'exam'|'homework'|'oral'|'participation',
+        date: evaluationDate,
+        maxScore: parseFloat(evaluationMaxScore),
+        weight: parseFloat(evaluationWeight),
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser.id,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.id,
+        version: 1
+      };
+      theEval = newEval;
     } else {
-      alert("Notes enregistrées avec succès.");
+      if (!selectedEvaluationId) {
+        alert("Veuillez sélectionner une évaluation existante.");
+        return;
+      }
+      finalEvalId = selectedEvaluationId;
+      theEval = (db.evaluations || []).find(e => e.id === finalEvalId);
+    }
+
+    if (!theEval) return;
+
+    const gradesToSave: Grade[] = [];
+    const classStudents = db.students.filter(s => s.schoolId === currentSchool.id && s.classId === selectedClassId && s.schoolingStatus !== 'inactive');
+
+    for (const stu of classStudents) {
+      const studentId = stu.id;
+      const entry = gradeEntryRows[studentId];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existingGrade = db.grades.find(g => (g as any).evaluationId === finalEvalId && g.studentId === studentId) as any;
+
+      let finalScoreVal: number | undefined;
+      let finalResultStatus: 'scored' | 'absent' | 'exempt' | 'missing' = 'missing';
+
+      if (entry && entry.score !== '') {
+        const scoreVal = parseFloat(entry.score);
+        if (!Number.isFinite(scoreVal) || scoreVal < 0 || scoreVal > theEval.maxScore) {
+          alert(`La note doit être comprise entre 0 et ${theEval.maxScore}.`);
+          return;
+        }
+        finalScoreVal = scoreVal;
+        finalResultStatus = 'scored';
+      } else if (existingGrade && (existingGrade.resultStatus === 'absent' || existingGrade.resultStatus === 'exempt')) {
+        finalResultStatus = existingGrade.resultStatus;
+      }
+
+      if (finalResultStatus !== 'missing') {
+        const gId = buildGradeId(finalEvalId, studentId);
+        const newGrade: Grade = {
+          id: gId,
+          schoolId: currentSchool.id,
+          academicYearId: selectedAcademicYearId,
+          periodId: selectedPeriodId,
+          evaluationId: finalEvalId,
+          classId: selectedClassId,
+          classSubjectId: selectedClassSubjectId,
+          subjectId: effSub.subjectId,
+          studentId: studentId,
+          teacherId: activeAssignment.teacherStaffId,
+          status: 'draft',
+          resultStatus: finalResultStatus,
+          score: finalScoreVal,
+          maxScore: theEval.maxScore,
+          createdAt: existingGrade?.createdAt || new Date().toISOString(),
+          createdBy: existingGrade?.createdBy || currentUser.id,
+          updatedAt: new Date().toISOString(),
+          updatedBy: currentUser.id,
+          version: (existingGrade?.version || 0) + 1
+        };
+        gradesToSave.push(newGrade);
+      }
+    }
+
+    try {
+      await saveStructuredGrades({ evaluation: theEval, grades: gradesToSave });
+
+      alert("Notes structurées enregistrées avec succès !");
+      setModalOpen(false);
+      setGradeEntryRows({});
+    } catch (err) {
+      if (err instanceof Error && err.name === "StructuredGradeSaveCancelledError") {
+        return; // Silent cancel, preserve modal and rows
+      }
+      console.error("Erreur saveStructuredGrades:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(`Erreur lors de l'enregistrement des notes: ${errorMessage}`);
     }
   };
 
@@ -113,7 +298,7 @@ const Grades: React.FC = () => {
       import('jspdf').then(({ jsPDF }) => {
         const el = document.querySelector(selector) as HTMLElement;
         if (!el) return;
-        html2canvas(el, { scale: 2 }).then((canvas: any) => {
+        html2canvas(el, { scale: 2 }).then((canvas: HTMLCanvasElement) => {
           const imgData = canvas.toDataURL('image/png');
           const pdf = new jsPDF('p', 'mm', 'a4');
           const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -131,36 +316,30 @@ const Grades: React.FC = () => {
     });
   };
 
-  const studentGrades = db.grades.filter(g => g.studentId === selectedStudent);
-  const student = db.students.find(s => s.id === selectedStudent);
-  const studentClass = db.classes.find(c => c.id === student?.classId);
-  const totalNormalized = studentGrades.reduce((sum, g) => sum + ((g.score / (g.maxScore || 20)) * 20), 0);
-  const average = studentGrades.length > 0 ? totalNormalized / studentGrades.length : 0;
-
-  // Ranking Calculation
-  const classStudents = db.students.filter(s => s.classId === selectedClassRank);
+  const classStudents = db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === selectedClassRank && s.schoolingStatus !== 'inactive');
   const rankingData = classStudents.map(s => {
     const sGrades = db.grades.filter(g => g.studentId === s.id);
-    const sum = sGrades.reduce((acc, g) => acc + ((g.score / (g.maxScore || 20)) * 20), 0);
-    const avg = sGrades.length > 0 ? sum / sGrades.length : 0;
-    return { student: s, avg, hasGrades: sGrades.length > 0 };
+    const validSGrades = sGrades.map(g => getLegacyGradeNormalizedValue(g)).filter(v => v.calculable) as { calculable: true, value: number }[];
+    const sum = validSGrades.reduce((acc, v) => acc + v.value, 0);
+    const avg = validSGrades.length > 0 ? sum / validSGrades.length : 0;
+    return { student: s, avg, hasGrades: validSGrades.length > 0 };
   }).filter(d => d.hasGrades).sort((a, b) => b.avg - a.avg);
-
   const classAvg = rankingData.length > 0 ? rankingData.reduce((sum, d) => sum + d.avg, 0) / rankingData.length : 0;
   const currentRankClass = db.classes.find(c => c.id === selectedClassRank);
 
-  // School Ranking Calculation
   const schoolRankingData = db.classes.map(c => {
-    const cStudents = db.students.filter(s => s.classId === c.id);
-    const validStudentAvgs = cStudents.map(s => {
-      const sGrades = db.grades.filter(g => g.studentId === s.id);
-      const sum = sGrades.reduce((acc, g) => acc + ((g.score / (g.maxScore || 20)) * 20), 0);
-      return sGrades.length > 0 ? sum / sGrades.length : null;
+    const cStudents = db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === c.id && s.schoolingStatus !== 'inactive');
+      const validStudentAvgs = cStudents.map(s => {
+        const sGrades = db.grades.filter(g => g.studentId === s.id);
+        const validSGrades = sGrades.map(g => getLegacyGradeNormalizedValue(g)).filter(v => v.calculable) as { calculable: true, value: number }[];
+        const sum = validSGrades.reduce((acc, v) => acc + v.value, 0);
+        return validSGrades.length > 0 ? sum / validSGrades.length : null;
     }).filter(a => a !== null) as number[];
-    
-    const cAvg = validStudentAvgs.length > 0 ? validStudentAvgs.reduce((sum, a) => sum + a, 0) / validStudentAvgs.length : 0;
+  const cAvg = validStudentAvgs.length > 0 ? validStudentAvgs.reduce((sum, a) => sum + a, 0) / validStudentAvgs.length : 0;
     return { class: c, avg: cAvg, studentCount: cStudents.length, evaluatedCount: validStudentAvgs.length };
   }).filter(d => d.evaluatedCount > 0).sort((a, b) => b.avg - a.avg);
+
+  const isGlobalRankingDisabled = true;
 
   return (
     <div className="page-container" id="grades-page">
@@ -201,69 +380,138 @@ const Grades: React.FC = () => {
               </select>
             </div>
             {selectedStudent && (
-              <button className="secondary" onClick={() => handlePrint('.print-bulletin', `bulletin_${student?.name}`)}>
+              <button className="secondary" onClick={() => handlePrint('.print-bulletin', `bulletin_${selectedStudent}`)}>
                 <Printer size={18} /> Imprimer Bulletin
               </button>
             )}
           </div>
 
-          {selectedStudent && student && (
-             <div className="card print-area print-bulletin" style={{ padding: '2rem', background: '#fff' }}>
-               <SchoolDocumentHeader school={currentSchool} documentTitle="Bulletin Trimestriel" />
-               <div style={{ textAlign: 'center', marginBottom: '2rem', paddingBottom: '1rem' }}>
-                 <h3>{student.name}</h3>
-                 <p>Classe : {studentClass?.name || student.section} | Date : {new Date().toLocaleDateString('fr-FR')}</p>
-               </div>
-               
-               <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '1.5rem' }}>
-                 <thead style={{ background: '#f8f9fa' }}>
-                   <tr>
-                     <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Matière</th>
-                     <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>Date</th>
-                     <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>Note</th>
-                     <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Appréciation</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {studentGrades.length === 0 ? (
-                     <tr><td colSpan={4} style={{ padding: '1rem', textAlign: 'center' }}>Aucune note</td></tr>
-                   ) : (
-                     studentGrades.map(g => {
-                       const subject = db.subjects.find(s => s.id === g.subjectId);
-                       return (
-                         <tr key={g.id}>
-                           <td style={{ border: '1px solid #000', padding: '0.75rem' }}>{subject?.name || 'Inconnue'}</td>
-                           <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>{new Date(g.date).toLocaleDateString('fr-FR')}</td>
-                           <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>{g.score} / {g.maxScore || 20}</td>
-                           <td style={{ border: '1px solid #000', padding: '0.75rem', fontStyle: 'italic' }}>{getAppreciation(g.score, g.maxScore || 20)}</td>
-                         </tr>
-                       )
-                     })
-                   )}
-                 </tbody>
-               </table>
-               
-               {studentGrades.length > 0 && (
-                 <div style={{ padding: '1.5rem', border: '2px solid #000', borderRadius: '4px', background: '#f8f9fa' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                     <p style={{ fontSize: '1.2rem', margin: 0 }}><strong>Moyenne Trimestrielle : </strong> {average.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / 20</p>
-                     <p style={{ fontSize: '1.1rem', margin: 0 }}><strong>Mention : </strong> {getAppreciation(average, 20)}</p>
-                   </div>
-                   <p style={{ margin: 0 }}><strong>Décision du Conseil des Professeurs :</strong> Élève {average >= 10 ? 'admis(e)' : 'ajourné(e)'}</p>
-                 </div>
-               )}
+          {selectedStudent && (
+            <div className="card print-area print-bulletin" style={{ padding: '2rem', background: '#fff' }}>
+              <SchoolDocumentHeader school={currentSchool} documentTitle="Bulletin de Notes" />
+              {(() => {
+                const student = db.students.find(s => s.id === selectedStudent);
+                const studentClass = db.classes.find(c => c.id === student?.classId);
+                if (!student || !studentClass) return null;
 
-               <div style={{ marginTop: '3rem', display: 'flex', justifyContent: 'space-between' }}>
-                 <div style={{ textAlign: 'left' }}>
-                    <p>Signature du Titulaire</p>
-                    <div style={{ marginTop: '3rem', borderBottom: '1px dotted #000', width: '200px' }}></div>
-                 </div>
-                 <div style={{ textAlign: 'right' }}>
-                    <p>Signature du Directeur</p>
-                    <div style={{ marginTop: '3rem', borderBottom: '1px dotted #000', width: '200px', display: 'inline-block' }}></div>
-                 </div>
-               </div>
-             </div>
+                let generalAvg = 0;
+                let subjectsRender = null;
+
+                if (activeYear) {
+                  const activePer = db.periods?.find(p => p.schoolId === currentSchool?.id && p.academicYearId === activeYear.id && p.status === 'open');
+                  if (activePer) {
+                    if (!db.classPrograms || !db.classSubjects || !db.subjects) return null;
+                    const equivalentAcademicYearIds = getEquivalentAcademicYearIds(db.academicYears || [], currentSchool?.id, activeYear.id);
+                    const effResult = getEffectiveClassSubjects({ classId: studentClass.id, classes: db.classes, classPrograms: db.classPrograms, classSubjects: db.classSubjects, subjects: db.subjects, activeAcademicYearId: activeYear.id, equivalentAcademicYearIds });
+                    const effSubjects = effResult.subjects;
+                    const stGrades = (db.gradesStrict || []).filter(g =>
+                      g.studentId === student.id && g.academicYearId === activeYear.id && g.periodId === activePer.id
+                    );
+
+                    const summaries = groupGradesByClassSubject(stGrades, effSubjects); summaries.forEach(s => calculateSubjectAverage(s)); const genAvgObj = calculateWeightedGeneralAverage(summaries); const weightedSum = genAvgObj.generalAverage;
+                    generalAvg = weightedSum || 0;
+
+                    subjectsRender = (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000' }}>
+                        <thead style={{ background: 'var(--bg-color)' }}>
+                          <tr>
+                            <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Code</th>
+                            <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Matière</th>
+                            <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>Coefficient</th>
+                            <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>Moyenne / 20</th>
+                            <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>Pts Pondérés</th>
+                            <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Appréciation</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summaries.map(sub => {
+                            const coeff = sub.coefficient || 1;
+                            const pts = (sub.calculable && sub.rawAverage !== null) ? (sub.rawAverage * coeff) : null;
+
+                            return (
+                              <tr key={sub.classSubjectId}>
+                                <td style={{ border: '1px solid #000', padding: '0.75rem' }}>{sub.subjectCode}</td>
+                                <td style={{ border: '1px solid #000', padding: '0.75rem' }}>{sub.subjectName}</td>
+                                <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>{coeff}</td>
+                                <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
+                                  {(sub.calculable && sub.rawAverage !== null) ? sub.rawAverage.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}
+                                </td>
+                                <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>
+                                  {pts !== null ? pts.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}
+                                </td>
+                                <td style={{ border: '1px solid #000', padding: '0.75rem', fontStyle: 'italic' }}>
+                                  {(sub.calculable && sub.rawAverage !== null) ? getAppreciation(sub.rawAverage, 20) : '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    );
+                  }
+                }
+
+                const legacyGrades = db.grades.filter(g => g.studentId === student.id);
+
+                return (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
+                      <div>
+                        <h3>{student.name}</h3>
+                        <p><strong>Classe :</strong> {studentClass.name} ({studentClass.type})</p>
+                        <p><strong>Section :</strong> {student.section}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p><strong>Année Scolaire :</strong> {activeYear?.name || 'Année scolaire non configurée'}</p>
+                        <p><strong>Décision du conseil :</strong> Non renseignée</p>
+                      </div>
+                    </div>
+
+                    <h4 style={{marginBottom: '1rem'}}>Notes de la période (Structurées)</h4>
+                    {subjectsRender || <p style={{ color: 'var(--text-muted)' }}>Aucune note structurée disponible.</p>}
+
+                    {subjectsRender && (
+                      <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ border: '2px solid #000', padding: '1rem', minWidth: '300px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                            <span>Moyenne Générale :</span>
+                            <span>{generalAvg.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / 20</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontStyle: 'italic' }}>
+                            <span>Mention :</span>
+                            <span>{getAppreciation(generalAvg, 20)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {legacyGrades.length > 0 && (
+                      <div style={{marginTop: '3rem'}}>
+                        <h4 style={{marginBottom: '1rem', color: 'var(--text-muted)'}}>Notes historiques non classées (Ancien système)</h4>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ccc', color: 'var(--text-muted)' }}>
+                          <thead style={{ background: '#f9f9f9' }}>
+                            <tr>
+                              <th style={{ border: '1px solid #ccc', padding: '0.5rem', textAlign: 'left' }}>Date</th>
+                              <th style={{ border: '1px solid #ccc', padding: '0.5rem', textAlign: 'left' }}>Matière ID</th>
+                              <th style={{ border: '1px solid #ccc', padding: '0.5rem', textAlign: 'center' }}>Note / Max</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {legacyGrades.map(g => (
+                              <tr key={g.id}>
+                                <td style={{ border: '1px solid #ccc', padding: '0.5rem' }}>{g.date || '-'}</td>
+                                <td style={{ border: '1px solid #ccc', padding: '0.5rem' }}>{g.subjectId}</td>
+                                <td style={{ border: '1px solid #ccc', padding: '0.5rem', textAlign: 'center' }}>{g.score} / {g.maxScore || 20}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           )}
         </>
       )}
@@ -274,67 +522,57 @@ const Grades: React.FC = () => {
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Sélectionner une classe complète :</label>
               <select value={selectedClassRank} onChange={e => setSelectedClassRank(e.target.value)}>
-                <option value="">-- Choisir une classe --</option>
+                <option value="">-- Choisir --</option>
                 {sortClasses(db.classes).map(c => <option key={c.id} value={c.id}>{c.name} ({c.type})</option>)}
               </select>
             </div>
             {selectedClassRank && rankingData.length > 0 && (
               <button className="secondary" onClick={() => handlePrint('.print-ranking', `palmares_${currentRankClass?.name}`)}>
-                <Printer size={18} /> Imprimer Palmarès
+                <Printer size={18} /> Imprimer le Palmarès
               </button>
             )}
           </div>
 
-          {selectedClassRank && currentRankClass && (
+          {selectedClassRank && (
             <div className="card print-area print-ranking" style={{ padding: '2rem', background: '#fff' }}>
-              <SchoolDocumentHeader school={currentSchool} documentTitle="Palmarès Trimestriel" />
+              <SchoolDocumentHeader school={currentSchool} documentTitle="Palmarès (Classement)" />
               <div style={{ textAlign: 'center', marginBottom: '2rem', paddingBottom: '1rem' }}>
-                <h3>Classement et Palmarès</h3>
-                <p>Classe : {currentRankClass.name} | Effectif classé : {rankingData.length}</p>
+                <h3>Classement de la classe : {currentRankClass?.name}</h3>
+                <p>Moyenne de la classe : {classAvg.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / 20</p>
               </div>
 
               {rankingData.length > 0 ? (
-                <>
-                  <div style={{ background: '#eef2ff', padding: '1.5rem', borderRadius: '4px', marginBottom: '2rem', border: '1px solid var(--primary-color)' }}>
-                    <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-color)' }}>Statistiques de la Classe</h3>
-                    <p style={{ margin: 0, fontSize: '1.2rem' }}>
-                      <strong>Moyenne Générale :</strong> {classAvg.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / 20
-                      <span style={{ fontSize: '0.9rem', marginLeft: '1rem', color: 'var(--text-muted)' }}>({getAppreciation(classAvg, 20)})</span>
-                    </p>
-                  </div>
-
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000' }}>
-                    <thead style={{ background: 'var(--bg-color)' }}>
-                      <tr>
-                        <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', width: '80px' }}>Rang</th>
-                        <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Nom de l'élève</th>
-                        <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>Moyenne (/20)</th>
-                        <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Appréciation</th>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000' }}>
+                  <thead style={{ background: 'var(--bg-color)' }}>
+                    <tr>
+                      <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', width: '80px' }}>Rang</th>
+                      <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Élève</th>
+                      <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center' }}>Moyenne / 20</th>
+                      <th style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'left' }}>Appréciation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankingData.map((d, index) => (
+                      <tr key={d.student.id} style={{ background: index === 0 ? '#fffbeb' : 'transparent' }}>
+                        <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
+                          {index + 1}{index === 0 ? 'er' : 'e'}
+                        </td>
+                        <td style={{ border: '1px solid #000', padding: '0.75rem', fontWeight: 500 }}>
+                          {index === 0 && <Trophy size={16} color="var(--warning)" style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />}
+                          {d.student.name}
+                        </td>
+                        <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
+                          {d.avg.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </td>
+                        <td style={{ border: '1px solid #000', padding: '0.75rem', fontStyle: 'italic' }}>
+                          {getAppreciation(d.avg, 20)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {rankingData.map((d, index) => (
-                        <tr key={d.student.id} style={{ background: index === 0 ? '#fffbeb' : 'transparent' }}>
-                          <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
-                            {index + 1}{index === 0 ? 'er' : 'e'}
-                          </td>
-                          <td style={{ border: '1px solid #000', padding: '0.75rem', fontWeight: 500 }}>
-                            {index === 0 && <Trophy size={16} color="var(--warning)" style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />}
-                            {d.student.name}
-                          </td>
-                          <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
-                            {d.avg.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                          </td>
-                          <td style={{ border: '1px solid #000', padding: '0.75rem', fontStyle: 'italic' }}>
-                            {getAppreciation(d.avg, 20)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </>
+                    ))}
+                  </tbody>
+                </table>
               ) : (
-                <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun élève de cette classe n'a de notes enregistrées.</p>
+                <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun élève évalué dans cette classe.</p>
               )}
             </div>
           )}
@@ -358,7 +596,9 @@ const Grades: React.FC = () => {
               <p>Basé sur la moyenne générale de chaque classe | Date : {new Date().toLocaleDateString('fr-FR')}</p>
             </div>
 
-            {schoolRankingData.length > 0 ? (
+            {isGlobalRankingDisabled ? (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Le classement global sera disponible après configuration d'une politique de comparaison commune aux classes.</p>
+            ) : schoolRankingData.length > 0 ? (
               <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000' }}>
                 <thead style={{ background: 'var(--bg-color)' }}>
                   <tr>
@@ -403,85 +643,257 @@ const Grades: React.FC = () => {
         </>
       )}
 
-      {/* Bulk Edit Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Saisie Rapide des Notes">
+      <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Saisie des Notes">
+        {firestoreError ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <p style={{ marginBottom: '1rem', color: 'var(--danger-color)', fontWeight: 'bold' }}>Le calendrier académique n'a pas pu être chargé. Vérifiez vos droits ou réessayez.</p>
+          </div>
+        ) : !hasAcademicYears ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <p style={{ marginBottom: '1rem', color: 'var(--danger-color)', fontWeight: 'bold' }}>Aucun calendrier académique n’est configuré pour cette école.</p>
+            <p style={{ marginBottom: '2rem' }}>Configurez l'année scolaire et ses périodes avant la saisie des notes.</p>
+            <button type="button" onClick={() => window.location.href = ACADEMIC_CALENDAR_SETTINGS_HASH}>Configurer le calendrier académique</button>
+            <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>* Note: L'écran de configuration complet du calendrier académique fera l'objet d'un lot séparé. Pour l'instant, naviguez vers les paramètres.</p>
+          </div>
+        ) : (
         <form onSubmit={handleSaveBulk}>
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Élève</label>
-              <select required value={bulkStudentId} onChange={e => setBulkStudentId(e.target.value)}>
-                <option value="">-- Choisir un élève --</option>
-                {db.students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.section})</option>)}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group">
+              <label>Année Scolaire</label>
+              <select required value={selectedAcademicYearId} onChange={e => handleAcademicYearChange(e.target.value)}>
+                <option value="">-- Choisir --</option>
+                {validAcademicYears.map(y => {
+                  const isDuplicate = validAcademicYears.filter(ay => ay.name === y.name).length > 1;
+                  const label = isDuplicate && y.startDate && y.endDate ? `${y.name} (${y.startDate} - ${y.endDate})` : y.name;
+                  return <option key={y.id} value={y.id}>{label}</option>;
+                })}
               </select>
             </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Date Enregistrement</label>
-              <input type="date" required value={bulkDate} onChange={e => setBulkDate(e.target.value)} />
+            <div className="form-group">
+              <label>Période</label>
+              <select required value={selectedPeriodId} onChange={e => {
+                const val = e.target.value;
+                setSelectedPeriodId(val);
+                const p = dropdownPeriods.find(x => x.id === val);
+                if (p && p.startDate && p.endDate) {
+                  const today = new Date().toISOString().split('T')[0];
+                  if (today >= p.startDate && today <= p.endDate) {
+                    setEvaluationDate(today);
+                  } else {
+                    setEvaluationDate(p.startDate);
+                  }
+                }
+              }}>
+                <option value="">-- Choisir --</option>
+                {dropdownPeriods.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {selectedAcademicYearId && dropdownPeriods.length === 0 && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <small style={{ color: 'var(--danger-color)', display: 'block', marginBottom: '0.5rem' }}>Aucune période de saisie n'est actuellement ouverte pour cette année scolaire.</small>
+                  <button type="button" onClick={() => window.location.href = ACADEMIC_CALENDAR_SETTINGS_HASH}>Ouvrir une période de saisie</button>
+                </div>
+              )}
             </div>
           </div>
-          
-          <div style={{ maxHeight: '400px', overflowY: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-            {(() => {
-              const student = db.students.find(s => s.id === bulkStudentId);
-              const stClass = db.classes.find(c => c.id === student?.classId);
-              const mappedSubIds = stClass?.subjects;
-              let applicableSubjects = db.subjects;
-              if (mappedSubIds && mappedSubIds.length > 0) {
-                 applicableSubjects = db.subjects.filter(s => mappedSubIds.includes(s.id));
-              }
 
-              if (applicableSubjects.length === 0) {
-                return <p style={{ color: 'var(--danger)' }}>Aucune matière disponible pour cette classe ou aucune matière configurée.</p>;
-              }
+          {selectedAcademicYearId && selectedPeriodId && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group">
+                <label>Classe</label>
+                <select required value={selectedClassId} onChange={e => {
+                    setSelectedClassId(e.target.value);
+                    setSelectedClassSubjectId('');
+                  }}>
+                  <option value="">-- Choisir --</option>
+                  {sortClasses(db.classes.filter(c => c.schoolId === currentSchool?.id)).map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.type})</option>
+                  ))}
+                </select>
+              </div>
 
-              return (
+              {selectedClassId && (
+                <div className="form-group">
+                  <label>Matière</label>
+                  {(() => {
+                    if (firestoreError) return <div style={{ fontSize: '0.85rem', color: 'var(--danger-color)' }}>Impossible de charger les matières. Réessayer.</div>;
+                    if (!db.classPrograms || !db.classSubjects || !db.subjects) return <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Chargement des matières...</div>;
+
+                    const equivalentAcademicYearIds = getEquivalentAcademicYearIds(db.academicYears || [], currentSchool?.id, selectedAcademicYearId);
+                    const effResult = getEffectiveClassSubjects({
+                      classId: selectedClassId,
+                      classes: db.classes,
+                      classPrograms: db.classPrograms,
+                      classSubjects: db.classSubjects,
+                      subjects: db.subjects,
+                      activeAcademicYearId: selectedAcademicYearId,
+                      equivalentAcademicYearIds
+                    });
+
+                    if (effResult.status === 'ambiguous_program') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Plusieurs programmes publiés existent pour cette année scolaire.<br/>Une correction administrative est nécessaire.</div>;
+                    if (effResult.status === 'no_program') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Le programme de cette classe n’est pas encore publié.</div>;
+                    if (effResult.status === 'empty') return <div style={{ fontSize: '0.85rem', color: '#d97706' }}>Aucune matière active dans le programme publié de cette classe.</div>;
+
+                    return (
+                      <SubjectSelectDropdown
+                        subjects={effResult.subjects}
+                        value={selectedClassSubjectId}
+                        onChange={setSelectedClassSubjectId}
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedClassSubjectId && (
+            <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Évaluation</label>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                <label>
+                  <input type="radio" name="evalMode" checked={evaluationMode === 'existing'} onChange={() => handleModeChange('existing')} />
+                  Existante
+                </label>
+                <label>
+                  <input type="radio" name="evalMode" checked={evaluationMode === 'new'} onChange={() => handleModeChange('new')} />
+                  Nouvelle
+                </label>
+              </div>
+
+              {evaluationMode === 'existing' && (
+                <div className="form-group">
+                  <select required value={selectedEvaluationId} onChange={e => handleExistingEvalChange(e.target.value)}>
+                    <option value="">-- Choisir --</option>
+                    {(db.evaluations || []).filter(e =>
+                      e.schoolId === currentSchool?.id &&
+                      e.academicYearId === selectedAcademicYearId &&
+                      e.periodId === selectedPeriodId &&
+                      e.classSubjectId === selectedClassSubjectId
+                    ).map(e => (
+                      <option key={e.id} value={e.id}>{e.title} (Max: {e.maxScore}, Coeff: {e.weight})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {evaluationMode === 'new' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                  <div className="form-group">
+                    <label>Titre</label>
+                    <input type="text" required value={evaluationTitle} onChange={e => setEvaluationTitle(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label>Type</label>
+                    <select required value={evaluationType} onChange={e => setEvaluationType(e.target.value)}>
+                      <option value="exam">Examen</option>
+                      <option value="homework">Devoir</option>
+                      <option value="oral">Oral</option>
+                      <option value="participation">Participation</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Date</label>
+                    <input type="date" required value={evaluationDate} min={dropdownPeriods.find(p => p.id === selectedPeriodId)?.startDate} max={dropdownPeriods.find(p => p.id === selectedPeriodId)?.endDate} onChange={e => setEvaluationDate(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label>Note sur (Max)</label>
+                    <input type="number" required min="1" value={evaluationMaxScore} onChange={e => setEvaluationMaxScore(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label>Coefficient</label>
+                    <input type="number" required min="0.1" step="0.1" value={evaluationWeight} onChange={e => setEvaluationWeight(e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(evaluationMode === 'new' || (evaluationMode === 'existing' && selectedEvaluationId)) && (
+            <div style={{ maxHeight: '400px', overflowY: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              {db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === selectedClassId && s.schoolingStatus !== 'inactive').length === 0 ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  Aucun élève actif n’est actuellement affecté à cette classe.
+                </p>
+              ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Matière</th>
-                      <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '100px' }}>Note</th>
-                      <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '100px' }}>Sur (Max)</th>
+                      <th style={{ textAlign: 'left', paddingBottom: '0.5rem' }}>Élève</th>
+                      <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '100px' }}>Statut</th>
+                      <th style={{ textAlign: 'center', paddingBottom: '0.5rem', width: '120px' }}>Note / {evaluationMaxScore}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {applicableSubjects.map(sub => {
-                      const currentObj = bulkGrades[sub.id] || { score: '', maxScore: '20' };
+                    {db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === selectedClassId && s.schoolingStatus !== 'inactive').map(stu => {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      const existingGrade = db.grades.find(g => (g as any).evaluationId === selectedEvaluationId && g.studentId === stu.id) as any;
+
+                      let currentVal = '';
+                      let statusText = 'Non noté';
+
+                      if (gradeEntryRows[stu.id] !== undefined) {
+                        currentVal = gradeEntryRows[stu.id].score;
+                        if (currentVal === '') statusText = 'Non noté';
+                        else statusText = 'Noté';
+                      } else if (existingGrade) {
+                        if (existingGrade.resultStatus === 'scored') {
+                          currentVal = existingGrade.score?.toString() || '';
+                          statusText = currentVal === '' ? 'Non noté' : 'Noté';
+                        } else if (existingGrade.resultStatus === 'absent') {
+                          statusText = 'Absent';
+                        } else if (existingGrade.resultStatus === 'exempt') {
+                          statusText = 'Dispensé';
+                        }
+                      }
+
                       return (
-                        <tr key={sub.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '0.75rem 0' }}>{sub.name}</td>
+                        <tr key={stu.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.75rem 0' }}>{stu.name}</td>
+                          <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>{statusText}</td>
                           <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>
-                            <input 
-                              type="number" step="0.25" min="0" placeholder="ex: 15"
-                              style={{ width: '80px', textAlign: 'center' }} 
-                              value={currentObj.score} 
-                              onChange={e => handleUpdateBulkGrade(sub.id, 'score', e.target.value)} 
-                            />
-                          </td>
-                          <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>
-                            <input 
-                              type="number" step="1" min="1" 
-                              style={{ width: '80px', textAlign: 'center' }} 
-                              value={currentObj.maxScore} 
-                              onChange={e => handleUpdateBulkGrade(sub.id, 'maxScore', e.target.value)} 
+                            <input
+                              type="number" step="any" min="0" max={evaluationMaxScore} placeholder="Note"
+                              style={{ width: '80px', textAlign: 'center' }}
+                              value={currentVal}
+                              onChange={e => handleUpdateGradeEntry(stu.id, e.target.value)}
                             />
                           </td>
                         </tr>
-                      )
+                      );
                     })}
                   </tbody>
                 </table>
-              );
-            })()}
-          </div>
+              )}
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
             <button type="button" className="secondary" onClick={() => setModalOpen(false)}>Annuler</button>
-            <button type="submit">Enregistrer les notes</button>
+            <button type="submit" disabled={(() => {
+              if (dropdownPeriods.length === 0) return true;
+              if (evaluationMode === 'new') {
+                if (!evaluationTitle.trim()) return true;
+                if (!evaluationType) return true;
+                const maxScore = parseFloat(evaluationMaxScore);
+                if (isNaN(maxScore) || maxScore <= 0) return true;
+                const weight = parseFloat(evaluationWeight);
+                if (isNaN(weight) || weight <= 0) return true;
+                const p = dropdownPeriods.find(x => x.id === selectedPeriodId);
+                if (p && (evaluationDate < p.startDate || evaluationDate > p.endDate)) return true;
+              }
+              return false;
+            })()}>Enregistrer les notes</button>
           </div>
         </form>
+        )}
       </Modal>
     </div>
   );
 };
 
 export default Grades;
+
+

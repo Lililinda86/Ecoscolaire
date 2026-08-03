@@ -33,11 +33,17 @@ const SchoolDocumentHeader: React.FC<SchoolDocumentHeaderProps> = ({ school, doc
             background: '#f1f5f9',
             borderRadius: '50%',
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            border: '1px solid #cbd5e1'
+            border: '1px solid #cbd5e1',
+            padding: '5px',
+            textAlign: 'center',
+            fontSize: '10px',
+            color: '#64748b'
           }}>
-            <Building size={40} color="#94a3b8" />
+            <Building size={24} color="#94a3b8" />
+            <span style={{ marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{school.name}</span>
           </div>
         )}
       </div>
@@ -47,6 +53,13 @@ const SchoolDocumentHeader: React.FC<SchoolDocumentHeaderProps> = ({ school, doc
         <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', color: '#1e293b', textTransform: 'uppercase' }}>
           {school.name}
         </h1>
+        
+        {(school.address || school.phone || school.email) && (
+          <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>
+            {[school.address, school.phone, school.email].filter(Boolean).join(' • ')}
+          </div>
+        )}
+
         <div style={{ fontSize: '1rem', color: '#64748b', marginBottom: '0.25rem' }}>
           Année Académique : <strong>{school.academicYear}</strong>
         </div>

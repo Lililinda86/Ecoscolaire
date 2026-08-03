@@ -1,10 +1,28 @@
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
-import { normalizeRows } from './studentImportNormalizer';
+import { normalizeRows, ImportStudentRow } from './studentImportNormalizer';
 import { runDiscovery } from './studentImportDiscovery';
 import { reserveStudentImportQuota, markImportJobFailedIfCurrent } from './studentImportQuota';
 import { executeBulkWriterImport, markImportJobCompletedIfRunning } from './studentImportBulkWriter';
 import { reconcileImportJobQuota } from './studentImportReconciler';
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return String(error);
+};
+
 // Trigger on document creation in student_import_jobs
 export const processStudentImportJob = onDocumentCreated(
   {
@@ -78,11 +96,11 @@ export const processStudentImportJob = onDocumentCreated(
         throw new Error('File exceeds 10MB limit');
       }
 
-      let payload: any[];
+      let payload: ImportStudentRow[];
       try {
         const fileContent = fileBuffer.toString('utf-8');
         payload = JSON.parse(fileContent);
-      } catch (err) {
+      } catch {
         throw new Error('Invalid JSON format');
       }
 
@@ -148,13 +166,13 @@ export const processStudentImportJob = onDocumentCreated(
 
       // Phase 2E Quota Reconciliation
       await reconcileImportJobQuota(db, jobId, schoolId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Error processing job ${jobId}:`, error);
       await markImportJobFailedIfCurrent(
         db,
         jobId,
         'SYSTEM_ERROR',
-        `System Error: ${error.message || 'Unknown error'}`
+        `System Error: ${getErrorMessage(error) || 'Unknown error'}`
       );
       
       // Phase 2E Quota Reconciliation (in case it failed after quota reservation)

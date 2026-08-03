@@ -6,7 +6,7 @@ import Modal from '../components/Modal';
 import { createSecondaryUser } from '../db/firebase';
 
 const UsersManagement: React.FC = () => {
-  const { db, saveDB, currentUser, currentSchool, logAuditAction } = useAppContext();
+  const { db, safeMergeDB, currentUser, currentSchool, logAuditAction } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -39,7 +39,7 @@ const UsersManagement: React.FC = () => {
       if (formData.id) {
         // Mise à jour (pas de changement de mot de passe ici, juste des rôles/status)
         newDb.users = newDb.users.map(u => u.id === formData.id ? { ...u, ...formData } as User : u);
-        await saveDB(newDb);
+        await safeMergeDB(newDb);
       } else {
         // Création d'un NOUVEL utilisateur Firebase Auth
         if (!formData.email) throw new Error("Email requis");
@@ -58,7 +58,7 @@ const UsersManagement: React.FC = () => {
         };
         
         newDb.users.push(newUser);
-        await saveDB(newDb);
+        await safeMergeDB(newDb);
         
         await logAuditAction({
           action: 'CREATE_USER',
@@ -68,8 +68,9 @@ const UsersManagement: React.FC = () => {
         });
       }
       setModalOpen(false);
-    } catch (err: any) {
-      alert("Erreur: " + err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert("Erreur: " + message);
     }
     setLoading(false);
   };

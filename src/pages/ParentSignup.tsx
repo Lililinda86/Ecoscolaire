@@ -6,6 +6,59 @@ import { db, auth } from '../db/firebase';
 import type { ParentInvitation } from '../types';
 import { GraduationCap, AlertCircle, CheckCircle } from 'lucide-react';
 
+
+type ExpirableValue =
+  | Date
+  | string
+  | number
+  | {
+      toDate?: () => Date;
+      seconds?: number;
+    }
+  | null
+  | undefined;
+
+const toNullableDate = (value: ExpirableValue): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === 'object') {
+    if (typeof value.toDate === 'function') return value.toDate();
+    if (typeof value.seconds === 'number') return new Date(value.seconds * 1000);
+  }
+  return null;
+};
+
+const getErrorCode = (error: unknown): string | undefined => {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string'
+  ) {
+    return (error as { code: string }).code;
+  }
+  return undefined;
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+  return String(error);
+};
+
 const ParentSignup: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -44,11 +97,10 @@ const ParentSignup: React.FC = () => {
           return;
         }
 
-        const expiresAtTime = typeof (data.expiresAt as any)?.toDate === 'function' 
-          ? (data.expiresAt as any).toDate().getTime() 
-          : new Date(data.expiresAt).getTime();
+        const parsedDate = toNullableDate(data.expiresAt as unknown as ExpirableValue);
+        const expiresAtTime = parsedDate ? parsedDate.getTime() : 0;
           
-        if (expiresAtTime < Date.now()) {
+        if (!parsedDate || expiresAtTime < Date.now()) {
           setError('Cette invitation a expiré.');
           setLoading(false);
           return;
@@ -56,7 +108,7 @@ const ParentSignup: React.FC = () => {
 
         setInvitation(data);
         setName(data.parentName || '');
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Erreur lecture invitation:", err);
         setError('Erreur lors de la lecture de l\'invitation. Veuillez réessayer.');
       } finally {
@@ -120,13 +172,16 @@ const ParentSignup: React.FC = () => {
       // Rediriger vers l'accueil, AppContext gérera le routage Parent
       navigate('/');
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
+      const code = getErrorCode(err);
+      const message = getErrorMessage(err);
+      
+      if (code === 'auth/email-already-in-use') {
         alert("Cet email est déjà utilisé par un autre compte. Si vous avez déjà un compte, connectez-vous directement sur la page d'accueil.");
         navigate('/login');
       } else {
-        alert("Erreur lors de l'inscription : " + err.message);
+        alert("Erreur lors de l'inscription : " + message);
       }
     } finally {
       setSubmitting(false);
@@ -237,3 +292,4 @@ const ParentSignup: React.FC = () => {
 };
 
 export default ParentSignup;
+

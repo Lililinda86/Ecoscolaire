@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { ShieldAlert, KeyRound } from 'lucide-react';
 
 const Activation: React.FC = () => {
-  const { db, saveDB } = useAppContext();
+  const { db, safeMergeDB } = useAppContext();
   const [key, setKey] = useState('');
   const [error, setError] = useState(false);
 
@@ -33,7 +33,7 @@ const Activation: React.FC = () => {
     e.preventDefault();
     if (verifyKey(key.trim())) {
       setError(false);
-      saveDB({ ...db, isActivated: true });
+      safeMergeDB({ ...db, isActivated: true });
       window.location.reload();
     } else {
       setError(true);

@@ -1,12 +1,30 @@
 export type SubscriptionPlan = 'starter' | 'standard' | 'premium' | 'pilot';
 export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired';
 
+export type EducationCycle = 'nursery' | 'primary' | 'secondary';
+
+export interface CycleNames {
+  nursery?: string;
+  primary?: string;
+  secondary?: string;
+}
+
+export interface CycleAccreditationNumbers {
+  nursery?: string;
+  primary?: string;
+  secondary?: string;
+}
+
 export interface School {
+  updatedAt?: string;
+  updatedBy?: string;
+  version?: number;
   id: string; // schoolId
   schoolCode: string;
   name: string; // schoolName
   academicYear: string;
-  logoUrl?: string; // Image en Base64
+  activeAcademicYearId?: string;
+  logoUrl?: string | null; // Image en Base64 ; null = logo supprimé explicitement
   logoFileName?: string;
   logoUpdatedAt?: string;
   adminPin?: string;
@@ -16,6 +34,11 @@ export interface School {
   email?: string;
   directorName?: string;
   accreditationNumber?: string;
+  educationCycles?: EducationCycle[];
+  founderName?: string;
+  principalName?: string;
+  cycleNames?: CycleNames;
+  cycleAccreditationNumbers?: CycleAccreditationNumbers;
   // --- Nouveaux champs SaaS ---
   subscriptionPlan?: SubscriptionPlan;
   subscriptionStatus?: SubscriptionStatus;
@@ -33,6 +56,16 @@ export interface School {
     feeT3: number;
     feeTransport: number;
     feeUniforms: number;
+  };
+  classFees?: Record<string, {
+    registration?: number;
+    tuition?: number;
+    t1?: number;
+    t2?: number;
+    t3?: number;
+  }>;
+  transportPolicy?: {
+    secretaryManageAll?: boolean;
   };
   apiKeys?: { // DEPRECATED
     flutterwavePublic?: string;
@@ -80,7 +113,7 @@ export interface ValidationRequest {
   actionType: 'UPDATE_GRADE' | 'DELETE_STUDENT' | 'HIGH_EXPENSE' | 'CHANGE_ROLE';
   targetCollection: string;
   targetDocumentId?: string;
-  proposedData: any;
+  proposedData: unknown;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 }
@@ -105,13 +138,45 @@ export interface ClassSection {
   type: SectionType;
   subjects?: string[]; // Allowed subjects for this class
   capacity?: number;
-  level?: 'maternelle' | 'primaire';
+  level?: 'maternelle' | 'primaire' | 'secondaire';
+
+  // Réf. classes prédéfinies
+  section?: SectionType;
+  cycle?: 'preschool' | 'nursery' | 'primary' | 'secondary';
+  educationType?: 'general' | 'technical';
+  levelOrder?: number;
+  isDefault?: boolean;
+  isActive?: boolean;
+
+  catalogLevelId?: string; // identifiant du niveau dans DEFAULT_CLASS_LEVELS
+  specialtyId?: string; // identifiant de la spécialité technique configurée par l'école
+}
+
+export interface TechnicalSpecialty {
+  id: string;
+  schoolId?: string;
+  name: string;
+  code?: string;
+  isActive: boolean;
+  displayOrder?: number;
 }
 
 export interface Subject {
   id: string;
   schoolId?: string;
   name: string;
+  code?: string;
+  shortName?: string;
+  section?: 'francophone' | 'anglophone' | 'all';
+  cycles?: ('nursery' | 'primary' | 'secondary')[];
+  category?: string;
+  teachingLanguage?: string;
+  color?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface Student {
@@ -140,6 +205,66 @@ export interface Student {
   allergies?: string;
   medicalConditions?: string;
   emergencyContact?: string;
+  studentStatus?: 'nouveau' | 'ancien';
+  registrationYear?: string;
+  registrationFeeExpected?: number;
+  registrationFeePaid?: number;
+  registrationFeeStatus?: 'unpaid' | 'partial' | 'paid';
+  tuitionExpected?: number;
+  tuitionPaid?: number;
+  tuitionStatus?: 'unpaid' | 'partial' | 'paid';
+  usesTransport?: boolean;
+  transportNeighborhood?: string;
+  transportPickupPoint?: string;
+  transportMonthlyFee?: number;
+  transportFleet?: string;
+  transportStatus?: 'none' | 'active' | 'suspended';
+  transportPaid?: number;
+
+  schoolingStatus?: 'active' | 'inactive';
+  departureReason?: 'school_change' | 'graduated' | 'withdrawn' | 'other';
+  departureDate?: string;
+  departureNote?: string;
+  deactivatedAt?: DateLike;
+  deactivatedBy?: string;
+  reactivatedAt?: DateLike;
+  reactivatedBy?: string;
+
+  // --- Structured student identity ---
+  studentLastName?: string;
+  studentFirstName?: string;
+  placeOfBirth?: string;
+
+  // --- Structured parents / guardians ---
+  fatherName?: string;
+  fatherPhone?: string;
+  fatherProfession?: string;
+
+  motherName?: string;
+  motherPhone?: string;
+  motherProfession?: string;
+
+  guardianRelationship?: 'father' | 'mother' | 'other';
+  guardianRelationshipDetails?: string;
+
+  motherLastName?: string;
+  motherFirstName?: string;
+  motherEmail?: string;
+  motherWhatsapp?: boolean;
+
+  fatherLastName?: string;
+  fatherFirstName?: string;
+  fatherEmail?: string;
+  fatherWhatsapp?: boolean;
+
+  guardianLastName?: string;
+  guardianFirstName?: string;
+  guardianPhone?: string;
+  guardianEmail?: string;
+  guardianWhatsapp?: boolean;
+  guardianRelation?: string;
+
+  primaryContactType?: "mother" | "father" | "guardian";
 }
 
 export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
@@ -174,14 +299,33 @@ export interface StudentImportJob {
 
 export interface Staff {
   id: string;
-  schoolId?: string;
-  name: string;
-  role: 'teacher' | 'driver' | 'assistant' | 'director' | 'secretary';
-  assignedClassId?: string;
+  schoolId: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: 'M' | 'F' | 'other';
+  dateOfBirth?: string;
   phone?: string;
+  email?: string;
+  staffType?: 'teacher' | 'director' | 'secretary' | 'accountant' | 'supervisor' | 'driver' | 'maintenance' | 'other';
+  teachingEnabled?: boolean;
+  employmentStatus?: 'active' | 'inactive' | 'suspended' | 'departed';
+  hireDate?: string;
+  departureDate?: string;
+  departureReason?: string;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  updatedBy?: string;
+  name?: string;
+  role?: string;
+  status?: string;
+  active?: boolean;
+  isActive?: boolean;
+  assignedClassId?: string;
   licenseNumber?: string;
   assignedBusId?: string;
-  status?: 'actif' | 'absent' | 'remplacé';
+  position?: string;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'left_early';
@@ -206,14 +350,129 @@ export interface StaffAttendance {
   reason?: string;
 }
 
+export interface AcademicYear {
+  version?: number;
+  id: string;
+  schoolId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: 'draft' | 'active' | 'closed' | 'archived';
+  openPeriodId?: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface Period {
+  version?: number;
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  name: string;
+  type: 'term' | 'semester' | 'sequence' | 'custom';
+  order: number;
+  startDate: string;
+  endDate: string;
+  status: 'draft' | 'open' | 'closed' | 'published' | 'archived';
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface Evaluation {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  periodId: string;
+  classId: string;
+  subjectId: string;
+  classSubjectId: string;
+  teacherId: string;
+  title: string;
+  type: string;
+  date: string;
+  maxScore: number;
+  weight: number;
+  status: 'draft' | 'open' | 'submitted' | 'validated' | 'locked';
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  version: number;
+}
+
+export type GradeResultStatus = 'scored' | 'absent' | 'excused' | 'exempt' | 'notSubmitted';
+export type GradeStatus = 'draft' | 'submitted' | 'validated' | 'published' | 'locked';
+
+export interface LegacyGrade {
+  id?: string;
+  schoolId?: string;
+  subjectId?: string;
+  studentId?: string;
+  date?: string; // e.g. "2023-10-01"
+  score?: number;
+  maxScore?: number;
+  status?: string;
+  version?: number;
+}
+
+export interface LegacyGradeAnalysis {
+  grade: LegacyGrade;
+  isMigratable: boolean;
+  missingFields: string[];
+  warnings: string[];
+  legacy: true;
+}
+
 export interface Grade {
   id: string;
-  schoolId?: string;
-  studentId: string;
+  schoolId: string;
+  academicYearId: string;
+  periodId: string;
+  evaluationId: string;
+  classId: string;
+  classSubjectId: string;
   subjectId: string;
-  date: string; // e.g. "2023-10-01" ou un ID de semestre
-  score: number;
-  maxScore?: number;
+  studentId: string;
+  teacherId: string;
+  status: GradeStatus;
+  resultStatus: GradeResultStatus;
+  score?: number; // Obligatoire seulement si resultStatus === 'scored'
+  maxScore: number;
+  comment?: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  version: number;
+}
+
+export interface CreateGradeInput {
+  schoolId: string;
+  academicYearId: string;
+  periodId: string;
+  evaluationId: string;
+  classId: string;
+  classSubjectId: string;
+  subjectId: string;
+  studentId: string;
+  teacherId: string;
+  status: GradeStatus;
+  resultStatus: GradeResultStatus;
+  score?: number;
+  maxScore: number;
+  comment?: string;
+}
+
+export interface UpdateGradeInput {
+  score?: number;
+  resultStatus?: GradeResultStatus;
+  comment?: string;
+  status?: GradeStatus;
+  expectedVersion: number;
 }
 
 export interface Bus {
@@ -224,6 +483,7 @@ export interface Bus {
   capacity?: number;
   status?: 'actif' | 'en_panne' | 'en_entretien';
   routeId?: string;
+  isActive?: boolean;
 }
 
 export interface BusRoute {
@@ -233,6 +493,7 @@ export interface BusRoute {
   areas: string;
   departureTime: string;
   returnTime: string;
+  isActive?: boolean;
 }
 
 export interface FuelExpense {
@@ -269,7 +530,7 @@ export interface Breakdown {
   actualCost?: number;
 }
 
-export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'other';
+export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'registration_fee' | 'other';
 
 export interface SchoolPaymentSettingsPublic {
   campayPublic?: string;
@@ -304,6 +565,16 @@ export interface PaymentTransaction {
   updatedAt: string;
 }
 
+export type DateLike =
+  | string
+  | number
+  | Date
+  | {
+      seconds?: number;
+      toDate?: () => Date;
+    }
+  | null;
+
 export interface Payment {
   id: string;
   schoolId?: string;
@@ -311,10 +582,42 @@ export interface Payment {
   amount: number;
   type: PaymentType;
   installment?: 'T1' | 'T2' | 'T3';
+  month?: string;
   date: string;
   description?: string;
   method?: 'cash' | 'mobile_money';
   transactionId?: string;
+  academicYear?: string;
+  createdBy?: string;
+  createdAt?: DateLike;
+  requestId?: string;
+  byRecordCashPayment?: boolean;
+}
+
+export interface ReceiptLike {
+  id?: string;
+  paymentId?: string;
+  schoolId?: string;
+  receiptNumber?: string;
+  studentId?: string;
+  studentName?: string;
+  studentRegistrationNumber?: string;
+  classId?: string;
+  className?: string;
+  academicYear?: string;
+  schoolName?: string;
+  type?: string;
+  method?: string;
+  date?: string;
+  amount?: number;
+  expectedAmount?: number;
+  previousPaid?: number;
+  newPaid?: number;
+  remainingBalance?: number;
+  collectedByUserId?: string;
+  collectedByName?: string;
+  createdAt?: DateLike;
+  [key: string]: unknown;
 }
 
 export interface Expense {
@@ -342,4 +645,199 @@ export interface InventoryTransaction {
   quantity: number;
   personName: string;
   date: string;
+}
+
+export type DiscountStatus =
+  | 'draft'
+  | 'approved'
+  | 'applied'
+  | 'settled'
+  | 'revoked';
+
+export type TuitionInstallment = 'T1' | 'T2' | 'T3';
+
+/**
+ * TuitionDiscount represents a discount allocated to a student for a specific trimester.
+ * Note: Amounts are temporary drafts until approved, when they become immutable snapshots.
+ */
+export interface TuitionDiscount {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  academicYear: string;
+  discountCode: string;
+  installment: TuitionInstallment;
+  grossExpectedAmount: number;
+  discountAmount: number;
+  netExpectedAmount: number;
+  reason: string;
+  status: DiscountStatus;
+  createdByUserId: string;
+  approvedByUserId?: string;
+  createdAt: DateLike;
+  approvedAt?: DateLike;
+  firstAppliedAt?: DateLike;
+  settledAt?: DateLike;
+  revokedAt?: DateLike;
+  revokedByUserId?: string;
+  revocationReason?: string;
+  firstPaymentId?: string;
+  settlementPaymentId?: string;
+}
+
+export interface TuitionDiscountSlot {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  academicYear: string;
+  installment: TuitionInstallment;
+  discountId: string;
+  createdAt: DateLike;
+}
+
+export interface CashClosure {
+  id: string;
+  schoolId: string;
+  academicYear: string;
+  date: string;
+  openingBalance: number;
+  cashReceived: number;
+  cashExpenses: number;
+  theoreticalBalance: number;
+  countedBalance: number;
+  discrepancy: number;
+  notes: string;
+  status: 'closed';
+  closedBy: string;
+  closedByName?: string;
+  closedAt: DateLike;
+}
+
+export interface ClassProgram {
+  id: string; // `${schoolId}__${academicYearId}__${classId}`
+  schoolId: string;
+  classId: string;
+  academicYearId: string;
+
+  status: 'draft' | 'published';
+
+  draftRevisionId: string;
+  draftRevisionNumber: number;
+
+  publishedRevisionId?: string;
+  publishedRevisionNumber?: number;
+
+  hasUnpublishedChanges: boolean;
+
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+
+  publishedAt?: string;
+  publishedBy?: string;
+}
+
+export interface ClassSubject {
+  id: string; // `${revisionId}__${subjectId}`
+  programId: string;
+
+  schoolId: string;
+  classId: string;
+  academicYearId: string;
+  subjectId: string;
+
+  revisionId: string;
+  revisionNumber: number;
+
+  subjectNameSnapshot: string;
+  subjectCodeSnapshot?: string;
+
+  coefficient?: number;
+  weeklyHours?: number;
+  isRequired: boolean;
+  displayOrder: number;
+  isActive: boolean;
+
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface StaffUserLink {
+  id: string;
+  schoolId: string;
+  userId: string;
+  staffId: string;
+  isActive: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  deactivatedAt?: string;
+  deactivatedBy?: string;
+  deactivationReason?: string;
+}
+
+export interface StaffUserLinkByUser {
+  userId: string;
+  staffId: string;
+  schoolId: string;
+  linkId: string;
+  isActive: boolean;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface StaffUserLinkByStaff {
+  userId: string;
+  staffId: string;
+  schoolId: string;
+  linkId: string;
+  isActive: boolean;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface TeacherAssignment {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  subjectId: string;
+  teacherStaffId: string;
+  assignmentRole: 'primary';
+  sourceProgramId: string;
+  sourcePublishedRevisionId: string;
+  sourceClassSubjectId: string;
+  isActive: boolean;
+  startedAt: string;
+  endedAt?: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  deactivatedAt?: string;
+  deactivatedBy?: string;
+  deactivationReason?: string;
+  teacherUserId?: string;
+}
+
+export interface TeacherAssignmentSlot {
+  id: string;
+  assignmentId: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  subjectId: string;
+  teacherStaffId: string;
+  assignmentRole: 'primary';
+  sourceProgramId: string;
+  sourcePublishedRevisionId: string;
+  sourceClassSubjectId: string;
+  isActive: boolean;
+  updatedAt: string;
+  updatedBy: string;
+  teacherUserId?: string;
 }

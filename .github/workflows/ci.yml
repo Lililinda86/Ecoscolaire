@@ -77,6 +77,10 @@ jobs:
           node tests/functions/test-student-import-lease.cjs
           node tests/functions/test-student-import-recovery.cjs
           node tests/functions/test-student-import-bulk-writer.cjs
+          node tests/functions/test-academic-resolvers.cjs
+          node tests/functions/test-ensure-class-program-draft.cjs
+          node tests/functions/test-publish-class-program-draft.cjs
+          node tests/functions/test-bulk-add-subjects.cjs
 
       - name: Upload Artifact
         if: github.ref == 'refs/heads/main'

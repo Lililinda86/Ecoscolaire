@@ -1,5 +1,22 @@
 import * as admin from 'firebase-admin';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return String(error);
+};
+
 export interface QuotaReservationResult {
   success: boolean;
   errorCode?: string;
@@ -17,7 +34,7 @@ export async function reserveStudentImportQuota(
   jobId: string,
   schoolId: string,
   newStudentsCount: number,
-  discoverySummary: any
+  discoverySummary: Record<string, unknown>
 ): Promise<QuotaReservationResult> {
   const jobRef = db.collection('student_import_jobs').doc(jobId);
   const schoolRef = db.collection('schools').doc(schoolId);
@@ -95,8 +112,8 @@ export async function reserveStudentImportQuota(
       reservedCount: result.reservedCount,
       isNoOp: result.isNoOp
     };
-  } catch (error: any) {
-    const errorCode = error.message; // From our throw statements
+  } catch (error: unknown) {
+    const errorCode = getErrorMessage(error); // From our throw statements
     
     // Map known errors to specific codes, else generic
     const knownCodes = ['JOB_NOT_FOUND', 'INVALID_JOB_STATUS', 'SCHOOL_NOT_FOUND', 'SUBSCRIPTION_SUSPENDED', 'LIMIT_UNDEFINED', 'QUOTA_EXCEEDED'];
@@ -105,13 +122,13 @@ export async function reserveStudentImportQuota(
       // It's a business logic failure we explicitly threw
       // We must mark the job as failed, except for JOB_NOT_FOUND (can't update it)
       if (errorCode !== 'JOB_NOT_FOUND' && errorCode !== 'INVALID_JOB_STATUS') {
-        await markImportJobFailedIfCurrent(db, jobId, errorCode, error.message);
+        await markImportJobFailedIfCurrent(db, jobId, errorCode, getErrorMessage(error));
       }
       return { success: false, errorCode, reservedCount: 0 };
     }
 
     // Unhandled / Transaction aborted / Permission denied
-    return { success: false, errorCode: 'TRANSACTION_ERROR', errorMessage: error.message, reservedCount: 0 };
+    return { success: false, errorCode: 'TRANSACTION_ERROR', errorMessage: getErrorMessage(error), reservedCount: 0 };
   }
 }
 

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { CheckCircle, XCircle, Clock, ShieldAlert } from 'lucide-react';
-import type { ValidationRequest } from '../types';
+import { auth } from '../db/firebase';
+import type { ValidationRequest, Expense } from '../types';
 
 const ValidationDashboard: React.FC = () => {
-  const { db, saveDB, currentUser, logAuditAction } = useAppContext();
+  type ValidationEntity = { id: string; [key: string]: unknown };
+  const { db, safeMergeDB, updateLocalState, currentUser, logAuditAction } = useAppContext();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   if (!db || !currentUser) return <div style={{padding: '2rem'}}>Chargement (db manquant: {!db}, user manquant: {!currentUser})...</div>;
@@ -27,34 +29,159 @@ const ValidationDashboard: React.FC = () => {
 
   const handleApprove = async (req: ValidationRequest) => {
     if (!window.confirm("Confirmer l'approbation de cette action ?")) return;
+    const approverUid = auth.currentUser?.uid;
+    if (!approverUid) {
+      alert("Erreur : Aucun utilisateur connecté dans Firebase Auth.");
+      return;
+    }
     setLoadingId(req.id);
     
     try {
-      // 1. Appliquer l'action
-      const newDb = { ...db };
-      let targetArray = (newDb as any)[req.targetCollection] || [];
-      
-      if (req.actionType === 'DELETE_STUDENT') {
-        targetArray = targetArray.filter((i: any) => i.id !== req.targetDocumentId);
-      } else {
-        // UPDATE ou CREATE
-        const index = targetArray.findIndex((i: any) => i.id === req.targetDocumentId);
-        if (index >= 0) {
-          targetArray[index] = { ...targetArray[index], ...req.proposedData };
-        } else {
-          targetArray.push(req.proposedData);
+      if (req.actionType === 'HIGH_EXPENSE') {
+        const { doc, runTransaction, serverTimestamp, getDoc } = await import('firebase/firestore');
+        const { db: firestoreDb } = await import('../db/firebase');
+
+        const { requestId, expenseId } = await runTransaction(firestoreDb, async (transaction) => {
+          const reqRef = doc(firestoreDb, 'validation_requests', req.id);
+          const reqSnap = await transaction.get(reqRef);
+
+          if (!reqSnap.exists()) {
+            throw new Error("La demande n'existe pas.");
+          }
+          const reqData = reqSnap.data() as ValidationRequest;
+          if (reqData.status !== 'pending') {
+            throw new Error("La demande n'est plus en attente.");
+          }
+          if (reqData.actionType !== 'HIGH_EXPENSE') {
+            throw new Error("Type de demande invalide.");
+          }
+          if (currentUser.role !== 'superAdmin' && reqData.schoolId !== currentUser.schoolId) {
+            throw new Error("Vous n'avez pas accès à cette école.");
+          }
+
+          const proposed = reqData.proposedData as Record<string, unknown>;
+          if (!proposed) {
+            throw new Error("Données proposées manquantes.");
+          }
+
+          const proposedKeys = Object.keys(proposed).sort();
+          const expectedKeys = ['id', 'schoolId', 'amount', 'date', 'person', 'reason'].sort();
+          const hasExactKeys = proposedKeys.length === expectedKeys.length && proposedKeys.every((k, i) => k === expectedKeys[i]);
+          if (!hasExactKeys) {
+            throw new Error("Les champs de la dépense sont invalides ou incomplets.");
+          }
+
+          if (proposed.schoolId !== reqData.schoolId) {
+            throw new Error("Incohérence du schoolId.");
+          }
+
+          if (typeof proposed.id !== 'string' || !proposed.id) {
+            throw new Error("Identifiant de dépense invalide.");
+          }
+
+          const expenseRef = doc(firestoreDb, 'expenses', proposed.id);
+          const expenseSnap = await transaction.get(expenseRef);
+
+          if (expenseSnap.exists()) {
+            const existingData = expenseSnap.data();
+            const isSame = existingData.id === proposed.id &&
+                           existingData.schoolId === proposed.schoolId &&
+                           existingData.amount === proposed.amount &&
+                           existingData.date === proposed.date &&
+                           existingData.person === proposed.person &&
+                           existingData.reason === proposed.reason;
+            if (!isSame) {
+              throw new Error("Une dépense existante avec cet identifiant possède des données différentes.");
+            }
+          } else {
+            transaction.set(expenseRef, proposed);
+          }
+
+          transaction.update(reqRef, {
+            status: 'approved',
+            approvedBy: approverUid,
+            approvedAt: serverTimestamp()
+          });
+
+          return { requestId: req.id, expenseId: proposed.id };
+        });
+
+        // Relire après commit
+        const reqRef = doc(firestoreDb, 'validation_requests', requestId);
+        const expenseRef = doc(firestoreDb, 'expenses', expenseId);
+
+        const [reqSnapAfter, expenseSnapAfter] = await Promise.all([
+          getDoc(reqRef),
+          getDoc(expenseRef)
+        ]);
+
+        if (!reqSnapAfter.exists() || !expenseSnapAfter.exists()) {
+          throw new Error("Erreur de synchronisation : Les documents n'ont pas pu être relus après écriture.");
         }
-      }
-      
-      (newDb as any)[req.targetCollection] = targetArray;
 
-      // 2. Mettre à jour la requête
-      const reqIndex = newDb.validation_requests.findIndex(r => r.id === req.id);
-      if (reqIndex >= 0) {
-        newDb.validation_requests[reqIndex] = { ...newDb.validation_requests[reqIndex], status: 'approved' };
+        const freshRequest = { id: reqSnapAfter.id, ...reqSnapAfter.data() } as ValidationRequest;
+        const freshExpense = { id: expenseSnapAfter.id, ...expenseSnapAfter.data() } as Expense;
+
+        if (freshRequest.status !== 'approved') {
+          throw new Error("La demande relue n'est pas approuvée.");
+        }
+        if (freshExpense.id !== expenseId) {
+          throw new Error("L'identifiant de la dépense relue ne correspond pas.");
+        }
+        if (freshExpense.schoolId !== freshRequest.schoolId) {
+          throw new Error("Incohérence d'école sur les documents relus.");
+        }
+
+        // Update local React state using fresh data from firestore
+        const updatedRequests = db.validation_requests.map(r => r.id === req.id ? freshRequest : r);
+        const updatedExpenses = [...(db.expenses || [])];
+        if (!updatedExpenses.some(e => e.id === freshExpense.id)) {
+          updatedExpenses.push(freshExpense);
+        }
+
+        updateLocalState({
+          validation_requests: updatedRequests,
+          expenses: updatedExpenses
+        });
+
+        alert("Dépense approuvée et enregistrée avec succès.");
+      } else {
+        // Fallback for other action types
+        const newDb = { ...db };
+        const targetArray = ((newDb as Record<string, unknown>)[req.targetCollection] as ValidationEntity[]) || [];
+
+        if (req.actionType === 'DELETE_STUDENT') {
+          const index = targetArray.findIndex((i: ValidationEntity) => i.id === req.targetDocumentId);
+          if (index >= 0) {
+            targetArray[index] = {
+              ...targetArray[index],
+              ...(req.proposedData as Record<string, unknown>),
+              schoolingStatus: 'inactive',
+              departureReason: 'withdrawn',
+              departureDate: new Date().toISOString().split('T')[0],
+              departureNote: 'Retiré des élèves actifs (Demande approuvée)'
+            };
+          }
+        } else {
+          const index = targetArray.findIndex((i: ValidationEntity) => i.id === req.targetDocumentId);
+          if (index >= 0) {
+            targetArray[index] = { ...targetArray[index], ...(req.proposedData as Record<string, unknown>) };
+          } else {
+            targetArray.push(req.proposedData as ValidationEntity);
+          }
+        }
+
+        (newDb as Record<string, unknown>)[req.targetCollection] = targetArray;
+
+        const reqIndex = newDb.validation_requests.findIndex(r => r.id === req.id);
+        if (reqIndex >= 0) {
+          newDb.validation_requests[reqIndex] = { ...newDb.validation_requests[reqIndex], status: 'approved' };
+        }
+
+        await safeMergeDB(newDb);
+        alert("Action approuvée avec succès.");
       }
 
-      await saveDB(newDb);
       logAuditAction({
         action: 'APPROVE_VALIDATION_REQUEST',
         targetType: 'VALIDATION_REQUEST',
@@ -62,23 +189,73 @@ const ValidationDashboard: React.FC = () => {
         targetName: getActionLabel(req.actionType)
       });
     } catch (err) {
-      alert("Erreur lors de l'approbation.");
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      alert("Erreur lors de l'approbation : " + errorMsg);
       console.error(err);
+    } finally {
+      setLoadingId(null);
     }
-    setLoadingId(null);
   };
 
   const handleReject = async (req: ValidationRequest) => {
     if (!window.confirm("Rejeter cette demande ?")) return;
+    const approverUid = auth.currentUser?.uid;
+    if (!approverUid) {
+      alert("Erreur : Aucun utilisateur connecté dans Firebase Auth.");
+      return;
+    }
     setLoadingId(req.id);
-    
+
     try {
-      const newDb = { ...db };
-      const reqIndex = newDb.validation_requests.findIndex(r => r.id === req.id);
-      if (reqIndex >= 0) {
-        newDb.validation_requests[reqIndex] = { ...newDb.validation_requests[reqIndex], status: 'rejected' };
+      const { doc, runTransaction, serverTimestamp, getDoc } = await import('firebase/firestore');
+      const { db: firestoreDb } = await import('../db/firebase');
+
+      const { requestId } = await runTransaction(firestoreDb, async (transaction) => {
+        const reqRef = doc(firestoreDb, 'validation_requests', req.id);
+        const reqSnap = await transaction.get(reqRef);
+
+        if (!reqSnap.exists()) {
+          throw new Error("La demande n'existe pas.");
+        }
+        const reqData = reqSnap.data() as ValidationRequest;
+        if (reqData.status !== 'pending') {
+          throw new Error("La demande n'est plus en attente.");
+        }
+        if (currentUser.role !== 'superAdmin' && reqData.schoolId !== currentUser.schoolId) {
+          throw new Error("Vous n'avez pas accès à cette école.");
+        }
+
+        transaction.update(reqRef, {
+          status: 'rejected',
+          rejectedBy: approverUid,
+          rejectedAt: serverTimestamp()
+        });
+
+        return { requestId: req.id };
+      });
+
+      // Relire après commit
+      const reqRef = doc(firestoreDb, 'validation_requests', requestId);
+      const reqSnapAfter = await getDoc(reqRef);
+
+      if (!reqSnapAfter.exists()) {
+        throw new Error("Erreur de synchronisation : La demande n'a pas pu être relue après écriture.");
       }
-      await saveDB(newDb);
+
+      const freshRequest = { id: reqSnapAfter.id, ...reqSnapAfter.data() } as ValidationRequest;
+      if (freshRequest.status !== 'rejected') {
+        throw new Error("La demande relue n'est pas rejetée.");
+      }
+
+      // Update local React state using fresh data from firestore
+      const updatedRequests = db.validation_requests.map(r => r.id === req.id ? freshRequest : r);
+
+      updateLocalState({
+        validation_requests: updatedRequests
+      });
+
+      alert("Demande rejetée avec succès.");
+
       logAuditAction({
         action: 'REJECT_VALIDATION_REQUEST',
         targetType: 'VALIDATION_REQUEST',
@@ -86,9 +263,12 @@ const ValidationDashboard: React.FC = () => {
         targetName: getActionLabel(req.actionType)
       });
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      alert("Erreur lors du rejet : " + errorMsg);
       console.error(err);
+    } finally {
+      setLoadingId(null);
     }
-    setLoadingId(null);
   };
 
   const getActionLabel = (type: string) => {
@@ -152,14 +332,14 @@ const ValidationDashboard: React.FC = () => {
                 <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
                   <button 
                     onClick={() => handleApprove(req)}
-                    disabled={loadingId === req.id}
+                    disabled={loadingId !== null}
                     style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.75rem 1rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500 }}
                   >
                     <CheckCircle size={18} /> Approuver
                   </button>
                   <button 
                     onClick={() => handleReject(req)}
-                    disabled={loadingId === req.id}
+                    disabled={loadingId !== null}
                     style={{ background: 'white', color: '#ef4444', border: '1px solid #ef4444', padding: '0.75rem 1rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500 }}
                   >
                     <XCircle size={18} /> Rejeter

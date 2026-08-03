@@ -76,7 +76,7 @@ test.describe('P0-024B POST-DEPLOYMENT LIVE VALIDATION (with seed)', () => {
         const confirmBtn = page.locator('button:has-text("Confirmer l\'importation")');
         if (expectedStatus === 'bloque') {
           let alertTriggered = false;
-          const dialogHandler = async (dialog: any) => {
+          const dialogHandler = async (dialog: import('@playwright/test').Dialog) => {
             if (dialog.message().includes('limite SaaS')) {
               alertTriggered = true;
             }

@@ -39,7 +39,7 @@ export async function executeBulkWriterImport(
   const bulkWriter = db.bulkWriter();
   
   // Track promises to ensure we catch everything
-  const allPromises: Promise<any>[] = [];
+  const allPromises: Promise<unknown>[] = [];
 
   // Map to track operation types for error handling
   const operationTypeMap = new Map<string, { type: 'create' | 'update', matricule: string }>();
@@ -62,7 +62,7 @@ export async function executeBulkWriterImport(
   let processedCount = 0;
   const progressPromises: Promise<void>[] = [];
 
-  bulkWriter.onWriteResult((docRef, resultSnap) => {
+  bulkWriter.onWriteResult((docRef) => {
     // Success callback
     const op = operationTypeMap.get(docRef.id);
     if (op) {

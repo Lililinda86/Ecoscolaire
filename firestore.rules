@@ -1,13 +1,65 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ==========================================
     // UTILS : FONCTIONS DE SÉCURITÉ
     // ==========================================
-    
+
+
+    function isStrictGradePayload(data) {
+      return data.keys().hasAll(['academicYearId', 'periodId', 'evaluationId', 'classId', 'classSubjectId']);
+    }
+
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function isValidEvaluationStatusTransition(oldStatus, newStatus, role) {
+      return (
+        (role == 'teacher' && (
+          (oldStatus == 'NEW' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'submitted') ||
+          (oldStatus == 'submitted' && newStatus == 'draft')
+        )) ||
+        (role == 'director' && (
+          (oldStatus == 'NEW' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'draft' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'submitted' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'validated' && (newStatus == 'draft' || newStatus == 'validated' || newStatus == 'locked'))
+        )) ||
+        (role == 'owner' || role == 'superAdmin')
+      );
+    }
+
+    function isValidGradeStatusTransition(oldStatus, newStatus, role) {
+      return (
+        (role == 'teacher' && (
+          (oldStatus == 'NEW' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'draft') ||
+          (oldStatus == 'draft' && newStatus == 'submitted') ||
+          (oldStatus == 'submitted' && newStatus == 'draft')
+        )) ||
+        (role == 'director' && (
+          (oldStatus == 'NEW' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'draft' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'submitted' && (newStatus == 'draft' || newStatus == 'validated')) ||
+          (oldStatus == 'validated' && (newStatus == 'draft' || newStatus == 'validated' || newStatus == 'locked'))
+        )) ||
+        (role == 'owner' || role == 'superAdmin')
+      );
+    }
+
+    function isProtectedCashPayment(data) {
+      return (
+        (data.keys().hasAll(['byRecordCashPayment']) && data.byRecordCashPayment == true)
+        || (
+          data.keys().hasAll(['type', 'method'])
+          && (data.type == 'tuition' || data.type == 'registration_fee')
+          && data.method == 'cash'
+        )
+      );
     }
 
     function getUserData() {
@@ -30,21 +82,70 @@ service cloud.firestore {
 
     function isUpdatingSaasFields() {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny([
-        'subscriptionPlan', 
-        'subscriptionStatus', 
-        'subscriptionStartDate', 
-        'subscriptionEndDate', 
-        'subscriptionRenewalDate', 
-        'nextPaymentDate', 
-        'isInternalSchool', 
-        'studentLimit', 
+        'subscriptionPlan',
+        'subscriptionStatus',
+        'subscriptionStartDate',
+        'subscriptionEndDate',
+        'subscriptionRenewalDate',
+        'nextPaymentDate',
+        'isInternalSchool',
+        'studentLimit',
         'studentsCount',
         'studentCount',
         'pilot',
-        'billingStatus', 
-        'billingCycle', 
+        'billingStatus',
+        'billingCycle',
         'trialEndsAt'
       ]);
+    }
+
+    function isUpdatingTransportPolicy() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['transportPolicy']);
+    }
+
+    function isValidTransportPolicy() {
+      let policy = request.resource.data.get('transportPolicy', {});
+      let validKeys = policy.keys().hasOnly(['secretaryManageAll']);
+      let validTypes = !('secretaryManageAll' in policy) || policy.secretaryManageAll is bool;
+      return validKeys && validTypes;
+    }
+
+    function isAcademicCalendarPointerUpdate(schoolId) {
+      let isAllowedRole = isSuperAdmin() || (hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector()));
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      let onlyAllowedKeysChanged = affectedKeys.hasOnly(['activeAcademicYearId', 'updatedAt', 'updatedBy', 'version']);
+
+      let validActiveYearId = !affectedKeys.hasAny(['activeAcademicYearId']) ||
+                              request.resource.data.activeAcademicYearId == null ||
+                              (request.resource.data.activeAcademicYearId is string && request.resource.data.activeAcademicYearId.size() > 0);
+
+      let validUpdatedBy = !affectedKeys.hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid;
+
+      let validVersion = affectedKeys.hasAll(['version']) &&
+                         request.resource.data.version is number &&
+                         request.resource.data.version == (('version' in resource.data ? resource.data.version : 0) + 1);
+
+      return isAllowedRole && onlyAllowedKeysChanged && validActiveYearId && validUpdatedBy && validVersion;
+    }
+
+    function isPeriodPointerUpdate() {
+      let isAllowedRole = isSuperAdmin() || (hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector()));
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      let onlyAllowedKeysChanged = affectedKeys.hasOnly(['openPeriodId', 'status', 'updatedAt', 'updatedBy', 'version']);
+
+      let validOpenPeriodId = !affectedKeys.hasAny(['openPeriodId']) ||
+                              request.resource.data.openPeriodId == null ||
+                              (request.resource.data.openPeriodId is string && request.resource.data.openPeriodId.size() > 0);
+
+      let validUpdatedBy = !affectedKeys.hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid;
+
+      let validVersion = affectedKeys.hasAll(['version']) &&
+                         request.resource.data.version is number &&
+                         request.resource.data.version == (('version' in resource.data ? resource.data.version : 0) + 1);
+
+      let schoolIdImmutable = request.resource.data.schoolId == resource.data.schoolId;
+
+      return isAllowedRole && onlyAllowedKeysChanged && validOpenPeriodId && validUpdatedBy && validVersion && schoolIdImmutable;
     }
 
     function isUpdatingSensitiveUserFields() {
@@ -60,12 +161,25 @@ service cloud.firestore {
     }
 
     function isPromotingToSuperAdmin() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) 
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
              && request.resource.data.role == 'superAdmin';
     }
 
     function isChangingSchoolId() {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId', 'schoolIds']);
+    }
+
+    function isUpdatingStudentActiveStatusFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'schoolingStatus',
+        'departureReason',
+        'departureDate',
+        'departureNote',
+        'deactivatedAt',
+        'deactivatedBy',
+        'reactivatedAt',
+        'reactivatedBy'
+      ]);
     }
 
     // --- Rôles ---
@@ -111,17 +225,117 @@ service cloud.firestore {
       return hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector() || isSecretary());
     }
 
+    function canSecretaryManageAllTransport(schoolId) {
+      let schoolPath = /databases/$(database)/documents/schools/$(schoolId);
+      return isAuthenticated() && isActive() && isSecretary() && hasSchoolAccess(schoolId) &&
+             exists(schoolPath) &&
+             get(schoolPath).data.get('transportPolicy', {}).get('secretaryManageAll', false) == true;
+    }
+
+    function isAcademicProgramManager() {
+      return isSuperAdmin() || isOwner() || isDirector() || isSecretary();
+    }
+
+    function isTeacherAssignedToClassSubject(schoolId, academicYearId, classId, classSubjectId) {
+      let staffLink = get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid));
+      let assignmentPath = /databases/$(database)/documents/teacherAssignments/$(schoolId + '__' + academicYearId + '__' + classId + '__' + classSubjectId + '__' + staffLink.data.staffId);
+      return isAuthenticated()
+        && isTeacher()
+        && staffLink != null
+        && staffLink.data.isActive == true
+        && staffLink.data.schoolId == schoolId
+        && exists(assignmentPath)
+        && get(assignmentPath).data.isActive == true;
+    }
+
+    function hasValidStudentClass(studentData) {
+      let classPath = /databases/$(database)/documents/classes/$(studentData.classId);
+      return studentData.classId is string
+        && studentData.classId.size() > 0
+        && exists(classPath)
+        && get(classPath).data.schoolId == studentData.schoolId
+        && (
+          !('isActive' in get(classPath).data)
+          || get(classPath).data.isActive != false
+        );
+    }
+
     function canCreateStudentWithinLimits(schoolId) {
       let school = get(/databases/$(database)/documents/schools/$(schoolId)).data;
       let isInternal = school.get('isInternalSchool', false) == true;
       let plan = school.get('subscriptionPlan', 'starter');
       let count = school.get('studentsCount', 0);
-      
-      return isInternal 
+
+      return isInternal
           || plan == 'premium'
           || (plan == 'pilot' && count < 1000)
           || (plan == 'standard' && count < 1000)
           || (plan == 'starter' && count < 200);
+    }
+
+    function isAccountantRegistrationFeeUpdate() {
+      return isAccountant()
+          && hasSchoolAccess(resource.data.schoolId)
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'registrationFeePaid',
+            'registrationFeeStatus'
+          ])
+          && request.resource.data.registrationFeePaid is number
+          && request.resource.data.registrationFeePaid >= 0
+          && request.resource.data.registrationFeeStatus in ['unpaid', 'partial', 'paid'];
+    }
+
+    function isAccountantTuitionUpdate() {
+      return isAccountant()
+          && hasSchoolAccess(resource.data.schoolId)
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'tuitionPaid',
+            'tuitionStatus'
+          ])
+          && request.resource.data.tuitionPaid is number
+          && request.resource.data.tuitionPaid >= 0
+          && request.resource.data.tuitionStatus in ['unpaid', 'partial', 'paid'];
+    }
+
+    function isAccountantTransportUpdate() {
+      return isAccountant()
+          && hasSchoolAccess(resource.data.schoolId)
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'transportPaid'
+          ])
+          && request.resource.data.transportPaid is number
+          && request.resource.data.transportPaid >= 0;
+    }
+
+    function isValidExpense(data, expenseId) {
+      return data.keys().hasAll(['id', 'schoolId', 'amount', 'date', 'person', 'reason'])
+          && data.keys().hasOnly(['id', 'schoolId', 'amount', 'date', 'person', 'reason'])
+          && data.id is string
+          && data.id == expenseId
+          && data.schoolId is string
+          && data.schoolId.size() > 0
+          && data.amount is int
+          && data.amount > 0
+          && data.date is string
+          && data.date.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
+          && data.person is string
+          && data.person.matches('.*\\S.*')
+          && data.reason is string
+          && data.reason.matches('.*\\S.*');
+    }
+
+    function canCreateExpense(data) {
+      return isAdminOrOwner()
+          || isDirector()
+          || ((isAccountant() || isSecretary()) && data.amount <= 50000);
+    }
+
+    function canUpdateExpense(data) {
+      return isAdminOrOwner()
+          || ((isAccountant() || isSecretary()) && data.amount <= 50000);
     }
 
     // ==========================================
@@ -150,7 +364,7 @@ service cloud.firestore {
 
       // Autorise superAdmin/owner à créer, OU le premier superAdmin via email, OU Auto-inscription Parent via Invitation
       allow create: if isAuthenticated() && (
-        isSuperAdmin() || isOwner() || 
+        isSuperAdmin() || isOwner() ||
         (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId) ||
         (
           request.auth.uid == userId &&
@@ -164,7 +378,7 @@ service cloud.firestore {
         )
       );
       allow update: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         (
           (request.auth.uid == userId || (isOwner() && hasSchoolAccess(resource.data.schoolId))) &&
           !isUpdatingSensitiveUserFields()
@@ -176,14 +390,17 @@ service cloud.firestore {
     // --- SCHOOLS ---
     match /schools/{schoolId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId);
-      
+
       // Seul le superAdmin peut créer ou supprimer des écoles
-      allow create, delete: if isAuthenticated() && isSuperAdmin();
-      // Le propriétaire peut modifier son école (mais pas l'abonnement SaaS)
+      allow create: if isAuthenticated() && isSuperAdmin() && isValidTransportPolicy();
+      allow delete: if isAuthenticated() && isSuperAdmin();
+      // Le propriétaire peut modifier son école (mais pas l'abonnement SaaS ni le pointeur de manière non atomique)
       allow update: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
-        (canManageSchool(schoolId) && !isUpdatingSaasFields())
-      );
+        isSuperAdmin() ||
+        (canManageSchool(schoolId) && !isUpdatingSaasFields() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeAcademicYearId'])) ||
+        (isAcademicCalendarPointerUpdate(schoolId) && !isUpdatingTransportPolicy())
+      ) && (!isUpdatingTransportPolicy() || (isValidTransportPolicy() && (isOwner() || isSuperAdmin())))
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId']);
 
       match /secrets/{secretId} {
         allow read: if false;
@@ -198,12 +415,12 @@ service cloud.firestore {
       allow get: if resource.data.status == 'pending' && resource.data.expiresAt > request.time; // Not fully possible to compare string ISO with toMillis simply in rules if it's stored as string. Wait, ISO strings can be compared directly in lexicographical order!
       // Better yet, just check pending. The client checks expiration, or we can check string:
       // allow get: if resource.data.status == 'pending'; (the UI will check expiration)
-      
+
       allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(request.resource.data.schoolId);
-      
+
       allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
-      
-      allow update: if isAuthenticated() && 
+
+      allow update: if isAuthenticated() &&
                     (request.auth.token.email == resource.data.parentEmailLower || request.auth.token.email == resource.data.parentEmail) &&
                     resource.data.status == 'pending' &&
                     request.resource.data.status == 'used' &&
@@ -213,16 +430,35 @@ service cloud.firestore {
     // --- STUDENTS & PARENTS ---
     match /students/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
       );
-      // Création par Owner, Director, Secretary AVEC limite
-      allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId) && canCreateStudentWithinLimits(request.resource.data.schoolId);
+      // Création par Owner, Director, Secretary AVEC limite et validation stricte de classe
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && canCreateStudentWithinLimits(request.resource.data.schoolId)
+                    && hasValidStudentClass(request.resource.data);
       // Update
-      allow update: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
-      // Delete (Demande validation dans le client, mais ici la vraie suppression requiert owner)
-      allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
+      allow update: if isAuthenticated() && isActive() && (
+        !(isSecretary() && isUpdatingStudentActiveStatusFields())
+        && (
+          (
+            canManagePedagogy(request.resource.data.schoolId)
+            && request.resource.data.schoolId == resource.data.schoolId
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
+              || hasValidStudentClass(request.resource.data)
+            )
+          ) ||
+          isAccountantRegistrationFeeUpdate() ||
+          isAccountantTuitionUpdate() ||
+          isAccountantTransportUpdate()
+        )
+      );
+      // Delete (Désactivé physiquement pour la sécurité des données)
+      allow delete: if false;
     }
 
     match /parents/{parentId} {
@@ -230,14 +466,259 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
     }
 
+    function hasNonEmptySpecialtyId(classData) {
+      return 'specialtyId' in classData
+        && classData.specialtyId is string
+        && classData.specialtyId.size() > 0;
+    }
+
+    function hasValidTechnicalSpecialty(classData) {
+      let specialtyPath = /databases/$(database)/documents/technicalSpecialties/$(classData.specialtyId);
+      return classData.educationType == 'technical'
+        && hasNonEmptySpecialtyId(classData)
+        && exists(specialtyPath)
+        && get(specialtyPath).data.schoolId == classData.schoolId
+        && (
+          !('isActive' in get(specialtyPath).data)
+          || get(specialtyPath).data.isActive != false
+        );
+    }
+
+    function isValidClassPayload(classData) {
+      return (
+        'educationType' in classData
+        && classData.educationType == 'technical'
+        && hasValidTechnicalSpecialty(classData)
+      ) || (
+        (
+          !('educationType' in classData)
+          || classData.educationType == 'general'
+        )
+        && !hasNonEmptySpecialtyId(classData)
+      );
+    }
+
     // --- CLASSES & SUBJECTS ---
     match /classes/{classId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow create: if isAuthenticated()
+        && isActive()
+        && (isAdminOrOwner() || isDirector())
+        && hasSchoolAccess(request.resource.data.schoolId)
+        && isValidClassPayload(request.resource.data);
+      allow update: if isAuthenticated()
+        && isActive()
+        && (isAdminOrOwner() || isDirector())
+        && hasSchoolAccess(resource.data.schoolId)
+        && request.resource.data.schoolId == resource.data.schoolId
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['educationType', 'specialtyId'])
+          || isValidClassPayload(request.resource.data)
+        );
+      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId);
     }
     match /subjects/{subjectId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow create: if isAuthenticated()
+        && isActive()
+        && request.resource.data.schoolId is string
+        && hasSchoolAccess(request.resource.data.schoolId)
+        && isAcademicProgramManager()
+        && request.resource.data.id is string
+        && request.resource.data.id == subjectId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive == true
+        && request.resource.data.createdAt is string
+        && request.resource.data.createdBy is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string;
+      allow update: if isAuthenticated()
+        && isActive()
+        && hasSchoolAccess(resource.data.schoolId)
+        && request.resource.data.schoolId == resource.data.schoolId
+        && isAcademicProgramManager()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'schoolId'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string;
+      allow delete: if false;
+    }
+    match /technicalSpecialties/{specialtyId} {
+      allow read: if isAuthenticated()
+        && isActive()
+        && hasSchoolAccess(resource.data.schoolId);
+
+      allow create: if isAuthenticated()
+        && isActive()
+        && request.resource.data.schoolId is string
+        && hasSchoolAccess(request.resource.data.schoolId)
+        && (isAdminOrOwner() || isDirector())
+        && request.resource.data.id is string
+        && request.resource.data.id == specialtyId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive == true;
+
+      allow update: if isAuthenticated()
+        && isActive()
+        && hasSchoolAccess(resource.data.schoolId)
+        && request.resource.data.schoolId == resource.data.schoolId
+        && (isAdminOrOwner() || isDirector())
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id'])
+        && (!('id' in resource.data) || (('id' in request.resource.data) && request.resource.data.id == resource.data.id && request.resource.data.id == specialtyId))
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.matches('.*[^ \t\r\n].*')
+        && request.resource.data.isActive is bool;
+
+      allow delete: if false;
+    }
+
+    match /classPrograms/{programId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+                  && (
+                    isAcademicProgramManager()
+                    || (
+                      isTeacher()
+                      && resource.data.status == 'published'
+                      && 'publishedRevisionId' in resource.data
+                      && resource.data.publishedRevisionId is string
+                      && resource.data.publishedRevisionId != ""
+                      && 'publishedRevisionNumber' in resource.data
+                      && resource.data.publishedRevisionNumber is int
+                      && resource.data.publishedRevisionNumber >= 1
+                    )
+                  );
+      allow create: if isAuthenticated() && isActive()
+                    && request.resource.data.schoolId is string
+                    && request.resource.data.schoolId.size() > 0
+                    && hasSchoolAccess(request.resource.data.schoolId)
+                    && isAcademicProgramManager()
+                    && request.resource.data.classId is string
+                    && request.resource.data.classId.size() > 0
+                    && request.resource.data.academicYearId is string
+                    && request.resource.data.academicYearId.matches('^\\d{4}-\\d{4}$')
+                    && programId == request.resource.data.schoolId + '__' + request.resource.data.academicYearId + '__' + request.resource.data.classId
+                    && exists(/databases/$(database)/documents/classes/$(request.resource.data.classId))
+                    && get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.schoolId == request.resource.data.schoolId
+                    && request.resource.data.status == 'draft'
+                    && request.resource.data.draftRevisionNumber == 1
+                    && request.resource.data.draftRevisionId == programId + '__v1'
+                    && !('publishedRevisionId' in request.resource.data)
+                    && !('publishedRevisionNumber' in request.resource.data)
+                    && !('publishedAt' in request.resource.data)
+                    && !('publishedBy' in request.resource.data)
+                    && request.resource.data.hasUnpublishedChanges == true
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && request.resource.data.createdAt is string
+                    && request.resource.data.updatedAt is string
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'classId', 'academicYearId', 'status',
+                      'draftRevisionId', 'draftRevisionNumber', 'hasUnpublishedChanges',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ]);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /classSubjects/{classSubjectId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+                  && (
+                    isAcademicProgramManager()
+                    || (
+                      isTeacher()
+                      && exists(/databases/$(database)/documents/classPrograms/$(resource.data.programId))
+                      && get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.schoolId == resource.data.schoolId
+                      && 'publishedRevisionId' in get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data
+                      && resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.publishedRevisionId
+                    )
+                  );
+      allow create: if isAuthenticated() && isActive()
+                    && request.resource.data.schoolId is string
+                    && hasSchoolAccess(request.resource.data.schoolId)
+                    && isAcademicProgramManager()
+                    && exists(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId))
+                    && request.resource.data.schoolId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.schoolId
+                    && request.resource.data.classId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.classId
+                    && request.resource.data.academicYearId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.academicYearId
+                    && request.resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.draftRevisionId
+                    && request.resource.data.revisionNumber == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.draftRevisionNumber
+                    && get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.hasUnpublishedChanges == true
+                    && request.resource.data.subjectId is string
+                    && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
+                    && get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.schoolId == request.resource.data.schoolId
+                    && get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.isActive != false
+                    && classSubjectId == request.resource.data.revisionId + '__' + request.resource.data.subjectId
+                    && request.resource.data.subjectNameSnapshot == get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.name
+                    && request.resource.data.subjectNameSnapshot.size() > 0
+                    && (
+                      (
+                        (
+                          !('code' in get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data) ||
+                          get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.code == ""
+                        )
+                        && !('subjectCodeSnapshot' in request.resource.data)
+                      )
+                      ||
+                      (
+                        'code' in get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data &&
+                        get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.code != "" &&
+                        'subjectCodeSnapshot' in request.resource.data &&
+                        request.resource.data.subjectCodeSnapshot == get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.code
+                      )
+                    )
+                    && request.resource.data.isRequired is bool
+                    && request.resource.data.isActive is bool
+                    && request.resource.data.displayOrder is int
+                    && request.resource.data.displayOrder >= 0
+                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient > 0))
+                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours > 0))
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && request.resource.data.createdAt is string
+                    && request.resource.data.updatedAt is string
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'programId', 'schoolId', 'classId', 'academicYearId', 'subjectId',
+                      'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',
+                      'coefficient', 'weeklyHours', 'isRequired', 'displayOrder', 'isActive',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ]);
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+                    && isAcademicProgramManager()
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                      'id', 'programId', 'schoolId', 'classId', 'academicYearId', 'subjectId',
+                      'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',
+                      'createdAt', 'createdBy'
+                    ])
+                    && resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.draftRevisionId
+                    && resource.data.revisionNumber == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.draftRevisionNumber
+                    && get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.hasUnpublishedChanges == true
+                    && (
+                      !('publishedRevisionId' in get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data)
+                      || resource.data.revisionId != get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.publishedRevisionId
+                    )
+                    && request.resource.data.isRequired is bool
+                    && request.resource.data.isActive is bool
+                    && request.resource.data.displayOrder is int
+                    && request.resource.data.displayOrder >= 0
+                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient > 0))
+                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours > 0))
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && request.resource.data.updatedAt is string
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'programId', 'schoolId', 'classId', 'academicYearId', 'subjectId',
+                      'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',
+                      'coefficient', 'weeklyHours', 'isRequired', 'displayOrder', 'isActive',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ]);
+      allow delete: if false;
     }
 
     // --- STUDENT IMPORT JOBS ---
@@ -258,11 +739,11 @@ service cloud.firestore {
                     && request.resource.data.skippedCount is int && request.resource.data.skippedCount == 0
                     && request.resource.data.failedCount is int && request.resource.data.failedCount == 0
                     && request.resource.data.createdBy is string
-                    && request.resource.data.createdAt is timestamp
-                    && (!('startedAt' in request.resource.data) || request.resource.data.startedAt == null)
-                    && (!('finishedAt' in request.resource.data) || request.resource.data.finishedAt == null)
-                    && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null)
-                    && (!('errorMessage' in request.resource.data) || request.resource.data.errorMessage == null);
+        && request.resource.data.createdAt is timestamp
+        && (!('startedAt' in request.resource.data) || request.resource.data.startedAt == null)
+        && (!('finishedAt' in request.resource.data) || request.resource.data.finishedAt == null)
+        && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null)
+        && (!('errorMessage' in request.resource.data) || request.resource.data.errorMessage == null);
       allow update, delete: if false; // Only Cloud Functions (Admin SDK) can update/delete
     }
 
@@ -273,14 +754,87 @@ service cloud.firestore {
       allow update, delete: if false; // Immuable
     }
 
+    match /academicYears/{yearId} {
+      allow read: if isAuthenticated() && isActive() && (resource == null || hasSchoolAccess(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow update: if isAuthenticated() && isActive() && (
+        ((isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['openPeriodId'])) ||
+        isPeriodPointerUpdate()
+      );
+      allow delete: if false;
+    }
+
+    match /periods/{periodId} {
+      allow read: if isAuthenticated() && isActive() && (resource == null || hasSchoolAccess(resource.data.schoolId));
+      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) &&
+        hasSchoolAccess(request.resource.data.schoolId) &&
+        request.resource.data.keys().hasAll(['schoolId', 'academicYearId', 'name', 'type', 'order', 'startDate', 'endDate', 'status', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']);
+      allow delete: if false;
+    }
+
+    match /evaluations/{evalId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || (isDirector() && isValidEvaluationStatusTransition('NEW', request.resource.data.status, 'director'))) ||
+        (isTeacher()
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+          && isValidEvaluationStatusTransition('NEW', request.resource.data.status, 'teacher')
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId) && request.resource.data.weight > 0;
+      allow update: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || (isDirector() && isValidEvaluationStatusTransition(resource.data.status, request.resource.data.status, 'director'))) ||
+        (isTeacher()
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+          && isValidEvaluationStatusTransition(resource.data.status, request.resource.data.status, 'teacher')
+          && resource.data.status != 'locked'
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId) && request.resource.data.weight > 0;
+      allow delete: if false;
+    }
+
     match /grades/{gradeId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isTeacher()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId)) // La logique "uniquement si payé" est gérée par le client, on peut difficilement la faire en rules sans check croisé de /payments/
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published') ||
+        (isStudent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published' && resource.data.studentId == request.auth.uid)
       );
-      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isTeacher()) && hasSchoolAccess(request.resource.data.schoolId);
-      allow delete: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+
+      allow create: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || (isDirector() && isValidGradeStatusTransition('NEW', request.resource.data.status, 'director'))) ||
+        (
+          isTeacher()
+          && request.resource.data.keys().hasAll(['schoolId', 'academicYearId', 'periodId', 'evaluationId', 'classId', 'classSubjectId', 'studentId', 'teacherId', 'status', 'maxScore'])
+          && request.resource.data.schoolId == getUserSchoolId()
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+          && isValidGradeStatusTransition('NEW', request.resource.data.status, 'teacher')
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId)
+        && (!isStrictGradePayload(request.resource.data) || request.resource.data.teacherId != '')
+        && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && (!('maxScore' in request.resource.data) || request.resource.data.score <= request.resource.data.maxScore)))
+        && (!isStrictGradePayload(request.resource.data) || !('resultStatus' in request.resource.data) || request.resource.data.resultStatus != 'scored' || ('score' in request.resource.data));
+
+      allow update: if isAuthenticated() && isActive() && (
+        (isAdminOrOwner() || (isDirector() && isValidGradeStatusTransition(resource.data.status, request.resource.data.status, 'director'))) ||
+        (
+          isTeacher()
+          && isValidGradeStatusTransition(resource.data.status, request.resource.data.status, 'teacher')
+          && resource.data.status != 'locked'
+          && request.resource.data.schoolId == resource.data.schoolId
+          && request.resource.data.academicYearId == resource.data.academicYearId
+          && request.resource.data.evaluationId == resource.data.evaluationId
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.classId == resource.data.classId
+          && request.resource.data.subjectId == resource.data.subjectId
+          && request.resource.data.version > resource.data.version
+          && isTeacherAssignedToClassSubject(request.resource.data.schoolId, request.resource.data.academicYearId, request.resource.data.classId, request.resource.data.classSubjectId)
+        )
+      ) && hasSchoolAccess(request.resource.data.schoolId)
+        && (!isStrictGradePayload(request.resource.data) || request.resource.data.teacherId != '')
+        && (!('score' in request.resource.data) || (request.resource.data.score >= 0 && (!('maxScore' in request.resource.data) || request.resource.data.score <= request.resource.data.maxScore)))
+        && (!isStrictGradePayload(request.resource.data) || !('resultStatus' in request.resource.data) || request.resource.data.resultStatus != 'scored' || ('score' in request.resource.data));
+
+      allow delete: if false;
     }
 
     match /attendance/{attendanceId} {
@@ -289,11 +843,43 @@ service cloud.firestore {
     }
     match /staff/{staffId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.schoolId is string
+                    && (!('staffType' in request.resource.data) || request.resource.data.staffType in ['teacher', 'director', 'secretary', 'accountant', 'supervisor', 'driver', 'maintenance', 'other'])
+                    && (!('employmentStatus' in request.resource.data) || request.resource.data.employmentStatus in ['active', 'inactive', 'suspended', 'departed']);
+      allow update: if isAuthenticated() && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && (!('staffType' in request.resource.data) || request.resource.data.staffType in ['teacher', 'director', 'secretary', 'accountant', 'supervisor', 'driver', 'maintenance', 'other'])
+                    && (!('employmentStatus' in request.resource.data) || request.resource.data.employmentStatus in ['active', 'inactive', 'suspended', 'departed']);
+      allow delete: if false;
     }
     match /staffAttendance/{attendanceId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
       allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+    }
+    match /staffUserLinks/{linkId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow write: if false;
+    }
+    match /staffUserLinkByUser/{userId} {
+      allow read: if isAuthenticated() && isActive() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        ((isOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow write: if false;
+    }
+    match /staffUserLinkByStaff/{pointerId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow write: if false;
     }
 
     // --- FINANCE (PAYMENTS & EXPENSES) ---
@@ -301,32 +887,68 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         resource.data.userId == request.auth.uid ||
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isAccountant()) && hasSchoolAccess(resource.data.schoolId))
+        ((isOwner() || isDirector() || isAccountant() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
       );
       allow create, update, delete: if false;
     }
 
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
       // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId)
+                    && !isProtectedCashPayment(request.resource.data);
+      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant())
+                    && hasSchoolAccess(resource.data.schoolId)
+                    && hasSchoolAccess(request.resource.data.schoolId)
+                    && !isProtectedCashPayment(resource.data)
+                    && !isProtectedCashPayment(request.resource.data);
+      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)
+                    && !isProtectedCashPayment(resource.data);
     }
     match /receipts/{receiptId} {
       allow read: if isAuthenticated() && isActive() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
-      // Création gérée uniquement par le backend (Cloud Functions onPaymentCreated)
+      // Écritures gérées uniquement par le backend avec Firebase Admin SDK.
       allow write: if false;
     }
     match /expenses/{expenseId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow get: if isAuthenticated()
+        && isActive()
+        && (
+          (
+            (isAdminOrOwner() || isDirector())
+            && (
+              !exists(/databases/$(database)/documents/expenses/$(expenseId))
+              || hasSchoolAccess(resource.data.schoolId)
+            )
+          )
+          ||
+          (
+            (isAccountant() || isSecretary())
+            && exists(/databases/$(database)/documents/expenses/$(expenseId))
+            && hasSchoolAccess(resource.data.schoolId)
+          )
+        );
+      allow list: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isAccountant() || isSecretary())
+                    && hasSchoolAccess(request.resource.data.schoolId)
+                    && isValidExpense(request.resource.data, expenseId)
+                    && canCreateExpense(request.resource.data);
+      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary())
+                    && hasSchoolAccess(resource.data.schoolId)
+                    && hasSchoolAccess(request.resource.data.schoolId)
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.id == resource.data.id
+                    && isValidExpense(request.resource.data, expenseId)
+                    && canUpdateExpense(request.resource.data);
+      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
     }
 
     // --- INVENTORY ---
@@ -340,38 +962,76 @@ service cloud.firestore {
     }
 
     // --- TRANSPORT ---
-    match /buses/{busId} {
-      // Driver voit le transport
-      allow read: if isAuthenticated() && isActive() && (
-        hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isSecretary() || isAccountant() || isDriver())
-      );
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
-    }
-    match /busRoutes/{routeId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
-    }
-    match /fuelExpenses/{expId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
-    }
-    match /maintenances/{mId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
-    }
-    match /breakdowns/{bId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDriver()) && hasSchoolAccess(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDriver()) && hasSchoolAccess(request.resource.data.schoolId);
+    function isDriverBreakdownCreation(data, docId) {
+      return data.keys().hasOnly(['id', 'schoolId', 'date', 'busId', 'description', 'severity', 'status'])
+          && data.keys().hasAll(['id', 'schoolId', 'date', 'busId', 'description', 'severity', 'status'])
+          && data.id == docId
+          && data.schoolId is string && data.schoolId != '' && hasSchoolAccess(data.schoolId)
+          && data.busId is string && data.busId != ''
+          && data.description is string && data.description != ''
+          && data.severity in ['légère', 'moyenne', 'urgente']
+          && data.status == 'signalée'
+          && data.date is string && data.date != ''
+          && exists(/databases/$(database)/documents/buses/$(data.busId))
+          && get(/databases/$(database)/documents/buses/$(data.busId)).data.schoolId == data.schoolId;
     }
 
-    // --- VALIDATION REQUESTS ---
+    match /buses/{busId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || isAccountant() || isDriver() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow delete: if false;
+    }
+    match /busRoutes/{routeId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow delete: if false;
+    }
+    match /fuelExpenses/{expId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow delete: if false;
+    }
+    match /maintenances/{mId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(request.resource.data.schoolId));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow delete: if false;
+    }
+    match /breakdowns/{bId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isDriver() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || canSecretaryManageAllTransport(request.resource.data.schoolId) || (isDriver() && isDriverBreakdownCreation(request.resource.data, bId)));
+      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow delete: if false;
+    }
+
     match /validation_requests/{reqId} {
       // N'importe quel membre du staff peut créer une requête
-      allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId)
+                    && !(isSecretary() && request.resource.data.actionType == 'DELETE_STUDENT');
       // Tout le staff peut lire les requêtes de son école
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       // Seuls les approbateurs peuvent modifier/résoudre
-      allow update, delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId);
+      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector())
+                    && hasSchoolAccess(resource.data.schoolId)
+                    && resource.data.status == 'pending'
+                    && !(isSecretary() && (resource.data.actionType == 'DELETE_STUDENT' || request.resource.data.actionType == 'DELETE_STUDENT'))
+                    && (
+                      (request.resource.data.status == 'approved'
+                       && request.resource.data.approvedBy == request.auth.uid
+                       && request.resource.data.approvedAt == request.time
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'approvedBy', 'approvedAt'])
+                      ) ||
+                      (request.resource.data.status == 'rejected'
+                       && request.resource.data.rejectedBy == request.auth.uid
+                       && request.resource.data.rejectedAt == request.time
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectedBy', 'rejectedAt'])
+                      )
+                    )
+                    && (resource.data.requesterId != request.auth.uid || isAdminOrOwner() || isDirector());
+      allow delete: if false;
     }
 
     // --- NOTIFICATIONS ---
@@ -379,6 +1039,47 @@ service cloud.firestore {
       // Tout utilisateur connecté peut recevoir/créer des notifications dans son école
       allow read, update, delete: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId);
       allow create: if isAuthenticated() && isActive() && hasSchoolAccess(request.resource.data.schoolId);
+    }
+
+    // --- CASH CLOSURES ---
+    match /cashClosures/{closureId} {
+      allow get, list: if isAuthenticated() && isActive() && (isSuperAdmin() || (resource.data.schoolId == getUserSchoolId() && (isOwner() || isDirector() || isSecretary() || isAccountant())));
+      allow create, update, delete: if false;
+    }
+
+    // --- TEACHER ASSIGNMENTS ---
+    match /teacherAssignments/{assignmentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (
+          isTeacher()
+          && hasSchoolAccess(resource.data.schoolId)
+          && resource.data.isActive == true
+          && exists(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid))
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.isActive == true
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.schoolId == resource.data.schoolId
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.staffId == resource.data.teacherStaffId
+        )
+      );
+      allow write: if false;
+    }
+
+    match /teacherAssignmentSlots/{slotId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (
+          isTeacher()
+          && hasSchoolAccess(resource.data.schoolId)
+          && resource.data.isActive == true
+          && exists(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid))
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.isActive == true
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.schoolId == resource.data.schoolId
+          && get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid)).data.staffId == resource.data.teacherStaffId
+        )
+      );
+      allow write: if false;
     }
   }
 }

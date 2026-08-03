@@ -1,5 +1,7 @@
 import * as crypto from 'crypto';
 
+export type ImportRowValue = string | number | boolean | null | undefined;
+export type ImportStudentRow = Record<string, ImportRowValue>;
 export interface NormalizedStudentRow {
   id: string;
   schoolId: string;
@@ -22,14 +24,14 @@ export interface NormalizedStudentRow {
   allergies?: string;
   medicalConditions?: string;
   importJobId: string;
-  importedAt: any; // Firebase Timestamp or string depending on context
-  updatedAt: any;
+  importedAt: unknown; // Firebase Timestamp or string depending on context
+  updatedAt: unknown;
 }
 
 export interface RowNormalizationResult {
   validRows: NormalizedStudentRow[];
-  invalidRows: any[];
-  skippedRows: any[];
+  invalidRows: unknown[];
+  skippedRows: unknown[];
   summary: {
     total: number;
     valid: number;
@@ -41,7 +43,7 @@ export interface RowNormalizationResult {
 /**
  * Normalizes a string: trims, removes multiple spaces, converts to uppercase (optional), and standardizes Unicode.
  */
-function normalizeString(str: any, toUpper = false): string {
+function normalizeString(str: unknown, toUpper = false): string {
   if (typeof str !== 'string') return '';
   let normalized = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
   if (toUpper) normalized = normalized.toUpperCase();
@@ -51,7 +53,7 @@ function normalizeString(str: any, toUpper = false): string {
 /**
  * Normalizes phone numbers (simple cleanup)
  */
-function normalizePhone(str: any): string {
+function normalizePhone(str: unknown): string {
   if (typeof str !== 'string' && typeof str !== 'number') return '';
   let phone = String(str).replace(/\s+/g, '');
   const hasPlus = phone.startsWith('+');
@@ -64,7 +66,7 @@ function normalizePhone(str: any): string {
 /**
  * Normalizes email address
  */
-function normalizeEmail(str: any): string {
+function normalizeEmail(str: unknown): string {
   if (typeof str !== 'string') return '';
   const email = str.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '';
@@ -74,7 +76,7 @@ function normalizeEmail(str: any): string {
 /**
  * Normalizes financial amounts
  */
-function normalizeAmount(val: any): number {
+function normalizeAmount(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0;
   const num = Number(val);
   if (!Number.isFinite(num)) return 0;
@@ -93,7 +95,7 @@ export function generateStudentId(schoolId: string, matricule: string): string {
 /**
  * Normalizes a raw payload row into a safe, whitelisted student object.
  */
-export function normalizeRows(payload: any[], schoolId: string, jobId: string, timestamp: any = new Date().toISOString()): RowNormalizationResult {
+export function normalizeRows(payload: ImportStudentRow[], schoolId: string, jobId: string, timestamp: unknown = new Date().toISOString()): RowNormalizationResult {
   const result: RowNormalizationResult = {
     validRows: [],
     invalidRows: [],

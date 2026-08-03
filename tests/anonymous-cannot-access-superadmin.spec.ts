@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { loginAs } from './helpers/auth';
 
 test('Anonymous user cannot access /superadmin', async ({ page }) => {
   await page.goto('/#/superadmin');

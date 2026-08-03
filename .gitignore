@@ -32,3 +32,6 @@ firebase-service-account*.json
 *.njsproj
 *.sln
 *.sw?
+
+# Development test accounts file
+runtime-test-accounts.md

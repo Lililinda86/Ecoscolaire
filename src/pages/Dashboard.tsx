@@ -1,34 +1,423 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { 
   UserPlus, GraduationCap, DollarSign, AlertCircle, 
-  CheckCircle2, XCircle, FileText, MessageSquare, Briefcase, PlusCircle
+  CheckCircle2, XCircle, FileText, MessageSquare, Briefcase, PlusCircle,
+  Users, Bus, AlertTriangle, Activity
 } from 'lucide-react';
+
+const formatReasons = (reasons: string[]) => {
+  if (reasons.length <= 2) return reasons.join(' · ');
+  return `${reasons.slice(0, 2).join(' · ')} · +${reasons.length - 2}`;
+};
+
+const formatLocalDateKey = (date: Date): string | null => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeDateKey = (value: unknown): string | null => {
+  if (!value) return null;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      return trimmed.slice(0, 10);
+    }
+
+    const parsed = new Date(trimmed);
+    return formatLocalDateKey(parsed);
+  }
+
+  if (value instanceof Date) {
+    return formatLocalDateKey(value);
+  }
+
+  if (value && typeof value === 'object') {
+    const candidate = value as {
+      toDate?: () => Date;
+      seconds?: number;
+    };
+
+    if (typeof candidate.toDate === 'function') {
+      try {
+        return formatLocalDateKey(candidate.toDate());
+      } catch {
+        return null;
+      }
+    }
+
+    if (typeof candidate.seconds === 'number') {
+      return formatLocalDateKey(new Date(candidate.seconds * 1000));
+    }
+  }
+
+  return null;
+};
 
 const Dashboard: React.FC = () => {
   const { db, isFirestoreConnected, currentUser } = useAppContext();
   const navigate = useNavigate();
 
+  // Vue d'ensemble de l'établissement
+  const italoStats = useMemo(() => {
+    const students = db?.students ?? [];
+    const classes = db?.classes ?? [];
+    const attendanceList = db?.attendance || [];
+    
+    const validClassIds = new Set(classes.map(c => c.id).filter(Boolean));
+    const classIdToNameMap = new Map(classes.map(c => [c.id, c.name]));
+
+    // 1. Map each studentId to their classId for attendance
+    const studentClassMap = new Map<string, string>();
+    students.forEach(s => {
+      if (s && s.id && s.classId) {
+        studentClassMap.set(s.id, s.classId);
+      }
+    });
+
+    // 2. Gather unique valid dates of attendance per class
+    const classDaysMap = new Map<string, Set<string>>();
+    attendanceList.forEach(a => {
+      if (a && a.studentId && a.date) {
+        const norm = normalizeDateKey(a.date);
+        if (!norm) return;
+        const classId = studentClassMap.get(a.studentId);
+        if (!classId) return;
+
+        if (!classDaysMap.has(classId)) {
+          classDaysMap.set(classId, new Set());
+        }
+        classDaysMap.get(classId)!.add(norm);
+      }
+    });
+
+    const classDaysSorted = new Map<string, string[]>();
+    for (const [classId, dateSet] of classDaysMap.entries()) {
+      classDaysSorted.set(classId, Array.from(dateSet).sort());
+    }
+
+    // 3. Group attendance status by student
+    const studentStates = new Map<string, { presentDates: Set<string>; absentDates: Set<string> }>();
+    attendanceList.forEach(a => {
+      if (a && a.studentId && a.date) {
+        const norm = normalizeDateKey(a.date);
+        if (!norm) return;
+
+        if (!studentStates.has(a.studentId)) {
+          studentStates.set(a.studentId, { presentDates: new Set(), absentDates: new Set() });
+        }
+        const states = studentStates.get(a.studentId)!;
+        if (a.present === true) {
+          states.presentDates.add(norm);
+          states.absentDates.delete(norm);
+        } else if (a.present === false) {
+          if (!states.presentDates.has(norm)) {
+            states.absentDates.add(norm);
+          }
+        }
+      }
+    });
+
+    let totalStudents = 0;
+    let newStudents = 0;
+    let returningStudents = 0;
+    let transportedStudents = 0;
+
+    let registrationExpectedTotal = 0;
+    let registrationPaidTotal = 0;
+    
+    let tuitionExpectedTotal = 0;
+    let tuitionPaidTotal = 0;
+    
+    let transportPaidTotal = 0;
+
+    let studentsToRemindCount = 0;
+    let parentsWithoutPhoneCount = 0;
+    let studentsWithoutClassCount = 0;
+    let prolongedAbsenceCount = 0;
+
+    const allPriorityActions: Array<{
+      studentId: string;
+      name: string;
+      className: string;
+      level: 1 | 2 | 3;
+      reasons: string[];
+      recommendedAction: string;
+      remaining: number;
+      prolongedAbsenceDays: number;
+    }> = [];
+
+    students.forEach(student => {
+      totalStudents++;
+      
+      if (student.studentStatus === 'nouveau') {
+        newStudents++;
+      } else if (student.studentStatus === 'ancien') {
+        returningStudents++;
+      }
+
+      if (student.usesTransport) {
+        transportedStudents++;
+      }
+
+      const regExpected = student.registrationFeeExpected ?? 15000;
+      const regPaid = student.registrationFeePaid ?? 0;
+      const regRemaining = Math.max(regExpected - regPaid, 0);
+
+      registrationExpectedTotal += regExpected;
+      registrationPaidTotal += regPaid;
+
+      const tuiExpected = (student.tuitionExpected && student.tuitionExpected > 0)
+        ? student.tuitionExpected
+        : ((student.feeT1 || 0) + (student.feeT2 || 0) + (student.feeT3 || 0));
+      const tuiPaid = student.tuitionPaid ?? 0;
+      const tuiRemaining = Math.max(tuiExpected - tuiPaid, 0);
+
+      tuitionExpectedTotal += tuiExpected;
+      tuitionPaidTotal += tuiPaid;
+
+      const transPaid = Number(student.transportPaid) || 0;
+      transportPaidTotal += transPaid;
+      
+      const transportFeeConfigured = Number(student.transportMonthlyFee) > 0;
+      const hasNoTransportPayment = student.usesTransport === true && transportFeeConfigured && transPaid <= 0;
+
+      // 4. Calculate consecutive absences
+      let consecutiveAbsenceDays = 0;
+      const classId = student.classId;
+      if (classId) {
+        const sortedDays = classDaysSorted.get(classId);
+        const states = studentStates.get(student.id);
+        if (sortedDays && sortedDays.length >= 3 && states) {
+          for (let i = sortedDays.length - 1; i >= 0; i--) {
+            const day = sortedDays[i];
+            if (states.absentDates.has(day)) {
+              consecutiveAbsenceDays++;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+      const hasProlongedAbsence = consecutiveAbsenceDays >= 3;
+      if (hasProlongedAbsence) {
+        prolongedAbsenceCount++;
+      }
+
+      const isClassInvalid = !student.classId || student.classId.trim() === '' || !validClassIds.has(student.classId);
+      const isPhoneMissing = !student.parentPhone || student.parentPhone.trim() === '';
+
+      // Debt detail reasons
+      const debtReasons: string[] = [];
+      let totalDebt = 0;
+      if (regRemaining > 0) {
+        debtReasons.push('Inscription à régulariser');
+        totalDebt += regRemaining;
+      }
+      if (tuiRemaining > 0) {
+        debtReasons.push('Pension à régulariser');
+        totalDebt += tuiRemaining;
+      }
+
+      const hasDebt = totalDebt > 0;
+      if (hasDebt || regRemaining > 0 || tuiRemaining > 0) {
+        studentsToRemindCount++;
+      }
+
+      if (isClassInvalid) {
+        studentsWithoutClassCount++;
+      }
+
+      if (isPhoneMissing) {
+        parentsWithoutPhoneCount++;
+      }
+
+      // Group into a single action per student with priority levels
+      let level: 1 | 2 | 3 | null = null;
+      const studentMotifs: string[] = [];
+      let recommendedAction = '';
+
+      if (hasProlongedAbsence) {
+        studentMotifs.push('Absence prolongée');
+        if (isPhoneMissing) {
+          studentMotifs.push('Téléphone manquant');
+          level = 1;
+          recommendedAction = 'Rechercher un contact et prévenir la direction';
+        } else {
+          level = 1;
+          recommendedAction = 'Contacter la famille';
+        }
+      }
+
+      if (isClassInvalid) {
+        studentMotifs.push(student.classId ? 'Classe invalide' : 'Classe absente');
+        if (level === null || level > 2) {
+          level = 2;
+          recommendedAction = 'Affecter une classe';
+        }
+      }
+
+      if (hasNoTransportPayment) {
+        studentMotifs.push('Paiement transport à vérifier');
+        if (level === null || level > 2) {
+          level = 2;
+          recommendedAction = 'Contacter le responsable financier';
+        }
+      }
+
+      if (hasDebt) {
+        debtReasons.forEach(r => studentMotifs.push(r));
+        if (level === null || level > 2) {
+          level = 2;
+          recommendedAction = 'Contacter le responsable financier';
+        }
+      }
+
+      if (isPhoneMissing && !hasProlongedAbsence) {
+        studentMotifs.push('Téléphone parent manquant');
+        if (level === null || level > 3) {
+          level = 3;
+          recommendedAction = 'Compléter les coordonnées';
+        }
+      }
+
+      const resolvedClassName = (student.classId && classIdToNameMap.get(student.classId)) || student.rawClassName || 'Non assigné';
+
+      if (level !== null) {
+        allPriorityActions.push({
+          studentId: student.id,
+          name: student.name,
+          className: resolvedClassName,
+          level,
+          reasons: Array.from(new Set(studentMotifs)),
+          recommendedAction,
+          remaining: totalDebt,
+          prolongedAbsenceDays: consecutiveAbsenceDays
+        });
+      }
+    });
+
+    const comparePriorityActions = (a: typeof allPriorityActions[0], b: typeof allPriorityActions[0]) => {
+      // 1. Level: 1 (Urgent) before 2 (Haute) before 3 (Normale)
+      if (a.level !== b.level) {
+        return a.level - b.level;
+      }
+      // 2. Prolonged absence days (descending)
+      if (a.prolongedAbsenceDays !== b.prolongedAbsenceDays) {
+        return b.prolongedAbsenceDays - a.prolongedAbsenceDays;
+      }
+      // 3. Count of reasons (descending)
+      if (a.reasons.length !== b.reasons.length) {
+        return b.reasons.length - a.reasons.length;
+      }
+      // 4. Remaining debt (descending)
+      if (a.remaining !== b.remaining) {
+        return b.remaining - a.remaining;
+      }
+      // 5. Alphabetical name comparison
+      return a.name.localeCompare(b.name);
+    };
+
+    const priorityActions = allPriorityActions.sort(comparePriorityActions).slice(0, 10);
+
+    const registrationRemainingTotal = Math.max(registrationExpectedTotal - registrationPaidTotal, 0);
+    const tuitionRemainingTotal = Math.max(tuitionExpectedTotal - tuitionPaidTotal, 0);
+
+    return {
+      totalStudents, newStudents, returningStudents, transportedStudents,
+      registrationExpectedTotal, registrationPaidTotal, registrationRemainingTotal,
+      tuitionExpectedTotal, tuitionPaidTotal, tuitionRemainingTotal,
+      transportPaidTotal,
+      studentsToRemindCount, parentsWithoutPhoneCount, studentsWithoutClassCount, prolongedAbsenceCount,
+      priorityActions
+    };
+  }, [db]);
+
+  // Real data calculations in local timezone format (YYYY-MM-DD)
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  const currentMonthPrefix = useMemo(() => {
+    return todayStr.slice(0, 7); // YYYY-MM
+  }, [todayStr]);
+
+  const todayStats = useMemo(() => {
+    const attendanceList = db?.attendance || [];
+    const staffAttendanceList = db?.staffAttendance || [];
+    const paymentsList = db?.payments || [];
+
+    const todayAttendance = attendanceList.filter(a => a && normalizeDateKey(a.date) === todayStr);
+    const presentStudents = todayAttendance.filter(a => a.present === true).length;
+    const absentStudents = todayAttendance.filter(a => a.present === false).length;
+
+    const presentStaff = staffAttendanceList.filter(sa => sa && normalizeDateKey(sa.date) === todayStr && sa.present === true).length;
+
+    const todayPayments = paymentsList
+      .filter(p => p && normalizeDateKey(p.date) === todayStr)
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    return {
+      presentStudents,
+      absentStudents,
+      presentStaff,
+      todayPayments,
+      pendingNotifications: 0
+    };
+  }, [db?.attendance, db?.staffAttendance, db?.payments, todayStr]);
+
+  const monthStats = useMemo(() => {
+    const paymentsList = db?.payments || [];
+    const expensesList = db?.expenses || [];
+    const fuelExpensesList = db?.fuelExpenses || [];
+    const maintenancesList = db?.maintenances || [];
+
+    const revenues = paymentsList
+      .filter(p => p && normalizeDateKey(p.date)?.startsWith(currentMonthPrefix) === true)
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    const exp = expensesList
+      .filter(e => e && normalizeDateKey(e.date)?.startsWith(currentMonthPrefix) === true)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const fuel = fuelExpensesList
+      .filter(fe => fe && normalizeDateKey(fe.date)?.startsWith(currentMonthPrefix) === true)
+      .reduce((sum, fe) => sum + (Number(fe.amount) || 0), 0);
+
+    const maint = maintenancesList
+      .filter(m => m && normalizeDateKey(m.date)?.startsWith(currentMonthPrefix) === true)
+      .reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+
+    const expenses = exp + fuel + maint;
+    const balance = revenues - expenses;
+
+    const paymentCount = paymentsList.filter(
+      p => p && normalizeDateKey(p.date)?.startsWith(currentMonthPrefix) === true
+    ).length;
+
+    return {
+      revenues,
+      expenses,
+      balance,
+      paymentCount
+    };
+  }, [db?.payments, db?.expenses, db?.fuelExpenses, db?.maintenances, currentMonthPrefix]);
+
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher'].includes(currentUser.role)) return null;
 
   if (!db) return null;
-
-  // Mock data for KPIs - In a real scenario these would be calculated from db
-  const todayStats = {
-    presentStudents: Math.floor(db.students.length * 0.9),
-    absentStudents: Math.floor(db.students.length * 0.1),
-    presentStaff: db.staff.length,
-    todayPayments: 150000, // FCFA
-    pendingNotifications: 3
-  };
-
-  const monthStats = {
-    revenues: 2500000, // FCFA
-    expenses: 800000, // FCFA
-    balance: 1700000, // FCFA
-    newStudents: 12
-  };
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }} data-testid="dashboard-page">
@@ -40,7 +429,7 @@ const Dashboard: React.FC = () => {
             {db.school?.name || 'Tableau de bord'}
           </h1>
           <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
-            Année Académique {db.school?.academicYear || '2023-2024'}
+            {db.school?.academicYear ? `Année académique ${db.school.academicYear}` : 'Année scolaire non définie'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -75,6 +464,123 @@ const Dashboard: React.FC = () => {
           <button onClick={() => navigate('/communication')} style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
             <MessageSquare size={18} /> Envoyer WhatsApp
           </button>
+        </div>
+      </div>
+
+      {/* Suivi d'Activité */}
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <Activity size={24} color="var(--primary-color)" /> Suivi de l'établissement {db.school?.academicYear ? `- ${db.school.academicYear}` : ''}
+        </h2>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          {/* Carte 1 - Inscriptions */}
+          <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={18} /> Inscriptions
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b' }}>Total élèves</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>{italoStats.totalStudents}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b' }}>Nouveaux</span>
+              <span style={{ fontWeight: 600, color: '#10b981' }}>{italoStats.newStudents}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#64748b' }}>Anciens</span>
+              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{italoStats.returningStudents}</span>
+            </div>
+          </div>
+
+          {/* Carte 2 - Paiements */}
+          <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <DollarSign size={18} /> Paiements
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Inscription (Enc. / Att.)</span>
+              <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>{italoStats.registrationPaidTotal.toLocaleString()} / {italoStats.registrationExpectedTotal.toLocaleString()}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Pension (Enc. / Att.)</span>
+              <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>{italoStats.tuitionPaidTotal.toLocaleString()} / {italoStats.tuitionExpectedTotal.toLocaleString()}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem' }}>
+              <span style={{ color: '#64748b', fontWeight: 600 }}>Reste total</span>
+              <span style={{ fontWeight: 700, color: '#ef4444' }}>{(italoStats.registrationRemainingTotal + italoStats.tuitionRemainingTotal).toLocaleString()} FCFA</span>
+            </div>
+          </div>
+
+          {/* Carte 3 - Transport */}
+          <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Bus size={18} /> Transport
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#64748b' }}>Élèves transportés</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>{italoStats.transportedStudents}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#64748b' }}>Transport encaissé</span>
+              <span style={{ fontWeight: 600, color: '#10b981' }}>{italoStats.transportPaidTotal.toLocaleString()} FCFA</span>
+            </div>
+          </div>
+
+          {/* Carte 4 - Relances */}
+          <div className="card" style={{ background: '#fff1f2', border: '1px solid #fecdd3' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#9f1239', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertTriangle size={18} /> Relances
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#be123c' }}>Élèves à relancer</span>
+              <span style={{ fontWeight: 700, color: '#9f1239' }}>{italoStats.studentsToRemindCount}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#be123c' }}>Parents sans téléphone</span>
+              <span style={{ fontWeight: 700, color: '#9f1239' }}>{italoStats.parentsWithoutPhoneCount}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tableau Actions prioritaires */}
+        <div className="card" style={{ background: 'white', padding: '1rem', overflowX: 'auto', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: '#334155' }}>Actions prioritaires (Top 10)</h3>
+          {italoStats.priorityActions.length > 0 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
+                  <th style={{ padding: '0.5rem' }}>Élève</th>
+                  <th style={{ padding: '0.5rem' }}>Classe</th>
+                  <th style={{ padding: '0.5rem' }}>Priorité</th>
+                  <th style={{ padding: '0.5rem' }}>Motif</th>
+                  <th style={{ padding: '0.5rem', textAlign: 'right' }}>Reste (FCFA)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {italoStats.priorityActions.map((action, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '0.5rem', fontWeight: 500, color: '#0f172a' }}>{action.name}</td>
+                    <td style={{ padding: '0.5rem', color: '#475569' }}>{action.className}</td>
+                    <td style={{ padding: '0.5rem', fontWeight: 600, color: action.level === 1 ? '#dc2626' : action.level === 2 ? '#d97706' : '#2563eb' }}>
+                      {action.level === 1 ? 'Urgent' : action.level === 2 ? 'Haute' : 'Normale'}
+                    </td>
+                    <td style={{ padding: '0.5rem', color: action.level === 1 ? '#dc2626' : action.level === 2 ? '#d97706' : '#475569' }}>
+                      {formatReasons(action.reasons)}
+                    </td>
+                    <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: action.remaining > 0 ? '#ef4444' : '#94a3b8' }}>
+                      {action.remaining > 0 ? action.remaining.toLocaleString() : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: '#64748b' }}>
+              <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '1rem', marginBottom: '0.25rem' }}>Aucune action prioritaire</div>
+              <div style={{ fontSize: '0.875rem' }}>Aucun dossier nécessitant une intervention immédiate</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -133,9 +639,9 @@ const Dashboard: React.FC = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
-                <UserPlus size={16} color="var(--accent-color)" /> Nouveaux inscrits
+                <FileText size={16} color="var(--accent-color)" /> Paiements enregistrés
               </div>
-              <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>+{monthStats.newStudents}</span>
+              <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{monthStats.paymentCount}</span>
             </div>
           </div>
         </div>
@@ -146,27 +652,85 @@ const Dashboard: React.FC = () => {
             <AlertCircle size={18} color="var(--warning)" /> Alertes & Tâches
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#fffbeb', padding: '0.75rem', borderRadius: '8px' }}>
-              <DollarSign size={16} color="#d97706" style={{ marginTop: '2px' }} />
-              <div>
-                <div style={{ fontWeight: 600, color: '#92400e', fontSize: '0.875rem' }}>12 retards de paiement</div>
-                <div style={{ fontSize: '0.75rem', color: '#b45309' }}>Tranche 2 non soldée</div>
+            {/* Alerte 1: Élèves à relancer */}
+            {italoStats.studentsToRemindCount > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#fffbeb', padding: '0.75rem', borderRadius: '8px' }}>
+                <DollarSign size={16} color="#d97706" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#92400e', fontSize: '0.875rem' }}>{italoStats.studentsToRemindCount} élèves à relancer</div>
+                  <div style={{ fontSize: '0.75rem', color: '#b45309' }}>Paiements ou dossiers à régulariser</div>
+                </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#fef2f2', padding: '0.75rem', borderRadius: '8px' }}>
-              <UserCircle2 size={16} color="#dc2626" style={{ marginTop: '2px' }} />
-              <div>
-                <div style={{ fontWeight: 600, color: '#991b1b', fontSize: '0.875rem' }}>3 élèves absents {'>'} 3 jours</div>
-                <div style={{ fontSize: '0.75rem', color: '#b91c1c' }}>Nécessite appel aux parents</div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#f0fdf4', padding: '0.75rem', borderRadius: '8px' }}>
+                <CheckCircle2 size={16} color="#16a34a" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#166534', fontSize: '0.875rem' }}>Aucun élève à relancer</div>
+                  <div style={{ fontSize: '0.75rem', color: '#15803d' }}>Tous les comptes sont en règle</div>
+                </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#eff6ff', padding: '0.75rem', borderRadius: '8px' }}>
-              <FileText size={16} color="#2563eb" style={{ marginTop: '2px' }} />
-              <div>
-                <div style={{ fontWeight: 600, color: '#1e40af', fontSize: '0.875rem' }}>Bulletins T2 à générer</div>
-                <div style={{ fontSize: '0.75rem', color: '#1d4ed8' }}>Classe de CM2 incomplète</div>
+            )}
+
+            {/* Alerte 2: Parents sans téléphone */}
+            {italoStats.parentsWithoutPhoneCount > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#fff1f2', padding: '0.75rem', borderRadius: '8px' }}>
+                <UserCircle2 size={16} color="#dc2626" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#991b1b', fontSize: '0.875rem' }}>{italoStats.parentsWithoutPhoneCount} fiches sans téléphone parent</div>
+                  <div style={{ fontSize: '0.75rem', color: '#b91c1c' }}>Coordonnées parentales à compléter</div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#f0fdf4', padding: '0.75rem', borderRadius: '8px' }}>
+                <CheckCircle2 size={16} color="#16a34a" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#166534', fontSize: '0.875rem' }}>Toutes les coordonnées parentales sont renseignées</div>
+                  <div style={{ fontSize: '0.75rem', color: '#15803d' }}>Aucun téléphone parent manquant</div>
+                </div>
+              </div>
+            )}
+
+            {/* Alerte 3: Élèves sans classe */}
+            {italoStats.studentsWithoutClassCount > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#eff6ff', padding: '0.75rem', borderRadius: '8px' }}>
+                <FileText size={16} color="#2563eb" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#1e40af', fontSize: '0.875rem' }}>
+                    {italoStats.studentsWithoutClassCount} {italoStats.studentsWithoutClassCount === 1 ? 'élève sans classe valide' : 'élèves sans classe valide'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#1d4ed8' }}>Affectation ou classe à vérifier</div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#f0fdf4', padding: '0.75rem', borderRadius: '8px' }}>
+                <CheckCircle2 size={16} color="#16a34a" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#166534', fontSize: '0.875rem' }}>Tous les élèves sont affectés</div>
+                  <div style={{ fontSize: '0.75rem', color: '#15803d' }}>Aucune affectation manquante</div>
+                </div>
+              </div>
+            )}
+
+            {/* Alerte 4: Absences prolongées */}
+            {italoStats.prolongedAbsenceCount > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#fff1f2', padding: '0.75rem', borderRadius: '8px' }}>
+                <UserCircle2 size={16} color="#dc2626" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#991b1b', fontSize: '0.875rem' }}>
+                    {italoStats.prolongedAbsenceCount} {italoStats.prolongedAbsenceCount === 1 ? 'élève en absence prolongée' : 'élèves en absence prolongée'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#b91c1c' }}>Absents depuis au moins 3 jours scolaires</div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: '#f0fdf4', padding: '0.75rem', borderRadius: '8px' }}>
+                <CheckCircle2 size={16} color="#16a34a" style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#166534', fontSize: '0.875rem' }}>Aucune absence prolongée</div>
+                  <div style={{ fontSize: '0.75rem', color: '#15803d' }}>Aucun élève absent depuis 3 jours scolaires</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -176,7 +740,8 @@ const Dashboard: React.FC = () => {
 };
 
 // Mock icon missing from import above
-const Calendar: React.FC<any> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
-const UserCircle2: React.FC<any> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20a6 6 0 0 0-12 0"></path><circle cx="12" cy="10" r="4"></circle><circle cx="12" cy="12" r="10"></circle></svg>;
+type IconProps = React.SVGProps<SVGSVGElement> & { size?: number | string };
+const Calendar: React.FC<IconProps> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
+const UserCircle2: React.FC<IconProps> = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20a6 6 0 0 0-12 0"></path><circle cx="12" cy="10" r="4"></circle><circle cx="12" cy="12" r="10"></circle></svg>;
 
 export default Dashboard;

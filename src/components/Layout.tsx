@@ -13,7 +13,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   };
 
   return (
-    <div className="app-layout" style={{ position: 'relative' }}>
+    <div className="app-container" style={{ position: 'relative' }}>
       {isSupervising && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000, background: '#ef4444', color: 'white', padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 'bold' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -77,6 +77,10 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                   )}
                   {['superAdmin', 'owner', 'director', 'teacher', 'secretary'].includes(currentUser.role) && (
                     <>
+                      <NavLink to="/subjects-program" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-subjects-program">
+                        <BookOpen size={20} />
+                        Matières & Programmes
+                      </NavLink>
                       <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-grades">
                         <ClipboardList size={20} />
                         Notes & Bulletins
@@ -114,7 +118,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'accountant'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">FINANCES</div>
                   <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-payments">
