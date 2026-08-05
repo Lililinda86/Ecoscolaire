@@ -74,7 +74,7 @@ export interface School {
   paymentSettings?: SchoolPaymentSettingsPublic;
 }
 
-export type GlobalRole = 'superAdmin' | 'owner' | 'director' | 'secretary' | 'accountant' | 'teacher' | 'driver' | 'parent' | 'student';
+export type GlobalRole = 'superAdmin' | 'owner' | 'director' | 'secretary' | 'accountant' | 'teacher' | 'driver' | 'parent' | 'student' | 'boardViewer';
 
 export interface User {
   id: string; // uid from Firebase Auth

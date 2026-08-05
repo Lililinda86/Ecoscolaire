@@ -322,6 +322,7 @@ const Students: React.FC = () => {
 
   const effectiveRole = typeof currentUser?.role === 'string' ? currentUser.role.trim() : '';
   const canManageStudents = ['superAdmin', 'owner', 'director', 'secretary'].includes(effectiveRole);
+  const canViewSensitive = currentUser && currentUser.role !== 'boardViewer';
   const canChangeStudentActiveStatus =
     !!effectiveRole &&
     ['superAdmin', 'owner', 'director'].includes(effectiveRole);
@@ -1642,7 +1643,7 @@ const Students: React.FC = () => {
                     <td style={{ padding: '1rem', fontWeight: 'bold' }}>{student.matricule || '-'}</td>
                     <td style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {student.name}
-                      {(student.allergies || student.medicalConditions) && (
+                      {(canViewSensitive && (student.allergies || student.medicalConditions)) && (
                         <span title={`Santé: ${student.allergies ? 'Allergies ' : ''}${student.medicalConditions ? 'Conditions Médicales' : ''}`}>
                           <HeartPulse size={16} color="#dc2626" />
                         </span>
@@ -1652,7 +1653,7 @@ const Students: React.FC = () => {
                       {db.classes.find(c => c.id === student.classId)?.name || '-'} <span style={{fontSize: '0.85em', color: 'var(--text-muted)'}}>({student.section})</span>
                     </td>
                     <td style={{ padding: '1rem' }}>{student.parentName}</td>
-                    <td style={{ padding: '1rem' }}>{student.parentPhone || '-'}</td>
+                    <td style={{ padding: '1rem' }}>{canViewSensitive ? (student.parentPhone || '-') : '***'}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
                         <span style={{

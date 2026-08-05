@@ -9,12 +9,14 @@ const Inventory: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
   const { t } = useI18n();
 
-  const allowedRoles = ['owner', 'director', 'secretary', 'accountant', 'superAdmin'];
+  const allowedRoles = ['owner', 'director', 'secretary', 'accountant', 'superAdmin', 'boardViewer'];
   const [isItemModalOpen, setItemModalOpen] = useState(false);
   const [isTxModalOpen, setTxModalOpen] = useState(false);
   
   const [currentItem, setCurrentItem] = useState<Partial<InventoryItem>>({ quantity: 0, alertThreshold: 10 });
   const [currentTx, setCurrentTx] = useState<Partial<InventoryTransaction>>({ type: 'IN', quantity: 1, date: new Date().toISOString().split('T')[0] });
+
+  const canWrite = currentUser && currentUser.role !== 'boardViewer';
 
   if (!currentUser || !allowedRoles.includes(currentUser.role)) {
     return (
@@ -83,14 +85,16 @@ const Inventory: React.FC = () => {
     <div className="page-container">
       <div className="page-header">
         <h1>{t('inventory', 'Inventaire & Logistique')}</h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="secondary" onClick={() => handleOpenItemModal()}>
-            <Plus size={18} /> Ajouter du Matériel
-          </button>
-          <button onClick={() => handleOpenTxModal()}>
-            <ArrowRightLeft size={18} /> Mouvement de stock (Apport/Retrait)
-          </button>
-        </div>
+        {canWrite && (
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button className="secondary" onClick={() => handleOpenItemModal()}>
+              <Plus size={18} /> Ajouter du Matériel
+            </button>
+            <button onClick={() => handleOpenTxModal()}>
+              <ArrowRightLeft size={18} /> Mouvement de stock (Apport/Retrait)
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
@@ -154,9 +158,11 @@ const Inventory: React.FC = () => {
                       </span>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
-                       <button className="secondary" onClick={() => handleOpenItemModal(i)}>
-                        <Edit2 size={16} /> Modifier le Matériel
-                      </button>
+                      {canWrite && (
+                        <button className="secondary" onClick={() => handleOpenItemModal(i)}>
+                          <Edit2 size={16} /> Modifier le Matériel
+                        </button>
+                      )}
                     </td>
                   </tr>
                 )

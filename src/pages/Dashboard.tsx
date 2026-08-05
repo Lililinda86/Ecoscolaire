@@ -415,7 +415,7 @@ const Dashboard: React.FC = () => {
     };
   }, [db?.payments, db?.expenses, db?.fuelExpenses, db?.maintenances, currentMonthPrefix]);
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher'].includes(currentUser.role)) return null;
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher', 'boardViewer'].includes(currentUser.role)) return null;
 
   if (!db) return null;
 

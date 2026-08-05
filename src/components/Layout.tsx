@@ -34,7 +34,13 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           Abonnement suspendu. L'accès est restreint en lecture seule. Veuillez contacter EcoScolaire.
         </div>
       )}
-      <aside className="sidebar" data-testid="sidebar" style={{ paddingTop: isSupervising ? '3rem' : isSchoolSuspended && currentUser?.role !== 'superAdmin' ? '3rem' : undefined }}>
+      {currentUser?.role === 'boardViewer' && (
+        <div style={{ position: 'absolute', top: isSupervising ? '2.5rem' : 0, left: 0, right: 0, zIndex: 999, background: '#3b82f6', color: 'white', padding: '0.5rem 1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}>
+          <Shield size={20} style={{ marginRight: '0.5rem' }} />
+          Accès en consultation uniquement
+        </div>
+      )}
+      <aside className="sidebar" data-testid="sidebar" style={{ paddingTop: (isSupervising || currentUser?.role === 'boardViewer' || (isSchoolSuspended && currentUser?.role !== 'superAdmin')) ? '3rem' : undefined }}>
         <h2>EcoScolaire</h2>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}>
           {currentUser?.role === 'superAdmin' && !currentSchool ? (
@@ -60,10 +66,10 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 {t('dashboard')}
               </NavLink>
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'accountant'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'accountant', 'boardViewer'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">ACADÉMIQUE</div>
-                  {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'secretary', 'boardViewer'].includes(currentUser.role) && (
                     <>
                       <NavLink to="/students" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-students">
                         <Users size={20} />
@@ -75,7 +81,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                       </NavLink>
                     </>
                   )}
-                  {['superAdmin', 'owner', 'director', 'teacher', 'secretary'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'boardViewer'].includes(currentUser.role) && (
                     <>
                       <NavLink to="/subjects-program" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-subjects-program">
                         <BookOpen size={20} />
@@ -94,22 +100,22 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'driver'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'driver', 'boardViewer'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">ADMINISTRATION</div>
-                  {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'secretary', 'boardViewer'].includes(currentUser.role) && (
                     <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-staff">
                       <Briefcase size={20} />
                       {t('staff')}
                     </NavLink>
                   )}
-                  {['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'secretary', 'driver', 'boardViewer'].includes(currentUser.role) && (
                     <NavLink to="/buses" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-bus">
                       <BusIcon size={20} />
                       {t('buses')}
                     </NavLink>
                   )}
-                  {['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'accountant', 'secretary', 'boardViewer'].includes(currentUser.role) && (
                     <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-inventory">
                       <Package size={20} />
                       {t('inventory')}
@@ -118,7 +124,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary', 'boardViewer'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">FINANCES</div>
                   <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-payments">
@@ -164,16 +170,18 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'boardViewer'].includes(currentUser.role) && (
                 <>
                   <NavLink to="/validations" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-validations">
                     <ShieldAlert size={20} />
                     Validations
                   </NavLink>
-                  <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-users">
-                    <Shield size={20} />
-                    Accès & Rôles
-                  </NavLink>
+                  {['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+                    <NavLink to="/users" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-users">
+                      <Shield size={20} />
+                      Accès & Rôles
+                    </NavLink>
+                  )}
                 </>
               )}
             </>

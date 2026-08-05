@@ -85,7 +85,7 @@ const Grades: React.FC = () => {
     setGradeEntryRows({});
   };
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher', 'boardViewer'].includes(currentUser.role)) return null;
 
   const handleOpenModal = () => {
     setSelectedAcademicYearId(activeYear?.id || '');

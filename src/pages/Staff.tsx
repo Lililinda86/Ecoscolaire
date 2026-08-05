@@ -15,7 +15,8 @@ const StaffPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
 
-  const isAllowed = currentUser && ['owner', 'director', 'secretary', 'superAdmin'].includes(currentUser.role);
+  const isAllowed = currentUser && ['owner', 'director', 'secretary', 'superAdmin', 'boardViewer'].includes(currentUser.role);
+  const canWrite = currentUser && currentUser.role !== 'boardViewer';
   if (!isAllowed) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#991b1b' }}>
@@ -141,14 +142,16 @@ const StaffPage: React.FC = () => {
       </style>
       <div className="page-header no-print">
         <h1>{t('staff')}</h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="secondary" onClick={() => window.print()}>
-            <Printer size={18} /> Imprimer la liste
+        <div style={{ display: 'flex', gap: '0.5rem' }} className="no-print">
+          <button className="secondary" onClick={() => window.print()} title="Imprimer la liste" disabled={isSchoolSuspended}>
+            <Printer size={20} />
           </button>
-          <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
-            <Plus size={18} />
-            {t('add', 'Ajouter')}
-          </button>
+          {canWrite && (
+            <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended}>
+              <Plus size={20} style={{ marginRight: '0.5rem' }} />
+              {t('add', 'Ajouter')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -192,12 +195,16 @@ const StaffPage: React.FC = () => {
                         {employmentStatusOptions.find(opt => opt.value === status)?.label || status}
                       </td>
                       <td className="no-print" style={{ padding: '1rem', textAlign: 'right' }}>
-                        <button data-testid={`edit-btn-${s.id}`} className="secondary" onClick={() => handleOpenModal(s)} style={{ marginRight: '0.5rem' }} disabled={isSchoolSuspended}>
-                          <Edit2 size={16} />
-                        </button>
-                        <button data-testid={`deact-btn-${s.id}`} className="secondary" onClick={() => handleDeactivate(s.id)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: '0.8rem' }} disabled={isSchoolSuspended || status !== 'active' || isDeactivating}>
-                          Désactiver
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button data-testid={`edit-btn-${s.id}`} className="secondary" onClick={() => handleOpenModal(s)} style={{ marginRight: '0.5rem' }} disabled={isSchoolSuspended}>
+                              <Edit2 size={16} />
+                            </button>
+                            <button data-testid={`deact-btn-${s.id}`} className="secondary" onClick={() => handleDeactivate(s.id)} style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: '0.8rem' }} disabled={isSchoolSuspended || status !== 'active' || isDeactivating}>
+                              Désactiver
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );

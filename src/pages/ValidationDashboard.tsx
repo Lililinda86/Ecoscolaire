@@ -11,9 +11,11 @@ const ValidationDashboard: React.FC = () => {
 
   if (!db || !currentUser) return <div style={{padding: '2rem'}}>Chargement (db manquant: {!db}, user manquant: {!currentUser})...</div>;
 
-  // Seuls les approbateurs peuvent voir ce dashboard
+  // Seuls les approbateurs et le boardViewer peuvent voir ce dashboard
   const canApprove = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
-  if (!canApprove) {
+  const canView = canApprove || currentUser.role === 'boardViewer';
+
+  if (!canView) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <ShieldAlert size={48} style={{ color: 'var(--danger)', margin: '0 auto 1rem' }} />
@@ -329,22 +331,24 @@ const ValidationDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
-                  <button 
-                    onClick={() => handleApprove(req)}
-                    disabled={loadingId !== null}
-                    style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.75rem 1rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500 }}
-                  >
-                    <CheckCircle size={18} /> Approuver
-                  </button>
-                  <button 
-                    onClick={() => handleReject(req)}
-                    disabled={loadingId !== null}
-                    style={{ background: 'white', color: '#ef4444', border: '1px solid #ef4444', padding: '0.75rem 1rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500 }}
-                  >
-                    <XCircle size={18} /> Rejeter
-                  </button>
-                </div>
+                {canApprove && (
+                  <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                    <button 
+                      onClick={() => handleApprove(req)}
+                      disabled={loadingId !== null}
+                      style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.75rem 1rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500 }}
+                    >
+                      <CheckCircle size={18} /> Approuver
+                    </button>
+                    <button 
+                      onClick={() => handleReject(req)}
+                      disabled={loadingId !== null}
+                      style={{ background: 'white', color: '#ef4444', border: '1px solid #ef4444', padding: '0.75rem 1rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500 }}
+                    >
+                      <XCircle size={18} /> Rejeter
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

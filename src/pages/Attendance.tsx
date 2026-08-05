@@ -27,7 +27,7 @@ const Attendance: React.FC = () => {
   // History state
   const [historyPersonId, setHistoryPersonId] = useState<string|null>(null);
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role)) return null;
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher', 'boardViewer'].includes(currentUser.role)) return null;
 
   const students = db.students.filter(s => {
     const matchSection = sectionFilter === 'all' || s.section === sectionFilter;
