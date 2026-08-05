@@ -868,7 +868,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const code = getErrorCode(error);
       const message = getErrorMessage(error);
       console.error("Login Error details:", { email, pin, code, message, error });
