@@ -210,6 +210,9 @@ service cloud.firestore {
     function isStudent() {
       return getRole() == 'student';
     }
+    function isBoardViewer() {
+      return getRole() == 'boardViewer';
+    }
 
     // --- Droits Composés ---
     function isAdminOrOwner() {
@@ -431,7 +434,7 @@ service cloud.firestore {
     match /students/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
+        ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
       );
       // Création par Owner, Director, Secretary AVEC limite et validation stricte de classe
@@ -795,7 +798,7 @@ service cloud.firestore {
     match /grades/{gradeId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isSecretary() || isTeacher()) && hasSchoolAccess(resource.data.schoolId)) ||
+        ((isOwner() || isDirector() || isSecretary() || isTeacher() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published') ||
         (isStudent() && hasSchoolAccess(resource.data.schoolId) && resource.data.status == 'published' && resource.data.studentId == request.auth.uid)
       );
@@ -895,7 +898,7 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
+        ((isOwner() || isDirector() || isSecretary() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
       // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
@@ -912,7 +915,7 @@ service cloud.firestore {
     match /receipts/{receiptId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
+        ((isOwner() || isDirector() || isSecretary() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId))
       );
       // Écritures gérées uniquement par le backend avec Firebase Admin SDK.
@@ -931,12 +934,12 @@ service cloud.firestore {
           )
           ||
           (
-            (isAccountant() || isSecretary())
+            (isAccountant() || isSecretary() || isBoardViewer())
             && exists(/databases/$(database)/documents/expenses/$(expenseId))
             && hasSchoolAccess(resource.data.schoolId)
           )
         );
-      allow list: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
+      allow list: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId);
       allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isAccountant() || isSecretary())
                     && hasSchoolAccess(request.resource.data.schoolId)
                     && isValidExpense(request.resource.data, expenseId)
@@ -957,7 +960,7 @@ service cloud.firestore {
       allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
     }
     match /inventoryTransactions/{txId} {
-      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId);
+      allow read: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId);
       allow write: if isAuthenticated() && isActive() && (isAdminOrOwner() || isSecretary() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId);
     }
 
@@ -977,31 +980,31 @@ service cloud.firestore {
     }
 
     match /buses/{busId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || isAccountant() || isDriver() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || isAccountant() || isDriver() || isBoardViewer() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(request.resource.data.schoolId));
       allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /busRoutes/{routeId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || isBoardViewer() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(request.resource.data.schoolId));
       allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isSecretary() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /fuelExpenses/{expId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || isBoardViewer() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(request.resource.data.schoolId));
       allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /maintenances/{mId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || isBoardViewer() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(request.resource.data.schoolId));
       allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || isAccountant() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
     }
     match /breakdowns/{bId} {
-      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isDriver() || canSecretaryManageAllTransport(resource.data.schoolId));
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector() || isDriver() || isBoardViewer() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow create: if isAuthenticated() && isActive() && request.resource.data.schoolId is string && hasSchoolAccess(request.resource.data.schoolId) && (isAdminOrOwner() || isDirector() || canSecretaryManageAllTransport(request.resource.data.schoolId) || (isDriver() && isDriverBreakdownCreation(request.resource.data, bId)));
       allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && request.resource.data.schoolId == resource.data.schoolId && (isAdminOrOwner() || isDirector() || canSecretaryManageAllTransport(resource.data.schoolId));
       allow delete: if false;
@@ -1043,7 +1046,7 @@ service cloud.firestore {
 
     // --- CASH CLOSURES ---
     match /cashClosures/{closureId} {
-      allow get, list: if isAuthenticated() && isActive() && (isSuperAdmin() || (resource.data.schoolId == getUserSchoolId() && (isOwner() || isDirector() || isSecretary() || isAccountant())));
+      allow get, list: if isAuthenticated() && isActive() && (isSuperAdmin() || (resource.data.schoolId == getUserSchoolId() && (isOwner() || isDirector() || isSecretary() || isAccountant() || isBoardViewer())));
       allow create, update, delete: if false;
     }
 
@@ -1051,7 +1054,7 @@ service cloud.firestore {
     match /teacherAssignments/{assignmentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId)) ||
+        ((isOwner() || isDirector() || isSecretary() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
         (
           isTeacher()
           && hasSchoolAccess(resource.data.schoolId)
@@ -1068,7 +1071,7 @@ service cloud.firestore {
     match /teacherAssignmentSlots/{slotId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
-        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId)) ||
+        ((isOwner() || isDirector() || isSecretary() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
         (
           isTeacher()
           && hasSchoolAccess(resource.data.schoolId)

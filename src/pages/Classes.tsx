@@ -120,7 +120,7 @@ const Classes: React.FC = () => {
     };
   }, []);
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role)) return null;
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'boardViewer'].includes(currentUser.role)) return null;
 
   const canManage = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
   const isSecretary = currentUser.role === 'secretary';

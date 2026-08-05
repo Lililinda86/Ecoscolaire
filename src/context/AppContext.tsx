@@ -10,6 +10,7 @@ import { db as firestoreDb } from '../db/firebase';
 import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
 import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
+import { sanitizeBoardViewerData } from '../utils/boardViewerSanitizer';
 
 type EntityWithId = {
   id: string;
@@ -395,8 +396,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]) as { colName: keyof Database; data: unknown[] }[];
 
         results.forEach((res) => {
+          let sanitizedData = res.data;
+          if (userData.role === 'boardViewer') {
+            sanitizedData = sanitizeBoardViewerData(res.data, res.colName as string);
+          }
+
           if (res.colName === 'grades') {
-            const partition = partitionGradeDocuments(res.data);
+            const partition = partitionGradeDocuments(sanitizedData as Grade[]);
             Object.assign(loadedDb, { 
               grades: partition.legacyGrades, 
               gradesStrict: partition.strictGrades,
@@ -406,7 +412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                console.warn(`[AppContext] ${partition.invalidGrades.length} grades ignorés (structure invalide ou hybride).`);
             }
           } else {
-            Object.assign(loadedDb, { [res.colName]: res.data });
+            Object.assign(loadedDb, { [res.colName]: sanitizedData });
           }
         });
 
@@ -477,7 +483,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cancelled) return;
           const paymentsList: Payment[] = [];
           snapshot.forEach((docSnap) => {
-            paymentsList.push({ id: docSnap.id, ...docSnap.data() } as Payment);
+            let item = { id: docSnap.id, ...docSnap.data() } as Payment;
+            if (currentUser?.role === 'boardViewer') {
+              item = sanitizeBoardViewerData(item, 'payments') as Payment;
+            }
+            paymentsList.push(item);
           });
           setDb(prevDb => {
             const current = prevDb || defaultDB;
@@ -503,7 +513,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cancelled) return;
           const expensesList: Expense[] = [];
           snapshot.forEach((docSnap) => {
-            expensesList.push({ id: docSnap.id, ...docSnap.data() } as Expense);
+            let item = { id: docSnap.id, ...docSnap.data() } as Expense;
+            if (currentUser?.role === 'boardViewer') {
+              item = sanitizeBoardViewerData(item, 'expenses') as Expense;
+            }
+            expensesList.push(item);
           });
           setDb(prevDb => {
             const current = prevDb || defaultDB;
@@ -533,7 +547,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubPayments) unsubPayments();
       if (unsubExpenses) unsubExpenses();
     };
-  }, [firebaseUser, supervisionSchoolId, currentUser?.schoolId]);
+  }, [firebaseUser, supervisionSchoolId, currentUser?.schoolId, currentUser?.role]);
 
   const saveDB = async (newDb: Database) => {
     if (!db || !currentUser) return;
@@ -854,10 +868,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       return true;
-    } catch (error: unknown) {
+    } catch (error: any) {
       const code = getErrorCode(error);
       const message = getErrorMessage(error);
-      console.error("Login Error:", error);
+      console.error("Login Error details:", { email, pin, code, message, error });
       if (code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
         alert("Email ou mot de passe incorrect.");
       } else {

@@ -42,7 +42,7 @@ const Buses: React.FC = () => {
     }
   }, [isDriver, activeTab]);
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role)) return null;
+  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'driver', 'boardViewer'].includes(currentUser.role)) return null;
 
   // Ensure arrays exist
   const buses = (db.buses || []).filter(b => b.isActive !== false);

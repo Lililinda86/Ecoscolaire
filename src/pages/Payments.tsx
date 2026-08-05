@@ -268,6 +268,8 @@ const Payments: React.FC = () => {
   const { db, updateLocalState, patchLocalEntities, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const { t } = useI18n();
 
+  const canWrite = currentUser && currentUser.role !== 'boardViewer';
+
   const [activeTab, setActiveTab] = useState<'encaissements'|'depenses'|'bilan'|'brouillard'|'historique-momo'|'historique-recus'|'finance-momo'>('encaissements');
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
 
@@ -466,7 +468,7 @@ const Payments: React.FC = () => {
     }
   }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, isModalOpen, db.payments, db.school?.globalFees, db.students]);
 
-  const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin', 'secretary'];
+  const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin', 'secretary', 'boardViewer'];
   if (!currentUser || !allowedRoles.includes(currentUser.role)) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626', background: '#fee2e2', borderRadius: '8px', margin: '2rem' }}>
@@ -1171,14 +1173,16 @@ const Payments: React.FC = () => {
 
       <div className="page-header no-print">
         <h1>{t('payments', 'Comptabilité Générale')}</h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={handleOpenModal} style={{ background: 'var(--success)' }} disabled={isSchoolSuspended}>
-            <Plus size={18} /> Encaissement (+)
-          </button>
-          <button onClick={handleOpenExpenseModal} style={{ background: 'var(--danger)' }} disabled={isSchoolSuspended}>
-            <Minus size={18} /> Dépense (-)
-          </button>
-        </div>
+        {canWrite && (
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button onClick={handleOpenModal} style={{ background: 'var(--success)' }} disabled={isSchoolSuspended}>
+              <Plus size={18} /> Encaissement (+)
+            </button>
+            <button onClick={handleOpenExpenseModal} style={{ background: 'var(--danger)' }} disabled={isSchoolSuspended}>
+              <Minus size={18} /> Dépense (-)
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
