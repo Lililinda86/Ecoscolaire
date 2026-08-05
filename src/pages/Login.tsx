@@ -21,9 +21,29 @@ const Login: React.FC = () => {
     setError('');
     setLoading(true);
 
-    const success = await login(email, password);
-    if (!success) {
-      setError("Identifiants incorrects ou accès refusé.");
+    const result = await login(email, password);
+    if (!result.success) {
+      switch (result.code) {
+        case 'invalid-credential':
+          setError("Email ou mot de passe incorrect.");
+          break;
+        case 'invalid-email':
+          setError("L'adresse e-mail saisie n'est pas valide.");
+          break;
+        case 'user-disabled':
+          setError("Ce compte a été désactivé. Contactez l'administration.");
+          break;
+        case 'too-many-requests':
+          setError("Trop de tentatives ont été effectuées. Réessayez plus tard.");
+          break;
+        case 'network-error':
+          setError("Connexion réseau impossible. Vérifiez votre connexion Internet.");
+          break;
+        case 'unknown':
+        default:
+          setError("Une erreur est survenue lors de la connexion.");
+          break;
+      }
     }
     
     setLoading(false);

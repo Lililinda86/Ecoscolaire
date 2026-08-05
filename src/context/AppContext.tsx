@@ -64,6 +64,19 @@ export type StudentLocalStatusPatch = Partial<Pick<
   | 'reactivatedBy'
 >>;
 
+export type LoginResult =
+  | { success: true }
+  | {
+      success: false;
+      code:
+        | 'invalid-credential'
+        | 'invalid-email'
+        | 'user-disabled'
+        | 'too-many-requests'
+        | 'network-error'
+        | 'unknown';
+    };
+
 interface AppContextProps {
   db: Database | null;
   updateLocalState: (patch: Partial<Database>) => void;
@@ -79,7 +92,7 @@ interface AppContextProps {
   isSupervising: boolean;
   enterSupervision: (schoolId: string) => void;
   exitSupervision: () => void;
-  login: (email: string, pin: string) => Promise<boolean>;
+  login: (email: string, pin: string) => Promise<LoginResult>;
   logout: () => void;
   isFirestoreConnected: boolean | null;
   firestoreError: string | null;
@@ -216,7 +229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Fetch user profile
         let userDoc = null;
         const delays = [0, 500, 1000, 2000, 3000];
-        
+
         for (const delay of delays) {
           if (isCancelled) return;
           if (delay > 0) {
@@ -231,8 +244,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               userDoc = snapshot;
               break;
             }
-          } catch (err: any) {
-            const code = err?.code || '';
+          } catch (err: unknown) {
+            const code = getErrorCode(err) || (err as { code?: string })?.code || '';
             if (code === 'permission-denied') {
               console.error("Erreur de permissions critique. Arrêt immédiat des tentatives.");
               setIsFirestoreConnected(false);
@@ -253,13 +266,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error("Profil utilisateur introuvable après plusieurs tentatives.");
           setIsFirestoreConnected(false);
           setFirestoreError("Votre compte existe, mais votre profil EcoScolaire n'est pas encore configuré. Contactez l'administration.");
-          
+
           // Déconnexion différée pour laisser le temps au message de s'afficher sur l'écran Login
           setTimeout(async () => {
             const { auth } = await import('../db/firebase');
             await auth.signOut();
           }, 3000);
-          
+
           return;
         } else {
           userData = { id: userDoc.id, ...userDoc.data() } as User;
@@ -278,7 +291,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const loadedDb: Database = { ...defaultDB };
         const collectionsToFetch: (keyof Database)[] = [
-          'classes', 'students', 'staff', 'buses', 'inventory', 
+          'classes', 'students', 'staff', 'buses', 'inventory',
           'grades', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'technicalSpecialties', 'busRoutes', 'fuelExpenses', 'maintenances',
           'breakdowns', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts',
@@ -295,17 +308,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.log("🔵 [AppContext] Collection interrogée : /schools");
           const schoolsSnap = await getDocs(collection(firestoreDb, 'schools'));
           console.log("4. schoolsSnap.size :", schoolsSnap.size);
-          
+
           const docsInfo = schoolsSnap.docs.map(d => ({id: d.id, name: d.data().name}));
           console.log(`🔵 [AppContext] Nombre de documents retournés dans /schools : ${schoolsSnap.docs.length}`);
           console.log(`🔵 [AppContext] IDs trouvés : ${docsInfo.map(d => d.id).join(', ')}`);
           console.log(`🔵 [AppContext] Noms trouvés : ${docsInfo.map(d => d.name).join(', ')}`);
-          
+
           loadedDb.schools = schoolsSnap.docs.map(d => ({id: d.id, ...d.data()}) as School);
           const usersSnap = await getDocs(collection(firestoreDb, 'users'));
           loadedDb.users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}) as User);
           console.log("5. Contenu de loadedDb.schools avant setDb :", loadedDb.schools);
-          
+
           setIsFirestoreConnected(true);
           setDb(loadedDb);
           setLoading(false);
@@ -405,8 +418,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           if (res.colName === 'grades') {
             const partition = partitionGradeDocuments(sanitizedData as Grade[]);
-            Object.assign(loadedDb, { 
-              grades: partition.legacyGrades, 
+            Object.assign(loadedDb, {
+              grades: partition.legacyGrades,
               gradesStrict: partition.strictGrades,
               invalidGradeDocumentsCount: partition.invalidGrades.length
             });
@@ -562,12 +575,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveDB = async (newDb: Database) => {
     if (!db || !currentUser) return;
-    
+
     if (isSupervising) {
       const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les données de cette école. Êtes-vous sûr ?");
       if (!confirm) return;
     }
-    
+
     setDb({ ...newDb });
 
     try {
@@ -575,12 +588,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
 
       const collections = [
-        'schools', 'users', 'classes', 'students', 'staff', 'buses', 
+        'schools', 'users', 'classes', 'students', 'staff', 'buses',
         'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
-        'subjects', 'busRoutes', 'fuelExpenses', 'maintenances', 
+        'subjects', 'busRoutes', 'fuelExpenses', 'maintenances',
         'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'transactions'
       ] as const;
-      
+
       for (const col of collections) {
         const oldArray = getMergeableCollection(db, col as keyof Database);
         const newArray = getMergeableCollection(newDb, col as keyof Database);
@@ -624,7 +637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) {
       throw new Error("Vous devez être authentifié pour enregistrer les notes.");
     }
-    
+
     if (isSupervising) {
       const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les notes structurées de cette école. Êtes-vous sûr ?");
       if (!confirm) {
@@ -635,11 +648,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { db: firestoreDb } = await import('../db/firebase');
       await saveStructuredEvaluationGrades({ firestore: firestoreDb, evaluation, grades });
-      
+
       // Update local state after successful persistence
       setDb(prevDb => {
         if (!prevDb) return prevDb;
-        
+
         // Update evaluations
         const nextEvaluations = [...(prevDb.evaluations || [])];
         const evalIndex = nextEvaluations.findIndex(e => e.id === evaluation.id);
@@ -648,7 +661,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
           nextEvaluations.push(evaluation);
         }
-        
+
         // Update gradesStrict
         const nextStrictGrades = [...(prevDb.gradesStrict || [])];
         grades.forEach(g => {
@@ -659,7 +672,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             nextStrictGrades.push(g);
           }
         });
-        
+
         return {
           ...prevDb,
           evaluations: nextEvaluations,
@@ -674,12 +687,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const safePatchDB = async (patch: DatabasePatch) => {
     if (!db || !currentUser) return;
-    
+
     if (isSupervising) {
       const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les données de cette école. Êtes-vous sûr ?");
       if (!confirm) return;
     }
-    
+
     setDb(prev => prev ? { ...prev, ...patch } : prev);
 
     try {
@@ -721,12 +734,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const safeMergeDB = async (newDb: Database) => {
     if (!db || !currentUser) return;
-    
+
     if (isSupervising) {
       const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les données de cette école. Êtes-vous sûr ?");
       if (!confirm) return;
     }
-    
+
     setDb({ ...newDb });
 
     try {
@@ -734,12 +747,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
 
       const collections = [
-        'schools', 'users', 'classes', 'students', 'staff', 'buses', 
+        'schools', 'users', 'classes', 'students', 'staff', 'buses',
         'inventory', 'grades', 'payments', 'attendance', 'validation_requests', 'notifications',
         'subjects', 'technicalSpecialties', 'busRoutes', 'fuelExpenses', 'maintenances',
         'breakdowns', 'expenses', 'inventoryTransactions', 'staffAttendance', 'transactions'
       ] as const;
-      
+
       for (const col of collections) {
         const oldArray = getMergeableCollection(db, col as keyof Database);
         const newArray = getMergeableCollection(newDb, col as keyof Database);
@@ -816,7 +829,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSupervisionSchoolId(null);
     setIsSupervising(false);
     setCurrentSchool(null);
-    
+
     try {
       const { db: firestoreDb } = await import('../db/firebase');
       const { collection, getDocs } = await import('firebase/firestore');
@@ -849,13 +862,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const login = async (email: string, pin: string): Promise<boolean> => {
+  const login = async (email: string, pin: string): Promise<LoginResult> => {
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { auth, db: firestoreDb } = await import('../db/firebase');
       const { signInWithEmailAndPassword } = await import('firebase/auth');
       const { doc, getDoc, collection, addDoc } = await import('firebase/firestore');
 
-      const cred = await signInWithEmailAndPassword(auth, email, pin);
+      const cred = await signInWithEmailAndPassword(auth, normalizedEmail, pin);
 
       try {
         const userDoc = await getDoc(doc(firestoreDb, 'users', cred.user.uid));
@@ -863,13 +877,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (userData) {
           await addDoc(collection(firestoreDb, 'audit_logs'), {
             userId: cred.user.uid,
-            userEmail: email,
+            userEmail: normalizedEmail,
             userRole: userData.role,
             schoolId: userData.schoolId || null,
             action: 'LOGIN',
             targetType: 'SYSTEM',
             targetId: cred.user.uid,
-            targetName: email,
+            targetName: normalizedEmail,
             timestamp: new Date().toISOString(),
             details: {}
           });
@@ -878,17 +892,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error("Failed to log LOGIN action", e);
       }
 
-      return true;
+      return { success: true };
     } catch (error: unknown) {
       const code = getErrorCode(error);
       const message = getErrorMessage(error);
       console.error("Login Error details:", { email, pin, code, message, error });
+
+      let resultCode: 'invalid-credential' | 'invalid-email' | 'user-disabled' | 'too-many-requests' | 'network-error' | 'unknown' = 'unknown';
       if (code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
-        alert("Email ou mot de passe incorrect.");
-      } else {
-        alert(message);
+        resultCode = 'invalid-credential';
+      } else if (code === 'auth/invalid-email') {
+        resultCode = 'invalid-email';
+      } else if (code === 'auth/user-disabled') {
+        resultCode = 'user-disabled';
+      } else if (code === 'auth/too-many-requests') {
+        resultCode = 'too-many-requests';
+      } else if (code === 'auth/network-request-failed') {
+        resultCode = 'network-error';
       }
-      return false;
+
+      return { success: false, code: resultCode };
     }
   };
 
@@ -1026,7 +1049,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!db) throw new Error('Database not initialized');
     if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
     if (isSupervising && !window.confirm('Action critique en mode supervision. Continuer ?')) throw new AcademicCalendarMutationCancelledError();
-    
+
     const result = await createAY(firestoreDb, currentSchool.id, year as AcademicYear, activateImmediately);
     setDb(prev => {
       if (!prev) throw new Error('État local indisponible.');
@@ -1042,7 +1065,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!db) throw new Error('Database not initialized');
     if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
     if (isSupervising && !window.confirm('Action critique en mode supervision. Continuer ?')) throw new AcademicCalendarMutationCancelledError();
-    
+
     const result = await actAY(firestoreDb, currentSchool.id, yearId, currentUser.id);
     setDb(prev => {
       if (!prev) throw new Error('État local indisponible.');
@@ -1082,7 +1105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!db) throw new Error('Database not initialized');
     if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
     if (isSupervising && !window.confirm('Action critique en mode supervision. Continuer ?')) throw new AcademicCalendarMutationCancelledError();
-    
+
     const result = await createP(firestoreDb, currentSchool.id, period as Period);
     setDb(prev => {
       if (!prev) throw new Error('État local indisponible.');
@@ -1098,7 +1121,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!db) throw new Error('Database not initialized');
     if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
     if (isSupervising && !window.confirm('Action critique en mode supervision. Continuer ?')) throw new AcademicCalendarMutationCancelledError();
-    
+
     if (!currentSchool.activeAcademicYearId) throw new Error('Aucune année académique active');
     const result = await openP(firestoreDb, currentSchool.id, currentSchool.activeAcademicYearId, periodId, currentUser.id);
     setDb(prev => {
@@ -1140,10 +1163,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   return (
-    <AppContext.Provider value={{ 
+    <AppContext.Provider value={{
       db, updateLocalState, updateStudentLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, saveStructuredGrades, currentUser, currentSchool,
       createAcademicYear, activateAcademicYear, updateAcademicYearBounds, createAcademicPeriod, openAcademicPeriod, closeAcademicPeriod, publishAcademicPeriod,
-      isSupervising, enterSupervision, exitSupervision, 
+      isSupervising, enterSupervision, exitSupervision,
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended
     }}>
