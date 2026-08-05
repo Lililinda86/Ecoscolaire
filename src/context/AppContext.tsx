@@ -203,63 +203,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 2. Data Fetcher
   useEffect(() => {
+    let isCancelled = false;
+
     if (!firebaseUser) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
         const { db: firestoreDb } = await import('../db/firebase');
-        const { doc, getDoc, setDoc, collection, getDocs, query, where, serverTimestamp, documentId } = await import('firebase/firestore');
+        const { doc, getDoc, collection, getDocs, query, where, documentId } = await import('firebase/firestore');
 
         // Fetch user profile
-        console.log("Utilisateur Firebase connecté:", firebaseUser.email, firebaseUser.uid);
-        const userDoc = await getDoc(doc(firestoreDb, 'users', firebaseUser.uid));
+        let userDoc = null;
+        const delays = [0, 500, 1000, 2000, 3000];
+        
+        for (const delay of delays) {
+          if (isCancelled) return;
+          if (delay > 0) {
+            console.log(`Document utilisateur introuvable, nouvel essai dans ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+          if (isCancelled) return;
+
+          try {
+            const snapshot = await getDoc(doc(firestoreDb, 'users', firebaseUser.uid));
+            if (snapshot.exists()) {
+              userDoc = snapshot;
+              break;
+            }
+          } catch (err: any) {
+            const code = err?.code || '';
+            if (code === 'permission-denied') {
+              console.error("Erreur de permissions critique. Arrêt immédiat des tentatives.");
+              setIsFirestoreConnected(false);
+              setFirestoreError("Accès refusé. Veuillez contacter l'administrateur.");
+              break;
+            } else if (code === 'unavailable') {
+              console.warn("Service indisponible. Le réseau ou le serveur Firestore est inaccessible.");
+              // Continuer les tentatives (retry)
+            } else {
+              throw err;
+            }
+          }
+        }
+
         let userData: User;
 
-        if (!userDoc.exists()) {
-          console.log("Document Firestore non trouvé pour:", firebaseUser.email);
-          if (firebaseUser.email === 'kyrialove@gmail.com') {              try {
-                userData = {
-                  id: firebaseUser.uid,
-                  email: firebaseUser.email ?? '',
-                  role: 'superAdmin',
-                  isActive: true,
-                  schoolId: undefined,
-                  createdAt: new Date().toISOString()
-                } as User;
-
-                const superAdminFirestorePayload = {
-                  ...userData,
-                  uid: firebaseUser.uid,
-                  active: true,
-                  schoolId: null,
-                  createdAt: serverTimestamp()
-                };
-
-                await setDoc(doc(firestoreDb, 'users', firebaseUser.uid), superAdminFirestorePayload, { merge: true });
-                console.log("Profil créé avec succès pour superAdmin:", userData);
-              } catch (err: unknown) {
-                const message = getErrorMessage(err);
-                console.error("Erreur lors de la création du profil Firestore:", err);
-                alert("Erreur: Impossible de créer le profil dans Firestore. " + message);
-                // On ne déconnecte pas, on continue avec un objet local temporaire
-                userData = { 
-                  id: firebaseUser.uid, 
-                  email: firebaseUser.email ?? '', 
-                  role: 'superAdmin', 
-                  isActive: true,
-                  schoolId: undefined,
-                  createdAt: new Date().toISOString()
-                } as User;
-              }        }
-          else {
-            console.error("Profil utilisateur introuvable et non autorisé à la création automatique.");
+        if (!userDoc || !userDoc.exists()) {
+          console.error("Profil utilisateur introuvable après plusieurs tentatives.");
+          setIsFirestoreConnected(false);
+          setFirestoreError("Votre compte existe, mais votre profil EcoScolaire n'est pas encore configuré. Contactez l'administration.");
+          
+          // Déconnexion différée pour laisser le temps au message de s'afficher sur l'écran Login
+          setTimeout(async () => {
             const { auth } = await import('../db/firebase');
-            auth.signOut();
-            return;
-          }
+            await auth.signOut();
+          }, 3000);
+          
+          return;
         } else {
-          console.log("Document Firestore trouvé:", userDoc.data());
           userData = { id: userDoc.id, ...userDoc.data() } as User;
         }
 
@@ -430,14 +432,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       } catch (error: unknown) {
         const message = getErrorMessage(error);
-        console.error("Data Fetch Error:", error);
-        setIsFirestoreConnected(false);
-        setFirestoreError(message);
-        setLoading(false);
+        if (!isCancelled) {
+          console.error("Data Fetch Error:", error);
+          setIsFirestoreConnected(false);
+          setFirestoreError(message);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [firebaseUser, supervisionSchoolId]);
 
   // 2b. Realtime Financial Subscriptions (payments & expenses)
@@ -868,7 +879,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const code = getErrorCode(error);
       const message = getErrorMessage(error);
       console.error("Login Error details:", { email, pin, code, message, error });

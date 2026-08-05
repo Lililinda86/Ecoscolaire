@@ -62,22 +62,31 @@ service cloud.firestore {
       );
     }
 
+    function currentUserDocExists() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function getUserData() {
-      // Les données de l'utilisateur qui fait la requête
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      // Les données de l'utilisateur qui fait la requête (sécurisé)
+      return currentUserDocExists()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
     }
 
     function getRole() {
-      return getUserData().role;
+      let data = getUserData();
+      return data != null ? data.role : null;
     }
 
     function getUserSchoolId() {
-      return getUserData().schoolId;
+      let data = getUserData();
+      return data != null ? data.schoolId : null;
     }
 
     function isActive() {
       let data = getUserData();
-      return data.active == true || data.isActive == true;
+      return data != null && (data.active == true || data.isActive == true);
     }
 
     function isUpdatingSaasFields() {

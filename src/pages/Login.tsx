@@ -78,11 +78,11 @@ const Login: React.FC = () => {
               <input 
                 type="email" 
                 name="email"
-                autoComplete="email"
+                autoComplete="username"
                 data-testid="login-email"
                 aria-label="Email"
                 required 
-                placeholder="Ex: kyrialove@gmail.com" 
+                placeholder="votre@email.com" 
                 value={email} 
                 onChange={e => setEmail(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
@@ -160,7 +160,7 @@ const Login: React.FC = () => {
                 required 
                 value={recoveryEmail}
                 onChange={e => setRecoveryEmail(e.target.value)}
-                placeholder="Ex: kyrialove@gmail.com"
+                placeholder="votre@email.com"
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
