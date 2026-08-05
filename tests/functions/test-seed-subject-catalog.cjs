@@ -230,7 +230,13 @@ async function runAllTests() {
     );
   });
 
-  await runTest('supervisor / parent / student / driver / rôle inconnu refusé', async () => {
+  await runTest('boardViewer / supervisor / parent / student / driver / rôle inconnu refusé', async () => {
+    setDocState('users', 'op_board_viewer', true, { role: 'boardViewer', isActive: true, schoolId: 'S1' });
+    await assertThrowsBusinessError(
+      () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_board_viewer' } }),
+      'permission-denied',
+      'PERMISSION_DENIED'
+    );
     setDocState('users', 'op_parent', true, { role: 'parent', isActive: true, schoolId: 'S1' });
     await assertThrowsBusinessError(
       () => seedDefaultSubjectCatalog({ schoolId: 'S1' }, { auth: { uid: 'op_parent' } }),
