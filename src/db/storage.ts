@@ -96,7 +96,7 @@ const initialDB: Database = {
   users: [
     {
       id: 'super-admin-1', // sera remplacé par l'UID Firebase Auth
-      email: 'kyrialove@gmail.com',
+      email: '',
       role: 'superAdmin',
       isActive: true,
       createdAt: new Date().toISOString()
