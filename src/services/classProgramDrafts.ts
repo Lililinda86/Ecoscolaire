@@ -1,4 +1,4 @@
-import { getFirestore, doc, runTransaction, type Firestore, type DocumentReference, deleteField, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, runTransaction, type Firestore, type DocumentReference, deleteField } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import type { ClassProgram, ClassSubject } from '../types';
 
@@ -33,75 +33,6 @@ export function buildClassProgramId(schoolId: string, academicYearId: string, cl
 
 export function buildClassSubjectId(revisionId: string, subjectId: string): string {
   return `${revisionId}__${subjectId}`;
-}
-
-interface CreateInitialParams {
-  schoolId: string;
-  academicYearId: string;
-  classId: string;
-  userId: string;
-}
-
-export async function createInitialClassProgram({
-  schoolId,
-  academicYearId,
-  classId,
-  userId
-}: CreateInitialParams): Promise<ClassProgram> {
-  const firestoreDb = getFirestore(getApp());
-  const programId = buildClassProgramId(schoolId, academicYearId, classId);
-  const programRef = doc(firestoreDb, 'classPrograms', programId);
-
-  try {
-    const newProgram = await runTransaction(firestoreDb, async (transaction) => {
-      const programSnap = await transaction.get(programRef);
-      if (programSnap.exists()) {
-        throw new ClassProgramDraftError('DRAFT_PROGRAM_ALREADY_EXISTS', 'Le programme de cette classe existe déjà.');
-      }
-
-      const now = new Date().toISOString();
-      const docData: ClassProgram = {
-        id: programId,
-        schoolId,
-        classId,
-        academicYearId,
-        status: 'draft',
-        draftRevisionId: `${programId}__v1`,
-        draftRevisionNumber: 1,
-        hasUnpublishedChanges: true,
-        createdAt: now,
-        createdBy: userId,
-        updatedAt: now,
-        updatedBy: userId
-      };
-
-      transaction.set(programRef, docData);
-      return docData;
-    });
-
-    return newProgram;
-  } catch (err: unknown) {
-    if (err instanceof ClassProgramDraftError) throw err;
-    const errObj = err as { code?: string; message?: string };
-    if (errObj?.code === 'permission-denied') {
-      throw new ClassProgramDraftError('DRAFT_PERMISSION_DENIED', 'Permissions insuffisantes pour créer le programme.');
-    }
-
-    // Double check if the document now exists due to race/concurrency
-    try {
-      const doubleCheck = await getDoc(programRef);
-      if (doubleCheck.exists()) {
-        throw new ClassProgramDraftError('DRAFT_PROGRAM_ALREADY_EXISTS', 'Le programme de cette classe existe déjà.');
-      }
-    } catch {
-      // Ignore check errors
-    }
-
-    if (errObj?.message?.includes('already-exists') || errObj?.code === 'already-exists') {
-      throw new ClassProgramDraftError('DRAFT_PROGRAM_ALREADY_EXISTS', 'Le programme de cette classe existe déjà.');
-    }
-    throw new ClassProgramDraftError('DRAFT_SAVE_FAILED', errObj?.message || 'Erreur lors de la création du programme.');
-  }
 }
 
 interface SaveClassProgramDraftParams {

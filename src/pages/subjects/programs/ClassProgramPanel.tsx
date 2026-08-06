@@ -14,7 +14,7 @@ import { determineProgramAction } from '../../../services/classProgramActions';
 import type { TechnicalSpecialty } from '../../../types';
 
 export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) => void }> = ({ onDirtyChange }) => {
-  const { db, currentUser, currentSchool } = useAppContext();
+  const { db, currentUser, currentSchool, updateLocalState } = useAppContext();
 
   // Filters state
   const [sectionFilter, setSectionFilter] = useState<'all' | 'francophone' | 'anglophone'>('all');
@@ -56,12 +56,30 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
     setIsCreatingDraft(true);
     setDraftError(null);
     try {
-      await ensureClassProgramDraft({
+      const result = await ensureClassProgramDraft({
         schoolId,
         academicYearId: normalizedYear,
         classId: selectedClassId
       });
-      // Force reload the program
+
+      // Si le programme n'est pas dǸj dans le state local, on le charge
+      if (result && result.programId && db && db.classPrograms && !db.classPrograms.some(p => p.id === result.programId)) {
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db: firestoreDb } = await import('../../../db/firebase');
+        const snap = await getDoc(doc(firestoreDb, 'classPrograms', result.programId));
+        if (snap.exists()) {
+          const newProgram = { id: snap.id, ...snap.data() } as import('../../../types').ClassProgram;
+          updateLocalState(prev => {
+            const current = prev.classPrograms || [];
+            if (current.some(p => p.id === newProgram.id)) {
+              return { classPrograms: current.map(p => p.id === newProgram.id ? newProgram : p) };
+            }
+            return { classPrograms: [...current, newProgram] };
+          });
+        }
+      }
+
+      // Force reload the program view
       retry();
       // Select draft view and open editor
       setRequestedView('draft');
