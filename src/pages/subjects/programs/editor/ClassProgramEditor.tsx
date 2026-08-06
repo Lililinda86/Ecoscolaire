@@ -55,14 +55,10 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     removeSubject,
     reorderSubjects,
     cancelChanges,
-    saveDraft,
-    createInitialProgram
+    saveDraft
   } = useClassProgramDraft({
     initialProgram,
     initialSubjects,
-    schoolId,
-    academicYearId,
-    classId,
     userId,
     userRole,
     onSaveSuccess,
@@ -79,6 +75,18 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   const [bulkResult, setBulkResult] = useState<BulkAddSubjectsResult | null>(null);
   const [bulkPendingInfo, setBulkPendingInfo] = useState<{ classes: number, subjects: number } | null>(null);
   const [isReloading, setIsReloading] = useState(false);
+  const [loadTimeout, setLoadTimeout] = useState(false);
+
+  React.useEffect(() => {
+    if (!program) {
+      const timer = setTimeout(() => {
+        setLoadTimeout(true);
+      }, 10000);
+      return () => clearTimeout(timer);
+    } else {
+      setLoadTimeout(false);
+    }
+  }, [program]);
 
   const handlePublish = async () => {
     if (isPublishing || !program) return;
@@ -153,27 +161,47 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     onClose();
   };
 
-  const handleCreateInitial = async () => {
-    await createInitialProgram();
-  };
-
   if (!program) {
+    if (loadTimeout) {
+      return (
+        <div className="p-6 text-center">
+          <h3 className="text-sm font-bold text-red-600 mb-2">
+            Le chargement du programme est anormalement long
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
+            Une erreur a pu se produire lors de la rǸcupǸration des donnǸes. Veuillez rǸessayer.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-bold transition"
+            >
+              Fermer
+            </button>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition"
+            >
+              Recharger la page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="p-6 text-center">
         <h3 className="text-sm font-bold text-gray-950 dark:text-white mb-2">
-          Aucun programme configuré pour cette classe
+          Chargement du programme...
         </h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-          Vous devez créer le premier brouillon du programme avant de pouvoir ajouter des matières.
+          Veuillez patienter pendant le chargement du programme de la classe.
         </p>
-        <button
-          type="button"
-          onClick={handleCreateInitial}
-          disabled={isSaving}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-50"
-        >
-          {isSaving ? 'Création en cours...' : 'Créer le premier brouillon'}
-        </button>
+        <div className="flex justify-center">
+          <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        </div>
         {error && (
           <div className="mt-4 text-xs font-semibold text-red-600">
             {error}

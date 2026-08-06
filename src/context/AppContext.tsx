@@ -79,7 +79,7 @@ export type LoginResult =
 
 interface AppContextProps {
   db: Database | null;
-  updateLocalState: (patch: Partial<Database>) => void;
+  updateLocalState: (patch: Partial<Database> | ((prev: Database) => Partial<Database>)) => void;
   updateStudentLocal: (studentId: string, patch: StudentLocalStatusPatch) => void;
   addStudentsLocal: (studentsToAdd: Student[]) => void;
   patchLocalEntities: (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => void;
@@ -184,8 +184,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 
-  const updateLocalState = (patch: Partial<Database>) => {
-    setDb(prev => prev ? { ...prev, ...patch } : null);
+  const updateLocalState = (patch: Partial<Database> | ((prev: Database) => Partial<Database>)) => {
+    setDb(prev => {
+      if (!prev) return null;
+      const resolvedPatch = typeof patch === 'function' ? patch(prev) : patch;
+      return { ...prev, ...resolvedPatch };
+    });
   };
 
   // 1. Auth Listener
