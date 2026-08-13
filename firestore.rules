@@ -360,6 +360,86 @@ service cloud.firestore {
         );
     }
 
+    function hasValidStudentAcademicYear(studentData) {
+      let yearPath = /databases/$(database)/documents/academicYears/$(studentData.academicYearId);
+      let schoolPath = /databases/$(database)/documents/schools/$(studentData.schoolId);
+      return studentData.academicYearId is string
+        && studentData.academicYearId.size() > 0
+        && exists(yearPath)
+        && exists(schoolPath)
+        && get(yearPath).data.schoolId == studentData.schoolId
+        && get(yearPath).data.status == 'active'
+        && studentData.registrationYear == get(yearPath).data.name
+        && (
+          !('activeAcademicYearId' in get(schoolPath).data)
+          || get(schoolPath).data.activeAcademicYearId == studentData.academicYearId
+        );
+    }
+
+    function isValidStudentCreate(studentData, studentId) {
+      return studentData.keys().hasAll([
+          'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
+          'matricule', 'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
+          'section', 'classId', 'studentStatus', 'parentName', 'parentPhone',
+          'registrationFeePaid', 'registrationFeeStatus',
+          'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+        ])
+        && studentData.keys().hasOnly([
+          'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
+          'matricule', 'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
+          'placeOfBirth', 'section', 'classId', 'studentStatus',
+          'fatherName', 'fatherPhone', 'fatherProfession',
+          'motherName', 'motherPhone', 'motherProfession',
+          'guardianRelationship', 'guardianRelationshipDetails',
+          'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
+          'allergies', 'medicalConditions',
+          'registrationFeeExpected', 'registrationFeePaid', 'registrationFeeStatus',
+          'tuitionExpected', 'feeT1', 'feeT2', 'feeT3',
+          'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+        ])
+        && studentData.id is string
+        && studentData.id == studentId
+        && studentData.schoolId is string
+        && studentData.schoolId.size() > 0
+        && studentData.registrationYear is string
+        && studentData.registrationYear.size() > 0
+        && studentData.schoolingStatus == 'active'
+        && studentData.matricule is string
+        && studentData.matricule.size() > 0
+        && studentData.name is string
+        && studentData.name.size() > 0
+        && studentData.studentLastName is string
+        && studentData.studentLastName.size() > 0
+        && studentData.studentFirstName is string
+        && studentData.studentFirstName.size() > 0
+        && studentData.gender in ['M', 'F']
+        && studentData.dob is string
+        && studentData.dob.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
+        && studentData.section in ['francophone', 'anglophone']
+        && studentData.classId is string
+        && studentData.classId.size() > 0
+        && studentData.studentStatus in ['nouveau', 'ancien']
+        && studentData.parentName is string
+        && studentData.parentName.size() > 0
+        && studentData.parentPhone is string
+        && studentData.parentPhone.size() > 0
+        && studentData.registrationFeePaid is number
+        && studentData.registrationFeePaid == 0
+        && studentData.registrationFeeStatus == 'unpaid'
+        && (!('parentEmails' in studentData) || studentData.parentEmails is list)
+        && (!('guardianRelationship' in studentData) || studentData.guardianRelationship in ['father', 'mother', 'other'])
+        && (!('registrationFeeExpected' in studentData) || (studentData.registrationFeeExpected is number && studentData.registrationFeeExpected >= 0))
+        && (!('tuitionExpected' in studentData) || (studentData.tuitionExpected is number && studentData.tuitionExpected >= 0))
+        && (!('feeT1' in studentData) || (studentData.feeT1 is number && studentData.feeT1 >= 0))
+        && (!('feeT2' in studentData) || (studentData.feeT2 is number && studentData.feeT2 >= 0))
+        && (!('feeT3' in studentData) || (studentData.feeT3 is number && studentData.feeT3 >= 0))
+        && studentData.createdAt == request.time
+        && studentData.updatedAt == request.time
+        && studentData.createdBy == request.auth.uid
+        && studentData.updatedBy == request.auth.uid
+        && hasValidStudentAcademicYear(studentData);
+    }
+
     function canCreateStudentWithinLimits(schoolId) {
       let school = get(/databases/$(database)/documents/schools/$(schoolId)).data;
       let isInternal = school.get('isInternalSchool', false) == true;
@@ -548,7 +628,8 @@ service cloud.firestore {
                     && isActive()
                     && canManagePedagogy(request.resource.data.schoolId)
                     && canCreateStudentWithinLimits(request.resource.data.schoolId)
-                    && hasValidStudentClass(request.resource.data);
+                    && hasValidStudentClass(request.resource.data)
+                    && isValidStudentCreate(request.resource.data, studentId);
       // Update
       allow update: if isAuthenticated() && isActive() && (
         !(isSecretary() && isUpdatingStudentActiveStatusFields())

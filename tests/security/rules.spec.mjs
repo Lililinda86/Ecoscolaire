@@ -1,6 +1,6 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import fs from 'fs';
-import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField, limit } from 'firebase/firestore';
+import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField, limit, serverTimestamp } from 'firebase/firestore';
 import { test } from '@playwright/test';
 const { describe, beforeAll: before, beforeEach, afterAll: after } = test;
 const it = test;
@@ -384,6 +384,122 @@ describe('Student Active Status Security Rules', () => {
         actionType: 'DELETE_STUDENT'
       })
     );
+  });
+});
+
+describe('Student Creation Schema Security Rules', () => {
+  const SCHOOL_ID = 'student-create-school';
+  const OTHER_SCHOOL_ID = 'student-create-other-school';
+  const YEAR_ID = 'student-create-year';
+  const OTHER_YEAR_ID = 'student-create-other-year';
+
+  const validStudent = (overrides = {}) => ({
+    id: 'student-create-1',
+    schoolId: SCHOOL_ID,
+    academicYearId: YEAR_ID,
+    registrationYear: '2026-2027',
+    schoolingStatus: 'active',
+    matricule: 'MAT-2026-1001',
+    name: 'Élève Fictif',
+    studentLastName: 'Élève',
+    studentFirstName: 'Fictif',
+    gender: 'M',
+    dob: '2018-01-02',
+    section: 'francophone',
+    classId: 'student-create-class',
+    studentStatus: 'nouveau',
+    parentName: 'Responsable Fictif',
+    parentPhone: '+237600000000',
+    registrationFeePaid: 0,
+    registrationFeeStatus: 'unpaid',
+    createdAt: serverTimestamp(),
+    createdBy: 'student-create-secretary',
+    updatedAt: serverTimestamp(),
+    updatedBy: 'student-create-secretary',
+    ...overrides
+  });
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'users', 'student-create-secretary'), {
+        role: 'secretary', schoolId: SCHOOL_ID, active: true
+      });
+      await setDoc(doc(db, 'schools', SCHOOL_ID), {
+        name: 'École fictive', isInternalSchool: true, activeAcademicYearId: YEAR_ID
+      });
+      await setDoc(doc(db, 'schools', OTHER_SCHOOL_ID), {
+        name: 'Autre école fictive', isInternalSchool: true, activeAcademicYearId: OTHER_YEAR_ID
+      });
+      await setDoc(doc(db, 'academicYears', YEAR_ID), {
+        schoolId: SCHOOL_ID, name: '2026-2027', status: 'active'
+      });
+      await setDoc(doc(db, 'academicYears', OTHER_YEAR_ID), {
+        schoolId: OTHER_SCHOOL_ID, name: '2026-2027', status: 'active'
+      });
+      await setDoc(doc(db, 'classes', 'student-create-class'), {
+        schoolId: SCHOOL_ID, name: 'Classe fictive', isActive: true
+      });
+      await setDoc(doc(db, 'classes', 'student-create-inactive-class'), {
+        schoolId: SCHOOL_ID, name: 'Classe inactive', isActive: false
+      });
+      await setDoc(doc(db, 'classes', 'student-create-other-class'), {
+        schoolId: OTHER_SCHOOL_ID, name: 'Autre classe', isActive: true
+      });
+    });
+  });
+
+  const createStudent = (payload) => {
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    return setDoc(doc(context.firestore(), 'students', 'student-create-1'), payload);
+  };
+
+  it('allows a valid same-school student creation for the active year', async () => {
+    await assertSucceeds(createStudent(validStudent()));
+  });
+
+  it('denies a cross-school student creation', async () => {
+    await assertFails(createStudent(validStudent({
+      schoolId: OTHER_SCHOOL_ID,
+      academicYearId: OTHER_YEAR_ID,
+      classId: 'student-create-other-class'
+    })));
+  });
+
+  it('denies a class from another school', async () => {
+    await assertFails(createStudent(validStudent({ classId: 'student-create-other-class' })));
+  });
+
+  it('denies an inactive class', async () => {
+    await assertFails(createStudent(validStudent({ classId: 'student-create-inactive-class' })));
+  });
+
+  it('denies a missing academic year', async () => {
+    const payload = validStudent();
+    delete payload.academicYearId;
+    await assertFails(createStudent(payload));
+  });
+
+  it('denies an academic year different from the school active pointer', async () => {
+    await assertFails(createStudent(validStudent({ academicYearId: OTHER_YEAR_ID })));
+  });
+
+  it('denies invalid required field types', async () => {
+    await assertFails(createStudent(validStudent({ parentPhone: 600000000 })));
+  });
+
+  it('denies an invalid initial schooling status', async () => {
+    await assertFails(createStudent(validStudent({ schoolingStatus: 'inactive' })));
+  });
+
+  it('denies a missing schoolId', async () => {
+    const payload = validStudent();
+    delete payload.schoolId;
+    await assertFails(createStudent(payload));
+  });
+
+  it('denies arbitrary client fields outside the creation schema', async () => {
+    await assertFails(createStudent(validStudent({ claims: { admin: true } })));
   });
 });
 

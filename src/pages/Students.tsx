@@ -13,6 +13,7 @@ import { normalizeParentEmails } from '../utils/emailHelpers';
 import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
 import { db as firestoreDb } from '../db/firebase';
 import { doc, setDoc, updateDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { resolveStudentEnrollmentAcademicYear } from '../utils/studentEnrollment';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -621,8 +622,16 @@ const Students: React.FC = () => {
 
       } else {
         if (!currentSchool) throw new Error("École non définie.");
+        const activeAcademicYear = resolveStudentEnrollmentAcademicYear(db.academicYears, currentSchool);
+        if (!activeAcademicYear) {
+          throw new Error("ACTIVE_ACADEMIC_YEAR_REQUIRED");
+        }
         const studentId = finalStudent.id || crypto.randomUUID();
         finalStudent.id = studentId;
+        finalStudent.schoolId = currentSchool.id;
+        finalStudent.academicYearId = activeAcademicYear.id;
+        finalStudent.registrationYear = activeAcademicYear.name;
+        finalStudent.schoolingStatus = 'active';
         const studentRef = doc(firestoreDb, 'students', studentId);
 
         const currentCountDisplay = currentSchool.studentCount ?? db.students.length;
@@ -630,7 +639,52 @@ const Students: React.FC = () => {
           throw new Error("QUOTA_EXCEEDED");
         }
 
-        const studentToSave = Object.fromEntries(Object.entries(finalStudent).filter(([, v]) => v !== undefined));
+        const optionalStudentFields: Partial<Student> = {
+          placeOfBirth: finalStudent.placeOfBirth,
+          fatherName: finalStudent.fatherName,
+          fatherPhone: finalStudent.fatherPhone,
+          fatherProfession: finalStudent.fatherProfession,
+          motherName: finalStudent.motherName,
+          motherPhone: finalStudent.motherPhone,
+          motherProfession: finalStudent.motherProfession,
+          guardianRelationship: finalStudent.guardianRelationship,
+          guardianRelationshipDetails: finalStudent.guardianRelationshipDetails,
+          parentEmails: finalStudent.parentEmails,
+          address: finalStudent.address,
+          emergencyContact: finalStudent.emergencyContact,
+          allergies: finalStudent.allergies,
+          medicalConditions: finalStudent.medicalConditions,
+          registrationFeeExpected: finalStudent.registrationFeeExpected,
+          tuitionExpected: finalStudent.tuitionExpected,
+          feeT1: finalStudent.feeT1,
+          feeT2: finalStudent.feeT2,
+          feeT3: finalStudent.feeT3
+        };
+        const studentToSave = Object.fromEntries(Object.entries({
+          id: studentId,
+          schoolId: currentSchool.id,
+          academicYearId: activeAcademicYear.id,
+          registrationYear: activeAcademicYear.name,
+          schoolingStatus: 'active',
+          matricule: finalStudent.matricule,
+          name: finalStudent.name,
+          studentLastName: finalStudent.studentLastName,
+          studentFirstName: finalStudent.studentFirstName,
+          gender: finalStudent.gender,
+          dob: finalStudent.dob,
+          section: finalStudent.section,
+          classId: finalStudent.classId,
+          studentStatus: finalStudent.studentStatus || 'nouveau',
+          parentName: finalStudent.parentName,
+          parentPhone: finalStudent.parentPhone,
+          registrationFeePaid: 0,
+          registrationFeeStatus: 'unpaid',
+          createdAt: serverTimestamp(),
+          createdBy: currentUser.id,
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser.id,
+          ...optionalStudentFields
+        }).filter(([, value]) => value !== undefined && value !== ''));
 
         await setDoc(studentRef, studentToSave, { merge: true });
 
@@ -653,6 +707,8 @@ const Students: React.FC = () => {
       const message = getErrorMessage(err);
       if (message === 'QUOTA_EXCEEDED') {
         alert("Action refusée : La limite de votre abonnement SaaS est atteinte. Veuillez passer au plan supérieur.");
+      } else if (message === 'ACTIVE_ACADEMIC_YEAR_REQUIRED') {
+        alert("Création impossible : aucune année académique active valide n'est configurée pour cette école.");
       } else if (message === 'ALREADY_EXISTS') {
         alert("Erreur métier : Cet élève existe déjà ou une requête concurrente a réussi.");
       } else if (code === 'permission-denied') {
@@ -2111,7 +2167,15 @@ const Students: React.FC = () => {
                   </div>
                   <div className="form-group" style={{ flex: '1 1 200px' }}>
                     <label>Année Scolaire</label>
-                    <input value={currentStudent.registrationYear || '2026-2027'} onChange={e => setCurrentStudent({...currentStudent, registrationYear: e.target.value})} />
+                    <input
+                      readOnly
+                      value={
+                        isEditing
+                          ? (currentStudent.registrationYear || 'Année non renseignée (fiche legacy)')
+                          : (resolveStudentEnrollmentAcademicYear(db.academicYears, currentSchool)?.name || 'Aucune année active configurée')
+                      }
+                      aria-label="Année scolaire active"
+                    />
                   </div>
                 </div>
               </div>

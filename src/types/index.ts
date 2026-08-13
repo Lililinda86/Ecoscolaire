@@ -184,6 +184,8 @@ export interface Subject {
 export interface Student {
   id: string;
   schoolId?: string;
+  /** Active academic year used when this student record was created. Legacy records may omit it. */
+  academicYearId?: string;
   matricule?: string;
   name: string;
   gender: 'M' | 'F';
@@ -267,6 +269,10 @@ export interface Student {
   guardianRelation?: string;
 
   primaryContactType?: "mother" | "father" | "guardian";
+  createdAt?: DateLike;
+  createdBy?: string;
+  updatedAt?: DateLike;
+  updatedBy?: string;
 }
 
 export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';
