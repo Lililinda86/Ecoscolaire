@@ -1,10 +1,6 @@
 name: Seed Staging Database
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'scripts/setup-test-data.mjs'
-      - '.github/workflows/run-seed.yml'
 
 jobs:
   seed:
@@ -22,4 +18,5 @@ jobs:
       - name: Run Seed Script
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          STAGING_TEST_SUPERADMIN_PASSWORD: ${{ secrets.STAGING_TEST_SUPERADMIN_PASSWORD }}
         run: npm run seed:staging
