@@ -163,10 +163,98 @@ service cloud.firestore {
         'schoolId',
         'schoolIds',
         'active',
+        'isActive',
         'status',
         'permissions',
-        'studentIds'
+        'claims',
+        'customClaims',
+        'studentIds',
+        'mustChangePin'
       ]);
+    }
+
+    function isUpdatingStoredAuthSecret() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'password',
+        'pin',
+        'token',
+        'credential'
+      ]);
+    }
+
+    function isOwnerManagedRole(role) {
+      return role in ['director', 'secretary', 'accountant', 'teacher', 'driver'];
+    }
+
+    function isDirectorManagedRole(role) {
+      return role in ['secretary', 'accountant', 'teacher', 'driver'];
+    }
+
+    function isOperationalStaffRole(role) {
+      return role in ['director', 'secretary', 'accountant', 'teacher', 'driver'];
+    }
+
+    function canCreateManagedUserRole(role) {
+      return (isOwner() && isOwnerManagedRole(role))
+        || (isDirector() && isDirectorManagedRole(role))
+        || (isSuperAdmin() && isOperationalStaffRole(role));
+    }
+
+    function hasValidManagedUserSchool(data) {
+      return data.schoolId is string
+        && data.schoolId.size() > 0
+        && (isSuperAdmin() || data.schoolId == getUserSchoolId());
+    }
+
+    function isStrictManagedUserCreate(data, userId) {
+      return data.keys().hasAll([
+          'id', 'email', 'role', 'schoolId', 'active', 'isActive', 'status', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'email', 'role', 'schoolId', 'active', 'isActive', 'status', 'createdAt'
+        ])
+        && data.id == userId
+        && data.email is string
+        && data.email.size() > 0
+        && canCreateManagedUserRole(data.role)
+        && hasValidManagedUserSchool(data)
+        && data.active == true
+        && data.isActive == true
+        && data.status == 'active';
+    }
+
+    function canManageUserActivation(targetData) {
+      return (
+          isSuperAdmin() && targetData.role != 'superAdmin'
+        ) || (
+          isOwner()
+          && targetData.schoolId == getUserSchoolId()
+          && isOwnerManagedRole(targetData.role)
+        ) || (
+          isDirector()
+          && targetData.schoolId == getUserSchoolId()
+          && isDirectorManagedRole(targetData.role)
+        );
+    }
+
+    function isValidUserActivationUpdate() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return affectedKeys.hasAny(['active', 'isActive', 'status'])
+        && affectedKeys.hasOnly(['active', 'isActive', 'status', 'updatedAt', 'updatedBy'])
+        && canManageUserActivation(resource.data)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.schoolId == resource.data.schoolId
+        && request.resource.data.get('schoolIds', []) == resource.data.get('schoolIds', [])
+        && request.resource.data.get('permissions', []) == resource.data.get('permissions', [])
+        && request.resource.data.get('claims', {}) == resource.data.get('claims', {})
+        && request.resource.data.get('customClaims', {}) == resource.data.get('customClaims', {})
+        && request.resource.data.active is bool
+        && request.resource.data.isActive is bool
+        && request.resource.data.active == request.resource.data.isActive
+        && (
+          (request.resource.data.active == true && request.resource.data.status == 'active')
+          || (request.resource.data.active == false && request.resource.data.status == 'inactive')
+        );
     }
 
     function isPromotingToSuperAdmin() {
@@ -374,10 +462,10 @@ service cloud.firestore {
         ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
       );
 
-      // Autorise superAdmin/owner à créer, OU le premier superAdmin via email, OU Auto-inscription Parent via Invitation
+      // Création administrative strictement limitée aux rôles ITALO autorisés,
+      // ou auto-inscription Parent via son invitation dédiée.
       allow create: if isAuthenticated() && (
-        isSuperAdmin() || isOwner() ||
-        (request.auth.token.email in ['kyrialove@gmail.com', 'superadmin.test@ecoscolaire.com'] && request.auth.uid == userId) ||
+        (isActive() && isStrictManagedUserCreate(request.resource.data, userId)) ||
         (
           request.auth.uid == userId &&
           request.resource.data.role == 'parent' &&
@@ -386,17 +474,26 @@ service cloud.firestore {
           get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.parentEmailLower == request.auth.token.email &&
           get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.schoolId == request.resource.data.schoolId &&
           request.resource.data.studentIds == get(/databases/$(database)/documents/parent_invitations/$(request.resource.data.inviteId)).data.studentIds &&
-          !request.resource.data.keys().hasAny(['isInternalSchool', 'subscriptionPlan', 'studentLimit', 'pilot', 'permissions', 'claims', 'customClaims'])
+          !request.resource.data.keys().hasAny([
+            'isInternalSchool', 'subscriptionPlan', 'studentLimit', 'pilot',
+            'permissions', 'claims', 'customClaims', 'password', 'pin', 'token', 'credential'
+          ])
         )
       );
       allow update: if isAuthenticated() && isActive() && (
-        isSuperAdmin() ||
+        isValidUserActivationUpdate() ||
         (
-          (request.auth.uid == userId || (isOwner() && hasSchoolAccess(resource.data.schoolId))) &&
-          !isUpdatingSensitiveUserFields()
+          (
+            isSuperAdmin()
+            || request.auth.uid == userId
+            || (isOwner() && hasSchoolAccess(resource.data.schoolId))
+          ) &&
+          !isUpdatingSensitiveUserFields() &&
+          !isUpdatingStoredAuthSecret()
         )
       );
-      allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
+      // Suppression physique réservée aux opérations backend/Admin SDK contrôlées.
+      allow delete: if false;
     }
 
     // --- SCHOOLS ---

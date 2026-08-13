@@ -11,6 +11,7 @@ import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
 import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
 import { sanitizeBoardViewerData } from '../utils/boardViewerSanitizer';
+import { isUserActive, logAuthenticationFailure } from '../utils/authSecurity';
 
 type EntityWithId = {
   id: string;
@@ -284,7 +285,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         console.log("Rôle détecté:", userData.role);
         console.log("Redirection gérée par App.tsx en fonction de ce rôle.");
-        if (!userData.isActive) {
+        if (!isUserActive(userData)) {
           alert("Votre compte est désactivé.");
           const { auth } = await import('../db/firebase');
           auth.signOut();
@@ -899,8 +900,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     } catch (error: unknown) {
       const code = getErrorCode(error);
-      const message = getErrorMessage(error);
-      console.error("Login Error details:", { email, pin, code, message, error });
+      logAuthenticationFailure(code);
 
       let resultCode: 'invalid-credential' | 'invalid-email' | 'user-disabled' | 'too-many-requests' | 'network-error' | 'unknown' = 'unknown';
       if (code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-credential') {

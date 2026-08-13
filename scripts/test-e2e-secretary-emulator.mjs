@@ -1,4 +1,5 @@
-import { initializeApp as initAdmin, cert } from 'firebase-admin/app';
+import { randomBytes } from 'node:crypto';
+import { initializeApp as initAdmin } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { initializeApp as initClient } from 'firebase/app';
@@ -13,7 +14,7 @@ const adminDb = getAdminFirestore(adminApp);
 const adminAuth = getAdminAuth(adminApp);
 
 const clientApp = initClient({
-  apiKey: "AIzaSyFakeApiKeyForEmulatorTest123456789",
+  apiKey: "demo-api-key",
   projectId: "ecoscolaire-staging"
 });
 const clientAuth = getAuth(clientApp);
@@ -29,7 +30,7 @@ async function runE2E() {
   console.log("=== DÉBUT TEST E2E ÉMULATEUR (FRAIS PAR ÉCOLE) ===");
   try {
     const testEmail = "sec_a@test.com";
-    const pass = "password123";
+    const pass = randomBytes(32).toString('base64url');
     const uid = "sec_a_uid";
     const schoolIdA = "ecole-avec-frais";
     const schoolIdB = "ecole-sans-frais";

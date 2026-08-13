@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Lock, Mail, Building, Eye, EyeOff, AlertTriangle, CheckCircle } from 'lucide-react';
 import Modal from '../components/Modal';
+import { requestPasswordReset } from '../db/firebase';
 
 const Login: React.FC = () => {
   const { login } = useAppContext();
@@ -15,6 +16,7 @@ const Login: React.FC = () => {
   const [isRecoveryModalOpen, setRecoveryModalOpen] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoverySent, setRecoverySent] = useState(false);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,14 +51,17 @@ const Login: React.FC = () => {
     setLoading(false);
   };
 
-  const handleRecoverySubmit = (e: React.FormEvent) => {
+  const handleRecoverySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRecoverySent(true);
-    setTimeout(() => {
-      setRecoveryModalOpen(false);
-      setRecoverySent(false);
-      setRecoveryEmail('');
-    }, 4000);
+    setRecoveryLoading(true);
+    try {
+      await requestPasswordReset(recoveryEmail);
+    } catch {
+      // Réponse volontairement identique pour ne pas révéler l'existence d'un compte.
+    } finally {
+      setRecoveryLoading(false);
+      setRecoverySent(true);
+    }
   };
 
   const { isFirestoreConnected, firestoreError } = useAppContext();
@@ -185,7 +190,9 @@ const Login: React.FC = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
               <button type="button" className="secondary" onClick={() => setRecoveryModalOpen(false)}>Annuler</button>
-              <button type="submit">Envoyer la demande</button>
+              <button type="submit" disabled={recoveryLoading}>
+                {recoveryLoading ? 'Envoi en cours...' : 'Envoyer la demande'}
+              </button>
             </div>
           </form>
         )}

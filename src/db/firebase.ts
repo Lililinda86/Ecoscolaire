@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { generateTemporaryAuthSecret } from '../utils/authSecurity';
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -91,17 +92,23 @@ if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true
 }
 
 // Application secondaire pour créer des comptes sans déconnecter l'admin
-export const createSecondaryUser = async (email: string, pass: string) => {
+export const createSecondaryUserForPasswordSetup = async (email: string) => {
   const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp');
   const secondaryAuth = getAuth(secondaryApp);
   const { createUserWithEmailAndPassword, signOut } = await import('firebase/auth');
-  
-  const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
-  await signOut(secondaryAuth);
-  
-  // Clean up
-  const { deleteApp } = await import('firebase/app');
-  await deleteApp(secondaryApp);
-  
-  return userCredential.user;
+
+  try {
+    const temporarySecret = generateTemporaryAuthSecret();
+    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, temporarySecret);
+    await signOut(secondaryAuth);
+    return userCredential.user;
+  } finally {
+    const { deleteApp } = await import('firebase/app');
+    await deleteApp(secondaryApp);
+  }
+};
+
+export const requestPasswordReset = async (email: string): Promise<void> => {
+  const { sendPasswordResetEmail } = await import('firebase/auth');
+  await sendPasswordResetEmail(auth, email.trim().toLowerCase());
 };
