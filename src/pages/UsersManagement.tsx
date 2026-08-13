@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Users, Plus, Shield, ShieldOff, Edit2, Key } from 'lucide-react';
+import { Users, Plus, Shield, ShieldOff, Edit2 } from 'lucide-react';
 import type { User, GlobalRole } from '../types';
 import Modal from '../components/Modal';
-import { createSecondaryUser } from '../db/firebase';
+import { createSecondaryUserForPasswordSetup, db as firebaseDb, requestPasswordReset } from '../db/firebase';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { getCreatableRoles } from '../utils/authRoles';
+import { getFirebaseErrorCode } from '../utils/authSecurity';
+const ROLE_LABELS: Partial<Record<GlobalRole, string>> = {
+  director: 'Directeur',
+  secretary: 'Secrétaire',
+  accountant: 'Comptable',
+  teacher: 'Enseignant',
+  driver: 'Chauffeur'
+};
 
 const UsersManagement: React.FC = () => {
-  const { db, safeMergeDB, currentUser, currentSchool, logAuditAction } = useAppContext();
+  const { db, updateLocalState, currentUser, currentSchool, logAuditAction } = useAppContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -14,7 +24,6 @@ const UsersManagement: React.FC = () => {
     role: 'teacher',
     isActive: true
   });
-  const [password, setPassword] = useState('123456');
 
   if (!db || !currentUser) return null;
 
@@ -34,38 +43,74 @@ const UsersManagement: React.FC = () => {
     setLoading(true);
 
     try {
-      const newDb = { ...db };
-      
       if (formData.id) {
-        // Mise à jour (pas de changement de mot de passe ici, juste des rôles/status)
-        newDb.users = newDb.users.map(u => u.id === formData.id ? { ...u, ...formData } as User : u);
-        await safeMergeDB(newDb);
+        const isActive = formData.isActive !== false;
+        await updateDoc(doc(firebaseDb, 'users', formData.id), {
+          active: isActive,
+          isActive,
+          status: isActive ? 'active' : 'inactive'
+        });
+        updateLocalState(prev => ({
+          users: prev.users.map(user => user.id === formData.id
+            ? { ...user, active: isActive, isActive, status: isActive ? 'active' : 'inactive' }
+            : user)
+        }));
       } else {
-        // Création d'un NOUVEL utilisateur Firebase Auth
         if (!formData.email) throw new Error("Email requis");
-        
-        console.log("Création auth Firebase silencieuse...");
-        const fbUser = await createSecondaryUser(formData.email, password);
+        if (!currentSchool) throw new Error("Sélectionnez d'abord une école");
+
+        const role = formData.role as GlobalRole;
+        if (!getCreatableRoles(currentUser.role).includes(role)) {
+          throw new Error("Rôle non autorisé");
+        }
+
+        const normalizedEmail = formData.email.trim().toLowerCase();
+        let fbUser: Awaited<ReturnType<typeof createSecondaryUserForPasswordSetup>>;
+        try {
+          fbUser = await createSecondaryUserForPasswordSetup(normalizedEmail);
+        } catch (error: unknown) {
+          if (getFirebaseErrorCode(error) === 'auth/email-already-in-use') {
+            throw new Error("Un compte Firebase Auth existe déjà pour cet email. Aucun doublon n'a été créé. Réconciliez son profil EcoScolaire avant de réessayer.");
+          }
+          throw error;
+        }
         
         const newUser: User = {
           id: fbUser.uid,
-          email: formData.email,
-          role: formData.role as GlobalRole,
-          schoolId: currentSchool?.id,
-          isActive: formData.isActive || true,
-          createdAt: new Date().toISOString(),
-          mustChangePin: true // Force password change later if we implement it
+          email: normalizedEmail,
+          role,
+          schoolId: currentSchool.id,
+          active: true,
+          isActive: true,
+          status: 'active',
+          createdAt: new Date().toISOString()
         };
-        
-        newDb.users.push(newUser);
-        await safeMergeDB(newDb);
+
+        try {
+          await setDoc(doc(firebaseDb, 'users', newUser.id), newUser, { merge: true });
+        } catch {
+          throw new Error("Le compte Firebase Auth a été créé, mais son profil EcoScolaire n'a pas pu être créé. Ce compte n'a aucun accès applicatif et doit être réconcilié avant une nouvelle tentative.");
+        }
+        updateLocalState(prev => ({ users: [...prev.users, newUser] }));
+
+        let setupEmailSent = true;
+        try {
+          await requestPasswordReset(normalizedEmail);
+        } catch {
+          setupEmailSent = false;
+        }
         
         await logAuditAction({
           action: 'CREATE_USER',
           targetType: 'USER',
           targetId: newUser.id,
-          targetName: newUser.email
+          targetName: newUser.email,
+          details: { setupEmailSent }
         });
+
+        if (!setupEmailSent) {
+          alert("Le compte a été créé, mais l'email de définition du mot de passe n'a pas pu être envoyé. L'utilisateur peut utiliser « Mot de passe oublié ».");
+        }
       }
       setModalOpen(false);
     } catch (err: unknown) {
@@ -98,7 +143,7 @@ const UsersManagement: React.FC = () => {
             </p>
           </div>
         </div>
-        <button className="primary" onClick={() => { setFormData({ role: 'teacher', isActive: true }); setPassword('123456'); setModalOpen(true); }}>
+        <button className="primary" disabled={!currentSchool} onClick={() => { setFormData({ role: 'teacher', isActive: true }); setModalOpen(true); }}>
           <Plus size={18} /> Nouvel Utilisateur
         </button>
       </div>
@@ -147,34 +192,19 @@ const UsersManagement: React.FC = () => {
             {!!formData.id && <small style={{ color: '#dc2626' }}>L'email Firebase ne peut pas être modifié ici.</small>}
           </div>
           
-          {!formData.id && (
-            <div className="form-group">
-              <label>Mot de passe initial (Min. 6 caractères)</label>
-              <div style={{ position: 'relative' }}>
-                <Key size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                <input type="text" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} style={{ paddingLeft: '2.5rem' }} />
-              </div>
-            </div>
-          )}
-
           <div className="form-group">
             <label>Rôle Sécurité</label>
-            <select required value={formData.role || 'teacher'} onChange={e => setFormData({...formData, role: e.target.value as GlobalRole})} disabled={formData.id === currentUser.id}>
-              {currentUser.role === 'superAdmin' && <option value="superAdmin">Super Admin (Accès total absolu)</option>}
-              {['superAdmin', 'owner'].includes(currentUser.role) && <option value="owner">Fondateur / Propriétaire</option>}
-              <option value="director">Directeur</option>
-              <option value="accountant">Comptable</option>
-              <option value="secretary">Secrétaire</option>
-              <option value="teacher">Enseignant</option>
-              <option value="driver">Chauffeur</option>
-              <option value="parent">Parent</option>
-              <option value="student">Élève</option>
+            <select required value={formData.role || 'teacher'} onChange={e => setFormData({...formData, role: e.target.value as GlobalRole})} disabled={!!formData.id}>
+              {(formData.id ? [formData.role] : getCreatableRoles(currentUser.role)).filter(Boolean).map(role => (
+                <option key={role} value={role}>{ROLE_LABELS[role as GlobalRole] || role}</option>
+              ))}
             </select>
+            {!formData.id && <small>Un email sécurisé permettra à l'utilisateur de définir lui-même son mot de passe.</small>}
           </div>
 
           <div className="form-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-              <input type="checkbox" checked={formData.isActive || false} onChange={e => setFormData({...formData, isActive: e.target.checked})} disabled={formData.id === currentUser.id} />
+              <input type="checkbox" checked={formData.isActive ?? false} onChange={e => setFormData({...formData, isActive: e.target.checked})} disabled={!formData.id || formData.id === currentUser.id} />
               Compte Actif (Autoriser la connexion)
             </label>
           </div>

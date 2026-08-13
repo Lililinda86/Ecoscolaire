@@ -131,13 +131,13 @@ describe('SaaS Fields Security Rules', () => {
     await assertFails(updateDoc(doc(context.firestore(), 'users', 'teacher-uid'), { role: 'superAdmin' }));
   });
 
-  it('SuperAdmin modifie le rôle d\'un utilisateur -> autorisé', async () => {
+  it('SuperAdmin modifie le rôle depuis le client -> refusé (provisioning Admin uniquement)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'users', 'sa-uid'), { role: 'superAdmin', active: true });
       await setDoc(doc(context.firestore(), 'users', 'teacher-uid'), { role: 'teacher', schoolId: 'school-123', active: true });
     });
     const context = testEnv.authenticatedContext('sa-uid');
-    await assertSucceeds(updateDoc(doc(context.firestore(), 'users', 'teacher-uid'), { role: 'director' }));
+    await assertFails(updateDoc(doc(context.firestore(), 'users', 'teacher-uid'), { role: 'director' }));
   });
 
 });

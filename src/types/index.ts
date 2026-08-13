@@ -81,11 +81,13 @@ export interface User {
   schoolId?: string; // Null pour le superAdmin
   email: string;
   role: GlobalRole;
+  active?: boolean;
   isActive: boolean;
+  status?: 'active' | 'inactive';
   createdAt: string;
   // Spécifique Parent
   studentIds?: string[];
-  // Legacy / Mots de passe
+  // Legacy : conservé en lecture pour compatibilité, non écrit par les nouveaux comptes.
   mustChangePin?: boolean;
 }
 

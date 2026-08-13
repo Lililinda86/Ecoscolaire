@@ -1,5 +1,13 @@
 const { chromium } = require('playwright');
-const admin = require('firebase-admin');
+
+const baseUrl = process.env.E2E_BASE_URL || 'http://localhost:5173';
+const teacherEmail = process.env.E2E_TEACHER_EMAIL;
+const ownerEmail = process.env.E2E_OWNER_EMAIL;
+const e2ePassword = process.env.E2E_PASSWORD;
+
+if (!teacherEmail || !ownerEmail || !e2ePassword) {
+    throw new Error('Définissez E2E_TEACHER_EMAIL, E2E_OWNER_EMAIL et E2E_PASSWORD dans votre environnement local.');
+}
 
 async function run() {
     console.log("Starting Transaction History Verification...");
@@ -8,16 +16,16 @@ async function run() {
     
     // 1. Test avec rôle 'teacher'
     console.log("\n--- TEST SECURITE : ROLE TEACHER ---");
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${baseUrl}/`);
     await page.waitForTimeout(2000);
     
     try {
-        await page.fill('input[type="email"]', 'teacher.alpha@ecoscolaire.com');
-        await page.fill('input[type="password"]', '123456');
+        await page.fill('input[type="email"]', teacherEmail);
+        await page.fill('input[type="password"]', e2ePassword);
         await page.click('button:has-text("Se connecter")');
         await page.waitForTimeout(5000); // Wait for login and routing
         
-        await page.goto('http://localhost:5173/#/payments');
+        await page.goto(`${baseUrl}/#/payments`);
         await page.waitForTimeout(3000);
         
         const historyTabTeacher = await page.$('button:has-text("Historique MoMo")');
@@ -39,15 +47,15 @@ async function run() {
     // 2. Test avec rôle 'owner'
     console.log("\n--- TEST FONCTIONNEL : ROLE OWNER ---");
     const page2 = await browser.newPage();
-    await page2.goto('http://localhost:5173/');
+    await page2.goto(`${baseUrl}/`);
     await page2.waitForTimeout(2000);
     
-    await page2.fill('input[type="email"]', 'owner.alpha@ecoscolaire.com');
-    await page2.fill('input[type="password"]', '123456');
+    await page2.fill('input[type="email"]', ownerEmail);
+    await page2.fill('input[type="password"]', e2ePassword);
     await page2.click('button:has-text("Se connecter")');
     await page2.waitForTimeout(5000);
     
-    await page2.goto('http://localhost:5173/#/payments');
+    await page2.goto(`${baseUrl}/#/payments`);
     await page2.waitForTimeout(3000);
     
     // Check Encaissements regressions
