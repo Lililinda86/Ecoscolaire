@@ -187,6 +187,11 @@ export interface Student {
   /** Active academic year used when this student record was created. Legacy records may omit it. */
   academicYearId?: string;
   matricule?: string;
+  /** Deterministic uniqueness metadata; optional only for legacy records. */
+  matriculeNormalized?: string;
+  matriculeReservationId?: string;
+  duplicateFingerprint?: string;
+  duplicateReservationId?: string;
   name: string;
   gender: 'M' | 'F';
   dob: string;

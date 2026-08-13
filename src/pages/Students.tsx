@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy, MessageSquare } from 'lucide-react';
@@ -14,6 +14,12 @@ import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel
 import { db as firestoreDb } from '../db/firebase';
 import { doc, setDoc, updateDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { resolveStudentEnrollmentAcademicYear } from '../utils/studentEnrollment';
+import {
+  acquireStudentSubmissionLock,
+  createStudentAtomically,
+  normalizeStudentMatricule,
+  releaseStudentSubmissionLock
+} from '../services/studentCreation';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -226,6 +232,8 @@ const Students: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingStudentOriginal, setEditingStudentOriginal] = useState<Student | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
+  const [isDuplicateConfirmOpen, setIsDuplicateConfirmOpen] = useState(false);
   const [, setRefresh] = useState(0);
   const { db, addStudentsLocal, updateStudentLocal, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
 
@@ -265,6 +273,7 @@ const Students: React.FC = () => {
   };
 
   const forceCloseStudentModal = () => {
+    setIsDuplicateConfirmOpen(false);
     setModalOpen(false);
   };
 
@@ -520,9 +529,11 @@ const Students: React.FC = () => {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSaving) return;
+  const handleSave = async (
+    e?: React.FormEvent,
+    confirmProbableDuplicate = false
+  ) => {
+    e?.preventDefault();
     if (currentStep !== 4) return;
 
     if (!currentStudent.classId) {
@@ -537,11 +548,12 @@ const Students: React.FC = () => {
       return;
     }
 
+    if (!acquireStudentSubmissionLock(saveInFlightRef)) return;
     setIsSaving(true);
     try {
       const normalizedEmails = normalizeParentEmails(parentEmailsInput);
       const parentPhone = currentStudent.parentPhone ? (normalizeCameroonPhoneNumber(currentStudent.parentPhone) || currentStudent.parentPhone) : '';
-      const matricule = currentStudent.matricule ? currentStudent.matricule.trim() : `MAT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const matricule = currentStudent.matricule?.trim() ?? '';
       const computedName = buildStudentDisplayName(currentStudent.studentLastName, currentStudent.studentFirstName);
       const finalName = computedName || currentStudent.name || '';
 
@@ -632,8 +644,6 @@ const Students: React.FC = () => {
         finalStudent.academicYearId = activeAcademicYear.id;
         finalStudent.registrationYear = activeAcademicYear.name;
         finalStudent.schoolingStatus = 'active';
-        const studentRef = doc(firestoreDb, 'students', studentId);
-
         const currentCountDisplay = currentSchool.studentCount ?? db.students.length;
         if (isStudentLimitReached(currentSchool, currentCountDisplay)) {
           throw new Error("QUOTA_EXCEEDED");
@@ -679,18 +689,45 @@ const Students: React.FC = () => {
           parentPhone: finalStudent.parentPhone,
           registrationFeePaid: 0,
           registrationFeeStatus: 'unpaid',
-          createdAt: serverTimestamp(),
-          createdBy: currentUser.id,
-          updatedAt: serverTimestamp(),
-          updatedBy: currentUser.id,
           ...optionalStudentFields
         }).filter(([, value]) => value !== undefined && value !== ''));
 
-        await setDoc(studentRef, studentToSave, { merge: true });
+        const creationResult = await createStudentAtomically({
+          firestore: firestoreDb,
+          studentId,
+          schoolId: currentSchool.id,
+          actorId: currentUser.id,
+          requestedMatricule: currentStudent.matricule,
+          studentData: studentToSave,
+          confirmProbableDuplicate,
+          isMatriculeKnown: normalizedMatricule => db.students.some(student => {
+            if (
+              student.schoolId !== currentSchool.id
+              || student.id === studentId
+              || !student.matricule
+            ) {
+              return false;
+            }
+            try {
+              return normalizeStudentMatricule(student.matricule) === normalizedMatricule;
+            } catch {
+              return false;
+            }
+          })
+        });
+        finalStudent.matricule = creationResult.matricule;
+        finalStudent.matriculeNormalized = creationResult.matriculeNormalized;
+        finalStudent.matriculeReservationId = creationResult.matriculeReservationId;
+        finalStudent.duplicateFingerprint = creationResult.duplicateFingerprint;
+        finalStudent.duplicateReservationId = creationResult.duplicateReservationId;
 
         // Mutate local state
-        db.students.push(finalStudent);
-        currentSchool.studentCount = (currentSchool.studentCount || 0) + 1;
+        if (!db.students.some(student => student.id === studentId)) {
+          db.students.push(finalStudent);
+          if (creationResult.created) {
+            currentSchool.studentCount = (currentSchool.studentCount || 0) + 1;
+          }
+        }
       }
 
       setRefresh(r => r + 1);
@@ -709,8 +746,14 @@ const Students: React.FC = () => {
         alert("Action refusée : La limite de votre abonnement SaaS est atteinte. Veuillez passer au plan supérieur.");
       } else if (message === 'ACTIVE_ACADEMIC_YEAR_REQUIRED') {
         alert("Création impossible : aucune année académique active valide n'est configurée pour cette école.");
-      } else if (message === 'ALREADY_EXISTS') {
-        alert("Erreur métier : Cet élève existe déjà ou une requête concurrente a réussi.");
+      } else if (message === 'MATRICULE_ALREADY_EXISTS') {
+        alert("Création impossible : ce matricule est déjà utilisé dans cette école.");
+      } else if (message === 'AUTOMATIC_MATRICULE_EXHAUSTED') {
+        alert("Création impossible : aucun matricule automatique unique n’a pu être réservé. Veuillez réessayer.");
+      } else if (message === 'PROBABLE_DUPLICATE') {
+        setIsDuplicateConfirmOpen(true);
+      } else if (message === 'STUDENT_ID_CONFLICT') {
+        alert("Création impossible : l’identifiant de cette saisie est déjà utilisé.");
       } else if (code === 'permission-denied') {
         console.error("PERMISSION DENIED ERROR DETAILS:", err);
         alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
@@ -722,6 +765,7 @@ const Students: React.FC = () => {
         alert("Erreur lors de l'enregistrement : " + message);
       }
     } finally {
+      releaseStudentSubmissionLock(saveInFlightRef);
       setIsSaving(false);
     }
   };
@@ -2007,10 +2051,11 @@ const Students: React.FC = () => {
                 )}
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   <div className="form-group" style={{ flex: '1 1 180px' }}>
-                    <label>Matricule <span style={{ fontSize: '0.8rem', color: '#64748b' }}>(Facultatif)</span></label>
+                    <label>Matricule <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{isEditing ? '(non modifiable)' : '(Facultatif)'}</span></label>
                     <input
                       value={currentStudent.matricule || ''}
                       onChange={e => setCurrentStudent({...currentStudent, matricule: e.target.value})}
+                      readOnly={isEditing}
                       placeholder="Laisser vide pour générer automatiquement"
                     />
                   </div>
@@ -2476,6 +2521,43 @@ const Students: React.FC = () => {
             </div>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={isDuplicateConfirmOpen}
+        onClose={() => setIsDuplicateConfirmOpen(false)}
+        title="Doublon probable détecté"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+      >
+        <div style={{ padding: '0.25rem 0' }}>
+          <p style={{ margin: '0 0 1rem 0' }}>
+            Un élève de la même école possède déjà les mêmes nom, prénom, date de naissance et sexe.
+          </p>
+          <p style={{ margin: '0 0 1.5rem 0', color: '#92400e' }}>
+            Vérifiez la saisie. Ne confirmez que s’il s’agit réellement de deux enfants différents.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setIsDuplicateConfirmOpen(false)}
+              disabled={isSaving}
+            >
+              Revenir à la saisie
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDuplicateConfirmOpen(false);
+                void handleSave(undefined, true);
+              }}
+              disabled={isSaving}
+            >
+              Confirmer deux enfants différents
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Abandon Confirmation Modal */}

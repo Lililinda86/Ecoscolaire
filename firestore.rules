@@ -379,14 +379,18 @@ service cloud.firestore {
     function isValidStudentCreate(studentData, studentId) {
       return studentData.keys().hasAll([
           'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
-          'matricule', 'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
+          'matricule', 'matriculeNormalized', 'matriculeReservationId',
+          'duplicateFingerprint', 'duplicateReservationId',
+          'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
           'section', 'classId', 'studentStatus', 'parentName', 'parentPhone',
           'registrationFeePaid', 'registrationFeeStatus',
           'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
         ])
         && studentData.keys().hasOnly([
           'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
-          'matricule', 'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
+          'matricule', 'matriculeNormalized', 'matriculeReservationId',
+          'duplicateFingerprint', 'duplicateReservationId',
+          'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
           'placeOfBirth', 'section', 'classId', 'studentStatus',
           'fatherName', 'fatherPhone', 'fatherProfession',
           'motherName', 'motherPhone', 'motherProfession',
@@ -406,6 +410,13 @@ service cloud.firestore {
         && studentData.schoolingStatus == 'active'
         && studentData.matricule is string
         && studentData.matricule.size() > 0
+        && studentData.matricule == studentData.matriculeNormalized
+        && studentData.matriculeNormalized.matches('^[A-Z0-9][A-Z0-9._-]{0,63}$')
+        && studentData.matriculeReservationId == studentData.schoolId + '__' + studentData.matriculeNormalized
+        && studentData.duplicateFingerprint is string
+        && studentData.duplicateFingerprint.size() > 0
+        && studentData.duplicateFingerprint.size() <= 300
+        && studentData.duplicateReservationId == studentData.schoolId + '__' + studentData.duplicateFingerprint
         && studentData.name is string
         && studentData.name.size() > 0
         && studentData.studentLastName is string
@@ -437,7 +448,21 @@ service cloud.firestore {
         && studentData.updatedAt == request.time
         && studentData.createdBy == request.auth.uid
         && studentData.updatedBy == request.auth.uid
-        && hasValidStudentAcademicYear(studentData);
+        && hasValidStudentAcademicYear(studentData)
+        && hasValidStudentCreationReservations(studentData, studentId);
+    }
+
+    function hasValidStudentCreationReservations(studentData, studentId) {
+      let matriculePath = /databases/$(database)/documents/studentMatriculeReservations/$(studentData.matriculeReservationId);
+      let duplicatePath = /databases/$(database)/documents/studentDuplicateReservations/$(studentData.duplicateReservationId);
+      return existsAfter(matriculePath)
+        && getAfter(matriculePath).data.schoolId == studentData.schoolId
+        && getAfter(matriculePath).data.studentId == studentId
+        && getAfter(matriculePath).data.matriculeNormalized == studentData.matriculeNormalized
+        && existsAfter(duplicatePath)
+        && getAfter(duplicatePath).data.schoolId == studentData.schoolId
+        && getAfter(duplicatePath).data.duplicateFingerprint == studentData.duplicateFingerprint
+        && studentId in getAfter(duplicatePath).data.studentIds;
     }
 
     function canCreateStudentWithinLimits(schoolId) {
@@ -616,6 +641,90 @@ service cloud.firestore {
                     request.resource.data.usedBy == request.auth.uid;
     }
 
+    match /studentMatriculeReservations/{reservationId} {
+      allow get: if isAuthenticated()
+                 && isActive()
+                 && (
+                   isSuperAdmin()
+                   || (
+                     canManagePedagogy(getUserSchoolId())
+                     && reservationId.matches('^' + getUserSchoolId() + '__.*$')
+                   )
+                 );
+      allow list: if false;
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'matriculeNormalized',
+                      'createdAt', 'createdBy'
+                    ])
+                    && request.resource.data.id == reservationId
+                    && request.resource.data.matriculeNormalized.matches('^[A-Z0-9][A-Z0-9._-]{0,63}$')
+                    && reservationId == request.resource.data.schoolId + '__' + request.resource.data.matriculeNormalized
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId))
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.matriculeReservationId == reservationId;
+      allow update, delete: if false;
+    }
+
+    match /studentDuplicateReservations/{reservationId} {
+      allow get: if isAuthenticated()
+                 && isActive()
+                 && (
+                   isSuperAdmin()
+                   || (
+                     canManagePedagogy(getUserSchoolId())
+                     && reservationId.matches('^' + getUserSchoolId() + '__.*$')
+                   )
+                 );
+      allow list: if false;
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'duplicateFingerprint', 'studentIds', 'lastStudentId',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == reservationId
+                    && request.resource.data.duplicateFingerprint is string
+                    && request.resource.data.duplicateFingerprint.size() > 0
+                    && request.resource.data.duplicateFingerprint.size() <= 300
+                    && reservationId == request.resource.data.schoolId + '__' + request.resource.data.duplicateFingerprint
+                    && request.resource.data.studentIds is list
+                    && request.resource.data.studentIds.size() == 1
+                    && request.resource.data.lastStudentId == request.resource.data.studentIds[0]
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId))
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.duplicateReservationId == reservationId;
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'studentIds', 'lastStudentId', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.duplicateFingerprint == resource.data.duplicateFingerprint
+                    && request.resource.data.studentIds is list
+                    && request.resource.data.studentIds.size() == resource.data.studentIds.size() + 1
+                    && request.resource.data.studentIds.hasAll(resource.data.studentIds)
+                    && request.resource.data.lastStudentId in request.resource.data.studentIds
+                    && !(request.resource.data.lastStudentId in resource.data.studentIds)
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId))
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.schoolId == resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.duplicateReservationId == reservationId;
+      allow delete: if false;
+    }
+
     // --- STUDENTS & PARENTS ---
     match /students/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
@@ -632,6 +741,11 @@ service cloud.firestore {
                     && isValidStudentCreate(request.resource.data, studentId);
       // Update
       allow update: if isAuthenticated() && isActive() && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'matricule', 'matriculeNormalized', 'matriculeReservationId',
+          'duplicateFingerprint', 'duplicateReservationId'
+        ])
+        &&
         !(isSecretary() && isUpdatingStudentActiveStatusFields())
         && (
           (

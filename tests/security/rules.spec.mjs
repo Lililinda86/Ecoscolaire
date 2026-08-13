@@ -1,7 +1,7 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import fs from 'fs';
-import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField, limit, serverTimestamp } from 'firebase/firestore';
-import { test } from '@playwright/test';
+import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField, limit, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { expect, test } from '@playwright/test';
 const { describe, beforeAll: before, beforeEach, afterAll: after } = test;
 const it = test;
 
@@ -392,6 +392,8 @@ describe('Student Creation Schema Security Rules', () => {
   const OTHER_SCHOOL_ID = 'student-create-other-school';
   const YEAR_ID = 'student-create-year';
   const OTHER_YEAR_ID = 'student-create-other-year';
+  const DEFAULT_MATRICULE = 'MAT-2026-1001';
+  const DEFAULT_FINGERPRINT = 'ELEVE__FICTIF__2018-01-02__M';
 
   const validStudent = (overrides = {}) => ({
     id: 'student-create-1',
@@ -399,7 +401,11 @@ describe('Student Creation Schema Security Rules', () => {
     academicYearId: YEAR_ID,
     registrationYear: '2026-2027',
     schoolingStatus: 'active',
-    matricule: 'MAT-2026-1001',
+    matricule: DEFAULT_MATRICULE,
+    matriculeNormalized: DEFAULT_MATRICULE,
+    matriculeReservationId: `${SCHOOL_ID}__${DEFAULT_MATRICULE}`,
+    duplicateFingerprint: DEFAULT_FINGERPRINT,
+    duplicateReservationId: `${SCHOOL_ID}__${DEFAULT_FINGERPRINT}`,
     name: 'Élève Fictif',
     studentLastName: 'Élève',
     studentFirstName: 'Fictif',
@@ -449,9 +455,103 @@ describe('Student Creation Schema Security Rules', () => {
     });
   });
 
-  const createStudent = (payload) => {
+  const createStudent = (payload, studentId = 'student-create-1') => {
     const context = testEnv.authenticatedContext('student-create-secretary');
-    return setDoc(doc(context.firestore(), 'students', 'student-create-1'), payload);
+    const db = context.firestore();
+    const reservationSchoolId = payload.schoolId || SCHOOL_ID;
+    const matriculeReservationId = payload.matriculeReservationId || `${payload.schoolId}__${payload.matriculeNormalized}`;
+    const duplicateReservationId = payload.duplicateReservationId || `${payload.schoolId}__${payload.duplicateFingerprint}`;
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'students', studentId), payload);
+    batch.set(doc(db, 'studentMatriculeReservations', matriculeReservationId), {
+      id: matriculeReservationId,
+      schoolId: reservationSchoolId,
+      studentId,
+      matriculeNormalized: payload.matriculeNormalized,
+      createdAt: serverTimestamp(),
+      createdBy: 'student-create-secretary'
+    });
+    batch.set(doc(db, 'studentDuplicateReservations', duplicateReservationId), {
+      id: duplicateReservationId,
+      schoolId: reservationSchoolId,
+      duplicateFingerprint: payload.duplicateFingerprint,
+      studentIds: [studentId],
+      lastStudentId: studentId,
+      createdAt: serverTimestamp(),
+      createdBy: 'student-create-secretary',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'student-create-secretary'
+    });
+    return batch.commit();
+  };
+
+  const createStudentTransactionally = ({
+    studentId,
+    matricule,
+    fingerprint,
+    confirmProbableDuplicate = false
+  }) => {
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    const db = context.firestore();
+    const matriculeReservationId = `${SCHOOL_ID}__${matricule}`;
+    const duplicateReservationId = `${SCHOOL_ID}__${fingerprint}`;
+
+    return runTransaction(db, async transaction => {
+      const studentRef = doc(db, 'students', studentId);
+      const matriculeRef = doc(db, 'studentMatriculeReservations', matriculeReservationId);
+      const duplicateRef = doc(db, 'studentDuplicateReservations', duplicateReservationId);
+      const [matriculeReservation, duplicateReservation] = await Promise.all([
+        transaction.get(matriculeRef),
+        transaction.get(duplicateRef)
+      ]);
+
+      if (matriculeReservation.exists()) {
+        if (matriculeReservation.data().studentId === studentId) return false;
+        throw new Error('MATRICULE_ALREADY_EXISTS');
+      }
+      if (duplicateReservation.exists() && !confirmProbableDuplicate) {
+        throw new Error('PROBABLE_DUPLICATE');
+      }
+
+      const timestamp = serverTimestamp();
+      transaction.set(studentRef, validStudent({
+        id: studentId,
+        matricule,
+        matriculeNormalized: matricule,
+        matriculeReservationId,
+        duplicateFingerprint: fingerprint,
+        duplicateReservationId
+      }));
+      transaction.set(matriculeRef, {
+        id: matriculeReservationId,
+        schoolId: SCHOOL_ID,
+        studentId,
+        matriculeNormalized: matricule,
+        createdAt: timestamp,
+        createdBy: 'student-create-secretary'
+      });
+      if (duplicateReservation.exists()) {
+        transaction.update(duplicateRef, {
+          studentIds: [...duplicateReservation.data().studentIds, studentId],
+          lastStudentId: studentId,
+          updatedAt: timestamp,
+          updatedBy: 'student-create-secretary'
+        });
+      } else {
+        transaction.set(duplicateRef, {
+          id: duplicateReservationId,
+          schoolId: SCHOOL_ID,
+          duplicateFingerprint: fingerprint,
+          studentIds: [studentId],
+          lastStudentId: studentId,
+          createdAt: timestamp,
+          createdBy: 'student-create-secretary',
+          updatedAt: timestamp,
+          updatedBy: 'student-create-secretary'
+        });
+      }
+      return true;
+    });
   };
 
   it('allows a valid same-school student creation for the active year', async () => {
@@ -500,6 +600,116 @@ describe('Student Creation Schema Security Rules', () => {
 
   it('denies arbitrary client fields outside the creation schema', async () => {
     await assertFails(createStudent(validStudent({ claims: { admin: true } })));
+  });
+
+  it('allows only one concurrent creation for the same normalized matricule', async () => {
+    const results = await Promise.allSettled([
+      createStudentTransactionally({
+        studentId: 'student-concurrent-1',
+        matricule: 'MAT-2026-2001',
+        fingerprint: 'ALPHA__ONE__2018-01-02__M'
+      }),
+      createStudentTransactionally({
+        studentId: 'student-concurrent-2',
+        matricule: 'MAT-2026-2001',
+        fingerprint: 'BETA__TWO__2018-02-03__F'
+      })
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      const students = await getDocs(query(collection(db, 'students'), where('matriculeNormalized', '==', 'MAT-2026-2001')));
+      const reservations = await getDocs(query(collection(db, 'studentMatriculeReservations'), where('matriculeNormalized', '==', 'MAT-2026-2001')));
+      expect(students.size).toBe(1);
+      expect(reservations.size).toBe(1);
+    });
+  });
+
+  it('rejects a matricule that is already reserved', async () => {
+    await createStudentTransactionally({
+      studentId: 'student-existing-1',
+      matricule: 'MAT-2026-2010',
+      fingerprint: 'EXISTING__ONE__2018-01-02__M'
+    });
+    await expect(createStudentTransactionally({
+      studentId: 'student-existing-2',
+      matricule: 'MAT-2026-2010',
+      fingerprint: 'EXISTING__TWO__2018-02-03__F'
+    })).rejects.toThrow('MATRICULE_ALREADY_EXISTS');
+  });
+
+  it('treats a retry with the same student id as idempotent', async () => {
+    const request = {
+      studentId: 'student-retry-1',
+      matricule: 'MAT-2026-2002',
+      fingerprint: 'RETRY__SAFE__2018-01-02__M'
+    };
+    await expect(createStudentTransactionally(request)).resolves.toBe(true);
+    await expect(createStudentTransactionally(request)).resolves.toBe(false);
+  });
+
+  it('signals concurrent probable duplicates with different matricules', async () => {
+    const results = await Promise.allSettled([
+      createStudentTransactionally({
+        studentId: 'student-probable-1',
+        matricule: 'MAT-2026-2003',
+        fingerprint: 'DUPONT__ALICE__2018-01-02__F'
+      }),
+      createStudentTransactionally({
+        studentId: 'student-probable-2',
+        matricule: 'MAT-2026-2004',
+        fingerprint: 'DUPONT__ALICE__2018-01-02__F'
+      })
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+  });
+
+  it('allows an explicitly confirmed probable duplicate', async () => {
+    await createStudentTransactionally({
+      studentId: 'student-twin-1',
+      matricule: 'MAT-2026-2005',
+      fingerprint: 'JUMEAU__TEST__2018-01-02__M'
+    });
+    await expect(createStudentTransactionally({
+      studentId: 'student-twin-2',
+      matricule: 'MAT-2026-2006',
+      fingerprint: 'JUMEAU__TEST__2018-01-02__M',
+      confirmProbableDuplicate: true
+    })).resolves.toBe(true);
+  });
+
+  it('denies a reservation for another school', async () => {
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    const reservationId = `${OTHER_SCHOOL_ID}__MAT-2026-2999`;
+    await assertFails(setDoc(doc(context.firestore(), 'studentMatriculeReservations', reservationId), {
+      id: reservationId,
+      schoolId: OTHER_SCHOOL_ID,
+      studentId: 'student-cross-school-reservation',
+      matriculeNormalized: 'MAT-2026-2999',
+      createdAt: serverTimestamp(),
+      createdBy: 'student-create-secretary'
+    }));
+  });
+
+  it('leaves no reservation after an atomic student creation failure', async () => {
+    const payload = validStudent({ classId: 'student-create-inactive-class' });
+    await assertFails(createStudent(payload));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'studentMatriculeReservations', payload.matriculeReservationId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentDuplicateReservations', payload.duplicateReservationId))).exists()).toBe(false);
+    });
+  });
+
+  it('denies deletion or reassignment of an existing matricule reservation', async () => {
+    await assertSucceeds(createStudent(validStudent()));
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    const reservationRef = doc(context.firestore(), 'studentMatriculeReservations', `${SCHOOL_ID}__${DEFAULT_MATRICULE}`);
+    await assertFails(updateDoc(reservationRef, { studentId: 'student-create-other' }));
+    await assertFails(deleteDoc(reservationRef));
   });
 });
 
