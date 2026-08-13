@@ -13,7 +13,7 @@ import {
 } from '../../src/services/studentCreation';
 
 vi.mock('firebase/firestore', () => ({
-  doc: vi.fn(),
+  doc: vi.fn((...args: unknown[]) => args.slice(1).join('/')),
   runTransaction: vi.fn(),
   serverTimestamp: vi.fn(() => ({ __serverTimestamp: true }))
 }));
@@ -74,6 +74,42 @@ describe('student creation identity helpers', () => {
     expect(acquireStudentSubmissionLock(lock)).toBe(true);
   });
 
+  it('creates both parent projections inside the same student transaction', async () => {
+    const writes: string[] = [];
+    vi.mocked(runTransaction).mockImplementationOnce(async (_firestore, callback) => callback({
+      get: vi.fn(async () => ({ exists: () => false })),
+      set: vi.fn((reference: unknown) => writes.push(String(reference))),
+      update: vi.fn()
+    } as never));
+
+    await createStudentAtomically({
+      firestore: {} as Firestore,
+      studentId: 'student-atomic-1',
+      schoolId: 'school-a',
+      actorId: 'owner-a',
+      requestedMatricule: 'MAT-2026-4001',
+      studentData: {
+        studentLastName: 'Élève', studentFirstName: 'Atomique', gender: 'F'
+      },
+      privateData: { dob: '2018-01-02' },
+      financeData: { feeT1: 1000, feeT2: 2000, feeT3: 3000 },
+      parentPrivateData: { dob: '2018-01-02' },
+      parentFinanceData: {
+        feeT1: 1000, feeT2: 2000, feeT3: 3000,
+        financialBypass: { t1: false, t2: false, t3: false }
+      }
+    });
+
+    expect(runTransaction).toHaveBeenCalledTimes(1);
+    expect(writes).toEqual(expect.arrayContaining([
+      'students/student-atomic-1',
+      'studentPrivate/student-atomic-1',
+      'studentFinance/student-atomic-1',
+      'studentParentPrivate/student-atomic-1',
+      'studentParentFinance/student-atomic-1'
+    ]));
+  });
+
   it('retries an automatic collision with a bounded alternative', async () => {
     const runTransactionMock = vi.mocked(runTransaction);
     const successResult = {
@@ -101,6 +137,10 @@ describe('student creation identity helpers', () => {
         dob: '2018-01-02',
         gender: 'M'
       },
+      privateData: {},
+      financeData: {},
+      parentPrivateData: {},
+      parentFinanceData: {},
       generateMatricule,
       maxAutomaticAttempts: 2
     })).resolves.toEqual(successResult);
@@ -133,6 +173,10 @@ describe('student creation identity helpers', () => {
         dob: '2018-01-02',
         gender: 'M'
       },
+      privateData: {},
+      financeData: {},
+      parentPrivateData: {},
+      parentFinanceData: {},
       generateMatricule: attempt => `MAT-2026-300${attempt + 1}`,
       isMatriculeKnown: matricule => matricule === 'MAT-2026-3001'
     });

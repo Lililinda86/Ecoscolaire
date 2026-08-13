@@ -20,6 +20,7 @@ import {
   normalizeStudentMatricule,
   releaseStudentSubmissionLock
 } from '../services/studentCreation';
+import { splitStudentData, updateStudentSeparatedData } from '../services/studentPrivacy';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -576,7 +577,6 @@ const Students: React.FC = () => {
       finalStudent.registrationFeeStatus = status;
 
       if (isEditing && finalStudent.id) {
-        const studentRef = doc(firestoreDb, 'students', finalStudent.id);
         const getPatchValue = <K extends keyof Student>(
           key: K,
           defaultValue: Student[K]
@@ -622,7 +622,13 @@ const Students: React.FC = () => {
           registrationYear: getPatchValue('registrationYear', '2026-2027')
         };
         const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
-        await updateDoc(studentRef, patchData);
+        await updateStudentSeparatedData({
+          firestore: firestoreDb,
+          studentId: finalStudent.id,
+          schoolId: currentSchool?.id || finalStudent.schoolId || '',
+          actorId: currentUser.id,
+          patch: patchData
+        });
 
         // Mutate local state for UI update
         const updatedLocalStudent = {
@@ -691,6 +697,12 @@ const Students: React.FC = () => {
           registrationFeeStatus: 'unpaid',
           ...optionalStudentFields
         }).filter(([, value]) => value !== undefined && value !== ''));
+        const { schoolData, privateData, financeData, parentPrivateData, parentFinanceData } = splitStudentData({
+          ...finalStudent,
+          ...studentToSave,
+          id: studentId,
+          schoolId: currentSchool.id
+        });
 
         const creationResult = await createStudentAtomically({
           firestore: firestoreDb,
@@ -698,7 +710,11 @@ const Students: React.FC = () => {
           schoolId: currentSchool.id,
           actorId: currentUser.id,
           requestedMatricule: currentStudent.matricule,
-          studentData: studentToSave,
+          studentData: schoolData,
+          privateData,
+          financeData,
+          parentPrivateData,
+          parentFinanceData,
           confirmProbableDuplicate,
           isMatriculeKnown: normalizedMatricule => db.students.some(student => {
             if (
@@ -755,7 +771,7 @@ const Students: React.FC = () => {
       } else if (message === 'STUDENT_ID_CONFLICT') {
         alert("Création impossible : l’identifiant de cette saisie est déjà utilisé.");
       } else if (code === 'permission-denied') {
-        console.error("PERMISSION DENIED ERROR DETAILS:", err);
+        console.error("Student write denied.", { code });
         alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
       } else if (code === 'unavailable' || !navigator.onLine) {
         alert("Erreur réseau : Impossible de vérifier le quota hors ligne. Veuillez vous reconnecter.");
@@ -843,7 +859,7 @@ const Students: React.FC = () => {
 
       alert("Élève désactivé avec succès.");
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Student status update failed.", { code: getErrorCode(err) });
       setStatusError(getErrorMessage(err));
     } finally {
       setIsStatusSaving(false);
@@ -906,7 +922,7 @@ const Students: React.FC = () => {
 
       alert("Élève réactivé avec succès.");
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Student status update failed.", { code: getErrorCode(err) });
       setStatusError(getErrorMessage(err));
     } finally {
       setIsStatusSaving(false);
@@ -1246,7 +1262,7 @@ const Students: React.FC = () => {
 
         setPreviewStudents(newStudents);
       } catch (err) {
-        console.error(err);
+        console.error("Student import validation failed.", { code: getErrorCode(err) });
         alert("Erreur lors de la lecture du fichier Excel.");
       }
     };
@@ -1377,7 +1393,7 @@ const Students: React.FC = () => {
       setExcelFile(null);
       alert("Importation finalisée avec succès !");
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Student import failed.", { code: getErrorCode(err) });
       alert("Erreur lors de l'enregistrement du lot. Zéro élève n'a été importé. Détails : " + getErrorMessage(err));
     } finally {
       setIsSaving(false);
@@ -1469,7 +1485,7 @@ const Students: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Student export failed.", { code: getErrorCode(err) });
       alert("Une erreur est survenue lors de la génération de l'export.");
     }
   };
@@ -1638,8 +1654,13 @@ const Students: React.FC = () => {
               <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended} aria-label="Ajouter un élève">
                 <Plus size={18} /> {t('add', 'Ajouter un élève')}
               </button>
-              <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended} aria-label="Importer depuis Excel">
-                <FileSpreadsheet size={18} /> Importer Excel
+              <button
+                className="secondary"
+                disabled
+                aria-label="Import temporairement indisponible"
+                title="Import temporairement indisponible — utilisez l’ajout manuel sécurisé."
+              >
+                <FileSpreadsheet size={18} /> Import temporairement indisponible
               </button>
             </>
           )}

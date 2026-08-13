@@ -381,24 +381,17 @@ service cloud.firestore {
           'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
           'matricule', 'matriculeNormalized', 'matriculeReservationId',
           'duplicateFingerprint', 'duplicateReservationId',
-          'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
-          'section', 'classId', 'studentStatus', 'parentName', 'parentPhone',
-          'registrationFeePaid', 'registrationFeeStatus',
+          'name', 'studentLastName', 'studentFirstName', 'gender',
+          'section', 'classId', 'studentStatus',
           'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
         ])
         && studentData.keys().hasOnly([
           'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
           'matricule', 'matriculeNormalized', 'matriculeReservationId',
           'duplicateFingerprint', 'duplicateReservationId',
-          'name', 'studentLastName', 'studentFirstName', 'gender', 'dob',
-          'placeOfBirth', 'section', 'classId', 'studentStatus',
-          'fatherName', 'fatherPhone', 'fatherProfession',
-          'motherName', 'motherPhone', 'motherProfession',
-          'guardianRelationship', 'guardianRelationshipDetails',
-          'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
-          'allergies', 'medicalConditions',
-          'registrationFeeExpected', 'registrationFeePaid', 'registrationFeeStatus',
-          'tuitionExpected', 'feeT1', 'feeT2', 'feeT3',
+          'name', 'studentLastName', 'studentFirstName', 'gender',
+          'section', 'classId', 'studentStatus',
+          'busId', 'usesTransport', 'transportFleet', 'transportStatus',
           'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
         ])
         && studentData.id is string
@@ -424,32 +417,36 @@ service cloud.firestore {
         && studentData.studentFirstName is string
         && studentData.studentFirstName.size() > 0
         && studentData.gender in ['M', 'F']
-        && studentData.dob is string
-        && studentData.dob.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
         && studentData.section in ['francophone', 'anglophone']
         && studentData.classId is string
         && studentData.classId.size() > 0
         && studentData.studentStatus in ['nouveau', 'ancien']
-        && studentData.parentName is string
-        && studentData.parentName.size() > 0
-        && studentData.parentPhone is string
-        && studentData.parentPhone.size() > 0
-        && studentData.registrationFeePaid is number
-        && studentData.registrationFeePaid == 0
-        && studentData.registrationFeeStatus == 'unpaid'
-        && (!('parentEmails' in studentData) || studentData.parentEmails is list)
-        && (!('guardianRelationship' in studentData) || studentData.guardianRelationship in ['father', 'mother', 'other'])
-        && (!('registrationFeeExpected' in studentData) || (studentData.registrationFeeExpected is number && studentData.registrationFeeExpected >= 0))
-        && (!('tuitionExpected' in studentData) || (studentData.tuitionExpected is number && studentData.tuitionExpected >= 0))
-        && (!('feeT1' in studentData) || (studentData.feeT1 is number && studentData.feeT1 >= 0))
-        && (!('feeT2' in studentData) || (studentData.feeT2 is number && studentData.feeT2 >= 0))
-        && (!('feeT3' in studentData) || (studentData.feeT3 is number && studentData.feeT3 >= 0))
         && studentData.createdAt == request.time
         && studentData.updatedAt == request.time
         && studentData.createdBy == request.auth.uid
         && studentData.updatedBy == request.auth.uid
         && hasValidStudentAcademicYear(studentData)
-        && hasValidStudentCreationReservations(studentData, studentId);
+        && hasValidStudentCreationReservations(studentData, studentId)
+        && hasValidStudentRestrictedDocuments(studentData, studentId);
+    }
+
+    function hasValidStudentRestrictedDocuments(studentData, studentId) {
+      let privatePath = /databases/$(database)/documents/studentPrivate/$(studentId);
+      let financePath = /databases/$(database)/documents/studentFinance/$(studentId);
+      let parentPrivatePath = /databases/$(database)/documents/studentParentPrivate/$(studentId);
+      let parentFinancePath = /databases/$(database)/documents/studentParentFinance/$(studentId);
+      return existsAfter(privatePath)
+        && getAfter(privatePath).data.schoolId == studentData.schoolId
+        && getAfter(privatePath).data.studentId == studentId
+        && existsAfter(financePath)
+        && getAfter(financePath).data.schoolId == studentData.schoolId
+        && getAfter(financePath).data.studentId == studentId
+        && existsAfter(parentPrivatePath)
+        && getAfter(parentPrivatePath).data.schoolId == studentData.schoolId
+        && getAfter(parentPrivatePath).data.studentId == studentId
+        && existsAfter(parentFinancePath)
+        && getAfter(parentFinancePath).data.schoolId == studentData.schoolId
+        && getAfter(parentFinancePath).data.studentId == studentId;
     }
 
     function hasValidStudentCreationReservations(studentData, studentId) {
@@ -641,6 +638,232 @@ service cloud.firestore {
                     request.resource.data.usedBy == request.auth.uid;
     }
 
+    match /studentPrivate/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'dob', 'parentName', 'parentPhone',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob', 'placeOfBirth',
+                      'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
+                      'allergies', 'medicalConditions',
+                      'transportNeighborhood', 'transportPickupPoint',
+                      'fatherName', 'fatherPhone', 'fatherProfession',
+                      'motherName', 'motherPhone', 'motherProfession',
+                      'guardianRelationship', 'guardianRelationshipDetails',
+                      'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+                      'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+                      'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+                      'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.dob is string
+                    && request.resource.data.dob.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
+                    && request.resource.data.parentName is string
+                    && request.resource.data.parentName.size() > 0
+                    && request.resource.data.parentPhone is string
+                    && request.resource.data.parentPhone.size() > 0
+                    && (!('parentEmails' in request.resource.data) || request.resource.data.parentEmails is list)
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(studentId))
+                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails',
+                      'address', 'emergencyContact', 'allergies', 'medicalConditions',
+                      'transportNeighborhood', 'transportPickupPoint',
+                      'fatherName', 'fatherPhone', 'fatherProfession',
+                      'motherName', 'motherPhone', 'motherProfession',
+                      'guardianRelationship', 'guardianRelationshipDetails',
+                      'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+                      'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+                      'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+                      'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+                      'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && (
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['dob'])
+                      || (
+                        existsAfter(/databases/$(database)/documents/studentParentPrivate/$(studentId))
+                        && getAfter(/databases/$(database)/documents/studentParentPrivate/$(studentId)).data.dob == request.resource.data.dob
+                      )
+                    );
+      allow delete: if false;
+    }
+
+    match /studentFinance/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'registrationFeePaid', 'registrationFeeStatus',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId',
+                      'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
+                      'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
+                      'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
+                      'transportMonthlyFee', 'transportPaid',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.registrationFeePaid == 0
+                    && request.resource.data.registrationFeeStatus == 'unpaid'
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(studentId))
+                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
+                      'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
+                      'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
+                      'transportMonthlyFee', 'transportPaid', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && (
+                      canManagePedagogy(resource.data.schoolId)
+                      || (isAccountant() && hasSchoolAccess(resource.data.schoolId))
+                    )
+                    && (
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                        'feeT1', 'feeT2', 'feeT3', 'financialBypass'
+                      ])
+                      || (
+                        existsAfter(/databases/$(database)/documents/studentParentFinance/$(studentId))
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.feeT1 == request.resource.data.feeT1
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.feeT2 == request.resource.data.feeT2
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.feeT3 == request.resource.data.feeT3
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass
+                      )
+                    );
+      allow delete: if false;
+    }
+
+    match /studentParentPrivate/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+        || (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'dob',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.dob is string
+                    && request.resource.data.dob.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/studentPrivate/$(studentId))
+                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.dob == request.resource.data.dob;
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dob', 'updatedAt', 'updatedBy'])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.dob == request.resource.data.dob;
+      allow delete: if false;
+    }
+
+    match /studentParentFinance/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+        || (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.feeT1 is number
+                    && request.resource.data.feeT2 is number
+                    && request.resource.data.feeT3 is number
+                    && request.resource.data.financialBypass is map
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/studentFinance/$(studentId))
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT1 == request.resource.data.feeT1
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT2 == request.resource.data.feeT2
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT3 == request.resource.data.feeT3
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass;
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'feeT1', 'feeT2', 'feeT3', 'financialBypass', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT1 == request.resource.data.feeT1
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT2 == request.resource.data.feeT2
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT3 == request.resource.data.feeT3
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass;
+      allow delete: if false;
+    }
+
     match /studentMatriculeReservations/{reservationId} {
       allow get: if isAuthenticated()
                  && isActive()
@@ -730,7 +953,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
       );
       // Création par Owner, Director, Secretary AVEC limite et validation stricte de classe
       allow create: if isAuthenticated()
@@ -745,6 +968,25 @@ service cloud.firestore {
           'matricule', 'matriculeNormalized', 'matriculeReservationId',
           'duplicateFingerprint', 'duplicateReservationId'
         ])
+        && (
+          !('matriculeReservationId' in resource.data)
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails',
+            'address', 'emergencyContact', 'allergies', 'medicalConditions',
+            'transportNeighborhood', 'transportPickupPoint',
+            'fatherName', 'fatherPhone', 'fatherProfession',
+            'motherName', 'motherPhone', 'motherProfession',
+            'guardianRelationship', 'guardianRelationshipDetails',
+            'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+            'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+            'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+            'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+            'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
+            'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
+            'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
+            'transportMonthlyFee', 'transportPaid'
+          ])
+        )
         &&
         !(isSecretary() && isUpdatingStudentActiveStatusFields())
         && (
@@ -1200,7 +1442,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId))
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.studentId in getUserData().get('studentIds', []))
       );
       // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
       allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId)

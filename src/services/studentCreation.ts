@@ -99,6 +99,10 @@ export interface CreateStudentAtomicallyOptions {
   actorId: string;
   requestedMatricule?: string;
   studentData: DocumentData;
+  privateData: DocumentData;
+  financeData: DocumentData;
+  parentPrivateData: DocumentData;
+  parentFinanceData: DocumentData;
   confirmProbableDuplicate?: boolean;
   generateMatricule?: (attempt: number) => string;
   maxAutomaticAttempts?: number;
@@ -122,6 +126,10 @@ export const createStudentAtomically = async ({
   actorId,
   requestedMatricule,
   studentData,
+  privateData,
+  financeData,
+  parentPrivateData,
+  parentFinanceData,
   confirmProbableDuplicate = false,
   generateMatricule = attempt => generateAutomaticStudentMatricule(studentId, attempt),
   maxAutomaticAttempts = MAX_AUTOMATIC_ATTEMPTS,
@@ -131,7 +139,7 @@ export const createStudentAtomically = async ({
   const duplicateFingerprint = buildStudentDuplicateFingerprint({
     studentLastName: String(studentData.studentLastName ?? ''),
     studentFirstName: String(studentData.studentFirstName ?? ''),
-    dob: String(studentData.dob ?? ''),
+    dob: String(privateData.dob ?? studentData.dob ?? ''),
     gender: String(studentData.gender ?? '')
   });
   const duplicateReservationId = buildStudentDuplicateReservationId(schoolId, duplicateFingerprint);
@@ -163,6 +171,10 @@ export const createStudentAtomically = async ({
           'studentDuplicateReservations',
           duplicateReservationId
         );
+        const privateRef = doc(firestore, 'studentPrivate', studentId);
+        const financeRef = doc(firestore, 'studentFinance', studentId);
+        const parentPrivateRef = doc(firestore, 'studentParentPrivate', studentId);
+        const parentFinanceRef = doc(firestore, 'studentParentFinance', studentId);
 
         const [matriculeReservation, duplicateReservation] = await Promise.all([
           transaction.get(matriculeReservationRef),
@@ -202,6 +214,46 @@ export const createStudentAtomically = async ({
           matriculeReservationId,
           duplicateFingerprint,
           duplicateReservationId,
+          createdAt: timestamp,
+          createdBy: actorId,
+          updatedAt: timestamp,
+          updatedBy: actorId
+        });
+        transaction.set(privateRef, {
+          ...privateData,
+          id: studentId,
+          schoolId,
+          studentId,
+          createdAt: timestamp,
+          createdBy: actorId,
+          updatedAt: timestamp,
+          updatedBy: actorId
+        });
+        transaction.set(financeRef, {
+          ...financeData,
+          id: studentId,
+          schoolId,
+          studentId,
+          createdAt: timestamp,
+          createdBy: actorId,
+          updatedAt: timestamp,
+          updatedBy: actorId
+        });
+        transaction.set(parentPrivateRef, {
+          ...parentPrivateData,
+          id: studentId,
+          schoolId,
+          studentId,
+          createdAt: timestamp,
+          createdBy: actorId,
+          updatedAt: timestamp,
+          updatedBy: actorId
+        });
+        transaction.set(parentFinanceRef, {
+          ...parentFinanceData,
+          id: studentId,
+          schoolId,
+          studentId,
           createdAt: timestamp,
           createdBy: actorId,
           updatedAt: timestamp,

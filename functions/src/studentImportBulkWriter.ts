@@ -1,6 +1,19 @@
 import * as admin from 'firebase-admin';
 import { NormalizedStudentRow } from './studentImportNormalizer';
 
+type LegacyFinancialFields = 'feeT1' | 'feeT2' | 'feeT3' | 'financialBypass';
+
+export const omitLegacyStudentFinancialFields = (
+  row: NormalizedStudentRow & { financialBypass?: unknown }
+): Omit<NormalizedStudentRow, LegacyFinancialFields> => {
+  const sanitized = { ...row };
+  delete sanitized.feeT1;
+  delete sanitized.feeT2;
+  delete sanitized.feeT3;
+  delete sanitized.financialBypass;
+  return sanitized;
+};
+
 export interface BulkWriterImportResult {
   successfulCreates: number;
   successfulUpdates: number;
@@ -80,9 +93,10 @@ export async function executeBulkWriterImport(
   for (const row of creates) {
     const docRef = db.collection('students').doc(row.id);
     operationTypeMap.set(row.id, { type: 'create', matricule: row.matricule });
+    const sanitizedRow = omitLegacyStudentFinancialFields(row);
     
     const promise = bulkWriter.create(docRef, {
-      ...row,
+      ...sanitizedRow,
       schoolId,
       importJobId: jobId,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -104,10 +118,11 @@ export async function executeBulkWriterImport(
   for (const row of updates) {
     const docRef = db.collection('students').doc(row.id);
     operationTypeMap.set(row.id, { type: 'update', matricule: row.matricule });
+    const sanitizedRow = omitLegacyStudentFinancialFields(row);
     
     // We don't overwrite createdAt for updates
     const promise = bulkWriter.update(docRef, {
-      ...row,
+      ...sanitizedRow,
       schoolId,
       lastImportJobId: jobId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()

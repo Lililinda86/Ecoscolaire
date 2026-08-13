@@ -12,6 +12,7 @@ import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, deleteDoc, runTransaction, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { translatePaymentType, translateInstallment, formatCurrency, translatePaymentMethod } from '../utils/paymentReceipt';
+import { canUseStudentContactWhatsApp } from '../services/studentPrivacy';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -266,6 +267,7 @@ const computeSHA256 = async (text: string): Promise<string> => {
 
 const Payments: React.FC = () => {
   const { db, updateLocalState, patchLocalEntities, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const canUseWhatsApp = canUseStudentContactWhatsApp(currentUser?.role ?? '');
   const { t } = useI18n();
 
   const canWrite = currentUser && currentUser.role !== 'boardViewer';
@@ -1493,7 +1495,7 @@ const Payments: React.FC = () => {
                           {totalExpected === 0 ? '-' : (totalBalance <= 0 ? 'Soldé ✓' : totalBalance.toLocaleString('fr-FR') + ' FCFA')}
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          {totalBalance > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
+                          {canUseWhatsApp && totalBalance > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
                             <button onClick={() => handleWhatsAppClick(s, totalBalance, 'scolarité')} style={{ background: isSchoolSuspended ? '#a1a1aa' : '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: isSchoolSuspended ? 'not-allowed' : 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp" disabled={isSchoolSuspended}>📱 WhatsApp</button>
                           ) : null}
                         </td>
@@ -1519,7 +1521,7 @@ const Payments: React.FC = () => {
                           {expected === 0 ? '-' : (reste <= 0 ? 'Soldé ✓' : `${reste.toLocaleString('fr-FR')} FCFA`)}
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          {reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
+                          {canUseWhatsApp && reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
                             <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (transport)')} style={{ background: isSchoolSuspended ? '#a1a1aa' : '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: isSchoolSuspended ? 'not-allowed' : 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp" disabled={isSchoolSuspended}>📱 WhatsApp</button>
                           ) : null}
                         </td>
@@ -1545,7 +1547,7 @@ const Payments: React.FC = () => {
                           {expected === 0 ? '-' : (reste <= 0 ? 'Soldé ✓' : `${reste.toLocaleString('fr-FR')} FCFA`)}
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          {reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
+                          {canUseWhatsApp && reste > 0 && formatPhoneForWhatsApp(s.parentPhone) ? (
                             <button onClick={() => handleWhatsAppClick(s, reste, 'scolarité (tenues)')} style={{ background: '#25D366', color: 'white', padding: '0.25rem 0.5rem', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85em' }} title="Relancer par WhatsApp">📱 WhatsApp</button>
                           ) : null}
                         </td>
