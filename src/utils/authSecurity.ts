@@ -10,8 +10,8 @@ export const logAuthenticationFailure = (code?: string): void => {
   console.error('Login failed', { code: code || 'auth/unknown', category: 'authentication' });
 };
 
-export const isUserActive = (user: { active?: boolean; isActive?: boolean }): boolean => {
-  return user.active === true || user.isActive === true;
+export const isUserActive = (user: { active?: boolean; isActive?: boolean; status?: string }): boolean => {
+  return user.active === true || user.isActive === true || user.status === 'active';
 };
 
 export const getFirebaseErrorCode = (error: unknown): string | undefined => {

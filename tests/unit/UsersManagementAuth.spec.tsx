@@ -53,6 +53,31 @@ describe('UsersManagement — provisioning sécurisé', () => {
     expect(getCreatableRoles('owner')).not.toEqual(expect.arrayContaining(['superAdmin', 'owner', 'parent', 'student', 'boardViewer']));
   });
 
+  it('affiche correctement les statuts legacy active, isActive et status', () => {
+    vi.mocked(AppContextModule.useAppContext).mockReturnValue({
+      db: {
+        users: [
+          { id: 'active-true', email: 'a@example.test', role: 'teacher', schoolId: 'school-a', active: true },
+          { id: 'active-false', email: 'b@example.test', role: 'teacher', schoolId: 'school-a', active: false },
+          { id: 'is-active-true', email: 'c@example.test', role: 'teacher', schoolId: 'school-a', isActive: true },
+          { id: 'is-active-false', email: 'd@example.test', role: 'teacher', schoolId: 'school-a', isActive: false },
+          { id: 'status-active', email: 'e@example.test', role: 'teacher', schoolId: 'school-a', status: 'active' },
+          { id: 'status-inactive', email: 'f@example.test', role: 'teacher', schoolId: 'school-a', status: 'inactive' },
+          { id: 'current', email: 'g@example.test', role: 'teacher', schoolId: 'school-a', active: true, isActive: true, status: 'active' }
+        ]
+      },
+      updateLocalState,
+      currentUser: { id: 'owner-a', email: 'owner@example.test', role: 'owner', schoolId: 'school-a', isActive: true },
+      currentSchool: { id: 'school-a', name: 'School A' },
+      logAuditAction
+    } as unknown as ReturnType<typeof AppContextModule.useAppContext>);
+
+    render(<UsersManagement />);
+
+    expect(screen.getAllByText('Actif')).toHaveLength(4);
+    expect(screen.getAllByText('Suspendu')).toHaveLength(3);
+  });
+
   it('crée sans password Firestore puis envoie le lien de définition', async () => {
     render(<UsersManagement />);
     fireEvent.click(screen.getByRole('button', { name: /nouvel utilisateur/i }));

@@ -492,7 +492,8 @@ service cloud.firestore {
           !isUpdatingStoredAuthSecret()
         )
       );
-      allow delete: if isAuthenticated() && isActive() && canManageSchool(resource.data.schoolId);
+      // Suppression physique réservée aux opérations backend/Admin SDK contrôlées.
+      allow delete: if false;
     }
 
     // --- SCHOOLS ---

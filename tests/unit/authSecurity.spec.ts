@@ -42,9 +42,12 @@ describe('Auth security helpers', () => {
 
   it('accepte les marqueurs actifs legacy et le schéma courant', () => {
     expect(isUserActive({ active: true })).toBe(true);
-    expect(isUserActive({ active: true, isActive: false })).toBe(true);
+    expect(isUserActive({ active: false })).toBe(false);
     expect(isUserActive({ isActive: true })).toBe(true);
-    expect(isUserActive({ active: true, isActive: true })).toBe(true);
-    expect(isUserActive({ active: false, isActive: false })).toBe(false);
+    expect(isUserActive({ isActive: false })).toBe(false);
+    expect(isUserActive({ status: 'active' })).toBe(true);
+    expect(isUserActive({ status: 'inactive' })).toBe(false);
+    expect(isUserActive({ active: true, isActive: true, status: 'active' })).toBe(true);
+    expect(isUserActive({ active: false, isActive: false, status: 'inactive' })).toBe(false);
   });
 });

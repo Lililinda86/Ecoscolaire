@@ -1,5 +1,5 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import fs from 'fs';
 import { test } from '@playwright/test';
 
@@ -160,6 +160,51 @@ describe('ITALO Auth/RBAC — users', () => {
     await seedUser('teacher-a', 'teacher');
     const db = testEnv.authenticatedContext('secretary-a').firestore();
     await assertFails(updateDoc(doc(db, 'users', 'teacher-a'), { active: false, isActive: false, status: 'inactive' }));
+  });
+
+  test('director désactive et réactive un rôle autorisé : accepté', async () => {
+    await seedUser('director-a', 'director');
+    await seedUser('secretary-a', 'secretary');
+    const db = testEnv.authenticatedContext('director-a').firestore();
+    const ref = doc(db, 'users', 'secretary-a');
+    await assertSucceeds(updateDoc(ref, { active: false, isActive: false, status: 'inactive' }));
+    await assertSucceeds(updateDoc(ref, { active: true, isActive: true, status: 'active' }));
+  });
+
+  for (const targetRole of ['owner', 'director', 'secretary']) {
+    test(`owner supprime ${targetRole} même école : refusé`, async () => {
+      await seedUser('owner-a', 'owner');
+      await seedUser(`${targetRole}-target`, targetRole);
+      const db = testEnv.authenticatedContext('owner-a').firestore();
+      await assertFails(deleteDoc(doc(db, 'users', `${targetRole}-target`)));
+    });
+  }
+
+  test('director supprime secretary : refusé', async () => {
+    await seedUser('director-a', 'director');
+    await seedUser('secretary-target', 'secretary');
+    const db = testEnv.authenticatedContext('director-a').firestore();
+    await assertFails(deleteDoc(doc(db, 'users', 'secretary-target')));
+  });
+
+  test('superAdmin client supprime user : refusé', async () => {
+    await seedUser('superadmin-a', 'superAdmin');
+    await seedUser('teacher-target', 'teacher');
+    const db = testEnv.authenticatedContext('superadmin-a').firestore();
+    await assertFails(deleteDoc(doc(db, 'users', 'teacher-target')));
+  });
+
+  test('utilisateur supprime son propre document : refusé', async () => {
+    await seedUser('teacher-self', 'teacher');
+    const db = testEnv.authenticatedContext('teacher-self').firestore();
+    await assertFails(deleteDoc(doc(db, 'users', 'teacher-self')));
+  });
+
+  test('owner autre école supprime user : refusé', async () => {
+    await seedUser('owner-b', 'owner', SCHOOL_B);
+    await seedUser('teacher-a', 'teacher', SCHOOL_A);
+    const db = testEnv.authenticatedContext('owner-b').firestore();
+    await assertFails(deleteDoc(doc(db, 'users', 'teacher-a')));
   });
 
   test('aucun password ne peut être écrit dans users', async () => {

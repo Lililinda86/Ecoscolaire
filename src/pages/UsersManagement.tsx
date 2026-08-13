@@ -6,7 +6,7 @@ import Modal from '../components/Modal';
 import { createSecondaryUserForPasswordSetup, db as firebaseDb, requestPasswordReset } from '../db/firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { getCreatableRoles } from '../utils/authRoles';
-import { getFirebaseErrorCode } from '../utils/authSecurity';
+import { getFirebaseErrorCode, isUserActive } from '../utils/authSecurity';
 const ROLE_LABELS: Partial<Record<GlobalRole, string>> = {
   director: 'Directeur',
   secretary: 'Secrétaire',
@@ -164,14 +164,14 @@ const UsersManagement: React.FC = () => {
                 <td style={{ padding: '1rem' }}><strong>{u.email}</strong><br/><small style={{ color: '#64748b' }}>{u.id}</small></td>
                 <td style={{ padding: '1rem' }}>{getRoleBadge(u.role)}</td>
                 <td style={{ padding: '1rem' }}>
-                  {u.isActive ? (
+                  {isUserActive(u) ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#16a34a' }}><Shield size={14} /> Actif</span>
                   ) : (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#dc2626' }}><ShieldOff size={14} /> Suspendu</span>
                   )}
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'right' }}>
-                  <button className="secondary" onClick={() => { setFormData(u); setModalOpen(true); }} style={{ padding: '0.25rem 0.5rem' }}>
+                  <button className="secondary" onClick={() => { setFormData({ ...u, isActive: isUserActive(u) }); setModalOpen(true); }} style={{ padding: '0.25rem 0.5rem' }}>
                     <Edit2 size={14} /> Gérer
                   </button>
                 </td>
