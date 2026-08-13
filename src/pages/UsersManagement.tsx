@@ -167,7 +167,7 @@ const UsersManagement: React.FC = () => {
                   {isUserActive(u) ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#16a34a' }}><Shield size={14} /> Actif</span>
                   ) : (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#dc2626' }}><ShieldOff size={14} /> Suspendu</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#dc2626' }}><ShieldOff size={14} /> Inactif</span>
                   )}
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'right' }}>

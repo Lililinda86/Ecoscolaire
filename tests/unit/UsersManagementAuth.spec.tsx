@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import UsersManagement from '../../src/pages/UsersManagement';
 import { getCreatableRoles } from '../../src/utils/authRoles';
@@ -57,11 +57,11 @@ describe('UsersManagement — provisioning sécurisé', () => {
     vi.mocked(AppContextModule.useAppContext).mockReturnValue({
       db: {
         users: [
-          { id: 'active-true', email: 'a@example.test', role: 'teacher', schoolId: 'school-a', active: true },
+          { id: 'legacy-active-lot1', email: 'legacy-active@example.test', role: 'teacher', schoolId: 'school-a', active: true },
           { id: 'active-false', email: 'b@example.test', role: 'teacher', schoolId: 'school-a', active: false },
           { id: 'is-active-true', email: 'c@example.test', role: 'teacher', schoolId: 'school-a', isActive: true },
-          { id: 'is-active-false', email: 'd@example.test', role: 'teacher', schoolId: 'school-a', isActive: false },
-          { id: 'status-active', email: 'e@example.test', role: 'teacher', schoolId: 'school-a', status: 'active' },
+          { id: 'legacy-isactive-lot1', email: 'legacy-isactive@example.test', role: 'teacher', schoolId: 'school-a', isActive: false },
+          { id: 'legacy-status-lot1', email: 'legacy-status@example.test', role: 'teacher', schoolId: 'school-a', status: 'active' },
           { id: 'status-inactive', email: 'f@example.test', role: 'teacher', schoolId: 'school-a', status: 'inactive' },
           { id: 'current', email: 'g@example.test', role: 'teacher', schoolId: 'school-a', active: true, isActive: true, status: 'active' }
         ]
@@ -74,8 +74,11 @@ describe('UsersManagement — provisioning sécurisé', () => {
 
     render(<UsersManagement />);
 
+    expect(within(screen.getByText('legacy-active@example.test').closest('tr')!).getByText('Actif')).toBeTruthy();
+    expect(within(screen.getByText('legacy-isactive@example.test').closest('tr')!).getByText('Inactif')).toBeTruthy();
+    expect(within(screen.getByText('legacy-status@example.test').closest('tr')!).getByText('Actif')).toBeTruthy();
     expect(screen.getAllByText('Actif')).toHaveLength(4);
-    expect(screen.getAllByText('Suspendu')).toHaveLength(3);
+    expect(screen.getAllByText('Inactif')).toHaveLength(3);
   });
 
   it('crée sans password Firestore puis envoie le lien de définition', async () => {
