@@ -273,10 +273,47 @@ describe('Student Active Status Security Rules', () => {
       await setDoc(doc(ctx.firestore(), 'users', 'director-1'), { role: 'director', schoolId: SCHOOL_ID, active: true });
       await setDoc(doc(ctx.firestore(), 'users', 'secretary-1'), { role: 'secretary', schoolId: SCHOOL_ID, active: true });
       // Set up a class and a student
+      await setDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        name: 'School A', subscriptionPlan: 'starter', studentLimit: 2, studentsCount: 1
+      });
+      await setDoc(doc(ctx.firestore(), 'schools', 'school-B'), {
+        name: 'School B', subscriptionPlan: 'starter', studentLimit: 2, studentsCount: 1
+      });
       await setDoc(doc(ctx.firestore(), 'classes', 'class-1'), { schoolId: SCHOOL_ID, name: 'CP', isActive: true });
       await setDoc(doc(ctx.firestore(), 'students', 'student-1'), { schoolId: SCHOOL_ID, name: 'Alice', schoolingStatus: 'active', classId: 'class-1' });
+      await setDoc(doc(ctx.firestore(), 'students', 'student-B'), { schoolId: 'school-B', name: 'Bob', schoolingStatus: 'active', classId: 'class-B' });
     });
   });
+
+  const changeStatusAtomically = (actorId, studentId, targetStatus, schoolId = SCHOOL_ID) => {
+    const context = testEnv.authenticatedContext(actorId);
+    const db = context.firestore();
+    return runTransaction(db, async transaction => {
+      const schoolRef = doc(db, 'schools', schoolId);
+      const studentRef = doc(db, 'students', studentId);
+      const [schoolSnapshot, studentSnapshot] = await Promise.all([
+        transaction.get(schoolRef),
+        transaction.get(studentRef)
+      ]);
+      const currentStatus = studentSnapshot.data().schoolingStatus === 'inactive' ? 'inactive' : 'active';
+      if (currentStatus === targetStatus) return false;
+      const activating = targetStatus === 'active';
+      const timestamp = serverTimestamp();
+      transaction.update(schoolRef, {
+        studentsCount: schoolSnapshot.data().studentsCount + (activating ? 1 : -1),
+        lastStudentCounterMutationId: studentId,
+        lastStudentCounterMutationType: activating ? 'reactivate' : 'deactivate',
+        updatedAt: timestamp,
+        updatedBy: actorId
+      });
+      transaction.update(studentRef, {
+        schoolingStatus: targetStatus,
+        updatedAt: timestamp,
+        updatedBy: actorId
+      });
+      return true;
+    });
+  };
 
   it('secretary cannot deactivate active student', async () => {
     const context = testEnv.authenticatedContext('secretary-1');
@@ -307,27 +344,66 @@ describe('Student Active Status Security Rules', () => {
     await assertSucceeds(
       updateDoc(doc(context.firestore(), 'students', 'student-1'), { name: 'Alice Edited' })
     );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(1);
   });
 
   it('owner can deactivate student', async () => {
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
     const context = testEnv.authenticatedContext('owner-1');
-    await assertSucceeds(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn', classId: 'class-1' })
-    );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
   });
 
   it('director can deactivate student', async () => {
-    const context = testEnv.authenticatedContext('director-1');
-    await assertSucceeds(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn', classId: 'class-1' })
-    );
+    await assertSucceeds(changeStatusAtomically('director-1', 'student-1', 'inactive'));
   });
 
   it('superAdmin can deactivate student', async () => {
-    const context = testEnv.authenticatedContext('superAdmin-1');
-    await assertSucceeds(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn', classId: 'class-1' })
-    );
+    await assertSucceeds(changeStatusAtomically('superAdmin-1', 'student-1', 'inactive'));
+  });
+
+  it('reactivates atomically with capacity and increments only once', async () => {
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'active'));
+    await expect(changeStatusAtomically('owner-1', 'student-1', 'active')).resolves.toBe(false);
+    const context = testEnv.authenticatedContext('owner-1');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(1);
+  });
+
+  it('does not double-decrement on a repeated deactivation', async () => {
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
+    await expect(changeStatusAtomically('owner-1', 'student-1', 'inactive')).resolves.toBe(false);
+    const context = testEnv.authenticatedContext('owner-1');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+  });
+
+  it('denies reactivation when the active quota is full', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), { studentsCount: 2 });
+      await updateDoc(doc(ctx.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive' });
+    });
+    await assertFails(changeStatusAtomically('owner-1', 'student-1', 'active'));
+    const context = testEnv.authenticatedContext('owner-1');
+    expect((await getDoc(doc(context.firestore(), 'students', 'student-1'))).data().schoolingStatus).toBe('inactive');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(2);
+  });
+
+  it('never allows the active counter to become negative', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), { studentsCount: 0 });
+    });
+    await assertFails(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
+  });
+
+  it('denies arbitrary and cross-school counter updates', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(updateDoc(doc(context.firestore(), 'schools', SCHOOL_ID), { studentsCount: 50 }));
+    await assertFails(updateDoc(doc(context.firestore(), 'schools', 'school-B'), {
+      studentsCount: 0,
+      lastStudentCounterMutationId: 'student-B',
+      lastStudentCounterMutationType: 'deactivate',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'owner-1'
+    }));
   });
 
   it('secretary cannot create DELETE_STUDENT validation request', async () => {
@@ -485,10 +561,10 @@ describe('Student Creation Schema Security Rules', () => {
         role: 'secretary', schoolId: SCHOOL_ID, active: true
       });
       await setDoc(doc(db, 'schools', SCHOOL_ID), {
-        name: 'École fictive', isInternalSchool: true, activeAcademicYearId: YEAR_ID
+        name: 'École fictive', isInternalSchool: true, activeAcademicYearId: YEAR_ID, studentsCount: 0
       });
       await setDoc(doc(db, 'schools', OTHER_SCHOOL_ID), {
-        name: 'Autre école fictive', isInternalSchool: true, activeAcademicYearId: OTHER_YEAR_ID
+        name: 'Autre école fictive', isInternalSchool: true, activeAcademicYearId: OTHER_YEAR_ID, studentsCount: 0
       });
       await setDoc(doc(db, 'academicYears', YEAR_ID), {
         schoolId: SCHOOL_ID, name: '2026-2027', status: 'active'
@@ -515,6 +591,13 @@ describe('Student Creation Schema Security Rules', () => {
     const matriculeReservationId = payload.matriculeReservationId || `${payload.schoolId}__${payload.matriculeNormalized}`;
     const duplicateReservationId = payload.duplicateReservationId || `${payload.schoolId}__${payload.duplicateFingerprint}`;
     const batch = writeBatch(db);
+    batch.update(doc(db, 'schools', reservationSchoolId), {
+      studentsCount: 1,
+      lastStudentCounterMutationId: studentId,
+      lastStudentCounterMutationType: 'create',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'student-create-secretary'
+    });
     batch.set(doc(db, 'students', studentId), payload);
     batch.set(doc(db, 'studentPrivate', studentId), validStudentPrivate(studentId, {
       schoolId: reservationSchoolId,
@@ -569,7 +652,9 @@ describe('Student Creation Schema Security Rules', () => {
       const studentRef = doc(db, 'students', studentId);
       const matriculeRef = doc(db, 'studentMatriculeReservations', matriculeReservationId);
       const duplicateRef = doc(db, 'studentDuplicateReservations', duplicateReservationId);
-      const [matriculeReservation, duplicateReservation] = await Promise.all([
+      const schoolRef = doc(db, 'schools', SCHOOL_ID);
+      const [schoolSnapshot, matriculeReservation, duplicateReservation] = await Promise.all([
+        transaction.get(schoolRef),
         transaction.get(matriculeRef),
         transaction.get(duplicateRef)
       ]);
@@ -583,6 +668,13 @@ describe('Student Creation Schema Security Rules', () => {
       }
 
       const timestamp = serverTimestamp();
+      transaction.update(schoolRef, {
+        studentsCount: schoolSnapshot.data().studentsCount + 1,
+        lastStudentCounterMutationId: studentId,
+        lastStudentCounterMutationType: 'create',
+        updatedAt: timestamp,
+        updatedBy: 'student-create-secretary'
+      });
       transaction.set(studentRef, validStudent({
         id: studentId,
         matricule,
@@ -627,8 +719,117 @@ describe('Student Creation Schema Security Rules', () => {
     });
   };
 
-  it('allows a valid same-school student creation for the active year', async () => {
-    await assertSucceeds(createStudent(validStudent()));
+  it('denies a valid direct client creation because the callable is mandatory', async () => {
+    await assertFails(createStudent(validStudent()));
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+  });
+
+  it('denies direct client creation of every modern student companion document', async () => {
+    const db = testEnv.authenticatedContext('student-create-secretary').firestore();
+    const studentId = 'direct-companion-denied';
+    const attempts = [
+      setDoc(doc(db, 'studentPrivate', studentId), validStudentPrivate(studentId)),
+      setDoc(doc(db, 'studentFinance', studentId), validStudentFinance(studentId)),
+      setDoc(doc(db, 'studentParentPrivate', studentId), validStudentParentPrivate(studentId)),
+      setDoc(doc(db, 'studentParentFinance', studentId), validStudentParentFinance(studentId)),
+      setDoc(doc(db, 'studentMatriculeReservations', `${SCHOOL_ID}__MAT-2026-2990`), {
+        id: `${SCHOOL_ID}__MAT-2026-2990`, schoolId: SCHOOL_ID, studentId,
+        matriculeNormalized: 'MAT-2026-2990', createdAt: serverTimestamp(), createdBy: 'student-create-secretary'
+      }),
+      setDoc(doc(db, 'studentDuplicateReservations', `${SCHOOL_ID}__DIRECT__DENIED`), {
+        id: `${SCHOOL_ID}__DIRECT__DENIED`, schoolId: SCHOOL_ID, duplicateFingerprint: 'DIRECT__DENIED',
+        studentIds: [studentId], lastStudentId: studentId, createdAt: serverTimestamp(),
+        createdBy: 'student-create-secretary', updatedAt: serverTimestamp(), updatedBy: 'student-create-secretary'
+      })
+    ];
+    for (const attempt of attempts) await assertFails(attempt);
+  });
+
+  it('denies creation when only the legacy studentCount is initialized', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        studentsCount: deleteField(),
+        studentCount: 0
+      });
+    });
+    await assertFails(createStudent(validStudent()));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      expect((await getDoc(doc(ctx.firestore(), 'students', 'student-create-1'))).exists()).toBe(false);
+      expect((await getDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID))).data().studentCount).toBe(0);
+    });
+  });
+
+  it('denies creation at quota and leaves the counter unchanged', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        isInternalSchool: false,
+        subscriptionPlan: 'starter',
+        studentLimit: 100,
+        studentsCount: 100
+      });
+    });
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-quota-full',
+      matricule: 'MAT-2026-2100',
+      fingerprint: 'QUOTA__FULL__2018-01-02__F'
+    }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(100);
+      expect((await getDoc(doc(db, 'students', 'student-quota-full'))).exists()).toBe(false);
+    });
+  });
+
+  it('denies direct creation even for an unlimited runtime plan', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        isInternalSchool: false,
+        subscriptionPlan: 'premium',
+        studentLimit: 1,
+        studentsCount: 500
+      });
+    });
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-unlimited',
+      matricule: 'MAT-2026-2101',
+      fingerprint: 'UNLIMITED__PLAN__2018-01-02__M'
+    }));
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(500);
+  });
+
+  it('denies both direct concurrent creations for the last quota slot', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        isInternalSchool: false,
+        subscriptionPlan: 'starter',
+        studentLimit: 100,
+        studentsCount: 99
+      });
+    });
+    const results = await Promise.allSettled([
+      createStudentTransactionally({
+        studentId: 'student-last-slot-1',
+        matricule: 'MAT-2026-2102',
+        fingerprint: 'LAST__SLOT__ONE__M'
+      }),
+      createStudentTransactionally({
+        studentId: 'student-last-slot-2',
+        matricule: 'MAT-2026-2103',
+        fingerprint: 'LAST__SLOT__TWO__F'
+      })
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(0);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(2);
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(99);
+      const students = await getDocs(query(collection(db, 'students'), where('id', 'in', [
+        'student-last-slot-1', 'student-last-slot-2'
+      ])));
+      expect(students.size).toBe(0);
+    });
   });
 
   it('denies a cross-school student creation', async () => {
@@ -680,7 +881,7 @@ describe('Student Creation Schema Security Rules', () => {
     await assertFails(createStudent(validStudent({ financialBypass: { t1: true } })));
   });
 
-  it('allows only one concurrent creation for the same normalized matricule', async () => {
+  it('denies both direct concurrent creations for the same normalized matricule', async () => {
     const results = await Promise.allSettled([
       createStudentTransactionally({
         studentId: 'student-concurrent-1',
@@ -693,39 +894,43 @@ describe('Student Creation Schema Security Rules', () => {
         fingerprint: 'BETA__TWO__2018-02-03__F'
       })
     ]);
-    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(0);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(2);
 
     await testEnv.withSecurityRulesDisabled(async ctx => {
       const db = ctx.firestore();
       const students = await getDocs(query(collection(db, 'students'), where('matriculeNormalized', '==', 'MAT-2026-2001')));
       const reservations = await getDocs(query(collection(db, 'studentMatriculeReservations'), where('matriculeNormalized', '==', 'MAT-2026-2001')));
-      expect(students.size).toBe(1);
-      expect(reservations.size).toBe(1);
+      expect(students.size).toBe(0);
+      expect(reservations.size).toBe(0);
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
     });
   });
 
   it('rejects a matricule that is already reserved', async () => {
-    await createStudentTransactionally({
+    await assertFails(createStudentTransactionally({
       studentId: 'student-existing-1',
       matricule: 'MAT-2026-2010',
       fingerprint: 'EXISTING__ONE__2018-01-02__M'
-    });
-    await expect(createStudentTransactionally({
+    }));
+    await assertFails(createStudentTransactionally({
       studentId: 'student-existing-2',
       matricule: 'MAT-2026-2010',
       fingerprint: 'EXISTING__TWO__2018-02-03__F'
-    })).rejects.toThrow('MATRICULE_ALREADY_EXISTS');
+    }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      expect((await getDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+    });
   });
 
-  it('treats a retry with the same student id as idempotent', async () => {
+  it('denies direct retries with the same student id', async () => {
     const request = {
       studentId: 'student-retry-1',
       matricule: 'MAT-2026-2002',
       fingerprint: 'RETRY__SAFE__2018-01-02__M'
     };
-    await expect(createStudentTransactionally(request)).resolves.toBe(true);
-    await expect(createStudentTransactionally(request)).resolves.toBe(false);
+    await assertFails(createStudentTransactionally(request));
+    await assertFails(createStudentTransactionally(request));
   });
 
   it('signals concurrent probable duplicates with different matricules', async () => {
@@ -741,22 +946,25 @@ describe('Student Creation Schema Security Rules', () => {
         fingerprint: 'DUPONT__ALICE__2018-01-02__F'
       })
     ]);
-    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(0);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(2);
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      expect((await getDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+    });
   });
 
-  it('allows an explicitly confirmed probable duplicate', async () => {
-    await createStudentTransactionally({
+  it('still denies a direct client creation with an explicitly confirmed probable duplicate', async () => {
+    await assertFails(createStudentTransactionally({
       studentId: 'student-twin-1',
       matricule: 'MAT-2026-2005',
       fingerprint: 'JUMEAU__TEST__2018-01-02__M'
-    });
-    await expect(createStudentTransactionally({
+    }));
+    await assertFails(createStudentTransactionally({
       studentId: 'student-twin-2',
       matricule: 'MAT-2026-2006',
       fingerprint: 'JUMEAU__TEST__2018-01-02__M',
       confirmProbableDuplicate: true
-    })).resolves.toBe(true);
+    }));
   });
 
   it('denies a reservation for another school', async () => {
@@ -779,6 +987,7 @@ describe('Student Creation Schema Security Rules', () => {
       const db = ctx.firestore();
       expect((await getDoc(doc(db, 'studentMatriculeReservations', payload.matriculeReservationId))).exists()).toBe(false);
       expect((await getDoc(doc(db, 'studentDuplicateReservations', payload.duplicateReservationId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
     });
   });
 
@@ -842,7 +1051,14 @@ describe('Student Creation Schema Security Rules', () => {
   });
 
   it('denies deletion or reassignment of an existing matricule reservation', async () => {
-    await assertSucceeds(createStudent(validStudent()));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'studentMatriculeReservations', `${SCHOOL_ID}__${DEFAULT_MATRICULE}`), {
+        id: `${SCHOOL_ID}__${DEFAULT_MATRICULE}`,
+        schoolId: SCHOOL_ID,
+        studentId: 'student-create-1',
+        matriculeNormalized: DEFAULT_MATRICULE
+      });
+    });
     const context = testEnv.authenticatedContext('student-create-secretary');
     const reservationRef = doc(context.firestore(), 'studentMatriculeReservations', `${SCHOOL_ID}__${DEFAULT_MATRICULE}`);
     await assertFails(updateDoc(reservationRef, { studentId: 'student-create-other' }));

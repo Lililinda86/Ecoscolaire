@@ -76,10 +76,13 @@ describe('student creation identity helpers', () => {
 
   it('creates both parent projections inside the same student transaction', async () => {
     const writes: string[] = [];
+    const updates: Array<[string, Record<string, unknown>]> = [];
     vi.mocked(runTransaction).mockImplementationOnce(async (_firestore, callback) => callback({
-      get: vi.fn(async () => ({ exists: () => false })),
+      get: vi.fn(async (reference: string) => reference === 'schools/school-a'
+        ? { exists: () => true, data: () => ({ studentsCount: 0, subscriptionPlan: 'starter' }) }
+        : { exists: () => false }),
       set: vi.fn((reference: unknown) => writes.push(String(reference))),
-      update: vi.fn()
+      update: vi.fn((reference: string, data: Record<string, unknown>) => updates.push([reference, data]))
     } as never));
 
     await createStudentAtomically({
@@ -108,6 +111,60 @@ describe('student creation identity helpers', () => {
       'studentParentPrivate/student-atomic-1',
       'studentParentFinance/student-atomic-1'
     ]));
+    expect(updates).toContainEqual([
+      'schools/school-a',
+      expect.objectContaining({ studentsCount: 1, lastStudentCounterMutationType: 'create' })
+    ]);
+  });
+
+  it('rejects an uninitialized canonical counter without using legacy studentCount', async () => {
+    const set = vi.fn();
+    const update = vi.fn();
+    vi.mocked(runTransaction).mockImplementationOnce(async (_firestore, callback) => callback({
+      get: vi.fn(async (reference: string) => reference === 'schools/school-a'
+        ? { exists: () => true, data: () => ({ studentCount: 12, subscriptionPlan: 'starter' }) }
+        : { exists: () => false }),
+      set,
+      update
+    } as never));
+
+    await expect(createStudentAtomically({
+      firestore: {} as Firestore,
+      studentId: 'student-no-counter',
+      schoolId: 'school-a',
+      actorId: 'owner-a',
+      requestedMatricule: 'MAT-2026-4002',
+      studentData: { studentLastName: 'No', studentFirstName: 'Counter', gender: 'M' },
+      privateData: { dob: '2018-01-02' },
+      financeData: {}, parentPrivateData: {}, parentFinanceData: {}
+    })).rejects.toThrow('STUDENT_COUNTER_NOT_INITIALIZED');
+    expect(set).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a full quota before creating any document or incrementing the counter', async () => {
+    const set = vi.fn();
+    const update = vi.fn();
+    vi.mocked(runTransaction).mockImplementationOnce(async (_firestore, callback) => callback({
+      get: vi.fn(async (reference: string) => reference === 'schools/school-a'
+        ? { exists: () => true, data: () => ({ studentsCount: 2, studentLimit: 2, subscriptionPlan: 'starter' }) }
+        : { exists: () => false }),
+      set,
+      update
+    } as never));
+
+    await expect(createStudentAtomically({
+      firestore: {} as Firestore,
+      studentId: 'student-quota-full',
+      schoolId: 'school-a',
+      actorId: 'owner-a',
+      requestedMatricule: 'MAT-2026-4003',
+      studentData: { studentLastName: 'Quota', studentFirstName: 'Full', gender: 'F' },
+      privateData: { dob: '2018-01-02' },
+      financeData: {}, parentPrivateData: {}, parentFinanceData: {}
+    })).rejects.toThrow('STUDENT_QUOTA_REACHED');
+    expect(set).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('retries an automatic collision with a bounded alternative', async () => {

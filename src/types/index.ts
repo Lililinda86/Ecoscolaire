@@ -47,6 +47,10 @@ export interface School {
   trialEndsAt?: string;
   isInternalSchool?: boolean;
   studentCount?: number;
+  studentsCount?: number;
+  studentLimit?: number | null;
+  lastStudentCounterMutationId?: string;
+  lastStudentCounterMutationType?: 'create' | 'deactivate' | 'reactivate';
   amountPaid?: number;
   nextPaymentDate?: string;
   // --- Fin champs SaaS ---

@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { omitLegacyStudentFinancialFields } from '../../functions/src/studentImportBulkWriter';
+import {
+  isRealStudentImportEnabled,
+  omitLegacyStudentFinancialFields
+} from '../../functions/src/studentImportBulkWriter';
 
 describe('legacy student import safety', () => {
   it('removes parent-finance source fields before every BulkWriter write', () => {
@@ -28,6 +31,21 @@ describe('legacy student import safety', () => {
     const source = readFileSync('src/pages/Students.tsx', 'utf8');
     expect(source).toContain('Import temporairement indisponible — utilisez l’ajout manuel sécurisé.');
     expect(source).toMatch(/<button[\s\S]*?disabled[\s\S]*?Import temporairement indisponible[\s\S]*?<\/button>/);
+  });
+
+  it('keeps the BulkWriter real-data path disabled defensively', () => {
+    expect(isRealStudentImportEnabled()).toBe(false);
+  });
+
+  it('keeps enforceStudentSaasLimits observational and non-destructive', () => {
+    const source = readFileSync('functions/src/index.ts', 'utf8');
+    const triggerStart = source.indexOf('export const enforceStudentSaasLimits');
+    const triggerEnd = source.indexOf('// 9. updateStudentFinancialStatus', triggerStart);
+    const trigger = source.slice(triggerStart, triggerEnd);
+    expect(trigger).toContain('no mutation performed');
+    expect(trigger).not.toMatch(/\.delete\s*\(/);
+    expect(trigger).not.toMatch(/transaction\.(?:set|update|delete)\s*\(/);
+    expect(trigger).not.toMatch(/change\.(?:after|before)\.ref/);
   });
 
   it('does not introduce asynchronous projection synchronization', () => {

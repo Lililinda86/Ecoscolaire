@@ -24,6 +24,8 @@ export interface BulkWriterImportResult {
   durationMs: number;
 }
 
+export const isRealStudentImportEnabled = (): boolean => false;
+
 /**
  * Executes a BulkWriter operation to safely insert or update students.
  * Idempotency is guaranteed by deterministic IDs and strict create/update segregation
@@ -37,6 +39,9 @@ export async function executeBulkWriterImport(
   updates: NormalizedStudentRow[],
   onProgress?: (progress: number) => Promise<void>
 ): Promise<BulkWriterImportResult> {
+  if (!isRealStudentImportEnabled()) {
+    throw new Error('STUDENT_IMPORT_DISABLED');
+  }
   const startTime = Date.now();
   
   const result: BulkWriterImportResult = {

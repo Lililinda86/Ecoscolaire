@@ -12,15 +12,19 @@ import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '..
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, updateDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { resolveStudentEnrollmentAcademicYear } from '../utils/studentEnrollment';
 import {
   acquireStudentSubmissionLock,
-  createStudentAtomically,
-  normalizeStudentMatricule,
   releaseStudentSubmissionLock
 } from '../services/studentCreation';
+import { createStudentSecure } from '../services/studentCreationFunctions';
 import { splitStudentData, updateStudentSeparatedData } from '../services/studentPrivacy';
+import {
+  getCanonicalStudentCount,
+  getStudentCountForDisplay,
+  updateStudentSchoolingStatusAtomically
+} from '../services/studentQuota';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -238,7 +242,7 @@ const Students: React.FC = () => {
   const [, setRefresh] = useState(0);
   const { db, addStudentsLocal, updateStudentLocal, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
 
-  const currentCountDisplay = currentSchool?.studentCount ?? db.students.length;
+  const currentCountDisplay = currentSchool ? getStudentCountForDisplay(currentSchool) : db.students.length;
   const limitReached = isStudentLimitReached(currentSchool, currentCountDisplay);
   const limitLabel = getStudentLimitLabel(currentSchool, currentCountDisplay);
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
@@ -640,20 +644,10 @@ const Students: React.FC = () => {
 
       } else {
         if (!currentSchool) throw new Error("École non définie.");
-        const activeAcademicYear = resolveStudentEnrollmentAcademicYear(db.academicYears, currentSchool);
-        if (!activeAcademicYear) {
-          throw new Error("ACTIVE_ACADEMIC_YEAR_REQUIRED");
-        }
         const studentId = finalStudent.id || crypto.randomUUID();
         finalStudent.id = studentId;
         finalStudent.schoolId = currentSchool.id;
-        finalStudent.academicYearId = activeAcademicYear.id;
-        finalStudent.registrationYear = activeAcademicYear.name;
         finalStudent.schoolingStatus = 'active';
-        const currentCountDisplay = currentSchool.studentCount ?? db.students.length;
-        if (isStudentLimitReached(currentSchool, currentCountDisplay)) {
-          throw new Error("QUOTA_EXCEEDED");
-        }
 
         const optionalStudentFields: Partial<Student> = {
           placeOfBirth: finalStudent.placeOfBirth,
@@ -679,8 +673,6 @@ const Students: React.FC = () => {
         const studentToSave = Object.fromEntries(Object.entries({
           id: studentId,
           schoolId: currentSchool.id,
-          academicYearId: activeAcademicYear.id,
-          registrationYear: activeAcademicYear.name,
           schoolingStatus: 'active',
           matricule: finalStudent.matricule,
           name: finalStudent.name,
@@ -704,33 +696,18 @@ const Students: React.FC = () => {
           schoolId: currentSchool.id
         });
 
-        const creationResult = await createStudentAtomically({
-          firestore: firestoreDb,
+        const creationResult = await createStudentSecure({
           studentId,
-          schoolId: currentSchool.id,
-          actorId: currentUser.id,
           requestedMatricule: currentStudent.matricule,
           studentData: schoolData,
-          privateData,
-          financeData,
-          parentPrivateData,
-          parentFinanceData,
-          confirmProbableDuplicate,
-          isMatriculeKnown: normalizedMatricule => db.students.some(student => {
-            if (
-              student.schoolId !== currentSchool.id
-              || student.id === studentId
-              || !student.matricule
-            ) {
-              return false;
-            }
-            try {
-              return normalizeStudentMatricule(student.matricule) === normalizedMatricule;
-            } catch {
-              return false;
-            }
-          })
+          privateData: privateData as unknown as Record<string, unknown>,
+          financeData: financeData as unknown as Record<string, unknown>,
+          parentPrivateData: parentPrivateData as unknown as Record<string, unknown>,
+          parentFinanceData: parentFinanceData as unknown as Record<string, unknown>,
+          confirmProbableDuplicate
         });
+        finalStudent.academicYearId = creationResult.academicYearId;
+        finalStudent.registrationYear = creationResult.registrationYear;
         finalStudent.matricule = creationResult.matricule;
         finalStudent.matriculeNormalized = creationResult.matriculeNormalized;
         finalStudent.matriculeReservationId = creationResult.matriculeReservationId;
@@ -741,7 +718,7 @@ const Students: React.FC = () => {
         if (!db.students.some(student => student.id === studentId)) {
           db.students.push(finalStudent);
           if (creationResult.created) {
-            currentSchool.studentCount = (currentSchool.studentCount || 0) + 1;
+            currentSchool.studentsCount = (getCanonicalStudentCount(currentSchool) ?? 0) + 1;
           }
         }
       }
@@ -758,10 +735,20 @@ const Students: React.FC = () => {
     } catch (err: unknown) {
       const code = getErrorCode(err);
       const message = getErrorMessage(err);
-      if (message === 'QUOTA_EXCEEDED') {
+      if (message === 'STUDENT_QUOTA_REACHED' || message === 'QUOTA_EXCEEDED') {
         alert("Action refusée : La limite de votre abonnement SaaS est atteinte. Veuillez passer au plan supérieur.");
+      } else if (message === 'STUDENT_COUNTER_NOT_INITIALIZED') {
+        alert("Création impossible : le compteur d’élèves actifs doit être initialisé par une migration contrôlée.");
       } else if (message === 'ACTIVE_ACADEMIC_YEAR_REQUIRED') {
         alert("Création impossible : aucune année académique active valide n'est configurée pour cette école.");
+      } else if (message === 'INVALID_ACADEMIC_YEAR') {
+        alert("Création impossible : l’année académique active est absente ou invalide.");
+      } else if (message === 'INVALID_CLASS') {
+        alert("Création impossible : la classe sélectionnée est inactive, introuvable ou rattachée à une autre école.");
+      } else if (message === 'UNAUTHENTICATED') {
+        alert("Action refusée : votre session a expiré. Veuillez vous reconnecter.");
+      } else if (message === 'PERMISSION_DENIED') {
+        alert("Action refusée : vous n’avez pas l’autorisation de créer un élève.");
       } else if (message === 'MATRICULE_ALREADY_EXISTS') {
         alert("Création impossible : ce matricule est déjà utilisé dans cette école.");
       } else if (message === 'AUTOMATIC_MATRICULE_EXHAUSTED') {
@@ -824,9 +811,7 @@ const Students: React.FC = () => {
     setStatusError(null);
 
     try {
-      const studentRef = doc(firestoreDb, 'students', targetId);
       const patchData = {
-        schoolingStatus: 'inactive' as const,
         departureReason,
         departureDate,
         departureNote: departureNote.trim(),
@@ -834,7 +819,17 @@ const Students: React.FC = () => {
         deactivatedBy: actorId
       };
 
-      await updateDoc(studentRef, patchData);
+      const statusResult = await updateStudentSchoolingStatusAtomically({
+        firestore: firestoreDb,
+        schoolId: currentSchool.id,
+        studentId: targetId,
+        actorId,
+        targetStatus: 'inactive',
+        studentPatch: patchData
+      });
+      if (statusResult === 'updated') {
+        currentSchool.studentsCount = Math.max(0, (getCanonicalStudentCount(currentSchool) ?? 1) - 1);
+      }
 
       updateStudentLocal(targetId, {
         schoolingStatus: 'inactive',
@@ -896,14 +891,22 @@ const Students: React.FC = () => {
     setStatusError(null);
 
     try {
-      const studentRef = doc(firestoreDb, 'students', targetId);
       const patchData = {
-        schoolingStatus: 'active' as const,
         reactivatedAt: serverTimestamp(),
         reactivatedBy: actorId
       };
 
-      await updateDoc(studentRef, patchData);
+      const statusResult = await updateStudentSchoolingStatusAtomically({
+        firestore: firestoreDb,
+        schoolId: currentSchool.id,
+        studentId: targetId,
+        actorId,
+        targetStatus: 'active',
+        studentPatch: patchData
+      });
+      if (statusResult === 'updated') {
+        currentSchool.studentsCount = (getCanonicalStudentCount(currentSchool) ?? 0) + 1;
+      }
 
       updateStudentLocal(targetId, {
         schoolingStatus: 'active',
@@ -939,16 +942,24 @@ const Students: React.FC = () => {
 
     if (confirm("Retirer cet élève de la liste des élèves actifs ?")) {
       try {
-        const studentRef = doc(firestoreDb, 'students', student.id);
         const patchData = {
-          schoolingStatus: 'inactive' as const,
           departureReason: 'withdrawn' as const,
           departureDate: new Date().toISOString().split('T')[0],
           departureNote: 'Retiré des élèves actifs',
           deactivatedAt: serverTimestamp(),
           deactivatedBy: currentUser.id
         };
-        await updateDoc(studentRef, patchData);
+        const statusResult = await updateStudentSchoolingStatusAtomically({
+          firestore: firestoreDb,
+          schoolId: currentSchool.id,
+          studentId: student.id,
+          actorId: currentUser.id,
+          targetStatus: 'inactive',
+          studentPatch: patchData
+        });
+        if (statusResult === 'updated') {
+          currentSchool.studentsCount = Math.max(0, (getCanonicalStudentCount(currentSchool) ?? 1) - 1);
+        }
 
         // Mutate local state
         const idx = db.students.findIndex(s => s.id === student.id);

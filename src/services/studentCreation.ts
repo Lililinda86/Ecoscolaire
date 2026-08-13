@@ -5,6 +5,7 @@ import {
   type DocumentData,
   type Firestore
 } from 'firebase/firestore';
+import { getCanonicalStudentCount, getConfiguredStudentLimit } from './studentQuota';
 
 const MAX_MATRICULE_LENGTH = 64;
 const MAX_AUTOMATIC_ATTEMPTS = 8;
@@ -27,7 +28,10 @@ export type StudentCreationErrorCode =
   | 'MATRICULE_ALREADY_EXISTS'
   | 'PROBABLE_DUPLICATE'
   | 'AUTOMATIC_MATRICULE_EXHAUSTED'
-  | 'STUDENT_ID_CONFLICT';
+  | 'STUDENT_ID_CONFLICT'
+  | 'SCHOOL_NOT_FOUND'
+  | 'STUDENT_COUNTER_NOT_INITIALIZED'
+  | 'STUDENT_QUOTA_REACHED';
 
 export class StudentCreationError extends Error {
   readonly code: StudentCreationErrorCode;
@@ -161,6 +165,7 @@ export const createStudentAtomically = async ({
     try {
       return await runTransaction(firestore, async transaction => {
         const studentRef = doc(firestore, 'students', studentId);
+        const schoolRef = doc(firestore, 'schools', schoolId);
         const matriculeReservationRef = doc(
           firestore,
           'studentMatriculeReservations',
@@ -176,10 +181,13 @@ export const createStudentAtomically = async ({
         const parentPrivateRef = doc(firestore, 'studentParentPrivate', studentId);
         const parentFinanceRef = doc(firestore, 'studentParentFinance', studentId);
 
-        const [matriculeReservation, duplicateReservation] = await Promise.all([
+        const [schoolSnapshot, matriculeReservation, duplicateReservation] = await Promise.all([
+          transaction.get(schoolRef),
           transaction.get(matriculeReservationRef),
           transaction.get(duplicateReservationRef)
         ]);
+
+        if (!schoolSnapshot.exists()) throw new StudentCreationError('SCHOOL_NOT_FOUND');
 
         if (matriculeReservation.exists()) {
           if (matriculeReservation.data().studentId === studentId) {
@@ -204,7 +212,23 @@ export const createStudentAtomically = async ({
           throw new StudentCreationError('PROBABLE_DUPLICATE');
         }
 
+        const school = schoolSnapshot.data();
+        const currentStudentsCount = getCanonicalStudentCount(school);
+        if (currentStudentsCount === null) {
+          throw new StudentCreationError('STUDENT_COUNTER_NOT_INITIALIZED');
+        }
+        if (currentStudentsCount >= getConfiguredStudentLimit(school)) {
+          throw new StudentCreationError('STUDENT_QUOTA_REACHED');
+        }
+
         const timestamp = serverTimestamp();
+        transaction.update(schoolRef, {
+          studentsCount: currentStudentsCount + 1,
+          lastStudentCounterMutationId: studentId,
+          lastStudentCounterMutationType: 'create',
+          updatedAt: timestamp,
+          updatedBy: actorId
+        });
         transaction.set(studentRef, {
           ...studentData,
           id: studentId,

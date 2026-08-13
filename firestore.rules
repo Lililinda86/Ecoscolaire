@@ -101,6 +101,8 @@ service cloud.firestore {
         'studentLimit',
         'studentsCount',
         'studentCount',
+        'lastStudentCounterMutationId',
+        'lastStudentCounterMutationType',
         'pilot',
         'billingStatus',
         'billingCycle',
@@ -350,29 +352,32 @@ service cloud.firestore {
 
     function hasValidStudentClass(studentData) {
       let classPath = /databases/$(database)/documents/classes/$(studentData.classId);
+      let classData = get(classPath).data;
       return studentData.classId is string
         && studentData.classId.size() > 0
         && exists(classPath)
-        && get(classPath).data.schoolId == studentData.schoolId
+        && classData.schoolId == studentData.schoolId
         && (
-          !('isActive' in get(classPath).data)
-          || get(classPath).data.isActive != false
+          !('isActive' in classData)
+          || classData.isActive != false
         );
     }
 
     function hasValidStudentAcademicYear(studentData) {
       let yearPath = /databases/$(database)/documents/academicYears/$(studentData.academicYearId);
       let schoolPath = /databases/$(database)/documents/schools/$(studentData.schoolId);
+      let yearData = get(yearPath).data;
+      let schoolData = get(schoolPath).data;
       return studentData.academicYearId is string
         && studentData.academicYearId.size() > 0
         && exists(yearPath)
         && exists(schoolPath)
-        && get(yearPath).data.schoolId == studentData.schoolId
-        && get(yearPath).data.status == 'active'
-        && studentData.registrationYear == get(yearPath).data.name
+        && yearData.schoolId == studentData.schoolId
+        && yearData.status == 'active'
+        && studentData.registrationYear == yearData.name
         && (
-          !('activeAcademicYearId' in get(schoolPath).data)
-          || get(schoolPath).data.activeAcademicYearId == studentData.academicYearId
+          !('activeAcademicYearId' in schoolData)
+          || schoolData.activeAcademicYearId == studentData.academicYearId
         );
     }
 
@@ -435,44 +440,105 @@ service cloud.firestore {
       let financePath = /databases/$(database)/documents/studentFinance/$(studentId);
       let parentPrivatePath = /databases/$(database)/documents/studentParentPrivate/$(studentId);
       let parentFinancePath = /databases/$(database)/documents/studentParentFinance/$(studentId);
+      let privateData = getAfter(privatePath).data;
+      let financeData = getAfter(financePath).data;
+      let parentPrivateData = getAfter(parentPrivatePath).data;
+      let parentFinanceData = getAfter(parentFinancePath).data;
       return existsAfter(privatePath)
-        && getAfter(privatePath).data.schoolId == studentData.schoolId
-        && getAfter(privatePath).data.studentId == studentId
+        && privateData.schoolId == studentData.schoolId
+        && privateData.studentId == studentId
         && existsAfter(financePath)
-        && getAfter(financePath).data.schoolId == studentData.schoolId
-        && getAfter(financePath).data.studentId == studentId
+        && financeData.schoolId == studentData.schoolId
+        && financeData.studentId == studentId
         && existsAfter(parentPrivatePath)
-        && getAfter(parentPrivatePath).data.schoolId == studentData.schoolId
-        && getAfter(parentPrivatePath).data.studentId == studentId
+        && parentPrivateData.schoolId == studentData.schoolId
+        && parentPrivateData.studentId == studentId
         && existsAfter(parentFinancePath)
-        && getAfter(parentFinancePath).data.schoolId == studentData.schoolId
-        && getAfter(parentFinancePath).data.studentId == studentId;
+        && parentFinanceData.schoolId == studentData.schoolId
+        && parentFinanceData.studentId == studentId;
     }
 
     function hasValidStudentCreationReservations(studentData, studentId) {
       let matriculePath = /databases/$(database)/documents/studentMatriculeReservations/$(studentData.matriculeReservationId);
       let duplicatePath = /databases/$(database)/documents/studentDuplicateReservations/$(studentData.duplicateReservationId);
+      let matriculeData = getAfter(matriculePath).data;
+      let duplicateData = getAfter(duplicatePath).data;
       return existsAfter(matriculePath)
-        && getAfter(matriculePath).data.schoolId == studentData.schoolId
-        && getAfter(matriculePath).data.studentId == studentId
-        && getAfter(matriculePath).data.matriculeNormalized == studentData.matriculeNormalized
+        && matriculeData.schoolId == studentData.schoolId
+        && matriculeData.studentId == studentId
+        && matriculeData.matriculeNormalized == studentData.matriculeNormalized
         && existsAfter(duplicatePath)
-        && getAfter(duplicatePath).data.schoolId == studentData.schoolId
-        && getAfter(duplicatePath).data.duplicateFingerprint == studentData.duplicateFingerprint
-        && studentId in getAfter(duplicatePath).data.studentIds;
+        && duplicateData.schoolId == studentData.schoolId
+        && duplicateData.duplicateFingerprint == studentData.duplicateFingerprint
+        && studentId in duplicateData.studentIds;
     }
 
-    function canCreateStudentWithinLimits(schoolId) {
-      let school = get(/databases/$(database)/documents/schools/$(schoolId)).data;
+    function hasInitializedStudentCounter(school) {
+      return 'studentsCount' in school
+          && school.studentsCount is int
+          && school.studentsCount >= 0;
+    }
+
+    function hasStudentQuotaCapacity(school) {
       let isInternal = school.get('isInternalSchool', false) == true;
       let plan = school.get('subscriptionPlan', 'starter');
-      let count = school.get('studentsCount', 0);
+      let hasConfiguredLimit = 'studentLimit' in school
+          && school.studentLimit is int
+          && school.studentLimit >= 0;
 
       return isInternal
           || plan == 'premium'
-          || (plan == 'pilot' && count < 1000)
-          || (plan == 'standard' && count < 1000)
-          || (plan == 'starter' && count < 200);
+          || (hasConfiguredLimit && school.studentsCount < school.studentLimit)
+          || (!hasConfiguredLimit && plan == 'pilot' && school.studentsCount < 1000)
+          || (!hasConfiguredLimit && plan == 'standard' && school.studentsCount < 1000)
+          || (!hasConfiguredLimit && plan == 'starter' && school.studentsCount < 200);
+    }
+
+    function isValidStudentCounterMutation(schoolId, school, nextSchool) {
+      let studentId = nextSchool.get('lastStudentCounterMutationId', '');
+      let mutationType = nextSchool.get('lastStudentCounterMutationType', '');
+      let studentPath = /databases/$(database)/documents/students/$(studentId);
+      let onlyCounterFields = nextSchool.diff(school).affectedKeys().hasOnly([
+        'studentsCount', 'lastStudentCounterMutationId', 'lastStudentCounterMutationType',
+        'updatedAt', 'updatedBy'
+      ]);
+      let commonValid = canManagePedagogy(schoolId)
+          && hasInitializedStudentCounter(school)
+          && nextSchool.studentsCount is int
+          && nextSchool.studentsCount >= 0
+          && nextSchool.updatedAt == request.time
+          && nextSchool.updatedBy == request.auth.uid
+          && studentId != ''
+          && onlyCounterFields;
+      return commonValid && (
+        mutationType == 'deactivate' ? (
+          school.studentsCount > 0
+          && exists(studentPath)
+          && get(studentPath).data.schoolId == schoolId
+          && get(studentPath).data.get('schoolingStatus', 'active') == 'active'
+          && getAfter(studentPath).data.schoolingStatus == 'inactive'
+          && nextSchool.studentsCount == school.studentsCount - 1
+        ) : mutationType == 'reactivate' && (
+          hasStudentQuotaCapacity(school)
+          && exists(studentPath)
+          && get(studentPath).data.schoolId == schoolId
+          && get(studentPath).data.schoolingStatus == 'inactive'
+          && getAfter(studentPath).data.schoolingStatus == 'active'
+          && nextSchool.studentsCount == school.studentsCount + 1
+        )
+      );
+    }
+
+    function hasAtomicCounterForStudentStatusUpdate(studentId, student, nextStudent) {
+      let changesStatus = nextStudent.diff(student).affectedKeys().hasAny(['schoolingStatus']);
+      let expectedType = student.get('schoolingStatus', 'active') == 'active'
+          ? 'deactivate'
+          : 'reactivate';
+      return !changesStatus || (
+        nextStudent.schoolId == student.schoolId
+        && getAfter(/databases/$(database)/documents/schools/$(student.schoolId)).data.lastStudentCounterMutationId == studentId
+        && getAfter(/databases/$(database)/documents/schools/$(student.schoolId)).data.lastStudentCounterMutationType == expectedType
+      );
     }
 
     function isAccountantRegistrationFeeUpdate() {
@@ -607,7 +673,11 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isSuperAdmin();
       // Le propriétaire peut modifier son école (mais pas l'abonnement SaaS ni le pointeur de manière non atomique)
       allow update: if isAuthenticated() && isActive() && (
-        isSuperAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasAny(['studentsCount'])
+          && isValidStudentCounterMutation(schoolId, resource.data, request.resource.data)) ||
+        (isSuperAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'studentsCount', 'lastStudentCounterMutationId', 'lastStudentCounterMutationType'
+        ])) ||
         (canManageSchool(schoolId) && !isUpdatingSaasFields() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeAcademicYearId'])) ||
         (isAcademicCalendarPointerUpdate(schoolId) && !isUpdatingTransportPolicy())
       ) && (!isUpdatingTransportPolicy() || (isValidTransportPolicy() && (isOwner() || isSuperAdmin())))
@@ -643,10 +713,9 @@ service cloud.firestore {
         isSuperAdmin()
         || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
       );
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasAll([
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'dob', 'parentName', 'parentPhone',
                       'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
                     ])
@@ -678,7 +747,7 @@ service cloud.firestore {
                     && request.resource.data.createdBy == request.auth.uid
                     && request.resource.data.updatedBy == request.auth.uid
                     && existsAfter(/databases/$(database)/documents/students/$(studentId))
-                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId; */
       allow update: if isAuthenticated()
                     && isActive()
                     && canManagePedagogy(resource.data.schoolId)
@@ -715,10 +784,9 @@ service cloud.firestore {
         isSuperAdmin()
         || ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId))
       );
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasAll([
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'registrationFeePaid', 'registrationFeeStatus',
                       'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
                     ])
@@ -739,7 +807,7 @@ service cloud.firestore {
                     && request.resource.data.createdBy == request.auth.uid
                     && request.resource.data.updatedBy == request.auth.uid
                     && existsAfter(/databases/$(database)/documents/students/$(studentId))
-                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId; */
       allow update: if isAuthenticated()
                     && isActive()
                     && request.resource.data.schoolId == resource.data.schoolId
@@ -778,10 +846,9 @@ service cloud.firestore {
         || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
         || (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
       );
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasAll([
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'dob',
                       'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
                     ])
@@ -799,7 +866,7 @@ service cloud.firestore {
                     && request.resource.data.updatedBy == request.auth.uid
                     && existsAfter(/databases/$(database)/documents/studentPrivate/$(studentId))
                     && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.schoolId == request.resource.data.schoolId
-                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.dob == request.resource.data.dob;
+                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.dob == request.resource.data.dob; */
       allow update: if isAuthenticated()
                     && isActive()
                     && canManagePedagogy(resource.data.schoolId)
@@ -819,10 +886,9 @@ service cloud.firestore {
         || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
         || (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
       );
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasAll([
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
                       'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
                     ])
@@ -845,7 +911,7 @@ service cloud.firestore {
                     && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT1 == request.resource.data.feeT1
                     && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT2 == request.resource.data.feeT2
                     && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT3 == request.resource.data.feeT3
-                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass;
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass; */
       allow update: if isAuthenticated()
                     && isActive()
                     && canManagePedagogy(resource.data.schoolId)
@@ -875,10 +941,9 @@ service cloud.firestore {
                    )
                  );
       allow list: if false;
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasOnly([
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasOnly([
                       'id', 'schoolId', 'studentId', 'matriculeNormalized',
                       'createdAt', 'createdBy'
                     ])
@@ -889,7 +954,7 @@ service cloud.firestore {
                     && request.resource.data.createdBy == request.auth.uid
                     && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId))
                     && getAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.schoolId == request.resource.data.schoolId
-                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.matriculeReservationId == reservationId;
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.matriculeReservationId == reservationId; */
       allow update, delete: if false;
     }
 
@@ -904,10 +969,9 @@ service cloud.firestore {
                    )
                  );
       allow list: if false;
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasOnly([
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasOnly([
                       'id', 'schoolId', 'duplicateFingerprint', 'studentIds', 'lastStudentId',
                       'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
                     ])
@@ -925,7 +989,7 @@ service cloud.firestore {
                     && request.resource.data.updatedBy == request.auth.uid
                     && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId))
                     && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.schoolId == request.resource.data.schoolId
-                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.duplicateReservationId == reservationId;
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.duplicateReservationId == reservationId; */
       allow update: if isAuthenticated()
                     && isActive()
                     && canManagePedagogy(resource.data.schoolId)
@@ -956,12 +1020,8 @@ service cloud.firestore {
         (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
       );
       // Création par Owner, Director, Secretary AVEC limite et validation stricte de classe
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && canCreateStudentWithinLimits(request.resource.data.schoolId)
-                    && hasValidStudentClass(request.resource.data)
-                    && isValidStudentCreate(request.resource.data, studentId);
+      // La création moderne passe exclusivement par createStudentSecure (Admin SDK).
+      allow create: if false;
       // Update
       allow update: if isAuthenticated() && isActive() && (
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -1002,6 +1062,7 @@ service cloud.firestore {
           isAccountantTuitionUpdate() ||
           isAccountantTransportUpdate()
         )
+        && hasAtomicCounterForStudentStatusUpdate(studentId, resource.data, request.resource.data)
       );
       // Delete (Désactivé physiquement pour la sécurité des données)
       allow delete: if false;
