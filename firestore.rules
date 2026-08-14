@@ -541,43 +541,6 @@ service cloud.firestore {
       );
     }
 
-    function isAccountantRegistrationFeeUpdate() {
-      return isAccountant()
-          && hasSchoolAccess(resource.data.schoolId)
-          && request.resource.data.schoolId == resource.data.schoolId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'registrationFeePaid',
-            'registrationFeeStatus'
-          ])
-          && request.resource.data.registrationFeePaid is number
-          && request.resource.data.registrationFeePaid >= 0
-          && request.resource.data.registrationFeeStatus in ['unpaid', 'partial', 'paid'];
-    }
-
-    function isAccountantTuitionUpdate() {
-      return isAccountant()
-          && hasSchoolAccess(resource.data.schoolId)
-          && request.resource.data.schoolId == resource.data.schoolId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'tuitionPaid',
-            'tuitionStatus'
-          ])
-          && request.resource.data.tuitionPaid is number
-          && request.resource.data.tuitionPaid >= 0
-          && request.resource.data.tuitionStatus in ['unpaid', 'partial', 'paid'];
-    }
-
-    function isAccountantTransportUpdate() {
-      return isAccountant()
-          && hasSchoolAccess(resource.data.schoolId)
-          && request.resource.data.schoolId == resource.data.schoolId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'transportPaid'
-          ])
-          && request.resource.data.transportPaid is number
-          && request.resource.data.transportPaid >= 0;
-    }
-
     function isValidExpense(data, expenseId) {
       return data.keys().hasAll(['id', 'schoolId', 'amount', 'date', 'person', 'reason'])
           && data.keys().hasOnly(['id', 'schoolId', 'amount', 'date', 'person', 'reason'])
@@ -1141,9 +1104,7 @@ service cloud.firestore {
           'matricule', 'matriculeNormalized', 'matriculeReservationId',
           'duplicateFingerprint', 'duplicateReservationId'
         ])
-        && (
-          !('matriculeReservationId' in resource.data)
-          || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails',
             'address', 'emergencyContact', 'allergies', 'medicalConditions',
             'transportNeighborhood', 'transportPickupPoint',
@@ -1159,7 +1120,6 @@ service cloud.firestore {
             'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
             'transportMonthlyFee', 'transportPaid'
           ])
-        )
         &&
         !(
           isSecretary()
@@ -1174,10 +1134,7 @@ service cloud.firestore {
               !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
               || hasValidStudentClass(request.resource.data)
             )
-          ) ||
-          isAccountantRegistrationFeeUpdate() ||
-          isAccountantTuitionUpdate() ||
-          isAccountantTransportUpdate()
+          )
         )
         && hasAtomicCounterForStudentStatusUpdate(studentId, resource.data, request.resource.data)
       );

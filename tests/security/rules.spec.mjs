@@ -1462,6 +1462,51 @@ describe('Student Privacy Security Rules', () => {
       parentPhone: '+237699999999'
     }));
   });
+
+  for (const uid of [
+    'privacy-owner',
+    'privacy-director',
+    'privacy-secretary',
+    'privacy-superadmin'
+  ]) {
+    it(`denies medical and financial writes to a legacy public student for ${uid}`, async () => {
+      const context = testEnv.authenticatedContext(uid);
+      const publicRef = doc(context.firestore(), 'students', LEGACY_STUDENT_ID);
+
+      await assertFails(updateDoc(publicRef, { allergies: 'Arachides' }));
+      await assertFails(updateDoc(publicRef, { medicalConditions: 'Asthme' }));
+      await assertFails(updateDoc(publicRef, { tuitionPaid: 1000 }));
+    });
+  }
+
+  it('denies unauthenticated medical writes to a legacy public student', async () => {
+    const publicRef = doc(testEnv.unauthenticatedContext().firestore(), 'students', LEGACY_STUDENT_ID);
+    await assertFails(updateDoc(publicRef, { allergies: 'Arachides' }));
+  });
+
+  it('allows same-school creation of missing finance and denies cross-school creation', async () => {
+    const ownerDb = testEnv.authenticatedContext('privacy-owner').firestore();
+    const audit = {
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-owner',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-owner'
+    };
+    await assertSucceeds(setDoc(doc(ownerDb, 'studentFinance', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      feeT1: 1100,
+      ...audit
+    }));
+
+    const otherDb = testEnv.authenticatedContext('privacy-other-owner').firestore();
+    await assertFails(updateDoc(doc(otherDb, 'studentFinance', LEGACY_STUDENT_ID), {
+      feeT1: 2200,
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-other-owner'
+    }));
+  });
 });
 
 describe('Subjects Security Rules', () => {

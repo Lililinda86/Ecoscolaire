@@ -97,4 +97,31 @@ describe('student separated finance persistence', () => {
     expect(publicWrites).toEqual([{ name: 'Élève privé' }]);
     expect(publicWrites.every(data => !('allergies' in data) && !('medicalConditions' in data))).toBe(true);
   });
+
+  it('creates missing finance projections without a public financial fallback', async () => {
+    transactionGet.mockImplementation(async (reference: string) => ({
+      exists: () => ![
+        'studentFinance/student-1',
+        'studentParentFinance/student-1'
+      ].includes(reference)
+    }));
+
+    await updateStudentSeparatedData({
+      firestore: {} as Firestore,
+      studentId: 'student-1',
+      schoolId: 'school-1',
+      actorId: 'owner-1',
+      patch: { name: 'Élève legacy', feeT1: 1100, tuitionPaid: 500 }
+    });
+
+    expect(transactionSet).toHaveBeenCalledWith(
+      'studentFinance/student-1',
+      expect.objectContaining({ schoolId: 'school-1', studentId: 'student-1', feeT1: 1100, tuitionPaid: 500 })
+    );
+    expect(transactionSet).toHaveBeenCalledWith(
+      'studentParentFinance/student-1',
+      expect.objectContaining({ schoolId: 'school-1', studentId: 'student-1', feeT1: 1100 })
+    );
+    expect(transactionUpdate).toHaveBeenCalledWith('students/student-1', { name: 'Élève legacy' });
+  });
 });
