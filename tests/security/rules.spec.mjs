@@ -315,21 +315,17 @@ describe('Student Active Status Security Rules', () => {
     });
   };
 
-  it('secretary cannot deactivate active student', async () => {
+  it('secretary can deactivate active student atomically', async () => {
+    await assertSucceeds(changeStatusAtomically('secretary-1', 'student-1', 'inactive'));
     const context = testEnv.authenticatedContext('secretary-1');
-    await assertFails(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn' })
-    );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
   });
 
-  it('secretary cannot reactivate inactive student', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'students', 'student-1'), { schoolId: SCHOOL_ID, schoolingStatus: 'inactive', classId: 'class-1' });
-    });
+  it('secretary can reactivate inactive student atomically', async () => {
+    await assertSucceeds(changeStatusAtomically('secretary-1', 'student-1', 'inactive'));
+    await assertSucceeds(changeStatusAtomically('secretary-1', 'student-1', 'active'));
     const context = testEnv.authenticatedContext('secretary-1');
-    await assertFails(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'active' })
-    );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(1);
   });
 
   it('secretary cannot update deactivation metadata', async () => {
@@ -345,6 +341,18 @@ describe('Student Active Status Security Rules', () => {
       updateDoc(doc(context.firestore(), 'students', 'student-1'), { name: 'Alice Edited' })
     );
     expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(1);
+  });
+
+  it('secretary cannot change schoolId or matricule', async () => {
+    const context = testEnv.authenticatedContext('secretary-1');
+    const studentRef = doc(context.firestore(), 'students', 'student-1');
+    await assertFails(updateDoc(studentRef, { schoolId: 'school-B' }));
+    await assertFails(updateDoc(studentRef, { matricule: 'MAT-CHANGED' }));
+  });
+
+  it('secretary cannot physically delete a student', async () => {
+    const context = testEnv.authenticatedContext('secretary-1');
+    await assertFails(deleteDoc(doc(context.firestore(), 'students', 'student-1')));
   });
 
   it('owner can deactivate student', async () => {
@@ -1071,6 +1079,7 @@ describe('Student Privacy Security Rules', () => {
   const OTHER_SCHOOL_ID = 'privacy-other-school';
   const STUDENT_ID = 'privacy-student';
   const OTHER_STUDENT_ID = 'privacy-other-student';
+  const LEGACY_STUDENT_ID = 'privacy-legacy-student';
 
   beforeEach(async () => {
     await testEnv.withSecurityRulesDisabled(async ctx => {
@@ -1150,6 +1159,17 @@ describe('Student Privacy Security Rules', () => {
         classId: 'privacy-class',
         schoolingStatus: 'active'
       });
+      await setDoc(doc(db, 'students', LEGACY_STUDENT_ID), {
+        id: LEGACY_STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        name: 'Élève Legacy',
+        studentLastName: 'Legacy',
+        studentFirstName: 'Élève',
+        gender: 'F',
+        section: 'francophone',
+        classId: 'privacy-class',
+        schoolingStatus: 'active'
+      });
       await setDoc(doc(db, 'studentFinance', OTHER_STUDENT_ID), {
         id: OTHER_STUDENT_ID,
         schoolId: SCHOOL_ID,
@@ -1193,6 +1213,20 @@ describe('Student Privacy Security Rules', () => {
   it('allows owner to read school and private student data in the same school', async () => {
     await assertSucceeds(readAs('privacy-owner', 'students'));
     await assertSucceeds(readAs('privacy-owner', 'studentPrivate'));
+  });
+
+  it('returns missing separated projections for a same-school legacy student without permission errors', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    const db = context.firestore();
+    const missingPrivate = await assertSucceeds(getDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID)));
+    const missingFinance = await assertSucceeds(getDoc(doc(db, 'studentFinance', LEGACY_STUDENT_ID)));
+    const missingParentPrivate = await assertSucceeds(getDoc(doc(db, 'studentParentPrivate', LEGACY_STUDENT_ID)));
+    const missingParentFinance = await assertSucceeds(getDoc(doc(db, 'studentParentFinance', LEGACY_STUDENT_ID)));
+
+    expect(missingPrivate.exists()).toBe(false);
+    expect(missingFinance.exists()).toBe(false);
+    expect(missingParentPrivate.exists()).toBe(false);
+    expect(missingParentFinance.exists()).toBe(false);
   });
 
   it('allows director and secretary to read private student data in the same school', async () => {

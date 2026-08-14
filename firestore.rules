@@ -711,7 +711,12 @@ service cloud.firestore {
     match /studentPrivate/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin()
-        || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+        || ((isOwner() || isDirector() || isSecretary()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
       );
       allow create: if false;
       /* Schéma conservé comme documentation de migration serveur.
@@ -782,7 +787,12 @@ service cloud.firestore {
     match /studentFinance/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin()
-        || ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId))
+        || ((isOwner() || isDirector() || isSecretary() || isAccountant()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
       );
       allow create: if false;
       /* Schéma conservé comme documentation de migration serveur.
@@ -843,8 +853,20 @@ service cloud.firestore {
     match /studentParentPrivate/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin()
-        || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
-        || (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
+        || ((isOwner() || isDirector() || isSecretary()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
+        || (isParent()
+          && studentId in getUserData().get('studentIds', [])
+          && (
+            (resource == null
+              && exists(/databases/$(database)/documents/students/$(studentId))
+              && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+            || (resource != null && hasSchoolAccess(resource.data.schoolId))
+          ))
       );
       allow create: if false;
       /* Schéma conservé comme documentation de migration serveur.
@@ -883,8 +905,20 @@ service cloud.firestore {
     match /studentParentFinance/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin()
-        || ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
-        || (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
+        || ((isOwner() || isDirector() || isSecretary()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
+        || (isParent()
+          && studentId in getUserData().get('studentIds', [])
+          && (
+            (resource == null
+              && exists(/databases/$(database)/documents/students/$(studentId))
+              && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+            || (resource != null && hasSchoolAccess(resource.data.schoolId))
+          ))
       );
       allow create: if false;
       /* Schéma conservé comme documentation de migration serveur.
@@ -1048,7 +1082,11 @@ service cloud.firestore {
           ])
         )
         &&
-        !(isSecretary() && isUpdatingStudentActiveStatusFields())
+        !(
+          isSecretary()
+          && isUpdatingStudentActiveStatusFields()
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolingStatus'])
+        )
         && (
           (
             canManagePedagogy(request.resource.data.schoolId)

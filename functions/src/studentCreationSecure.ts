@@ -133,6 +133,8 @@ const validateStudentPayload = (
   financeData: InputMap
 ): void => {
   requireString(studentData.name, 'name', 240);
+  requireString(studentData.studentLastName, 'studentLastName', 120);
+  requireString(studentData.studentFirstName, 'studentFirstName', 120);
   requireString(privateData.parentName, 'parentName', 240);
   requireString(privateData.parentPhone, 'parentPhone', 80);
   if (!['francophone', 'anglophone'].includes(String(studentData.section))) {

@@ -108,10 +108,12 @@ describe('createStudentSecure callable', () => {
     await expectBusinessError(handleCreateStudentSecure(input(fixture.classId), {}, db, () => new Date().toISOString()), 'UNAUTHENTICATED');
   });
 
-  it('02 wrong role -> DENY', async () => {
-    const fixture = await seed({ role: 'teacher' });
-    await expectBusinessError(call(fixture.uid, input(fixture.classId)), 'PERMISSION_DENIED');
-  });
+  for (const role of ['teacher', 'accountant', 'boardViewer']) {
+    it(`02 ${role} create -> DENY`, async () => {
+      const fixture = await seed({ role });
+      await expectBusinessError(call(fixture.uid, input(fixture.classId)), 'PERMISSION_DENIED');
+    });
+  }
 
   for (const [number, role] of [['03', 'secretary'], ['04', 'owner'], ['05', 'director']] as const) {
     it(`${number} ${role} -> PASS`, async () => {
@@ -157,7 +159,12 @@ describe('createStudentSecure callable', () => {
 
   it('12 full quota -> DENY', async () => {
     const fixture = await seed({ studentsCount: 2, studentLimit: 2 });
-    await expectBusinessError(call(fixture.uid, input(fixture.classId)), 'STUDENT_QUOTA_REACHED');
+    const payload = input(fixture.classId);
+    await expectBusinessError(call(fixture.uid, payload), 'STUDENT_QUOTA_REACHED');
+    expect((await db.collection('schools').doc(fixture.schoolId).get()).data()?.studentsCount).toBe(2);
+    expect((await db.collection('students').where('schoolId', '==', fixture.schoolId).get()).empty).toBe(true);
+    expect((await db.collection('studentMatriculeReservations').where('schoolId', '==', fixture.schoolId).get()).empty).toBe(true);
+    expect((await db.collection('studentDuplicateReservations').where('schoolId', '==', fixture.schoolId).get()).empty).toBe(true);
   });
 
   it('13 unlimited plan -> PASS and increments counter', async () => {
@@ -183,6 +190,9 @@ describe('createStudentSecure callable', () => {
     await call(fixture.uid, first);
     const second = input(fixture.classId, { requestedMatricule: first.requestedMatricule });
     await expectBusinessError(call(fixture.uid, second), 'MATRICULE_ALREADY_EXISTS');
+    expect((await db.collection('schools').doc(fixture.schoolId).get()).data()?.studentsCount).toBe(1);
+    expect((await db.collection('students').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
+    expect((await db.collection('studentMatriculeReservations').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
   });
 
   it('16 concurrent same matricule -> one PASS and one DENY', async () => {
@@ -194,6 +204,9 @@ describe('createStudentSecure callable', () => {
     ]);
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect((await db.collection('schools').doc(fixture.schoolId).get()).data()?.studentsCount).toBe(1);
+    expect((await db.collection('students').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
+    expect((await db.collection('studentMatriculeReservations').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
   });
 
   it('17 probable duplicate without confirmation -> error', async () => {
@@ -230,9 +243,14 @@ describe('createStudentSecure callable', () => {
     const fixture = await seed({ classActive: false });
     const payload = input(fixture.classId);
     await expectBusinessError(call(fixture.uid, payload), 'INVALID_CLASS');
-    for (const collectionName of ['students', 'studentPrivate', 'studentFinance', 'studentParentPrivate', 'studentParentFinance']) {
+    for (const collectionName of [
+      'students', 'studentPrivate', 'studentFinance', 'studentParentPrivate', 'studentParentFinance'
+    ]) {
       expect((await db.collection(collectionName).doc(payload.studentId).get()).exists).toBe(false);
     }
+    expect((await db.collection('studentMatriculeReservations').where('schoolId', '==', fixture.schoolId).get()).empty).toBe(true);
+    expect((await db.collection('studentDuplicateReservations').where('schoolId', '==', fixture.schoolId).get()).empty).toBe(true);
+    expect((await db.collection('schools').doc(fixture.schoolId).get()).data()?.studentsCount).toBe(0);
   });
 
   it('21 counter is exact after one successful creation', async () => {
@@ -257,6 +275,7 @@ describe('createStudentSecure callable', () => {
 
   it('24 never writes any student document into a client-supplied foreign school', async () => {
     const fixture = await seed();
+    await db.collection('schools').doc(fixture.otherSchoolId).set({ studentsCount: 41 });
     const payload = input(fixture.classId);
     payload.studentData.schoolId = fixture.otherSchoolId;
     const result = await call(fixture.uid, payload);
@@ -264,5 +283,86 @@ describe('createStudentSecure callable', () => {
     for (const collectionName of collections) {
       expect((await db.collection(collectionName).doc(result.studentId).get()).data()?.schoolId).toBe(fixture.schoolId);
     }
+    expect((await db.collection('schools').doc(fixture.otherSchoolId).get()).data()?.studentsCount).toBe(41);
+  });
+
+  for (const [label, studentFirstName] of [['empty', ''], ['whitespace-only', '   ']] as const) {
+    it(`25 direct callable rejects a ${label} first name`, async () => {
+      const fixture = await seed();
+      const payload = input(fixture.classId);
+      payload.studentData.studentFirstName = studentFirstName;
+      await expectBusinessError(call(fixture.uid, payload), 'INVALID_ARGUMENT');
+    });
+  }
+
+  for (const [label, medicalData] of [
+    ['no medical fields', {}],
+    ['allergies only', { allergies: 'Arachides' }],
+    ['medical condition only', { medicalConditions: 'Asthme' }],
+    ['empty medical strings', { allergies: '', medicalConditions: '' }],
+    ['explicit no known condition confirmation', { allergies: '', medicalConditions: '' }]
+  ] as const) {
+    it(`26 accepts ${label}`, async () => {
+      const fixture = await seed();
+      const payload = input(fixture.classId, {
+        privateData: { ...input(fixture.classId).privateData, ...medicalData }
+      });
+      const result = await call(fixture.uid, payload);
+      expect(result).toMatchObject({ created: true });
+      const privateDocument = (await db.collection('studentPrivate').doc(result.studentId).get()).data();
+      if (medicalData.allergies) expect(privateDocument?.allergies).toBe(medicalData.allergies);
+      if (medicalData.medicalConditions) {
+        expect(privateDocument?.medicalConditions).toBe(medicalData.medicalConditions);
+      }
+    });
+  }
+
+  it('27 same matricule and same identity is denied for a distinct operation', async () => {
+    const fixture = await seed();
+    const first = input(fixture.classId);
+    await call(fixture.uid, first);
+    const second = input(fixture.classId, {
+      requestedMatricule: first.requestedMatricule,
+      studentData: { ...first.studentData },
+      privateData: { ...first.privateData }
+    });
+    await expectBusinessError(call(fixture.uid, second), 'MATRICULE_ALREADY_EXISTS');
+  });
+
+  it('28 same matricule and different identity is denied', async () => {
+    const fixture = await seed();
+    const first = input(fixture.classId);
+    await call(fixture.uid, first);
+    const second = input(fixture.classId, { requestedMatricule: first.requestedMatricule });
+    await expectBusinessError(call(fixture.uid, second), 'MATRICULE_ALREADY_EXISTS');
+  });
+
+  it('29 duplicate confirmation never bypasses a matricule collision', async () => {
+    const fixture = await seed();
+    const first = input(fixture.classId);
+    await call(fixture.uid, first);
+    const second = input(fixture.classId, {
+      requestedMatricule: first.requestedMatricule,
+      studentData: { ...first.studentData },
+      privateData: { ...first.privateData },
+      confirmProbableDuplicate: true
+    });
+    await expectBusinessError(call(fixture.uid, second), 'MATRICULE_ALREADY_EXISTS');
+    expect((await db.collection('schools').doc(fixture.schoolId).get()).data()?.studentsCount).toBe(1);
+    expect((await db.collection('students').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
+    expect((await db.collection('studentMatriculeReservations').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
+  });
+
+  it('30 allows the same normalized matricule in two different schools', async () => {
+    const firstSchool = await seed();
+    const secondSchool = await seed();
+    const sharedMatricule = `CODEX-C5-${nextId('cross-school')}`;
+
+    await expect(call(firstSchool.uid, input(firstSchool.classId, {
+      requestedMatricule: sharedMatricule
+    }))).resolves.toMatchObject({ created: true });
+    await expect(call(secondSchool.uid, input(secondSchool.classId, {
+      requestedMatricule: sharedMatricule
+    }))).resolves.toMatchObject({ created: true });
   });
 });

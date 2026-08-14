@@ -25,6 +25,13 @@ import {
   getStudentCountForDisplay,
   updateStudentSchoolingStatusAtomically
 } from '../services/studentQuota';
+import {
+  canRoleChangeStudentStatus,
+  canRoleManageStudents,
+  getStudentCreationErrorMessage,
+  getStudentStatusErrorMessage,
+  validateRequiredStudentFields
+} from '../services/studentManagementPolicy';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -336,11 +343,9 @@ const Students: React.FC = () => {
   }, [openRowMenuId]);
 
   const effectiveRole = typeof currentUser?.role === 'string' ? currentUser.role.trim() : '';
-  const canManageStudents = ['superAdmin', 'owner', 'director', 'secretary'].includes(effectiveRole);
+  const canManageStudents = canRoleManageStudents(effectiveRole);
   const canViewSensitive = currentUser && currentUser.role !== 'boardViewer';
-  const canChangeStudentActiveStatus =
-    !!effectiveRole &&
-    ['superAdmin', 'owner', 'director'].includes(effectiveRole);
+  const canChangeStudentActiveStatus = canRoleChangeStudentStatus(effectiveRole);
 
   if (!currentUser) return null;
 
@@ -541,6 +546,14 @@ const Students: React.FC = () => {
     e?.preventDefault();
     if (currentStep !== 4) return;
 
+    if (!isEditing) {
+      const requiredFieldError = validateRequiredStudentFields(currentStudent);
+      if (requiredFieldError) {
+        setStepValidationError(requiredFieldError);
+        return;
+      }
+    }
+
     if (!currentStudent.classId) {
       alert("Veuillez choisir une classe !");
       return;
@@ -724,6 +737,7 @@ const Students: React.FC = () => {
       }
 
       setRefresh(r => r + 1);
+      alert(isEditing ? 'Élève modifié avec succès.' : 'Élève créé avec succès.');
       forceCloseStudentModal();
 
       logAuditAction({
@@ -735,37 +749,21 @@ const Students: React.FC = () => {
     } catch (err: unknown) {
       const code = getErrorCode(err);
       const message = getErrorMessage(err);
-      if (message === 'STUDENT_QUOTA_REACHED' || message === 'QUOTA_EXCEEDED') {
-        alert("Action refusée : La limite de votre abonnement SaaS est atteinte. Veuillez passer au plan supérieur.");
-      } else if (message === 'STUDENT_COUNTER_NOT_INITIALIZED') {
-        alert("Création impossible : le compteur d’élèves actifs doit être initialisé par une migration contrôlée.");
-      } else if (message === 'ACTIVE_ACADEMIC_YEAR_REQUIRED') {
-        alert("Création impossible : aucune année académique active valide n'est configurée pour cette école.");
-      } else if (message === 'INVALID_ACADEMIC_YEAR') {
-        alert("Création impossible : l’année académique active est absente ou invalide.");
-      } else if (message === 'INVALID_CLASS') {
-        alert("Création impossible : la classe sélectionnée est inactive, introuvable ou rattachée à une autre école.");
-      } else if (message === 'UNAUTHENTICATED') {
-        alert("Action refusée : votre session a expiré. Veuillez vous reconnecter.");
-      } else if (message === 'PERMISSION_DENIED') {
-        alert("Action refusée : vous n’avez pas l’autorisation de créer un élève.");
-      } else if (message === 'MATRICULE_ALREADY_EXISTS') {
-        alert("Création impossible : ce matricule est déjà utilisé dans cette école.");
-      } else if (message === 'AUTOMATIC_MATRICULE_EXHAUSTED') {
-        alert("Création impossible : aucun matricule automatique unique n’a pu être réservé. Veuillez réessayer.");
-      } else if (message === 'PROBABLE_DUPLICATE') {
+      const creationErrorMessage = getStudentCreationErrorMessage(message);
+      if (message === 'PROBABLE_DUPLICATE') {
         setIsDuplicateConfirmOpen(true);
-      } else if (message === 'STUDENT_ID_CONFLICT') {
-        alert("Création impossible : l’identifiant de cette saisie est déjà utilisé.");
+      } else if (creationErrorMessage) {
+        alert(`Création impossible : ${creationErrorMessage}`);
       } else if (code === 'permission-denied') {
-        console.error("Student write denied.", { code });
+        console.error('Student write denied.', { code });
         alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
       } else if (code === 'unavailable' || !navigator.onLine) {
         alert("Erreur réseau : Impossible de vérifier le quota hors ligne. Veuillez vous reconnecter.");
       } else if (code === 'aborted') {
         alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
       } else {
-        alert("Erreur lors de l'enregistrement : " + message);
+        console.error('Student save failed.', { code });
+        alert("L'enregistrement a échoué. Veuillez réessayer ou contacter un administrateur.");
       }
     } finally {
       releaseStudentSubmissionLock(saveInFlightRef);
@@ -855,7 +853,7 @@ const Students: React.FC = () => {
       alert("Élève désactivé avec succès.");
     } catch (err: unknown) {
       console.error("Student status update failed.", { code: getErrorCode(err) });
-      setStatusError(getErrorMessage(err));
+      setStatusError(getStudentStatusErrorMessage(getErrorMessage(err)));
     } finally {
       setIsStatusSaving(false);
     }
@@ -926,7 +924,7 @@ const Students: React.FC = () => {
       alert("Élève réactivé avec succès.");
     } catch (err: unknown) {
       console.error("Student status update failed.", { code: getErrorCode(err) });
-      setStatusError(getErrorMessage(err));
+      setStatusError(getStudentStatusErrorMessage(getErrorMessage(err)));
     } finally {
       setIsStatusSaving(false);
     }
@@ -978,7 +976,7 @@ const Students: React.FC = () => {
 
         alert("Élève désactivé avec succès.");
         logAuditAction({
-          action: 'DELETE_STUDENT',
+          action: 'DEACTIVATE_STUDENT',
           targetType: 'STUDENT',
           targetId: student.id,
           targetName: student.name
@@ -987,7 +985,7 @@ const Students: React.FC = () => {
         const code = getErrorCode(err);
         const message = getErrorMessage(err);
         if (message === 'NOT_FOUND') {
-          alert("Erreur métier : Cet élève n'existe pas ou a déjà été supprimé.");
+          alert("Erreur métier : Cet élève n'existe pas ou son statut a déjà changé.");
         } else if (code === 'permission-denied') {
           alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
         } else if (code === 'unavailable' || !navigator.onLine) {
@@ -995,7 +993,8 @@ const Students: React.FC = () => {
         } else if (code === 'aborted') {
           alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
         } else {
-          alert("Erreur lors de la suppression : " + message);
+          console.error('Student deactivation failed.', { code });
+          alert("La désactivation a échoué. Veuillez réessayer.");
         }
       }
     }
@@ -2108,6 +2107,8 @@ const Students: React.FC = () => {
                     <label>Prénom(s) <span style={{ color: 'red' }}>*</span></label>
                     <input
                       required
+                      aria-invalid={stepValidationError === 'Veuillez renseigner le ou les prénoms.'}
+                      aria-describedby="student-first-name-error"
                       value={currentStudent.studentFirstName || ''}
                       onChange={e => {
                         const f = e.target.value;
@@ -2116,6 +2117,11 @@ const Students: React.FC = () => {
                       }}
                       placeholder="Ex: Mballa Élise"
                     />
+                    {stepValidationError === 'Veuillez renseigner le ou les prénoms.' && (
+                      <div id="student-first-name-error" role="alert" style={{ marginTop: '0.35rem', color: '#dc2626', fontSize: '0.82rem' }}>
+                        {stepValidationError}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -2493,11 +2499,11 @@ const Students: React.FC = () => {
                     e.stopPropagation();
                     setStepValidationError(null);
                     if (currentStep === 1) {
-                      if (!currentStudent.studentLastName && !currentStudent.name) {
+                      if (!currentStudent.studentLastName?.trim()) {
                         setStepValidationError('Veuillez renseigner le nom.');
                         return;
                       }
-                      if (!currentStudent.studentFirstName && !currentStudent.name) {
+                      if (!currentStudent.studentFirstName?.trim()) {
                         setStepValidationError('Veuillez renseigner le ou les prénoms.');
                         return;
                       }
@@ -2534,17 +2540,8 @@ const Students: React.FC = () => {
                   type="submit"
                   disabled={isSaving}
                   onClick={(e) => {
+                    e.stopPropagation();
                     setStepValidationError(null);
-                    const hasAllergies = Boolean((currentStudent.allergies || '').trim());
-                    const hasMedical = Boolean((currentStudent.medicalConditions || '').trim());
-                    if (!hasAllergies && !hasMedical && !noMedicalConditionConfirmed) {
-                      e.preventDefault();
-                      setStepValidationError('Veuillez renseigner les informations médicales ou confirmer qu’aucune condition connue n’est à signaler.');
-                      setTimeout(() => {
-                        const el = document.getElementById('student-allergies-input');
-                        if (el) el.focus();
-                      }, 50);
-                    }
                   }}
                 >
                   {isSaving ? 'Enregistrement...' : t('save', 'Enregistrer')}
