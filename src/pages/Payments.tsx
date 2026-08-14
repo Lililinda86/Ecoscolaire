@@ -12,7 +12,11 @@ import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, deleteDoc, runTransaction, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { translatePaymentType, translateInstallment, formatCurrency, translatePaymentMethod } from '../utils/paymentReceipt';
-import { canUseStudentContactWhatsApp } from '../services/studentPrivacy';
+import {
+  canUseStudentContactWhatsApp,
+  mergeStudentRestrictedData,
+  type StudentFinance
+} from '../services/studentPrivacy';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -719,6 +723,8 @@ const Payments: React.FC = () => {
       // 1. Lire depuis Firestore les documents réels (recalculés de façon autoritative)
       const studentDocRef = doc(firestoreDb, 'students', currentPayment.studentId);
       const studentDocSnap = await getDoc(studentDocRef);
+      const studentFinanceDocRef = doc(firestoreDb, 'studentFinance', currentPayment.studentId);
+      const studentFinanceDocSnap = await getDoc(studentFinanceDocRef);
 
       const paymentDocRef = doc(firestoreDb, 'payments', resData.paymentId);
       let paymentDocSnap = await getDoc(paymentDocRef);
@@ -739,7 +745,11 @@ const Payments: React.FC = () => {
       }
 
       if (studentDocSnap.exists() && paymentDocSnap.exists() && receiptDocSnap.exists()) {
-        const serverStudent = { id: studentDocSnap.id, ...studentDocSnap.data() } as unknown as Student;
+        const publicStudent = { id: studentDocSnap.id, ...studentDocSnap.data() } as unknown as Student;
+        const financeRecords = studentFinanceDocSnap.exists()
+          ? [{ id: studentFinanceDocSnap.id, ...studentFinanceDocSnap.data() } as unknown as StudentFinance]
+          : [];
+        const [serverStudent] = mergeStudentRestrictedData([publicStudent], [], financeRecords);
         const serverPayment = { id: paymentDocSnap.id, ...paymentDocSnap.data() } as unknown as Payment;
         const serverReceipt = { id: receiptDocSnap.id, ...receiptDocSnap.data() } as { id: string; [key: string]: unknown };
 

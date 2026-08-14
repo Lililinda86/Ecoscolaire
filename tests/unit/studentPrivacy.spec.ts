@@ -104,6 +104,49 @@ describe('student privacy separation', () => {
     expect(mergeStudentRestrictedData([schoolOnly], [privateRecord], [])[0].parentPhone).toBe(student.parentPhone);
   });
 
+  it('refreshes post-payment finance from the canonical projection', () => {
+    const stalePublicStudent = {
+      ...student,
+      tuitionPaid: 1000,
+      tuitionStatus: 'partial'
+    } as Student;
+    const canonicalFinance = {
+      id: student.id,
+      studentId: student.id,
+      schoolId: student.schoolId || '',
+      tuitionPaid: 6000,
+      tuitionStatus: 'paid'
+    } as const;
+
+    const refreshedStudent = mergeStudentRestrictedData(
+      [stalePublicStudent],
+      [],
+      [canonicalFinance]
+    )[0];
+
+    expect(refreshedStudent).toMatchObject({
+      tuitionPaid: 6000,
+      tuitionStatus: 'paid'
+    });
+
+    const paymentsSource = readFileSync('src/pages/Payments.tsx', 'utf8');
+    expect(paymentsSource).toContain("doc(firestoreDb, 'studentFinance', currentPayment.studentId)");
+    expect(paymentsSource).toContain('mergeStudentRestrictedData([publicStudent], [], financeRecords)');
+  });
+
+  it('keeps a legacy public student readable when its finance projection is absent', () => {
+    const publicStudent = { ...student };
+    delete publicStudent.registrationFeePaid;
+    delete publicStudent.registrationFeeStatus;
+
+    expect(() => mergeStudentRestrictedData([publicStudent], [], [])).not.toThrow();
+    expect(mergeStudentRestrictedData([publicStudent], [], [])[0]).toMatchObject({
+      id: student.id,
+      schoolId: student.schoolId,
+      name: student.name
+    });
+  });
+
   it('does not retain student PII debug logs in Students or AppContext', () => {
     const sources = [
       readFileSync('src/pages/Students.tsx', 'utf8'),
