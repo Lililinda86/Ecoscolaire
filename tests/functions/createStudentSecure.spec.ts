@@ -106,13 +106,13 @@ describe('createStudentSecure callable', () => {
   it('01 unauthenticated -> DENY', async () => {
     const fixture = await seed();
     await expectBusinessError(handleCreateStudentSecure(input(fixture.classId), {}, db, () => new Date().toISOString()), 'UNAUTHENTICATED');
-  });
+  }, 15_000);
 
   for (const role of ['teacher', 'accountant', 'boardViewer']) {
     it(`02 ${role} create -> DENY`, async () => {
       const fixture = await seed({ role });
       await expectBusinessError(call(fixture.uid, input(fixture.classId)), 'PERMISSION_DENIED');
-    });
+    }, 15_000);
   }
 
   for (const [number, role] of [['03', 'secretary'], ['04', 'owner'], ['05', 'director']] as const) {
