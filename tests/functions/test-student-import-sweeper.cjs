@@ -106,53 +106,17 @@ async function testCase(name, docs, verify) {
 }
 
 async function runTests() {
-  console.log('=== TESTS ZOMBIE SWEEPER (E1.1) ===');
-  
-  const nowMillis = Date.now();
-  const min20 = new Date(nowMillis - 20 * 60 * 1000);
-  const min10 = new Date(nowMillis - 10 * 60 * 1000);
-  const min5 = new Date(nowMillis - 5 * 60 * 1000);
-  
-  // Create mock Timestamp-like object
-  const createTimestamp = (date) => ({
-    toDate: () => date,
-    toMillis: () => date.getTime()
-  });
+  console.log('=== TEST IMPORT SWEEPER RUNTIME KILL SWITCH ===');
+  let firestoreCalled = false;
+  admin.firestore = () => {
+    firestoreCalled = true;
+    throw new Error('Firestore must not be accessed while imports are disabled');
+  };
 
-  await testCase('Détecte 1 zombie (RUNNING > 15m)', 
-    [
-      { id: 'job1', schoolId: 's1', status: 'RUNNING', updatedAt: createTimestamp(min20) }
-    ],
-    (summary) => {
-      assert.strictEqual(summary.scanned, 1);
-      assert.strictEqual(summary.zombiesDetected, 1);
-      assert.strictEqual(summary.skipped, 0);
-    }
-  );
-
-  await testCase('Ignore un job récent (RUNNING < 15m)', 
-    [
-      { id: 'job1', schoolId: 's1', status: 'RUNNING', lastHeartbeatAt: createTimestamp(min5) }
-    ],
-    (summary) => {
-      assert.strictEqual(summary.scanned, 1);
-      assert.strictEqual(summary.zombiesDetected, 0);
-      assert.strictEqual(summary.skipped, 1);
-    }
-  );
-
-  await testCase('Mixte (1 Zombie, 1 Récent, 1 sans Date)', 
-    [
-      { id: 'job1', schoolId: 's1', status: 'VALIDATING', lastHeartbeatAt: createTimestamp(min20) }, // Zombie
-      { id: 'job2', schoolId: 's1', status: 'RUNNING', lastHeartbeatAt: createTimestamp(min5) },    // Skip
-      { id: 'job3', schoolId: 's1', status: 'RUNNING' } // Skip (pas de date)
-    ],
-    (summary) => {
-      assert.strictEqual(summary.scanned, 3);
-      assert.strictEqual(summary.zombiesDetected, 1);
-      assert.strictEqual(summary.skipped, 2);
-    }
-  );
+  await sweeperFunction({});
+  assert.strictEqual(firestoreCalled, false);
+  console.log('✅ sweeper exits before Firestore, leases or recovery');
+  passed++;
   
   console.log(`\n=== RÉSULTATS: ${passed} PASS, ${failed} FAIL ===`);
   if (failed > 0) process.exit(1);

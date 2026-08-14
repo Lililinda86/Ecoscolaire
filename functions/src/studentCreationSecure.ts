@@ -28,7 +28,7 @@ export interface CreateStudentSecureResult {
   created: boolean;
 }
 
-const ALLOWED_ROLES = new Set(['owner', 'director', 'secretary']);
+const ALLOWED_ROLES = new Set(['superAdmin', 'owner', 'director', 'secretary']);
 const MAX_AUTOMATIC_ATTEMPTS = 8;
 
 const businessError = (
@@ -194,7 +194,9 @@ export const executeCreateStudentSecure = async (
         if (!ALLOWED_ROLES.has(String(user.role))) {
           throw businessError('permission-denied', 'PERMISSION_DENIED', 'Rôle non autorisé.');
         }
-        const schoolId = requireSafeId(user.schoolId, 'schoolId');
+        const schoolId = user.role === 'superAdmin'
+          ? requireSafeId(studentData.schoolId, 'schoolId')
+          : requireSafeId(user.schoolId, 'schoolId');
         const schoolRef = firestore.collection('schools').doc(schoolId);
         const schoolSnapshot = await transaction.get(schoolRef);
         if (!schoolSnapshot.exists) {

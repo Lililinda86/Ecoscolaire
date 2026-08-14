@@ -204,7 +204,7 @@ export const updateStudentSeparatedData = async ({
   schoolId: string;
   actorId: string;
   patch: Partial<Student>;
-}): Promise<'separated' | 'legacy'> => runTransaction(firestore, async transaction => {
+}): Promise<'separated'> => runTransaction(firestore, async transaction => {
   const studentRef = doc(firestore, 'students', studentId);
   const privateRef = doc(firestore, 'studentPrivate', studentId);
   const financeRef = doc(firestore, 'studentFinance', studentId);
@@ -216,11 +216,6 @@ export const updateStudentSeparatedData = async ({
     transaction.get(parentPrivateRef),
     transaction.get(parentFinanceRef)
   ]);
-
-  if (!privateSnapshot.exists() || !financeSnapshot.exists() || !parentPrivateSnapshot.exists() || !parentFinanceSnapshot.exists()) {
-    transaction.update(studentRef, patch);
-    return 'legacy';
-  }
 
   const { schoolData, privateData, financeData, parentPrivateData, parentFinanceData } = splitStudentData({
     ...patch,
@@ -245,11 +240,28 @@ export const updateStudentSeparatedData = async ({
       .filter(([key]) => key in patch)
   );
   const auditPatch = { updatedAt: serverTimestamp(), updatedBy: actorId };
+  const creationAuditPatch = {
+    createdAt: serverTimestamp(),
+    createdBy: actorId,
+    ...auditPatch
+  };
 
   if (Object.keys(schoolPatch).length > 0) transaction.update(studentRef, schoolPatch);
-  if (Object.keys(privatePatch).length > 0) transaction.update(privateRef, { ...privatePatch, ...auditPatch });
-  if (Object.keys(financePatch).length > 0) transaction.update(financeRef, { ...financePatch, ...auditPatch });
-  if (Object.keys(parentPrivatePatch).length > 0) transaction.update(parentPrivateRef, { ...parentPrivatePatch, ...auditPatch });
-  if (Object.keys(parentFinancePatch).length > 0) transaction.update(parentFinanceRef, { ...parentFinancePatch, ...auditPatch });
-  return 'separated';
+  if (Object.keys(privatePatch).length > 0) {
+    if (privateSnapshot.exists()) transaction.update(privateRef, { ...privatePatch, ...auditPatch });
+    else transaction.set(privateRef, { id: studentId, studentId, schoolId, ...privatePatch, ...creationAuditPatch });
+  }
+  if (Object.keys(financePatch).length > 0) {
+    if (financeSnapshot.exists()) transaction.update(financeRef, { ...financePatch, ...auditPatch });
+    else transaction.set(financeRef, { id: studentId, studentId, schoolId, ...financePatch, ...creationAuditPatch });
+  }
+  if (Object.keys(parentPrivatePatch).length > 0) {
+    if (parentPrivateSnapshot.exists()) transaction.update(parentPrivateRef, { ...parentPrivatePatch, ...auditPatch });
+    else transaction.set(parentPrivateRef, { id: studentId, studentId, schoolId, ...parentPrivatePatch, ...creationAuditPatch });
+  }
+  if (Object.keys(parentFinancePatch).length > 0) {
+    if (parentFinanceSnapshot.exists()) transaction.update(parentFinanceRef, { ...parentFinancePatch, ...auditPatch });
+    else transaction.set(parentFinanceRef, { id: studentId, studentId, schoolId, ...parentFinancePatch, ...creationAuditPatch });
+  }
+  return 'separated' as const;
 });

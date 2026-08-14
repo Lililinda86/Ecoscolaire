@@ -718,7 +718,32 @@ service cloud.firestore {
           || (resource != null && hasSchoolAccess(resource.data.schoolId))
         ))
       );
-      allow create: if false;
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob', 'placeOfBirth',
+                      'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
+                      'allergies', 'medicalConditions', 'transportNeighborhood', 'transportPickupPoint',
+                      'fatherName', 'fatherPhone', 'fatherProfession', 'motherName', 'motherPhone',
+                      'motherProfession', 'guardianRelationship', 'guardianRelationshipDetails',
+                      'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+                      'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+                      'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+                      'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
       /* Schéma conservé comme documentation de migration serveur.
       allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'dob', 'parentName', 'parentPhone',
@@ -794,7 +819,27 @@ service cloud.firestore {
           || (resource != null && hasSchoolAccess(resource.data.schoolId))
         ))
       );
-      allow create: if false;
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'feeAmount', 'feeT1', 'feeT2', 'feeT3',
+                      'feeTransport', 'feeUniforms', 'financialBypass', 'registrationFeeExpected',
+                      'registrationFeePaid', 'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid',
+                      'tuitionStatus', 'transportMonthlyFee', 'transportPaid',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
       /* Schéma conservé comme documentation de migration serveur.
       allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'registrationFeePaid', 'registrationFeeStatus',
@@ -868,7 +913,24 @@ service cloud.firestore {
             || (resource != null && hasSchoolAccess(resource.data.schoolId))
           ))
       );
-      allow create: if false;
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
       /* Schéma conservé comme documentation de migration serveur.
       allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'dob',
@@ -920,7 +982,24 @@ service cloud.firestore {
             || (resource != null && hasSchoolAccess(resource.data.schoolId))
           ))
       );
-      allow create: if false;
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
       /* Schéma conservé comme documentation de migration serveur.
       allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
@@ -1369,26 +1448,7 @@ service cloud.firestore {
     // --- STUDENT IMPORT JOBS ---
     match /student_import_jobs/{jobId} {
       allow read: if isAuthenticated() && isActive() && (isSuperAdmin() || hasSchoolAccess(resource.data.schoolId));
-      allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasOnly(['id', 'schoolId', 'status', 'storagePath', 'totalRows', 'processedCount', 'createdCount', 'updatedCount', 'skippedCount', 'failedCount', 'createdBy', 'createdAt', 'startedAt', 'finishedAt', 'errorCode', 'errorMessage'])
-                    && request.resource.data.id is string
-                    && request.resource.data.schoolId is string
-                    && request.resource.data.status is string
-                    && request.resource.data.status == 'PENDING'
-                    && request.resource.data.storagePath is string
-                    && request.resource.data.storagePath.matches('^import_jobs_data/' + request.resource.data.schoolId + '/[^/]+\\.json$')
-                    && request.resource.data.totalRows is int
-                    && request.resource.data.processedCount is int && request.resource.data.processedCount == 0
-                    && request.resource.data.createdCount is int && request.resource.data.createdCount == 0
-                    && request.resource.data.updatedCount is int && request.resource.data.updatedCount == 0
-                    && request.resource.data.skippedCount is int && request.resource.data.skippedCount == 0
-                    && request.resource.data.failedCount is int && request.resource.data.failedCount == 0
-                    && request.resource.data.createdBy is string
-        && request.resource.data.createdAt is timestamp
-        && (!('startedAt' in request.resource.data) || request.resource.data.startedAt == null)
-        && (!('finishedAt' in request.resource.data) || request.resource.data.finishedAt == null)
-        && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null)
-        && (!('errorMessage' in request.resource.data) || request.resource.data.errorMessage == null);
+      allow create: if false; // Imports remain disabled before any job can be created.
       allow update, delete: if false; // Only Cloud Functions (Admin SDK) can update/delete
     }
 

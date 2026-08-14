@@ -471,6 +471,31 @@ describe('Student Active Status Security Rules', () => {
   });
 });
 
+describe('Student Import Shutdown Rules', () => {
+  it('denies import job creation before any server-side processing can start', async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'users', 'import-owner'), {
+        role: 'owner', schoolId: 'import-school', active: true
+      });
+    });
+    const db = testEnv.authenticatedContext('import-owner').firestore();
+    await assertFails(setDoc(doc(db, 'student_import_jobs', 'disabled-job'), {
+      id: 'disabled-job',
+      schoolId: 'import-school',
+      status: 'PENDING',
+      storagePath: 'import_jobs_data/import-school/disabled-job.json',
+      totalRows: 1,
+      processedCount: 0,
+      createdCount: 0,
+      updatedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      createdBy: 'import-owner',
+      createdAt: serverTimestamp()
+    }));
+  });
+});
+
 describe('Student Creation Schema Security Rules', () => {
   const SCHOOL_ID = 'student-create-school';
   const OTHER_SCHOOL_ID = 'student-create-other-school';
@@ -1095,7 +1120,8 @@ describe('Student Privacy Security Rules', () => {
         ['privacy-parent', 'parent', SCHOOL_ID],
         ['privacy-cross-parent', 'parent', OTHER_SCHOOL_ID],
         ['privacy-other-owner', 'owner', OTHER_SCHOOL_ID],
-        ['privacy-other-secretary', 'secretary', OTHER_SCHOOL_ID]
+        ['privacy-other-secretary', 'secretary', OTHER_SCHOOL_ID],
+        ['privacy-superadmin', 'superAdmin', null]
       ]) {
         await setDoc(doc(db, 'users', id), { role, schoolId, active: true });
       }
@@ -1227,6 +1253,98 @@ describe('Student Privacy Security Rules', () => {
     expect(missingFinance.exists()).toBe(false);
     expect(missingParentPrivate.exists()).toBe(false);
     expect(missingParentFinance.exists()).toBe(false);
+  });
+
+  it('allows a manager to create missing private projections without writing medical data publicly', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    const db = context.firestore();
+    const batch = writeBatch(db);
+    const audit = {
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-owner',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-owner'
+    };
+    batch.set(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      dob: '2018-01-02',
+      allergies: 'Arachides',
+      medicalConditions: 'Asthme',
+      ...audit
+    });
+    batch.set(doc(db, 'studentParentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      dob: '2018-01-02',
+      ...audit
+    });
+
+    await assertSucceeds(batch.commit());
+    const publicStudent = await getDoc(doc(db, 'students', LEGACY_STUDENT_ID));
+    expect(publicStudent.data()).not.toHaveProperty('allergies');
+    expect(publicStudent.data()).not.toHaveProperty('medicalConditions');
+  });
+
+  it('denies cross-school creation of a missing private projection', async () => {
+    const context = testEnv.authenticatedContext('privacy-other-owner');
+    const db = context.firestore();
+    await assertFails(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-other-owner',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-other-owner'
+    }));
+  });
+
+  it('denies unauthenticated creation of a missing private projection', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'anonymous',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'anonymous'
+    }));
+  });
+
+  it('denies a non-manager role creating a missing private projection', async () => {
+    const context = testEnv.authenticatedContext('privacy-teacher');
+    const db = context.firestore();
+    await assertFails(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-teacher',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-teacher'
+    }));
+  });
+
+  it('allows superAdmin to create a missing private projection for the selected school', async () => {
+    const context = testEnv.authenticatedContext('privacy-superadmin');
+    const db = context.firestore();
+    await assertSucceeds(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-superadmin',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-superadmin'
+    }));
   });
 
   it('allows director and secretary to read private student data in the same school', async () => {

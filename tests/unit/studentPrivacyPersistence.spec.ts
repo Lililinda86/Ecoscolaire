@@ -4,12 +4,14 @@ import { updateStudentSeparatedData } from '../../src/services/studentPrivacy';
 
 const transactionGet = vi.fn();
 const transactionUpdate = vi.fn();
+const transactionSet = vi.fn();
 
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn((_firestore, collectionName: string, id: string) => `${collectionName}/${id}`),
   runTransaction: vi.fn(async (_firestore, callback) => callback({
     get: transactionGet,
-    update: transactionUpdate
+    update: transactionUpdate,
+    set: transactionSet
   })),
   serverTimestamp: vi.fn(() => ({ __serverTimestamp: true }))
 }));
@@ -58,5 +60,41 @@ describe('student separated finance persistence', () => {
       patch: { feeT1: 1100 }
     })).rejects.toThrow('projection write failed');
     expect(runTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates missing private projections and never sends medical fields to students', async () => {
+    transactionGet.mockImplementation(async (reference: string) => ({
+      exists: () => ![
+        'studentPrivate/student-1',
+        'studentParentPrivate/student-1'
+      ].includes(reference)
+    }));
+
+    await updateStudentSeparatedData({
+      firestore: {} as Firestore,
+      studentId: 'student-1',
+      schoolId: 'school-1',
+      actorId: 'owner-1',
+      patch: {
+        name: 'Élève privé',
+        dob: '2018-01-02',
+        allergies: 'Arachides',
+        medicalConditions: 'Asthme'
+      }
+    });
+
+    expect(transactionSet).toHaveBeenCalledWith(
+      'studentPrivate/student-1',
+      expect.objectContaining({ allergies: 'Arachides', medicalConditions: 'Asthme' })
+    );
+    expect(transactionSet).toHaveBeenCalledWith(
+      'studentParentPrivate/student-1',
+      expect.objectContaining({ dob: '2018-01-02' })
+    );
+    const publicWrites = transactionUpdate.mock.calls
+      .filter(([reference]) => reference === 'students/student-1')
+      .map(([, data]) => data as Record<string, unknown>);
+    expect(publicWrites).toEqual([{ name: 'Élève privé' }]);
+    expect(publicWrites.every(data => !('allergies' in data) && !('medicalConditions' in data))).toBe(true);
   });
 });

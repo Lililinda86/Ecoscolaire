@@ -1,6 +1,7 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import { resumeImportJob } from './studentImportRecovery';
+import { isRealStudentImportEnabled } from './studentImportBulkWriter';
 
 /**
  * E1.2 - Acquire a lease on a zombie job to prevent concurrent sweeper executions.
@@ -54,6 +55,10 @@ export async function acquireZombieLease(
 }
 
 export const sweepZombieImportJobs = onSchedule('every 15 minutes', async () => {
+  // Runtime kill switch: do not even query or lock import jobs while imports are disabled.
+  if (!isRealStudentImportEnabled()) {
+    return;
+  }
   const db = admin.firestore();
   console.log('Starting Zombie Sweeper Execution...');
 

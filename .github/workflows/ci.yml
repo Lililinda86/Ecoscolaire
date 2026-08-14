@@ -73,6 +73,7 @@ jobs:
 
       - name: Unit Tests
         run: |
+          node tests/functions/test-import-job-processor.cjs
           node tests/functions/test-student-import-sweeper.cjs
           node tests/functions/test-student-import-lease.cjs
           node tests/functions/test-student-import-recovery.cjs

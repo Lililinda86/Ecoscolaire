@@ -115,12 +115,21 @@ describe('createStudentSecure callable', () => {
     }, 15_000);
   }
 
-  for (const [number, role] of [['03', 'secretary'], ['04', 'owner'], ['05', 'director']] as const) {
+  for (const [number, role] of [['03', 'secretary'], ['04', 'owner'], ['05', 'director'], ['05b', 'superAdmin']] as const) {
     it(`${number} ${role} -> PASS`, async () => {
       const fixture = await seed({ role });
-      await expect(call(fixture.uid, input(fixture.classId))).resolves.toMatchObject({ created: true });
+      const payload = input(fixture.classId);
+      if (role === 'superAdmin') payload.studentData.schoolId = fixture.schoolId;
+      await expect(call(fixture.uid, payload)).resolves.toMatchObject({ created: true });
     });
   }
+
+  it('05c superAdmin cannot target a non-existent school', async () => {
+    const fixture = await seed({ role: 'superAdmin' });
+    const payload = input(fixture.classId);
+    payload.studentData.schoolId = nextId('missing-school');
+    await expectBusinessError(call(fixture.uid, payload), 'SCHOOL_NOT_FOUND');
+  });
 
   it('06 ignores falsified client schoolId and derives the authenticated school', async () => {
     const fixture = await seed();

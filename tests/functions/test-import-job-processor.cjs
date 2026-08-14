@@ -1,234 +1,45 @@
+const assert = require('assert');
 const Module = require('module');
-const originalRequire = Module.prototype.require;
 
-const docs = {};
-
-const dbMock = {
-  runTransaction: async (cb) => {
-    return await cb({
-      get: async (ref) => ref.mockGet(),
-      update: (ref, data) => ref.mockUpdate(data)
-    });
-  },
-  getAll: async (...docRefs) => {
-    return docRefs.map(ref => ({ exists: false }));
-  },
-  collection: (path) => ({
-    doc: (id) => {
-      if (path === 'schools') {
-        return { get: async () => ({ data: () => ({ studentCount: 0, studentLimit: 100 }) }) };
-      }
-      const key = `${path}/${id}`;
-      if (!docs[key]) {
-        let state = { exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 }) };
-        
-        docs[key] = {
-          mockGet: () => state,
-          mockUpdate: (data) => {
-            Object.assign(state.data(), data);
-            docs[key].updates.push(data);
-          },
-          update: async (data) => {
-            docs[key].mockUpdate(data);
-          },
-          setState: (newState) => { state = newState; },
-          updates: []
-        };
-      }
-      return docs[key];
-    }
-  })
-};
-
-const files = {};
-const storageMock = {
-  bucket: () => ({
-    file: (path) => {
-      if (!files[path]) {
-        let state = { exists: true, content: JSON.stringify([{ matricule: 'M001', name: 'John Doe', classId: 'C1' }, { matricule: 'M002', name: 'Jane Doe', classId: 'C1' }]) };
-        files[path] = {
-          exists: async () => [state.exists],
-          download: async () => [Buffer.from(state.content)],
-          setState: (newState) => { state = Object.assign(state, newState); }
-        };
-      }
-      return files[path];
-    }
-  })
-};
+let firestoreCalled = false;
+let storageCalled = false;
 
 const adminMock = {
-  initializeApp: () => {},
-  firestore: () => dbMock,
-  storage: () => storageMock
+  initializeApp: () => undefined,
+  firestore: () => {
+    firestoreCalled = true;
+    throw new Error('Firestore must not be accessed while imports are disabled');
+  },
+  storage: () => {
+    storageCalled = true;
+    throw new Error('Storage must not be accessed while imports are disabled');
+  }
 };
 adminMock.firestore.FieldValue = { serverTimestamp: () => 'MOCK_TIMESTAMP' };
 
-Module.prototype.require = function() {
-  if (arguments[0] === 'firebase-admin') {
-    return adminMock;
-  }
+const originalRequire = Module.prototype.require;
+Module.prototype.require = function (id) {
+  if (id === 'firebase-admin') return adminMock;
   return originalRequire.apply(this, arguments);
 };
 
 const { processStudentImportJob } = require('../../functions/lib/importStudents.js');
 
 async function runTests() {
-  console.log('=== DÉMARRAGE DES TESTS MOCKÉS (UNIT TESTS) ===');
-  let passed = 0;
-  let failed = 0;
+  console.log('=== TEST IMPORT PROCESSOR RUNTIME KILL SWITCH ===');
 
-  async function testCase(name, setupDoc, setupFile, expectedStatus, expectedErrorCode = null) {
-    console.log(`\nTEST: ${name}`);
-    const docRef = dbMock.collection('student_import_jobs').doc('job1');
-    docRef.updates = [];
-    docRef.setState(setupDoc());
-    
-    const handler = processStudentImportJob.__endpoint?.parsedTrigger?.run || processStudentImportJob.run;
+  await processStudentImportJob.run({
+    data: { data: () => ({ status: 'PENDING' }) },
+    params: { jobId: 'disabled-job' }
+  });
 
-    try {
-      const event = {
-        data: {
-          data: docRef.mockGet().data
-        },
-        params: { jobId: 'job1' }
-      };
-
-      const fileMock = storageMock.bucket().file(docRef.mockGet().data().storagePath || 'import_jobs_data/school1/job1.json');
-      fileMock.setState(setupFile());
-
-      await processStudentImportJob.run(event);
-
-      const finalUpdates = docRef.updates;
-      const lastUpdate = finalUpdates[finalUpdates.length - 1];
-
-      if (!lastUpdate && expectedStatus === 'NO_OP') {
-        console.log(`✅ ${name} -> PASS (No operations performed as expected)`);
-        passed++;
-        return;
-      }
-
-      if (lastUpdate?.status === expectedStatus) {
-        if (expectedErrorCode && lastUpdate.errorCode !== expectedErrorCode) {
-           console.log(`❌ ${name} -> FAIL: Expected ErrorCode ${expectedErrorCode}, got ${lastUpdate.errorCode}`);
-           failed++;
-           return;
-        }
-        console.log(`✅ ${name} -> PASS (Status: ${expectedStatus})`);
-        passed++;
-      } else {
-        console.log(`❌ ${name} -> FAIL: Expected ${expectedStatus}, got ${lastUpdate?.status}`);
-        failed++;
-      }
-
-    } catch (error) {
-      console.log(`❌ ${name} -> ERROR: ${error.message}`);
-      failed++;
-    }
-  }
-
-  await testCase(
-    '1. Job PENDING valide -> VALIDATING_COMPLETE',
-    () => ({ exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 }) }),
-    () => ({ exists: true, content: '[{"matricule":"M1","name":"Alice","classId":"C1"},{"matricule":"M2","name":"Bob","classId":"C1"}]' }),
-    'VALIDATING_COMPLETE'
-  );
-
-  await testCase(
-    '2. Double trigger simulé (job pas PENDING)',
-    () => ({ exists: true, data: () => ({ status: 'VALIDATING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 }) }),
-    () => ({ exists: true, content: '[]' }),
-    'NO_OP'
-  );
-
-  await testCase(
-    '3. storagePath falsifié',
-    () => ({ exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school2/job1.json', totalRows: 2 }) }),
-    () => ({ exists: true, content: '[]' }),
-    'FAILED',
-    'PROCESSOR_PHASE_1_ERROR'
-  );
-
-  await testCase(
-    '4. JSON malformé',
-    () => ({ exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 }) }),
-    () => ({ exists: true, content: 'INVALID_JSON' }),
-    'FAILED',
-    'PROCESSOR_PHASE_1_ERROR'
-  );
-
-  await testCase(
-    '5. Payload non-array',
-    () => ({ exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 }) }),
-    () => ({ exists: true, content: '{"name": "Alice"}' }),
-    'FAILED',
-    'PROCESSOR_PHASE_1_ERROR'
-  );
-
-  await testCase(
-    '6. TotalRows mismatch',
-    () => ({ exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 10 }) }),
-    () => ({ exists: true, content: '[{"name":"Alice"}]' }),
-    'FAILED',
-    'PROCESSOR_PHASE_1_ERROR'
-  );
-
-  await testCase(
-    '7. Payload vide (0 lignes)',
-    () => ({ exists: true, data: () => ({ status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 0 }) }),
-    () => ({ exists: true, content: '[]' }),
-    'FAILED',
-    'PROCESSOR_PHASE_1_ERROR'
-  );
-
-  // 8. Global FAILED RACE ELIMINATION (catch race)
-  console.log(`\nTEST: 8. Global FAILED RACE ELIMINATION (catch race)`);
-  const docRef8 = dbMock.collection('student_import_jobs').doc('job1');
-  docRef8.updates = [];
-  let state8 = { status: 'PENDING', schoolId: 'school1', storagePath: 'import_jobs_data/school1/job1.json', totalRows: 2 };
-  docRef8.setState({ exists: true, data: () => state8 });
-  docRef8.mockUpdate = (data) => { Object.assign(state8, data); docRef8.updates.push(data); };
-  
-  // Force a JSON error to trigger the catch block
-  const fileMock8 = storageMock.bucket().file('import_jobs_data/school1/job1.json');
-  fileMock8.setState({ exists: true, content: 'INVALID_JSON_RACE' });
-
-  // Hook runTransaction to simulate instance B updating to RUNNING right before the catch block's transaction commits
-  const originalRunTx = dbMock.runTransaction;
-  dbMock.runTransaction = async (cb) => {
-    if (docRef8.mockGet().data().status !== 'PENDING') {
-      // When markImportJobFailedIfCurrent opens a transaction, we simulate another instance already advanced it
-      docRef8.setState({ exists: true, data: () => ({ status: 'RUNNING', schoolId: 'school1' }) });
-    }
-    return await cb({
-      get: async (ref) => ref.mockGet(),
-      update: (ref, data) => ref.mockUpdate(data)
-    });
-  };
-
-  try {
-    const handler = processStudentImportJob.__endpoint?.parsedTrigger?.run || processStudentImportJob.run;
-    await handler({
-      data: { data: docRef8.mockGet().data },
-      params: { jobId: 'job1' }
-    });
-    // The final state should still be RUNNING because markImportJobFailedIfCurrent saw RUNNING and did a no-op
-    const lastState = docRef8.mockGet().data().status;
-    if (lastState === 'RUNNING') {
-      console.log(`✅ 8. Global FAILED RACE ELIMINATION (catch race) -> PASS (Status: RUNNING)`);
-      passed++;
-    } else {
-      console.log(`❌ 8. Global FAILED RACE ELIMINATION (catch race) -> FAIL: Expected RUNNING, got ${lastState}`);
-      failed++;
-    }
-  } catch(e) {
-    console.log(`❌ 8. Global FAILED RACE ELIMINATION (catch race) -> ERROR: ${e.message}`);
-    failed++;
-  }
-  dbMock.runTransaction = originalRunTx;
-
-  console.log(`\n=== RÉSULTATS: ${passed} PASS, ${failed} FAIL ===`);
-  if (failed > 0) process.exit(1);
+  assert.strictEqual(firestoreCalled, false);
+  assert.strictEqual(storageCalled, false);
+  console.log('PASS: processor exits before Firestore, Storage, quota, counters or BulkWriter');
 }
 
-runTests();
+runTests().catch((error) => {
+  console.error('FAIL: import processor crossed the runtime kill switch');
+  console.error(error);
+  process.exit(1);
+});

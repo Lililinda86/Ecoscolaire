@@ -42,6 +42,22 @@ export async function executeBulkWriterImport(
   if (!isRealStudentImportEnabled()) {
     throw new Error('STUDENT_IMPORT_DISABLED');
   }
+  return executeDormantBulkWriterImport(db, jobId, schoolId, creates, updates, onProgress);
+}
+
+/**
+ * Dormant implementation kept testable while the runtime entry point above remains closed.
+ * This function is not exported from the Cloud Functions index and must never be called by
+ * a deployed handler while student imports are disabled.
+ */
+export async function executeDormantBulkWriterImport(
+  db: FirebaseFirestore.Firestore,
+  jobId: string,
+  schoolId: string,
+  creates: NormalizedStudentRow[],
+  updates: NormalizedStudentRow[],
+  onProgress?: (progress: number) => Promise<void>
+): Promise<BulkWriterImportResult> {
   const startTime = Date.now();
   
   const result: BulkWriterImportResult = {
