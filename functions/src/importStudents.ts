@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import { normalizeRows, ImportStudentRow } from './studentImportNormalizer';
 import { runDiscovery } from './studentImportDiscovery';
 import { reserveStudentImportQuota, markImportJobFailedIfCurrent } from './studentImportQuota';
-import { executeBulkWriterImport, markImportJobCompletedIfRunning } from './studentImportBulkWriter';
+import { executeBulkWriterImport, isRealStudentImportEnabled, markImportJobCompletedIfRunning } from './studentImportBulkWriter';
 import { reconcileImportJobQuota } from './studentImportReconciler';
 
 const getErrorMessage = (error: unknown): string => {
@@ -32,6 +32,10 @@ export const processStudentImportJob = onDocumentCreated(
     memory: '512MiB',
   },
   async (event) => {
+    // Runtime kill switch: no snapshot processing, Firestore, Storage, quota or writer access.
+    if (!isRealStudentImportEnabled()) {
+      return;
+    }
     const snapshot = event.data;
     if (!snapshot) {
       console.log('No data associated with the event');

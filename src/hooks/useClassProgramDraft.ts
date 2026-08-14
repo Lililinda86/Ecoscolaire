@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ClassProgram, ClassSubject, Subject } from '../types';
 import {
-  createInitialClassProgram,
   saveClassProgramDraft,
   buildClassSubjectId,
   ClassProgramDraftError
@@ -24,9 +23,6 @@ export interface UseClassProgramDraftProps {
 export function useClassProgramDraft({
   initialProgram,
   initialSubjects,
-  schoolId,
-  academicYearId,
-  classId,
   userId,
   userRole,
   onSaveSuccess,
@@ -235,32 +231,6 @@ export function useClassProgramDraft({
     if (onDirtyChange) onDirtyChange(false);
   };
 
-  const createInitialProgram = async () => {
-    if (!isManager || !schoolId || !academicYearId || !classId || !userId) return null;
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      const newProgram = await createInitialClassProgram({
-        schoolId,
-        academicYearId,
-        classId,
-        userId
-      });
-      setProgram(newProgram);
-      setSubjects([]);
-      setOriginalSubjects([]);
-      setIsDirty(false);
-      if (onDirtyChange) onDirtyChange(false);
-      return newProgram;
-    } catch (err: unknown) {
-      setError(err instanceof ClassProgramDraftError ? err.message : 'Erreur lors de la création du programme.');
-      return null;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const saveDraft = async () => {
     if (!isManager || !program || !userId) return;
     setIsSaving(true);
@@ -331,7 +301,6 @@ export function useClassProgramDraft({
     removeSubject,
     reorderSubjects,
     cancelChanges,
-    saveDraft,
-    createInitialProgram
+    saveDraft
   };
 }

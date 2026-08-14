@@ -1,4 +1,4 @@
-import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { initializeTestEnvironment, assertFails } from '@firebase/rules-unit-testing';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,9 +48,9 @@ async function runTests() {
   };
 
   try {
-    // TEST 1 : Création valide
-    await assertSucceeds(db.collection('student_import_jobs').doc('job1').set(validJob));
-    console.log("✅ TEST 1 : Création valide -> PASS");
+    // TEST 1 : Même une création historiquement valide reste bloquée par le kill switch.
+    await assertFails(db.collection('student_import_jobs').doc('job1').set(validJob));
+    console.log("✅ TEST 1 : Import désactivé avant création du job -> FAIL (OK)");
 
     // TEST 2 : Champ interdit (billingBypass)
     await assertFails(db.collection('student_import_jobs').doc('job2').set({
@@ -92,6 +92,10 @@ async function runTests() {
       ...validJob, id: 'job7', schoolId: 'school999'
     }));
     console.log("✅ TEST 7 : schoolId différent -> FAIL (OK)");
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('student_import_jobs').doc('job1').set(validJob);
+    });
 
     // TEST 8 : update
     await assertFails(db.collection('student_import_jobs').doc('job1').update({

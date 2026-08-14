@@ -14,13 +14,9 @@ const ParentPortal: React.FC = () => {
   const parent = currentUser;
   
   // Filter children belonging to this parent and this school
-  const normalizedUserEmail = currentUser.email?.toLowerCase().trim();
   const children = db.students.filter(student => 
     student.schoolId === currentSchool.id &&
-    (
-      (student.parentEmails || []).map(e => e.toLowerCase().trim()).includes(normalizedUserEmail) ||
-      (parent.studentIds || []).includes(student.id)
-    )
+    (parent.studentIds || []).includes(student.id)
   );
 
   // Helper to check if a specific Tranche is fully paid for a student

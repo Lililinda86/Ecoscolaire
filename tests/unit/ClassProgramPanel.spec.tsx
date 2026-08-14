@@ -14,9 +14,22 @@ vi.mock('../../src/context/AppContext', () => ({
 }));
 
 vi.mock('../../src/hooks/useClassProgram', () => ({
-  useClassProgram: vi.fn()
+  useClassProgram: vi.fn(),
+  getClassProgramAccessMode: vi.fn(() => 'manager')
 }));
 import { useClassProgram } from '../../src/hooks/useClassProgram';
+
+vi.mock('../../src/services/classProgramDraftFunctions', () => ({
+  ensureClassProgramDraft: vi.fn()
+}));
+
+vi.mock('firebase/firestore', () => ({
+  getDoc: vi.fn(),
+  doc: vi.fn(),
+  getFirestore: vi.fn()
+}));
+import { ensureClassProgramDraft } from '../../src/services/classProgramDraftFunctions';
+import { getDoc } from 'firebase/firestore';
 
 vi.mock('../../src/utils/academicPermissions', () => ({
   canManageAcademicPrograms: vi.fn(() => true)
@@ -155,6 +168,63 @@ describe('ClassProgramPanel', () => {
     expect(rows.length).toBe(8);
 
     expect(screen.queryByText('Créer le programme')).toBeNull();
+  });
+
+  it('calls ensureClassProgramDraft exactly once and updates context if document is returned', async () => {
+    const mockSubjects = Array.from({ length: 8 }).map((_, i) => ({ id: `sub${i}`, name: `Subject ${i}` }));
+
+    (useClassProgram as Mock).mockReturnValue({
+      status: 'success',
+      source: 'none',
+      program: null,
+      subjects: mockSubjects,
+      hasPublishedVersion: false,
+      retry: vi.fn()
+    });
+
+    (ensureClassProgramDraft as Mock).mockResolvedValue({
+      programId: 'new_program_123',
+      draftRevisionId: 'new_program_123_v1',
+      draftRevisionNumber: 1,
+      created: true,
+      clonedSubjectCount: 0
+    });
+
+    (getDoc as Mock).mockResolvedValue({
+      exists: () => true,
+      id: 'new_program_123',
+      data: () => ({ status: 'draft', id: 'new_program_123' })
+    });
+
+    // We mock doc to just return its path so we can assert on it
+    const { doc } = await import('firebase/firestore');
+    (doc as Mock).mockImplementation((db, col, id) => `${col}/${id}`);
+
+    const { waitFor, fireEvent } = await import('@testing-library/react');
+
+    renderPanel();
+    const selectButton = screen.getByTestId('select-class');
+    fireEvent.click(selectButton);
+
+    const createButton = await screen.findByText('Créer le programme');
+
+    // Reset call counts
+    vi.clearAllMocks();
+    (useAppContext as Mock).mockReturnValue(mockContext);
+
+    fireEvent.click(createButton);
+
+    // Verify ensureClassProgramDraft called exactly once with proper arguments
+    await waitFor(() => {
+      expect(ensureClassProgramDraft).toHaveBeenCalledTimes(1);
+    });
+
+    expect(ensureClassProgramDraft).toHaveBeenCalledWith({
+      schoolId: 'school1',
+      academicYearId: 'ay_legacy_1',
+      classId: 'class1'
+    });
+
   });
 
   it('excludes other schools during resolution', () => {

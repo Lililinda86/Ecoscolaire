@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { writeStudentSeedDocuments } from './student-seed-data.mjs';
 
 dotenv.config({ path: '.env.staging' }); // Priority to staging
 dotenv.config(); // Fallback to .env
@@ -67,7 +68,15 @@ const auth = getAuth();
 
 const isoDate = () => new Date().toISOString();
 
-const createOrUpdateUser = async (email, pass) => {
+const getLocalSecret = (name) => {
+  const value = process.env[name];
+  if (!isDryRun && (!value || value.length < 12)) {
+    throw new Error(`${name} doit être défini localement avec au moins 12 caractères.`);
+  }
+  return value || 'dry-run-only';
+};
+
+const findOrCreateUser = async (email, passwordForCreation) => {
   if (isDryRun) {
     logAction('Create/Update Auth User', email);
     return `dry-run-uid-${email}`;
@@ -76,11 +85,9 @@ const createOrUpdateUser = async (email, pass) => {
   try {
     const userRecord = await auth.getUserByEmail(email);
     uid = userRecord.uid;
-    // Update password to ensure the script's password is the one set
-    await auth.updateUser(uid, { password: pass });
   } catch (e) {
     if (e.code === 'auth/user-not-found') {
-      const newUser = await auth.createUser({ email, password: pass });
+      const newUser = await auth.createUser({ email, password: passwordForCreation });
       uid = newUser.uid;
     } else {
       throw e;
@@ -92,7 +99,10 @@ const createOrUpdateUser = async (email, pass) => {
 const cleanupTestData = async () => {
   console.log("Starting cleanup for Alpha and Beta...");
   const schoolIds = ['school-alpha-001', 'school-beta-002'];
-  const collectionsList = ['schools', 'users', 'classes', 'students', 'payments', 'grades', 'attendance', 'subjects'];
+  const collectionsList = [
+    'schools', 'users', 'classes', 'students', 'studentPrivate', 'studentFinance',
+    'studentParentPrivate', 'studentParentFinance', 'payments', 'grades', 'attendance', 'subjects'
+  ];
   
   for (const c of collectionsList) {
     for (const sid of schoolIds) {
@@ -132,8 +142,10 @@ const setupTestData = async () => {
 
     // 1. Super Admin
     const saEmail = 'superadmin.test@ecoscolaire.com';
-    const saPass = 'Test@2026Super!';
-    const saUid = await createOrUpdateUser(saEmail, saPass);
+    const superAdminPassword = getLocalSecret('STAGING_TEST_SUPERADMIN_PASSWORD');
+    const alphaPassword = getLocalSecret('STAGING_TEST_ALPHA_PASSWORD');
+    const betaPassword = getLocalSecret('STAGING_TEST_BETA_PASSWORD');
+    const saUid = await findOrCreateUser(saEmail, superAdminPassword);
     if (!isDryRun) {
       console.log('Writing superAdmin user doc...');
       await db.collection('users').doc(saUid).set({
@@ -166,23 +178,23 @@ const setupTestData = async () => {
 
     // 3. Roles Alpha
     const alphaRoles = [
-      { role: 'owner', email: 'owner.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-      { role: 'director', email: 'director.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-      { role: 'secretary', email: 'secretary.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-      { role: 'accountant', email: 'accountant.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-      { role: 'teacher', email: 'teacher1.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-      { role: 'teacher', email: 'teacher2.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-      { role: 'teacher', email: 'teacher3.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-      { role: 'driver', email: 'driver.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' }
+      { role: 'owner', email: 'owner.alpha@ecoscolaire.com', passwordForCreation: alphaPassword },
+      { role: 'director', email: 'director.alpha@ecoscolaire.com', passwordForCreation: alphaPassword },
+      { role: 'secretary', email: 'secretary.alpha@ecoscolaire.com', passwordForCreation: alphaPassword },
+      { role: 'accountant', email: 'accountant.alpha@ecoscolaire.com', passwordForCreation: alphaPassword },
+      { role: 'teacher', email: 'teacher1.alpha@ecoscolaire.com', passwordForCreation: alphaPassword },
+      { role: 'teacher', email: 'teacher2.alpha@ecoscolaire.com', passwordForCreation: alphaPassword },
+      { role: 'teacher', email: 'teacher3.alpha@ecoscolaire.com', passwordForCreation: alphaPassword },
+      { role: 'driver', email: 'driver.alpha@ecoscolaire.com', passwordForCreation: alphaPassword }
     ];
-    for(let i=1; i<=5; i++) alphaRoles.push({ role: 'parent', email: `parent${i}.alpha@ecoscolaire.com`, pass: 'Test@2026Alpha!' });
+    for(let i=1; i<=5; i++) alphaRoles.push({ role: 'parent', email: `parent${i}.alpha@ecoscolaire.com`, passwordForCreation: alphaPassword });
 
     // Roles Beta
     const betaRoles = [
-      { role: 'owner', email: 'owner.beta@ecoscolaire.com', pass: 'Test@2026Beta!' },
-      { role: 'director', email: 'director.beta@ecoscolaire.com', pass: 'Test@2026Beta!' },
-      { role: 'teacher', email: 'teacher.beta@ecoscolaire.com', pass: 'Test@2026Beta!' },
-      { role: 'parent', email: 'parent.beta@ecoscolaire.com', pass: 'Test@2026Beta!' }
+      { role: 'owner', email: 'owner.beta@ecoscolaire.com', passwordForCreation: betaPassword },
+      { role: 'director', email: 'director.beta@ecoscolaire.com', passwordForCreation: betaPassword },
+      { role: 'teacher', email: 'teacher.beta@ecoscolaire.com', passwordForCreation: betaPassword },
+      { role: 'parent', email: 'parent.beta@ecoscolaire.com', passwordForCreation: betaPassword }
     ];
 
     const studentIds = [];
@@ -191,7 +203,7 @@ const setupTestData = async () => {
     const processRoles = async (rolesList, schoolId) => {
       let pIdx = 0;
       for (const r of rolesList) {
-        const uid = await createOrUpdateUser(r.email, r.pass);
+        const uid = await findOrCreateUser(r.email, r.passwordForCreation);
         if (!isDryRun) {
           const userData = { id: uid, schoolId, email: r.email, role: r.role, active: true, isActive: true, createdAt: isoDate() };
           if (r.role === 'parent' && schoolId === alphaId) {
@@ -242,27 +254,27 @@ const setupTestData = async () => {
     for(let i=1; i<=20; i++) {
       const classRef = i <= 7 ? classes[0].id : (i <= 14 ? classes[1].id : classes[2].id);
       if (!isDryRun) {
-        await db.collection('students').doc(studentIds[i-1]).set({
-          id: studentIds[i-1], schoolId: alphaId, classId: classRef,
+        await writeStudentSeedDocuments(db, {
+          studentId: studentIds[i-1], schoolId: alphaId, classId: classRef,
           name: `Élève${i} TestAlpha`, matricule: `MAT2026${i.toString().padStart(3,'0')}`,
-          gender: i%2===0?'F':'M', createdAt: isoDate(),
+          gender: i%2===0?'F':'M', timestamp: isoDate(),
           section: 'francophone',
           parentName: `Parent ${i}`,
           parentPhone: `+2376000000${i.toString().padStart(2,'0')}`,
           feeT1: 50000, feeT2: 0, feeT3: 0
-        }, { merge: true });
+        });
       }
     }
     if (!isDryRun) {
-      await db.collection('students').doc('beta-student-1').set({
-        id: 'beta-student-1', schoolId: betaId, classId: 'beta-class-cp',
+      await writeStudentSeedDocuments(db, {
+        studentId: 'beta-student-1', schoolId: betaId, classId: 'beta-class-cp',
         name: 'Élève1 TestBeta', matricule: 'BETAMAT001',
-        gender: 'M', createdAt: isoDate(),
+        gender: 'M', timestamp: isoDate(),
         section: 'francophone',
         parentName: 'Parent Beta',
         parentPhone: '+237600000099',
         feeT1: 50000, feeT2: 0, feeT3: 0
-      }, { merge: true });
+      });
     }
     logAction('Students', '20 Alpha + 1 Beta idempotent students generated.');
 
