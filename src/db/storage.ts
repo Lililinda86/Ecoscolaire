@@ -26,7 +26,8 @@ import type {
   Period,
   Evaluation,
   Grade,
-  TeacherAssignment
+  TeacherAssignment,
+  FinancialBenefit
 } from '../types';
 
 export interface Database {
@@ -67,6 +68,7 @@ export interface Database {
   transactions: StorageTransaction[];
   audit_logs: StorageAuditLog[];
   receipts?: StorageReceipt[];
+  financialBenefits: FinancialBenefit[];
 }
 
 export type StorageTransaction = {
@@ -167,6 +169,7 @@ const initialDB: Database = {
   transactions: [],
   audit_logs: [],
   receipts: [],
+  financialBenefits: [],
   academicYears: [],
   periods: [],
   evaluations: [],

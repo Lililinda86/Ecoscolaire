@@ -14,10 +14,14 @@ export interface ReceiptDisplayModel {
   className: string | null;
   nature: string;
   tranche: string | null;
+  period: string | null;
   method: string;
   amount: number;
   hasSnapshots: boolean;
   expectedAmount?: number;
+  grossExpectedAmount?: number;
+  discountAmount?: number;
+  netExpectedAmount?: number;
   previousPaid?: number;
   newPaid?: number;
   remainingBalance?: number;
@@ -30,6 +34,11 @@ export interface ReceiptDisplayModel {
   formattedNewPaid: string;
   formattedRemainingBalance: string;
   paymentType?: string;
+  collectedByName?: string;
+  benefits: Array<{ benefitType?: string; reference?: string | null; discountAmount?: number }>;
+  formattedGrossExpectedAmount: string;
+  formattedDiscountAmount: string;
+  formattedNetExpectedAmount: string;
 }
 
 // Centralized Translation Mappings
@@ -142,10 +151,16 @@ export const buildReceiptDisplayModel = (
     tranche: (receipt.type === 'tuition' || receipt.paymentType === 'tuition') && rawInstallment
       ? translateInstallment(rawInstallment as string)
       : null,
+    period: (receipt.type === 'transport' || receipt.paymentType === 'transport')
+      ? String(receipt.period || receipt.month || '') || null
+      : null,
     method: translatePaymentMethod(receipt.method as string | undefined || receipt.paymentMethod as string | undefined),
     amount: receipt.amount || 0,
     hasSnapshots,
     expectedAmount: receipt.expectedAmount,
+    grossExpectedAmount: receipt.grossExpectedAmount as number | undefined,
+    discountAmount: receipt.discountAmount as number | undefined,
+    netExpectedAmount: receipt.netExpectedAmount as number | undefined,
     previousPaid: receipt.previousPaid,
     newPaid: receipt.newPaid,
     remainingBalance: receipt.remainingBalance,
@@ -157,6 +172,11 @@ export const buildReceiptDisplayModel = (
     formattedPreviousPaid: formatCurrency(receipt.previousPaid),
     formattedNewPaid: formatCurrency(receipt.newPaid),
     formattedRemainingBalance: formatCurrency(receipt.remainingBalance),
-    paymentType: (receipt.type || receipt.paymentType) as string | undefined
+    paymentType: (receipt.type || receipt.paymentType) as string | undefined,
+    collectedByName: receipt.collectedByName as string | undefined,
+    benefits: Array.isArray(receipt.benefits) ? receipt.benefits as Array<{ benefitType?: string; reference?: string | null; discountAmount?: number }> : [],
+    formattedGrossExpectedAmount: formatCurrency(receipt.grossExpectedAmount as number | undefined),
+    formattedDiscountAmount: formatCurrency(receipt.discountAmount as number | undefined),
+    formattedNetExpectedAmount: formatCurrency(receipt.netExpectedAmount as number | undefined)
   };
 };

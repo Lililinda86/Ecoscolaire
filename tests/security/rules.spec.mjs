@@ -24,6 +24,79 @@ beforeEach(async () => {
   await testEnv.clearFirestore();
 });
 
+describe('Canonical financial benefits security', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      await Promise.all([
+        setDoc(doc(db, 'users', 'benefit-secretary-a'), { role: 'secretary', schoolId: 'benefit-school-a', active: true }),
+        setDoc(doc(db, 'users', 'benefit-owner-a'), { role: 'owner', schoolId: 'benefit-school-a', active: true }),
+        setDoc(doc(db, 'users', 'benefit-accountant-a'), { role: 'accountant', schoolId: 'benefit-school-a', active: true }),
+        setDoc(doc(db, 'users', 'benefit-secretary-b'), { role: 'secretary', schoolId: 'benefit-school-b', active: true }),
+        setDoc(doc(db, 'users', 'benefit-teacher-a'), { role: 'teacher', schoolId: 'benefit-school-a', active: true }),
+        setDoc(doc(db, 'students', 'student-a'), {
+          id: 'student-a', schoolId: 'benefit-school-a', name: 'Élève fictif', academicYear: '2026-2027'
+        }),
+        setDoc(doc(db, 'studentFinance', 'student-a'), {
+          id: 'student-a', studentId: 'student-a', schoolId: 'benefit-school-a',
+          tuitionExpectedGross: 70000, tuitionDiscountTotal: 10000,
+          tuitionExpectedNet: 60000, tuitionPaid: 30000
+        }),
+        setDoc(doc(db, 'financialBenefits', 'benefit-a'), {
+          id: 'benefit-a', schoolId: 'benefit-school-a', studentId: 'student-a', academicYear: '2026-2027',
+          benefitType: 'SCHOLARSHIP', paymentType: 'TUITION', mode: 'FIXED_AMOUNT', value: 1000,
+          installment: 'T1', stackable: true, reason: 'Test', status: 'approved'
+        }),
+        setDoc(doc(db, 'financialBenefits', 'benefit-b'), {
+          id: 'benefit-b', schoolId: 'benefit-school-b', studentId: 'student-b', academicYear: '2026-2027',
+          benefitType: 'SCHOLARSHIP', paymentType: 'TUITION', mode: 'FIXED_AMOUNT', value: 1000,
+          installment: 'T1', stackable: true, reason: 'Test', status: 'approved'
+        }),
+        setDoc(doc(db, 'financialBenefitReferences', 'reference-a'), {
+          id: 'reference-a', schoolId: 'benefit-school-a', benefitId: 'benefit-a', reference: 'BON-TEST'
+        })
+      ]);
+    });
+  });
+
+  it('allows same-school finance roles to read benefits and denies cross-school or teacher access', async () => {
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('benefit-secretary-a').firestore(), 'financialBenefits', 'benefit-a')));
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('benefit-owner-a').firestore(), 'financialBenefits', 'benefit-a')));
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('benefit-accountant-a').firestore(), 'financialBenefits', 'benefit-a')));
+    await assertFails(getDoc(doc(testEnv.authenticatedContext('benefit-secretary-b').firestore(), 'financialBenefits', 'benefit-a')));
+    await assertFails(getDoc(doc(testEnv.authenticatedContext('benefit-teacher-a').firestore(), 'financialBenefits', 'benefit-a')));
+  });
+
+  it('prevents every client role, including secretary and owner, from creating or approving benefits', async () => {
+    const secretaryDb = testEnv.authenticatedContext('benefit-secretary-a').firestore();
+    const ownerDb = testEnv.authenticatedContext('benefit-owner-a').firestore();
+    await assertFails(setDoc(doc(secretaryDb, 'financialBenefits', 'client-created'), {
+      id: 'client-created', schoolId: 'benefit-school-a', status: 'approved'
+    }));
+    await assertFails(updateDoc(doc(secretaryDb, 'financialBenefits', 'benefit-a'), { status: 'approved' }));
+    await assertFails(updateDoc(doc(ownerDb, 'financialBenefits', 'benefit-a'), { value: 5000 }));
+    await assertFails(deleteDoc(doc(ownerDb, 'financialBenefits', 'benefit-a')));
+  });
+
+  it('keeps voucher reference reservations hidden from secretary but visible to approvers/accounting', async () => {
+    await assertFails(getDoc(doc(testEnv.authenticatedContext('benefit-secretary-a').firestore(), 'financialBenefitReferences', 'reference-a')));
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('benefit-owner-a').firestore(), 'financialBenefitReferences', 'reference-a')));
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('benefit-accountant-a').firestore(), 'financialBenefitReferences', 'reference-a')));
+  });
+
+  it('prevents clients from falsifying server-calculated financial summaries', async () => {
+    const ownerDb = testEnv.authenticatedContext('benefit-owner-a').firestore();
+    const accountantDb = testEnv.authenticatedContext('benefit-accountant-a').firestore();
+    await assertFails(updateDoc(doc(ownerDb, 'studentFinance', 'student-a'), {
+      tuitionExpectedNet: 1, updatedAt: serverTimestamp(), updatedBy: 'benefit-owner-a'
+    }));
+    await assertFails(updateDoc(doc(accountantDb, 'studentFinance', 'student-a'), {
+      tuitionPaid: 60000, tuitionByInstallment: {},
+      updatedAt: serverTimestamp(), updatedBy: 'benefit-accountant-a'
+    }));
+  });
+});
+
 after(async () => {
   await testEnv.cleanup();
 });
