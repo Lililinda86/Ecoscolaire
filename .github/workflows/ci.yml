@@ -25,6 +25,8 @@ jobs:
         run: node --test tests/security/secret-guard.spec.mjs
       - name: Reject tracked staging credentials
         run: node scripts/check-staging-credential-regressions.mjs
+      - name: Validate production deployment manifest
+        run: npm run test:production-workflow
 
   frontend-ci:
     name: Frontend CI
@@ -71,6 +73,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'functions/package-lock.json'
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install Root Test Dependencies
+        run: npm ci
+
       - name: Install Dependencies
         run: npm ci
         working-directory: ./functions
@@ -96,6 +107,11 @@ jobs:
           node tests/functions/test-ensure-class-program-draft.cjs
           node tests/functions/test-publish-class-program-draft.cjs
           node tests/functions/test-bulk-add-subjects.cjs
+
+      - name: Test Secure Student Creation
+        run: npm run test:functions:secure-student
+        env:
+          FIREBASE_PROJECT: demo-ecoscolaire
 
       - name: Upload Artifact
         if: github.ref == 'refs/heads/main'

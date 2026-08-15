@@ -11,6 +11,8 @@
     "build:production": "node scripts/validate-firebase-environment.mjs --mode production && tsc -b && vite build --mode production",
     "lint": "eslint .",
     "test:secrets": "node scripts/check-staging-credential-regressions.mjs",
+    "test:functions:secure-student": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"vitest run tests/functions/createStudentSecure.spec.ts\"",
+    "test:production-workflow": "node --test tests/security/production-deploy-workflow.spec.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs --config=playwright.rules.config.ts\"",

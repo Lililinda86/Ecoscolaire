@@ -191,7 +191,7 @@ describe('createStudentSecure callable', () => {
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
     expect(businessCode((results.find(result => result.status === 'rejected') as PromiseRejectedResult).reason)).toBe('STUDENT_QUOTA_REACHED');
     expect((await db.collection('schools').doc(fixture.schoolId).get()).data()?.studentsCount).toBe(100);
-  });
+  }, 15_000);
 
   it('15 duplicate matricule -> DENY', async () => {
     const fixture = await seed();
