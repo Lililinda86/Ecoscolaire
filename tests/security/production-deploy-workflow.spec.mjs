@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const workflowPath = new URL('../../.github/workflows/firebase-deploy.yml', import.meta.url);
 const workflow = fs.readFileSync(workflowPath, 'utf8');
+const mainRef = 'refs/heads/main';
 
 const requiredFunctions = new Set([
   'createStudentSecure',
@@ -37,10 +38,31 @@ const deployedFunctions = new Set(
     .map(target => target.slice('functions:'.length)),
 );
 
+const jobGuardMatch = workflow.match(
+  /jobs:\s*\r?\n\s+deploy:\s*\r?\n\s+if:\s*github\.ref\s*==\s*'([^']+)'/,
+);
+const workflowDispatchRetained = /^\s{2}workflow_dispatch:\s*$/m.test(workflow);
+
+const productionDeployJobEligible = (eventName, ref) => {
+  const eventConfigured = eventName === 'push'
+    || (eventName === 'workflow_dispatch' && workflowDispatchRetained);
+  return eventConfigured && ref === jobGuardMatch?.[1];
+};
+
 test('Production deployment is main-only and guarded to ecoscolaire-c5861', () => {
   assert.match(workflow, /push:\s*\r?\n\s+branches:\s*\r?\n\s+- main/);
+  assert.ok(workflowDispatchRetained);
+  assert.equal(jobGuardMatch?.[1], mainRef);
+  assert.match(workflow, /if \[ "\$GITHUB_REF" != "refs\/heads\/main" \]; then/);
   assert.match(workflow, /FIREBASE_PROJECT_ID:\s*ecoscolaire-c5861/);
   assert.match(workflow, /\$FIREBASE_PROJECT_ID[^\r\n]*ecoscolaire-c5861/);
+});
+
+test('Production deploy eligibility is fail-closed for every configured trigger', () => {
+  assert.equal(productionDeployJobEligible('push', mainRef), true);
+  assert.equal(productionDeployJobEligible('workflow_dispatch', mainRef), true);
+  assert.equal(productionDeployJobEligible('workflow_dispatch', 'refs/heads/staging'), false);
+  assert.equal(productionDeployJobEligible('workflow_dispatch', 'refs/heads/feature/example'), false);
 });
 
 test('Production deployment includes Firestore Rules and the exact eight Functions', () => {

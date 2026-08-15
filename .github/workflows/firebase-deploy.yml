@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       FIREBASE_PROJECT_ID: ecoscolaire-c5861
@@ -56,6 +57,10 @@ jobs:
 
       - name: Guard Production Target
         run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Deployment blocked: Production deploys require refs/heads/main"
+            exit 1
+          fi
           if [ "$FIREBASE_PROJECT_ID" != "ecoscolaire-c5861" ]; then
             echo "Deployment blocked: unexpected Firebase Production project"
             exit 1
