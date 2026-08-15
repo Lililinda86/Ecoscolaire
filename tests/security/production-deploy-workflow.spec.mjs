@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
+import {
+  evaluateFirebaseDeployResult,
+  runFirebaseDeployFailClosed,
+} from '../../scripts/run-firebase-deploy-fail-closed.mjs';
+
 const workflowPath = new URL('../../.github/workflows/firebase-deploy.yml', import.meta.url);
 const workflow = fs.readFileSync(workflowPath, 'utf8');
 const mainRef = 'refs/heads/main';
@@ -79,4 +84,47 @@ test('Production deployment excludes import Functions and Storage Rules', () => 
 
 test('Production workflow never injects staging test credentials', () => {
   assert.doesNotMatch(workflow, /STAGING_TEST_(?:ALPHA|BETA|SUPERADMIN)_PASSWORD/);
+});
+
+test('Production workflow executes Firebase through the fail-closed wrapper', () => {
+  assert.match(
+    deployCommand,
+    /node scripts\/run-firebase-deploy-fail-closed\.mjs -- firebase deploy/,
+  );
+});
+
+test('A simulated firebase deploy exit 1 fails the deployment logic', async () => {
+  const sink = { write() {} };
+  const result = await runFirebaseDeployFailClosed(
+    process.execPath,
+    ['-e', 'process.exit(1)'],
+    { stdout: sink, stderr: sink },
+  );
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.reason, /exited with code 1/);
+});
+
+test('A zero exit with a Firebase function failure still fails closed', () => {
+  const result = evaluateFirebaseDeployResult(
+    0,
+    'functions: failed to create function projects/example/functions/example',
+  );
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.reason, /resource deployment failure/);
+});
+
+test('A zero exit without the Firebase completion marker fails closed', () => {
+  const result = evaluateFirebaseDeployResult(0, 'functions source uploaded successfully');
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.reason, /completion marker/);
+});
+
+test('A successful Firebase deployment result is accepted', () => {
+  assert.deepEqual(
+    evaluateFirebaseDeployResult(0, 'Deploy complete!'),
+    { exitCode: 0, reason: null },
+  );
 });
