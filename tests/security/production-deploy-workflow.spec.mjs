@@ -105,26 +105,43 @@ test('A simulated firebase deploy exit 1 fails the deployment logic', async () =
   assert.match(result.reason, /exited with code 1/);
 });
 
-test('A zero exit with a Firebase function failure still fails closed', () => {
+test('A zero exit with a plain Firebase completion marker succeeds', () => {
   const result = evaluateFirebaseDeployResult(
     0,
-    'functions: failed to create function projects/example/functions/example',
+    'Deploy complete!',
+  );
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.reason, null);
+  assert.equal(result.completionMarkerFound, true);
+});
+
+test('A zero exit with an ANSI-colored Firebase completion marker succeeds', () => {
+  const result = evaluateFirebaseDeployResult(
+    0,
+    '\u001b[32m\u001b[1m\u001b[4mDeploy complete!\u001b[24m\u001b[39m',
+  );
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.reason, null);
+  assert.equal(result.completionMarkerFound, true);
+});
+
+test('A non-zero exit fails even when output misleadingly contains the marker', () => {
+  const result = evaluateFirebaseDeployResult(
+    1,
+    '\u001b[32mDeploy complete!\u001b[39m',
   );
 
   assert.equal(result.exitCode, 1);
-  assert.match(result.reason, /resource deployment failure/);
+  assert.match(result.reason, /exited with code 1/);
+  assert.equal(result.completionMarkerFound, true);
 });
 
-test('A zero exit without the Firebase completion marker fails closed', () => {
+test('A zero exit without a completion marker remains a successful command', () => {
   const result = evaluateFirebaseDeployResult(0, 'functions source uploaded successfully');
 
-  assert.equal(result.exitCode, 1);
-  assert.match(result.reason, /completion marker/);
-});
-
-test('A successful Firebase deployment result is accepted', () => {
-  assert.deepEqual(
-    evaluateFirebaseDeployResult(0, 'Deploy complete!'),
-    { exitCode: 0, reason: null },
-  );
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.reason, null);
+  assert.equal(result.completionMarkerFound, false);
 });
