@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Test secret guard
+        run: node --test tests/security/secret-guard.spec.mjs
       - name: Reject tracked staging credentials
         run: node scripts/check-staging-credential-regressions.mjs
 
