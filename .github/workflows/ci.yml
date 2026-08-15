@@ -13,6 +13,17 @@ permissions:
   contents: read
 
 jobs:
+  secret-guard:
+    name: Secret Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Reject tracked staging credentials
+        run: node scripts/check-staging-credential-regressions.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest

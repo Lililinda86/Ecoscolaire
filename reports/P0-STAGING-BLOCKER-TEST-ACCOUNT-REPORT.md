@@ -7,7 +7,7 @@ OUI. Le compte `owner.alpha@ecoscolaire.com` existait déjà dans Firebase Auth.
 `eqk7YrlAxoW25ZouRPK6i4HGo1i2`
 
 ## Mot de passe réinitialisé ?
-Le mot de passe était DÉJÀ `Test@2026Alpha!`. Le script de diagnostic s'est connecté avec succès sans avoir besoin de le modifier.
+Le mot de passe était DÉJÀ `[REDACTED — use STAGING_TEST_ALPHA_PASSWORD]`. Le script de diagnostic s'est connecté avec succès sans avoir besoin de le modifier.
 
 ## Document user Firestore
 OUI.
@@ -36,7 +36,7 @@ Un test node direct avec la condition `where('schoolId', '==', 'school-alpha-001
 *Note: Bien que la règle Firestore pour `staff` semble toujours absente ou mal appliquée sur le backend staging, ce n'est PAS ce qui bloque l'interface, car `AppContext` intercepte cette erreur et renvoie `[]`.*
 
 ## Login Playwright réussi ?
-**OUI.** La connexion Playwright avec `owner.alpha@ecoscolaire.com` / `Test@2026Alpha!` a réussi.
+**OUI.** La connexion Playwright avec `owner.alpha@ecoscolaire.com` / `[REDACTED — use STAGING_TEST_ALPHA_PASSWORD]` a réussi.
 
 ## Logs DEBUG capturés
 ```text

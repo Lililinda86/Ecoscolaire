@@ -3,6 +3,10 @@ import { loginAs } from './helpers/auth';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { superAdminPassword } = loadStagingCredentials(['superAdmin']);
+
 test.describe('P0-024B AUDIT E2E', () => {
   test('Audit UI and Firebase Project ID', async ({ page }) => {
     let firestoreProjectId = '';
@@ -27,7 +31,7 @@ test.describe('P0-024B AUDIT E2E', () => {
     
     await page.goto('https://ecoscolaire-ghd6.vercel.app/#/login', { waitUntil: 'networkidle' });
     
-    await loginAs(page, 'superadmin.test@ecoscolaire.com', 'Test@2026Super!');
+    await loginAs(page, 'superadmin.test@ecoscolaire.com', superAdminPassword);
     
     console.log('Connexion réussie, accès au SuperAdmin...');
     

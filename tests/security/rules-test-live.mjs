@@ -1,3 +1,4 @@
+import { requireStagingCredential, assertStagingProject } from '../../scripts/staging-credentials.mjs';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFirestore, doc, updateDoc } from 'firebase/firestore';
@@ -12,6 +13,10 @@ const firebaseConfig = {
   messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.VITE_FIREBASE_APP_ID
 };
+
+assertStagingProject(firebaseConfig.projectId);
+const alphaPassword = requireStagingCredential('alpha');
+const superAdminPassword = requireStagingCredential('superAdmin');
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -46,7 +51,7 @@ async function runTests() {
   console.log("Running security rules live tests against staging...");
   
   // 1. Test Owner
-  await signInWithEmailAndPassword(auth, 'owner.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+  await signInWithEmailAndPassword(auth, 'owner.alpha@ecoscolaire.com', alphaPassword);
   const ownerUid = auth.currentUser.uid;
   console.log(`Logged in as Owner (UID: ${ownerUid})`);
 
@@ -89,7 +94,7 @@ async function runTests() {
   await signOut(auth);
 
   // 2. Test SuperAdmin
-  await signInWithEmailAndPassword(auth, 'superadmin.test@ecoscolaire.com', 'Test@2026Super!');
+  await signInWithEmailAndPassword(auth, 'superadmin.test@ecoscolaire.com', superAdminPassword);
   const saUid = auth.currentUser.uid;
   console.log(`\nLogged in as SuperAdmin (UID: ${saUid})`);
 
@@ -106,7 +111,7 @@ async function runTests() {
   await signOut(auth);
 
   // 3. Test Director
-  await signInWithEmailAndPassword(auth, 'director.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+  await signInWithEmailAndPassword(auth, 'director.alpha@ecoscolaire.com', alphaPassword);
   console.log(`\nLogged in as Director`);
 
   // Director modifie subscriptionStatus -> refusé

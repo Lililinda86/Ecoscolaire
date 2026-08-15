@@ -1,5 +1,7 @@
+const { requireStagingCredential, assertStagingProject } = require('./scripts/staging-credentials.cjs');
 const { chromium } = require('playwright');
 
+assertStagingProject(process.env.VITE_FIREBASE_PROJECT_ID);
 async function run() {
     console.log("Starting Receipts UI Verification...");
     const browser = await chromium.launch({ headless: true });
@@ -11,7 +13,7 @@ async function run() {
     await page.waitForTimeout(2000);
     
     await page.fill('input[type="email"]', 'owner.alpha@ecoscolaire.com');
-    await page.fill('input[type="password"]', 'Test@2026Alpha!');
+    await page.fill('input[type="password"]', requireStagingCredential('alpha'));
     await page.click('button:has-text("Se connecter")');
     await page.waitForTimeout(5000);
     

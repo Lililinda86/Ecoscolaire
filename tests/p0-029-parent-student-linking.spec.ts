@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test.describe('P0-029: Parent-Student Linking', () => {
   // Assuming test data contains a student with parentEmails: ['parent1.alpha@ecoscolaire.com']
   // The test will log in as parent1.alpha@ecoscolaire.com and expect to see the student.
@@ -8,7 +12,7 @@ test.describe('P0-029: Parent-Student Linking', () => {
     // 1. Log in as secretary
     await page.goto('/#/login');
     await page.fill('input[type="email"]', 'secretary.alpha@ecoscolaire.com');
-    await page.fill('input[type="password"]', 'Test@2026Alpha!');
+    await page.fill('input[type="password"]', alphaPassword);
     await page.click('button:has-text("Se connecter")');
     await page.waitForURL('**/dashboard');
     
@@ -43,7 +47,7 @@ test.describe('P0-029: Parent-Student Linking', () => {
 
     // 4. Connexion Parent
     await page.fill('input[type="email"]', 'parent1.alpha@ecoscolaire.com');
-    await page.fill('input[type="password"]', 'Test@2026Alpha!');
+    await page.fill('input[type="password"]', alphaPassword);
     await page.click('button:has-text("Se connecter")');
     
     await page.waitForURL('**/parent');

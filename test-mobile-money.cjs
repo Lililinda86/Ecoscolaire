@@ -1,6 +1,8 @@
+const { requireStagingCredential, assertStagingProject } = require('./scripts/staging-credentials.cjs');
 const { chromium } = require('playwright');
 const admin = require('firebase-admin');
 
+assertStagingProject(process.env.VITE_FIREBASE_PROJECT_ID);
 async function testMobileMoney() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
@@ -65,7 +67,7 @@ async function testMobileMoney() {
     
     console.log('Filling login form...');
     await page.fill('input[type="email"]', 'owner.alpha@ecoscolaire.com');
-    await page.fill('input[type="password"]', 'Test@2026Alpha!');
+    await page.fill('input[type="password"]', requireStagingCredential('alpha'));
     await page.click('button[type="submit"]');
 
     console.log('Waiting for login to complete (10s)...');

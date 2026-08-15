@@ -1,3 +1,4 @@
+const { requireStagingCredential, assertStagingProject } = require('./staging-credentials.cjs');
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, getDocs, query, where, doc, updateDoc, writeBatch } = require('firebase/firestore');
 const { getAuth, signInWithEmailAndPassword } = require('firebase/auth');
@@ -14,13 +15,15 @@ const firebaseConfig = {
   appId: process.env.VITE_FIREBASE_APP_ID
 };
 
+assertStagingProject(firebaseConfig.projectId);
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
 async function run() {
   try {
-    await signInWithEmailAndPassword(auth, "superadmin.test@ecoscolaire.com", "Test@2026Super!");
+    await signInWithEmailAndPassword(auth, "superadmin.test@ecoscolaire.com", requireStagingCredential('superAdmin'));
     console.log("Logged in as SuperAdmin");
 
     const schoolsSnapshot = await getDocs(collection(db, 'schools'));
