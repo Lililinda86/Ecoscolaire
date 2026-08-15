@@ -214,7 +214,10 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
           </h2>
           
           <div style={{ background: '#1e293b', color: '#e2e8f0', padding: '1.5rem', borderRadius: '8px', fontFamily: 'monospace', marginBottom: '1.5rem' }}>
-            <div><strong style={{color: '#38bdf8'}}>projectId:</strong> {firebaseConfigValues.projectId}</div>
+            <div>
+              <strong style={{color: '#38bdf8'}}>projectId:</strong>{' '}
+              <span data-testid="diagnostic-firebase-project">{firebaseConfigValues.projectId}</span>
+            </div>
             <div><strong style={{color: '#38bdf8'}}>authDomain:</strong> {firebaseConfigValues.authDomain}</div>
             <div><strong style={{color: '#38bdf8'}}>storageBucket:</strong> {firebaseConfigValues.storageBucket}</div>
             <div><strong style={{color: '#38bdf8'}}>appId:</strong> {firebaseConfigValues.appId}</div>

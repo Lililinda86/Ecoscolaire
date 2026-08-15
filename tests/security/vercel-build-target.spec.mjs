@@ -50,5 +50,6 @@ test('Diagnostic reports the Firebase configuration injected into the build', as
   assert.match(source, /authDomain:\s*import\.meta\.env\.VITE_FIREBASE_AUTH_DOMAIN/);
   assert.match(source, /storageBucket:\s*import\.meta\.env\.VITE_FIREBASE_STORAGE_BUCKET/);
   assert.match(source, /appId:\s*import\.meta\.env\.VITE_FIREBASE_APP_ID/);
+  assert.match(source, /data-testid=["']diagnostic-firebase-project["']/);
   assert.doesNotMatch(source, /projectId:\s*["']ecoscolaire-c5861["']/);
 });
