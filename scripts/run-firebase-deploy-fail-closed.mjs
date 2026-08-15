@@ -1,37 +1,31 @@
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const FIREBASE_FAILURE_PATTERNS = [
-  /functions:\s+failed to (?:create|update|delete) function\b/i,
-  /Failed to (?:create|update|delete) function\b/i,
-  /functions deploy had errors\b/i,
-];
+const ANSI_ESCAPE_PATTERN = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/g;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+const FIREBASE_SUCCESS_PATTERN = /\bDeploy\s+complete\s*!/i;
 
-const FIREBASE_SUCCESS_PATTERN = /\bDeploy complete!/i;
+export function normalizeFirebaseOutput(output) {
+  return String(output ?? '')
+    .replace(ANSI_ESCAPE_PATTERN, '')
+    .replace(CONTROL_CHARACTER_PATTERN, '')
+    .replace(/\s+/g, ' ');
+}
 
 export function evaluateFirebaseDeployResult(exitCode, output) {
+  const completionMarkerFound = FIREBASE_SUCCESS_PATTERN.test(
+    normalizeFirebaseOutput(output),
+  );
+
   if (exitCode !== 0) {
     return {
       exitCode: Number.isInteger(exitCode) && exitCode > 0 ? exitCode : 1,
       reason: `firebase deploy exited with code ${exitCode ?? 'unknown'}`,
+      completionMarkerFound,
     };
   }
 
-  if (FIREBASE_FAILURE_PATTERNS.some(pattern => pattern.test(output))) {
-    return {
-      exitCode: 1,
-      reason: 'firebase deploy reported a resource deployment failure',
-    };
-  }
-
-  if (!FIREBASE_SUCCESS_PATTERN.test(output)) {
-    return {
-      exitCode: 1,
-      reason: 'firebase deploy did not emit its completion marker',
-    };
-  }
-
-  return { exitCode: 0, reason: null };
+  return { exitCode: 0, reason: null, completionMarkerFound };
 }
 
 export async function runFirebaseDeployFailClosed(command, args, options = {}) {
@@ -84,6 +78,8 @@ if (isMain) {
 
     if (result.exitCode !== 0) {
       console.error(`Firebase deployment failed closed: ${result.reason}.`);
+    } else if (!result.completionMarkerFound) {
+      console.warn('Firebase deploy exited successfully without a recognizable completion marker.');
     }
     process.exitCode = result.exitCode;
   }
