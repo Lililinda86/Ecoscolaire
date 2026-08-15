@@ -35,6 +35,9 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
 
+      - name: Validate Vercel environment routing
+        run: npm run test:vercel-build
+
       - name: Secretary collections UI tests
         run: npx vitest run tests/unit/FinancialBenefitsPanel.spec.tsx tests/unit/paymentReceipt.spec.ts
 
