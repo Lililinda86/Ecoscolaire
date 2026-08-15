@@ -28,6 +28,9 @@ jobs:
       - name: Validate production deployment manifest
         run: npm run test:production-workflow
 
+      - name: Validate staging collections E2E safety contract
+        run: node --check scripts/test-secretary-collections-staging.mjs && node --test tests/security/staging-collections-e2e.spec.mjs tests/security/staging-firebase-precheck.spec.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
@@ -50,6 +53,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Validate Vercel environment routing
+        run: npm run test:vercel-build
+
+      - name: Secretary collections UI tests
+        run: npx vitest run tests/unit/FinancialBenefitsPanel.spec.tsx tests/unit/paymentReceipt.spec.ts
 
       - name: Upload Artifact
         if: github.ref == 'refs/heads/main'
@@ -103,6 +112,7 @@ jobs:
           node tests/functions/test-student-import-recovery.cjs
           node tests/functions/test-student-import-bulk-writer.cjs
           node tests/functions/test-student-finance-projection.cjs
+          node tests/functions/test-secretary-collection-calculations.cjs
           node tests/functions/test-academic-resolvers.cjs
           node tests/functions/test-ensure-class-program-draft.cjs
           node tests/functions/test-publish-class-program-draft.cjs
@@ -110,6 +120,11 @@ jobs:
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student
+        env:
+          FIREBASE_PROJECT: demo-ecoscolaire
+
+      - name: Test Secretary Collections
+        run: npm run test:functions:secretary-collections
         env:
           FIREBASE_PROJECT: demo-ecoscolaire
 

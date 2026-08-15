@@ -835,7 +835,8 @@ service cloud.firestore {
                       'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
                       'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
                       'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
-                      'transportMonthlyFee', 'transportPaid', 'updatedAt', 'updatedBy'
+                      'transportMonthlyFee', 'transportPaid',
+                      'updatedAt', 'updatedBy'
                     ])
                     && request.resource.data.updatedAt == request.time
                     && request.resource.data.updatedBy == request.auth.uid
@@ -1118,7 +1119,9 @@ service cloud.firestore {
             'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
             'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
             'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
-            'transportMonthlyFee', 'transportPaid'
+            'transportMonthlyFee', 'transportPaid',
+            'tuitionExpectedGross', 'tuitionDiscountTotal', 'tuitionExpectedNet', 'tuitionByInstallment',
+            'transportExpectedGross', 'transportDiscountTotal', 'transportExpectedNet', 'transportByPeriod'
           ])
         &&
         !(
@@ -1545,6 +1548,25 @@ service cloud.firestore {
     }
 
     // --- FINANCE (PAYMENTS & EXPENSES) ---
+    match /financialBenefits/{benefitId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary() || isAccountant())
+          && hasSchoolAccess(resource.data.schoolId))
+      );
+      // Canonical benefits are created, approved and consumed by Functions only.
+      allow create, update, delete: if false;
+    }
+
+    match /financialBenefitReferences/{referenceId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isAccountant())
+          && hasSchoolAccess(resource.data.schoolId))
+      );
+      allow create, update, delete: if false;
+    }
+
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && isActive() && (
         resource.data.userId == request.auth.uid ||

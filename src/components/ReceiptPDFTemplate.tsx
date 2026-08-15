@@ -99,6 +99,11 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
                     Tranche : {displayModel.tranche}
                   </div>
                 )}
+                {displayModel.period && (
+                  <div style={{ marginTop: '0.25rem', fontSize: '10pt', color: '#4b5563' }}>
+                    Période : {displayModel.period}
+                  </div>
+                )}
               </td>
               <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', fontSize: '11pt' }}>
                 {displayModel.method}
@@ -119,8 +124,16 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '11pt' }}>
                 <div>
-                  <span style={{ color: '#64748b' }}>Montant attendu :</span>{' '}
-                  <strong style={{ color: '#0f172a' }}>{displayModel.formattedExpectedAmount}</strong>
+                  <span style={{ color: '#64748b' }}>Montant brut :</span>{' '}
+                  <strong style={{ color: '#0f172a' }}>{displayModel.formattedGrossExpectedAmount || displayModel.formattedExpectedAmount}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Bourse / réduction :</span>{' '}
+                  <strong style={{ color: '#7c3aed' }}>{displayModel.formattedDiscountAmount || '0 FCFA'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Montant net dû :</span>{' '}
+                  <strong style={{ color: '#0f172a' }}>{displayModel.formattedNetExpectedAmount || displayModel.formattedExpectedAmount}</strong>
                 </div>
                 <div>
                   <span style={{ color: '#64748b' }}>Cumul après versement :</span>{' '}
@@ -137,6 +150,16 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
                   </strong>
                 </div>
               </div>
+              {displayModel.benefits.length > 0 && (
+                <div style={{ marginTop: '1rem', paddingTop: '.75rem', borderTop: '1px solid #e2e8f0', fontSize: '10pt' }}>
+                  {displayModel.benefits.map((benefit, index) => (
+                    <div key={`${benefit.reference || benefit.benefitType}-${index}`}>
+                      {benefit.benefitType || 'Avantage'}{benefit.reference ? ` (${benefit.reference})` : ''}
+                      {' : '}{(benefit.discountAmount || 0).toLocaleString('fr-FR')} FCFA
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ fontStyle: 'italic', color: '#64748b', fontSize: '10pt', background: '#f8fafc', padding: '1rem', borderRadius: '4px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
@@ -158,7 +181,8 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
         {/* Signature Area */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
           <div style={{ textAlign: 'center', width: '200px' }}>
-            <p style={{ margin: '0 0 3rem 0', fontWeight: 'bold', fontSize: '10pt' }}>Cachet / Signature</p>
+            <p style={{ margin: '0 0 .5rem 0', fontWeight: 'bold', fontSize: '10pt' }}>Encaissement effectué par</p>
+            <p style={{ margin: '0 0 3rem 0', fontSize: '10pt' }}>{displayModel.collectedByName || 'Opérateur autorisé'}</p>
             <div style={{ borderBottom: '1px solid #000' }}></div>
           </div>
         </div>

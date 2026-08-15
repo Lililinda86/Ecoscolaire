@@ -190,10 +190,10 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
   };
 
   const firebaseConfigValues = {
-    projectId: "ecoscolaire-c5861",
-    authDomain: "ecoscolaire-c5861.firebaseapp.com",
-    storageBucket: "ecoscolaire-c5861.firebasestorage.app",
-    appId: "1:329523025972:web:052855ab83a9da2ea49261",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
   };
 
   return (
@@ -214,7 +214,10 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
           </h2>
           
           <div style={{ background: '#1e293b', color: '#e2e8f0', padding: '1.5rem', borderRadius: '8px', fontFamily: 'monospace', marginBottom: '1.5rem' }}>
-            <div><strong style={{color: '#38bdf8'}}>projectId:</strong> {firebaseConfigValues.projectId}</div>
+            <div>
+              <strong style={{color: '#38bdf8'}}>projectId:</strong>{' '}
+              <span data-testid="diagnostic-firebase-project">{firebaseConfigValues.projectId}</span>
+            </div>
             <div><strong style={{color: '#38bdf8'}}>authDomain:</strong> {firebaseConfigValues.authDomain}</div>
             <div><strong style={{color: '#38bdf8'}}>storageBucket:</strong> {firebaseConfigValues.storageBucket}</div>
             <div><strong style={{color: '#38bdf8'}}>appId:</strong> {firebaseConfigValues.appId}</div>
