@@ -10,6 +10,7 @@
     "build:staging": "node scripts/validate-firebase-environment.mjs --mode staging && tsc -b && vite build --mode staging",
     "build:production": "node scripts/validate-firebase-environment.mjs --mode production && tsc -b && vite build --mode production",
     "lint": "eslint .",
+    "test:secrets": "node scripts/check-staging-credential-regressions.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs --config=playwright.rules.config.ts\"",

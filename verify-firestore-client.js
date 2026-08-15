@@ -1,3 +1,4 @@
+import { requireStagingCredential, assertStagingProject } from './scripts/staging-credentials.mjs';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
@@ -11,13 +12,15 @@ const firebaseConfig = {
   appId: "1:411364288790:web:745f0577ef947e1c994837"
 };
 
+assertStagingProject(firebaseConfig.projectId);
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 async function verify() {
   try {
-    await signInWithEmailAndPassword(auth, 'owner.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+    await signInWithEmailAndPassword(auth, 'owner.alpha@ecoscolaire.com', requireStagingCredential('alpha'));
     console.log('Logged in as owner.');
 
     const txSnapshot = await getDocs(query(collection(db, 'transactions'), where('schoolId', '==', 'school-alpha-001')));

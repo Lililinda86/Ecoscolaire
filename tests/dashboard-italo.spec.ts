@@ -1,12 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { attachConsoleMonitor } from './helpers/console-monitor';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test('Dashboard ITALO 2026-2027 is visible for owner', async ({ page }) => {
   const monitor = attachConsoleMonitor(page);
 
   await page.goto('/');
   await page.getByTestId('login-email').fill('owner.alpha@ecoscolaire.com');
-  await page.getByTestId('login-password').fill('Test@2026Alpha!');
+  await page.getByTestId('login-password').fill(alphaPassword);
   await page.getByTestId('login-submit').click();
 
   // Attendre que le dashboard soit chargé

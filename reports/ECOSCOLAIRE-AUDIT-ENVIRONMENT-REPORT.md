@@ -3,23 +3,23 @@
 ## 1. COMPTES EXISTANTS RETROUVÉS (SEEDS)
 L'audit du projet a permis d'identifier le script officiel **`scripts/setup-test-data.mjs`** dédié à la création d'environnements de test. Ce script génère de manière idempotente les identifiants et les données suivants pour deux écoles distinctes :
 
-**Comptes retrouvés et mots de passe codés en dur :**
-- **SuperAdmin** : `superadmin.test@ecoscolaire.com` (Mdp : `Test@2026Super!`)
+**Comptes retrouvés et références de secrets :**
+- **SuperAdmin** : `superadmin.test@ecoscolaire.com` (Mdp : `STAGING_TEST_SUPERADMIN_PASSWORD`)
 
 **Comptes École Alpha (`school-alpha-001`) :**
-- Owner : `owner.alpha@ecoscolaire.com` (`Test@2026Alpha!`)
-- Directeur : `director.alpha@ecoscolaire.com` (`Test@2026Alpha!`)
-- Secrétaire : `secretary.alpha@ecoscolaire.com` (`Test@2026Alpha!`)
-- Comptable : `accountant.alpha@ecoscolaire.com` (`Test@2026Alpha!`)
-- Enseignant 1 : `teacher1.alpha@ecoscolaire.com` (`Test@2026Alpha!`)
-- Chauffeur : `driver.alpha@ecoscolaire.com` (`Test@2026Alpha!`)
-- Parent 1 : `parent1.alpha@ecoscolaire.com` (`Test@2026Alpha!`)
+- Owner : `owner.alpha@ecoscolaire.com` (`STAGING_TEST_ALPHA_PASSWORD`)
+- Directeur : `director.alpha@ecoscolaire.com` (`STAGING_TEST_ALPHA_PASSWORD`)
+- Secrétaire : `secretary.alpha@ecoscolaire.com` (`STAGING_TEST_ALPHA_PASSWORD`)
+- Comptable : `accountant.alpha@ecoscolaire.com` (`STAGING_TEST_ALPHA_PASSWORD`)
+- Enseignant 1 : `teacher1.alpha@ecoscolaire.com` (`STAGING_TEST_ALPHA_PASSWORD`)
+- Chauffeur : `driver.alpha@ecoscolaire.com` (`STAGING_TEST_ALPHA_PASSWORD`)
+- Parent 1 : `parent1.alpha@ecoscolaire.com` (`STAGING_TEST_ALPHA_PASSWORD`)
 
 **Comptes École Beta (`school-beta-002`) :**
-- Owner : `owner.beta@ecoscolaire.com` (`Test@2026Beta!`)
-- Directeur : `director.beta@ecoscolaire.com` (`Test@2026Beta!`)
-- Enseignant : `teacher.beta@ecoscolaire.com` (`Test@2026Beta!`)
-- Parent : `parent.beta@ecoscolaire.com` (`Test@2026Beta!`)
+- Owner : `owner.beta@ecoscolaire.com` (`STAGING_TEST_BETA_PASSWORD`)
+- Directeur : `director.beta@ecoscolaire.com` (`STAGING_TEST_BETA_PASSWORD`)
+- Enseignant : `teacher.beta@ecoscolaire.com` (`STAGING_TEST_BETA_PASSWORD`)
+- Parent : `parent.beta@ecoscolaire.com` (`STAGING_TEST_BETA_PASSWORD`)
 
 ## 2. COMPTES ET DONNÉES INEXISTANTS
 Bien que les comptes et la majorité des données primaires soient gérés par le script, les éléments suivants sont **inexistants** (non générés par le script actuel) :

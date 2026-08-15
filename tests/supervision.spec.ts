@@ -1,10 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { superAdminPassword } = loadStagingCredentials(['superAdmin']);
+
 test.describe('SuperAdmin Supervision Mode', () => {
   test.beforeEach(async ({ page }) => {
     // Connexion en tant que Super Admin
-    await loginAs(page, 'superadmin.test@ecoscolaire.com', 'Test@2026Super!');
+    await loginAs(page, 'superadmin.test@ecoscolaire.com', superAdminPassword);
     await expect(page.locator('text=Espace Super Admin SaaS')).toBeVisible();
   });
 

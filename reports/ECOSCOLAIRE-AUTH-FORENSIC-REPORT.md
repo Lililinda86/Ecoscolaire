@@ -38,20 +38,20 @@ Voici la preuve formelle tirée de la lecture du code source `scripts/setup-test
 ```javascript
 // 3. Roles Alpha
 const alphaRoles = [
-  { role: 'owner', email: 'owner.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
+  { role: 'owner', email: 'owner.alpha@ecoscolaire.com', pass: '[REDACTED — use STAGING_TEST_ALPHA_PASSWORD]' },
   // ...
 ];
 ```
 
 * **Mot de passe codé en dur dans le script d'audit (Playwright) :** `test123`
-* **Mot de passe défini par le script de seed dans Firebase Auth :** `Test@2026Alpha!`
+* **Mot de passe défini par le script de seed dans Firebase Auth :** `[REDACTED — use STAGING_TEST_ALPHA_PASSWORD]`
 
 L'API Firebase Auth répondait logiquement `INVALID_LOGIN_CREDENTIALS` car le script Playwright essayait de s'authentifier avec `test123` au lieu du mot de passe officiel généré par le Seed pour les comptes de test Alpha.
 
-Un test d'authentification direct en REST avec le mot de passe `Test@2026Alpha!` retourne un `SUCCESS` immédiat.
+Un test d'authentification direct en REST avec le mot de passe `[REDACTED — use STAGING_TEST_ALPHA_PASSWORD]` retourne un `SUCCESS` immédiat.
 
 ---
 
 ### VERDICT DE L'INVESTIGATION
 
-La cause racine unique est une **désynchronisation des identifiants de test**. Le script d'audit tentait de s'authentifier avec `test123` alors que la base Firebase Staging a été correctement réinitialisée avec le mot de passe sécurisé `Test@2026Alpha!`. Aucune anomalie n'affecte l'infrastructure ou Firebase.
+La cause racine unique est une **désynchronisation des identifiants de test**. Le script d'audit tentait de s'authentifier avec `test123` alors que la base Firebase Staging a été correctement réinitialisée avec le mot de passe sécurisé `[REDACTED — use STAGING_TEST_ALPHA_PASSWORD]`. Aucune anomalie n'affecte l'infrastructure ou Firebase.

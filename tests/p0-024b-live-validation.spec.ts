@@ -4,6 +4,10 @@ import * as path from 'path';
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { superAdminPassword } = loadStagingCredentials(['superAdmin']);
+
 // Helper to generate a temp excel file with N students
 function generateExcel(filename: string, count: number) {
   const data = [['Matricule', 'Nom', 'Classe']];
@@ -28,7 +32,7 @@ test.describe('P0-024B POST-DEPLOYMENT LIVE VALIDATION (with seed)', () => {
     await expect(page.locator('text=Se connecter').first()).toBeVisible();
     
     console.log('Login SuperAdmin...');
-    await loginAs(page, 'superadmin.test@ecoscolaire.com', 'Test@2026Super!');
+    await loginAs(page, 'superadmin.test@ecoscolaire.com', superAdminPassword);
     await expect(page.locator('text=Espace Super Admin SaaS').first()).toBeVisible();
 
     async function checkSchool(schoolName: string, expectedStatus: 'autorise' | 'bloque', importCount?: number) {
