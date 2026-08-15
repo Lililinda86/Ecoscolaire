@@ -1,6 +1,19 @@
 import * as admin from 'firebase-admin';
 import { NormalizedStudentRow } from './studentImportNormalizer';
 
+type LegacyFinancialFields = 'feeT1' | 'feeT2' | 'feeT3' | 'financialBypass';
+
+export const omitLegacyStudentFinancialFields = (
+  row: NormalizedStudentRow & { financialBypass?: unknown }
+): Omit<NormalizedStudentRow, LegacyFinancialFields> => {
+  const sanitized = { ...row };
+  delete sanitized.feeT1;
+  delete sanitized.feeT2;
+  delete sanitized.feeT3;
+  delete sanitized.financialBypass;
+  return sanitized;
+};
+
 export interface BulkWriterImportResult {
   successfulCreates: number;
   successfulUpdates: number;
@@ -11,12 +24,33 @@ export interface BulkWriterImportResult {
   durationMs: number;
 }
 
+export const isRealStudentImportEnabled = (): boolean => false;
+
 /**
  * Executes a BulkWriter operation to safely insert or update students.
  * Idempotency is guaranteed by deterministic IDs and strict create/update segregation
  * provided by Phase 2B.
  */
 export async function executeBulkWriterImport(
+  db: FirebaseFirestore.Firestore,
+  jobId: string,
+  schoolId: string,
+  creates: NormalizedStudentRow[],
+  updates: NormalizedStudentRow[],
+  onProgress?: (progress: number) => Promise<void>
+): Promise<BulkWriterImportResult> {
+  if (!isRealStudentImportEnabled()) {
+    throw new Error('STUDENT_IMPORT_DISABLED');
+  }
+  return executeDormantBulkWriterImport(db, jobId, schoolId, creates, updates, onProgress);
+}
+
+/**
+ * Dormant implementation kept testable while the runtime entry point above remains closed.
+ * This function is not exported from the Cloud Functions index and must never be called by
+ * a deployed handler while student imports are disabled.
+ */
+export async function executeDormantBulkWriterImport(
   db: FirebaseFirestore.Firestore,
   jobId: string,
   schoolId: string,
@@ -80,9 +114,10 @@ export async function executeBulkWriterImport(
   for (const row of creates) {
     const docRef = db.collection('students').doc(row.id);
     operationTypeMap.set(row.id, { type: 'create', matricule: row.matricule });
+    const sanitizedRow = omitLegacyStudentFinancialFields(row);
     
     const promise = bulkWriter.create(docRef, {
-      ...row,
+      ...sanitizedRow,
       schoolId,
       importJobId: jobId,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -104,10 +139,11 @@ export async function executeBulkWriterImport(
   for (const row of updates) {
     const docRef = db.collection('students').doc(row.id);
     operationTypeMap.set(row.id, { type: 'update', matricule: row.matricule });
+    const sanitizedRow = omitLegacyStudentFinancialFields(row);
     
     // We don't overwrite createdAt for updates
     const promise = bulkWriter.update(docRef, {
-      ...row,
+      ...sanitizedRow,
       schoolId,
       lastImportJobId: jobId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()

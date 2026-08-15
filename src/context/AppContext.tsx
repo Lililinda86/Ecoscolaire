@@ -12,6 +12,17 @@ import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
 import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
 import { sanitizeBoardViewerData } from '../utils/boardViewerSanitizer';
 import { isUserActive, logAuthenticationFailure } from '../utils/authSecurity';
+import {
+  canLoadStudentFinance,
+  canLoadStudentParentFinance,
+  canLoadStudentParentPrivate,
+  canLoadStudentPrivate,
+  mergeStudentRestrictedData,
+  type StudentFinance,
+  type StudentParentFinance,
+  type StudentParentPrivate,
+  type StudentPrivate
+} from '../services/studentPrivacy';
 
 type EntityWithId = {
   id: string;
@@ -370,38 +381,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const fetchPromises = collectionsToFetch.map(async (colName) => {
           try {
             let q;
-            if (colName === 'students') {
-              console.log(`[DEBUG STUDENTS] Avant getDocs pour students. targetSchoolId: ${targetSchoolId}, role: ${userData.role}`);
+            if (userData.role === 'parent' && colName === 'payments') {
+              if (!userData.studentIds || userData.studentIds.length === 0) {
+                return { colName, data: [] };
+              }
+              const paymentQueries = [];
+              for (let index = 0; index < userData.studentIds.length; index += 30) {
+                paymentQueries.push(getDocs(query(
+                  collection(firestoreDb, colName),
+                  where('schoolId', '==', targetSchoolId),
+                  where('studentId', 'in', userData.studentIds.slice(index, index + 30))
+                )));
+              }
+              const paymentSnaps = await Promise.all(paymentQueries);
+              return {
+                colName,
+                data: paymentSnaps.flatMap(snapshot =>
+                  snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
+                )
+              };
             }
             if (userData.role === 'parent' && colName === 'students') {
-              const fetchQueries = [];
-              if (userData.studentIds && userData.studentIds.length > 0) {
-                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId), where(documentId(), 'in', userData.studentIds))));
-              }
-              if (firebaseUser.email) {
-                fetchQueries.push(getDocs(query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId), where('parentEmails', 'array-contains', firebaseUser.email.toLowerCase().trim()))));
-              }
-              if (fetchQueries.length === 0) {
-                if (colName === 'students') console.log(`[DEBUG STUDENTS] Parent sans liaison, aucun document chargé.`);
+              if (!userData.studentIds || userData.studentIds.length === 0) {
                 return { colName, data: [] };
+              }
+              const fetchQueries = [];
+              for (let index = 0; index < userData.studentIds.length; index += 30) {
+                fetchQueries.push(getDocs(query(
+                  collection(firestoreDb, colName),
+                  where('schoolId', '==', targetSchoolId),
+                  where(documentId(), 'in', userData.studentIds.slice(index, index + 30))
+                )));
               }
               const snaps = await Promise.all(fetchQueries);
               const allDocs = new Map();
               snaps.forEach((snap: QuerySnapshot<DocumentData>) => snap.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) => allDocs.set(d.id, { id: d.id, ...d.data() })));
-              console.log(`🔵 [AppContext] Lecture Firestore [${colName}] pour parent : ${allDocs.size} document(s) chargé(s).`);
-              if (colName === 'students') {
-                console.log(`[DEBUG STUDENTS] Documents trouvés (${allDocs.size}):`);
-                allDocs.forEach((val, key) => console.log(` - ID: ${key}, Name: ${val.name}, schoolId: ${val.schoolId}`));
-              }
               return { colName, data: Array.from(allDocs.values()) };
             } else {
               q = query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId));
             }
             const snap = await getDocs(q);
-            if (colName === 'students') {
-              console.log(`[DEBUG STUDENTS] Après getDocs pour students. Nombre docs: ${snap.docs.length}`);
-              snap.docs.forEach(d => console.log(` - ID: ${d.id}, Name: ${d.data().name}, schoolId: ${d.data().schoolId}`));
-            }
             console.log(`🔵 [AppContext] Lecture Firestore [${colName}] : ${snap.docs.length} document(s) chargé(s).`);
             return { colName, data: snap.docs.map(d => ({id: d.id, ...d.data()})) };
           } catch (e) {
@@ -435,6 +454,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             Object.assign(loadedDb, { [res.colName]: sanitizedData });
           }
         });
+
+        const loadedStudents = loadedDb.students as Student[];
+        let privateRecords: StudentPrivate[] = [];
+        let financeRecords: StudentFinance[] = [];
+        let parentPrivateRecords: StudentParentPrivate[] = [];
+        let parentFinanceRecords: StudentParentFinance[] = [];
+        const studentIds = loadedStudents.map(student => student.id);
+
+        if (studentIds.length > 0 && canLoadStudentPrivate(userData.role)) {
+          const privateSnapshots = await Promise.all(studentIds.map(studentId =>
+            getDoc(doc(firestoreDb, 'studentPrivate', studentId))
+          ));
+          privateRecords = privateSnapshots
+            .filter(snapshot => snapshot.exists())
+            .map(snapshot => ({ id: snapshot.id, ...snapshot.data() }) as StudentPrivate);
+        }
+
+        if (studentIds.length > 0 && canLoadStudentFinance(userData.role)) {
+          const financeSnapshots = await Promise.all(studentIds.map(studentId =>
+            getDoc(doc(firestoreDb, 'studentFinance', studentId))
+          ));
+          financeRecords = financeSnapshots
+            .filter(snapshot => snapshot.exists())
+            .map(snapshot => ({ id: snapshot.id, ...snapshot.data() }) as StudentFinance);
+        }
+
+        if (studentIds.length > 0 && canLoadStudentParentPrivate(userData.role)) {
+          const parentPrivateSnapshots = await Promise.all(studentIds.map(studentId =>
+            getDoc(doc(firestoreDb, 'studentParentPrivate', studentId))
+          ));
+          parentPrivateRecords = parentPrivateSnapshots
+            .filter(snapshot => snapshot.exists())
+            .map(snapshot => ({ id: snapshot.id, ...snapshot.data() }) as StudentParentPrivate);
+        }
+
+        if (studentIds.length > 0 && canLoadStudentParentFinance(userData.role)) {
+          const parentFinanceSnapshots = await Promise.all(studentIds.map(studentId =>
+            getDoc(doc(firestoreDb, 'studentParentFinance', studentId))
+          ));
+          parentFinanceRecords = parentFinanceSnapshots
+            .filter(snapshot => snapshot.exists())
+            .map(snapshot => ({ id: snapshot.id, ...snapshot.data() }) as StudentParentFinance);
+        }
+
+        loadedDb.students = mergeStudentRestrictedData(
+          loadedStudents,
+          privateRecords,
+          financeRecords,
+          parentPrivateRecords,
+          parentFinanceRecords
+        );
 
         console.log("5. Contenu de loadedDb.schools avant setDb final (Mode École) :", loadedDb.schools);
 
@@ -613,7 +683,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (!newItem.schoolId && col !== 'schools' && col !== 'users' && currentSchool) {
               newItem.schoolId = currentSchool.id;
             }
-            console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour ou ajout dans [${col}] :`, newItem);
+            console.log(`[AppContext] Écriture Firestore dans [${col}].`);
             await setDoc(doc(firestoreDb, col, newItem.id), newItem, { merge: true });
           }
         }
@@ -772,7 +842,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (!newItem.schoolId && col !== 'schools' && col !== 'users' && currentSchool) {
               newItem.schoolId = currentSchool.id;
             }
-            console.log(`🟢 [AppContext] Sauvegarde Firestore - Mise à jour ou ajout dans [${col}] :`, newItem);
+            console.log(`[AppContext] Écriture Firestore dans [${col}].`);
             await setDoc(doc(firestoreDb, col, newItem.id), newItem, { merge: true });
           }
         }
@@ -1020,7 +1090,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDb(prev => {
       if (!prev) return prev;
       const students = prev.students.map(item =>
-        item.id === student.id ? student : item
+        item.id === student.id ? { ...item, ...student } : item
       );
       const paymentExists = prev.payments.some(item =>
         item.id === payment.id

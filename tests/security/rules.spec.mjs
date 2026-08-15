@@ -1,7 +1,7 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import fs from 'fs';
-import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField, limit } from 'firebase/firestore';
-import { test } from '@playwright/test';
+import { setDoc, updateDoc, doc, getDoc, deleteDoc, query, where, collection, getDocs, writeBatch, deleteField, limit, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { expect, test } from '@playwright/test';
 const { describe, beforeAll: before, beforeEach, afterAll: after } = test;
 const it = test;
 
@@ -273,26 +273,59 @@ describe('Student Active Status Security Rules', () => {
       await setDoc(doc(ctx.firestore(), 'users', 'director-1'), { role: 'director', schoolId: SCHOOL_ID, active: true });
       await setDoc(doc(ctx.firestore(), 'users', 'secretary-1'), { role: 'secretary', schoolId: SCHOOL_ID, active: true });
       // Set up a class and a student
+      await setDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        name: 'School A', subscriptionPlan: 'starter', studentLimit: 2, studentsCount: 1
+      });
+      await setDoc(doc(ctx.firestore(), 'schools', 'school-B'), {
+        name: 'School B', subscriptionPlan: 'starter', studentLimit: 2, studentsCount: 1
+      });
       await setDoc(doc(ctx.firestore(), 'classes', 'class-1'), { schoolId: SCHOOL_ID, name: 'CP', isActive: true });
       await setDoc(doc(ctx.firestore(), 'students', 'student-1'), { schoolId: SCHOOL_ID, name: 'Alice', schoolingStatus: 'active', classId: 'class-1' });
+      await setDoc(doc(ctx.firestore(), 'students', 'student-B'), { schoolId: 'school-B', name: 'Bob', schoolingStatus: 'active', classId: 'class-B' });
     });
   });
 
-  it('secretary cannot deactivate active student', async () => {
+  const changeStatusAtomically = (actorId, studentId, targetStatus, schoolId = SCHOOL_ID) => {
+    const context = testEnv.authenticatedContext(actorId);
+    const db = context.firestore();
+    return runTransaction(db, async transaction => {
+      const schoolRef = doc(db, 'schools', schoolId);
+      const studentRef = doc(db, 'students', studentId);
+      const [schoolSnapshot, studentSnapshot] = await Promise.all([
+        transaction.get(schoolRef),
+        transaction.get(studentRef)
+      ]);
+      const currentStatus = studentSnapshot.data().schoolingStatus === 'inactive' ? 'inactive' : 'active';
+      if (currentStatus === targetStatus) return false;
+      const activating = targetStatus === 'active';
+      const timestamp = serverTimestamp();
+      transaction.update(schoolRef, {
+        studentsCount: schoolSnapshot.data().studentsCount + (activating ? 1 : -1),
+        lastStudentCounterMutationId: studentId,
+        lastStudentCounterMutationType: activating ? 'reactivate' : 'deactivate',
+        updatedAt: timestamp,
+        updatedBy: actorId
+      });
+      transaction.update(studentRef, {
+        schoolingStatus: targetStatus,
+        updatedAt: timestamp,
+        updatedBy: actorId
+      });
+      return true;
+    });
+  };
+
+  it('secretary can deactivate active student atomically', async () => {
+    await assertSucceeds(changeStatusAtomically('secretary-1', 'student-1', 'inactive'));
     const context = testEnv.authenticatedContext('secretary-1');
-    await assertFails(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn' })
-    );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
   });
 
-  it('secretary cannot reactivate inactive student', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'students', 'student-1'), { schoolId: SCHOOL_ID, schoolingStatus: 'inactive', classId: 'class-1' });
-    });
+  it('secretary can reactivate inactive student atomically', async () => {
+    await assertSucceeds(changeStatusAtomically('secretary-1', 'student-1', 'inactive'));
+    await assertSucceeds(changeStatusAtomically('secretary-1', 'student-1', 'active'));
     const context = testEnv.authenticatedContext('secretary-1');
-    await assertFails(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'active' })
-    );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(1);
   });
 
   it('secretary cannot update deactivation metadata', async () => {
@@ -307,27 +340,78 @@ describe('Student Active Status Security Rules', () => {
     await assertSucceeds(
       updateDoc(doc(context.firestore(), 'students', 'student-1'), { name: 'Alice Edited' })
     );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(1);
+  });
+
+  it('secretary cannot change schoolId or matricule', async () => {
+    const context = testEnv.authenticatedContext('secretary-1');
+    const studentRef = doc(context.firestore(), 'students', 'student-1');
+    await assertFails(updateDoc(studentRef, { schoolId: 'school-B' }));
+    await assertFails(updateDoc(studentRef, { matricule: 'MAT-CHANGED' }));
+  });
+
+  it('secretary cannot physically delete a student', async () => {
+    const context = testEnv.authenticatedContext('secretary-1');
+    await assertFails(deleteDoc(doc(context.firestore(), 'students', 'student-1')));
   });
 
   it('owner can deactivate student', async () => {
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
     const context = testEnv.authenticatedContext('owner-1');
-    await assertSucceeds(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn', classId: 'class-1' })
-    );
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
   });
 
   it('director can deactivate student', async () => {
-    const context = testEnv.authenticatedContext('director-1');
-    await assertSucceeds(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn', classId: 'class-1' })
-    );
+    await assertSucceeds(changeStatusAtomically('director-1', 'student-1', 'inactive'));
   });
 
   it('superAdmin can deactivate student', async () => {
-    const context = testEnv.authenticatedContext('superAdmin-1');
-    await assertSucceeds(
-      updateDoc(doc(context.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive', departureReason: 'withdrawn', classId: 'class-1' })
-    );
+    await assertSucceeds(changeStatusAtomically('superAdmin-1', 'student-1', 'inactive'));
+  });
+
+  it('reactivates atomically with capacity and increments only once', async () => {
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'active'));
+    await expect(changeStatusAtomically('owner-1', 'student-1', 'active')).resolves.toBe(false);
+    const context = testEnv.authenticatedContext('owner-1');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(1);
+  });
+
+  it('does not double-decrement on a repeated deactivation', async () => {
+    await assertSucceeds(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
+    await expect(changeStatusAtomically('owner-1', 'student-1', 'inactive')).resolves.toBe(false);
+    const context = testEnv.authenticatedContext('owner-1');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+  });
+
+  it('denies reactivation when the active quota is full', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), { studentsCount: 2 });
+      await updateDoc(doc(ctx.firestore(), 'students', 'student-1'), { schoolingStatus: 'inactive' });
+    });
+    await assertFails(changeStatusAtomically('owner-1', 'student-1', 'active'));
+    const context = testEnv.authenticatedContext('owner-1');
+    expect((await getDoc(doc(context.firestore(), 'students', 'student-1'))).data().schoolingStatus).toBe('inactive');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(2);
+  });
+
+  it('never allows the active counter to become negative', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), { studentsCount: 0 });
+    });
+    await assertFails(changeStatusAtomically('owner-1', 'student-1', 'inactive'));
+  });
+
+  it('denies arbitrary and cross-school counter updates', async () => {
+    const context = testEnv.authenticatedContext('owner-1');
+    await assertFails(updateDoc(doc(context.firestore(), 'schools', SCHOOL_ID), { studentsCount: 50 }));
+    await assertFails(updateDoc(doc(context.firestore(), 'schools', 'school-B'), {
+      studentsCount: 0,
+      lastStudentCounterMutationId: 'student-B',
+      lastStudentCounterMutationType: 'deactivate',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'owner-1'
+    }));
   });
 
   it('secretary cannot create DELETE_STUDENT validation request', async () => {
@@ -384,6 +468,1044 @@ describe('Student Active Status Security Rules', () => {
         actionType: 'DELETE_STUDENT'
       })
     );
+  });
+});
+
+describe('Student Import Shutdown Rules', () => {
+  it('denies import job creation before any server-side processing can start', async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'users', 'import-owner'), {
+        role: 'owner', schoolId: 'import-school', active: true
+      });
+    });
+    const db = testEnv.authenticatedContext('import-owner').firestore();
+    await assertFails(setDoc(doc(db, 'student_import_jobs', 'disabled-job'), {
+      id: 'disabled-job',
+      schoolId: 'import-school',
+      status: 'PENDING',
+      storagePath: 'import_jobs_data/import-school/disabled-job.json',
+      totalRows: 1,
+      processedCount: 0,
+      createdCount: 0,
+      updatedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      createdBy: 'import-owner',
+      createdAt: serverTimestamp()
+    }));
+  });
+});
+
+describe('Student Creation Schema Security Rules', () => {
+  const SCHOOL_ID = 'student-create-school';
+  const OTHER_SCHOOL_ID = 'student-create-other-school';
+  const YEAR_ID = 'student-create-year';
+  const OTHER_YEAR_ID = 'student-create-other-year';
+  const DEFAULT_MATRICULE = 'MAT-2026-1001';
+  const DEFAULT_FINGERPRINT = 'ELEVE__FICTIF__2018-01-02__M';
+
+  const validStudent = (overrides = {}) => ({
+    id: 'student-create-1',
+    schoolId: SCHOOL_ID,
+    academicYearId: YEAR_ID,
+    registrationYear: '2026-2027',
+    schoolingStatus: 'active',
+    matricule: DEFAULT_MATRICULE,
+    matriculeNormalized: DEFAULT_MATRICULE,
+    matriculeReservationId: `${SCHOOL_ID}__${DEFAULT_MATRICULE}`,
+    duplicateFingerprint: DEFAULT_FINGERPRINT,
+    duplicateReservationId: `${SCHOOL_ID}__${DEFAULT_FINGERPRINT}`,
+    name: 'Élève Fictif',
+    studentLastName: 'Élève',
+    studentFirstName: 'Fictif',
+    gender: 'M',
+    section: 'francophone',
+    classId: 'student-create-class',
+    studentStatus: 'nouveau',
+    createdAt: serverTimestamp(),
+    createdBy: 'student-create-secretary',
+    updatedAt: serverTimestamp(),
+    updatedBy: 'student-create-secretary',
+    ...overrides
+  });
+
+  const validStudentPrivate = (studentId = 'student-create-1', overrides = {}) => ({
+    id: studentId,
+    schoolId: SCHOOL_ID,
+    studentId,
+    dob: '2018-01-02',
+    parentName: 'Responsable Fictif',
+    parentPhone: '+237600000000',
+    createdAt: serverTimestamp(),
+    createdBy: 'student-create-secretary',
+    updatedAt: serverTimestamp(),
+    updatedBy: 'student-create-secretary',
+    ...overrides
+  });
+
+  const validStudentFinance = (studentId = 'student-create-1', overrides = {}) => ({
+    id: studentId,
+    schoolId: SCHOOL_ID,
+    studentId,
+    registrationFeePaid: 0,
+    registrationFeeStatus: 'unpaid',
+    feeT1: 1000,
+    feeT2: 2000,
+    feeT3: 3000,
+    financialBypass: { t1: false, t2: false, t3: false },
+    createdAt: serverTimestamp(),
+    createdBy: 'student-create-secretary',
+    updatedAt: serverTimestamp(),
+    updatedBy: 'student-create-secretary',
+    ...overrides
+  });
+
+  const validStudentParentPrivate = (studentId = 'student-create-1', overrides = {}) => ({
+    id: studentId,
+    schoolId: SCHOOL_ID,
+    studentId,
+    dob: '2018-01-02',
+    createdAt: serverTimestamp(),
+    createdBy: 'student-create-secretary',
+    updatedAt: serverTimestamp(),
+    updatedBy: 'student-create-secretary',
+    ...overrides
+  });
+
+  const validStudentParentFinance = (studentId = 'student-create-1', overrides = {}) => ({
+    id: studentId,
+    schoolId: SCHOOL_ID,
+    studentId,
+    feeT1: 1000,
+    feeT2: 2000,
+    feeT3: 3000,
+    financialBypass: { t1: false, t2: false, t3: false },
+    createdAt: serverTimestamp(),
+    createdBy: 'student-create-secretary',
+    updatedAt: serverTimestamp(),
+    updatedBy: 'student-create-secretary',
+    ...overrides
+  });
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'users', 'student-create-secretary'), {
+        role: 'secretary', schoolId: SCHOOL_ID, active: true
+      });
+      await setDoc(doc(db, 'schools', SCHOOL_ID), {
+        name: 'École fictive', isInternalSchool: true, activeAcademicYearId: YEAR_ID, studentsCount: 0
+      });
+      await setDoc(doc(db, 'schools', OTHER_SCHOOL_ID), {
+        name: 'Autre école fictive', isInternalSchool: true, activeAcademicYearId: OTHER_YEAR_ID, studentsCount: 0
+      });
+      await setDoc(doc(db, 'academicYears', YEAR_ID), {
+        schoolId: SCHOOL_ID, name: '2026-2027', status: 'active'
+      });
+      await setDoc(doc(db, 'academicYears', OTHER_YEAR_ID), {
+        schoolId: OTHER_SCHOOL_ID, name: '2026-2027', status: 'active'
+      });
+      await setDoc(doc(db, 'classes', 'student-create-class'), {
+        schoolId: SCHOOL_ID, name: 'Classe fictive', isActive: true
+      });
+      await setDoc(doc(db, 'classes', 'student-create-inactive-class'), {
+        schoolId: SCHOOL_ID, name: 'Classe inactive', isActive: false
+      });
+      await setDoc(doc(db, 'classes', 'student-create-other-class'), {
+        schoolId: OTHER_SCHOOL_ID, name: 'Autre classe', isActive: true
+      });
+    });
+  });
+
+  const createStudent = (payload, studentId = 'student-create-1', privateOverrides = {}, financeOverrides = {}, parentPrivateOverrides = {}, parentFinanceOverrides = {}) => {
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    const db = context.firestore();
+    const reservationSchoolId = payload.schoolId || SCHOOL_ID;
+    const matriculeReservationId = payload.matriculeReservationId || `${payload.schoolId}__${payload.matriculeNormalized}`;
+    const duplicateReservationId = payload.duplicateReservationId || `${payload.schoolId}__${payload.duplicateFingerprint}`;
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'schools', reservationSchoolId), {
+      studentsCount: 1,
+      lastStudentCounterMutationId: studentId,
+      lastStudentCounterMutationType: 'create',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'student-create-secretary'
+    });
+    batch.set(doc(db, 'students', studentId), payload);
+    batch.set(doc(db, 'studentPrivate', studentId), validStudentPrivate(studentId, {
+      schoolId: reservationSchoolId,
+      ...privateOverrides
+    }));
+    batch.set(doc(db, 'studentFinance', studentId), validStudentFinance(studentId, {
+      schoolId: reservationSchoolId,
+      ...financeOverrides
+    }));
+    batch.set(doc(db, 'studentParentPrivate', studentId), validStudentParentPrivate(studentId, {
+      schoolId: reservationSchoolId,
+      ...parentPrivateOverrides
+    }));
+    batch.set(doc(db, 'studentParentFinance', studentId), validStudentParentFinance(studentId, {
+      schoolId: reservationSchoolId,
+      ...parentFinanceOverrides
+    }));
+    batch.set(doc(db, 'studentMatriculeReservations', matriculeReservationId), {
+      id: matriculeReservationId,
+      schoolId: reservationSchoolId,
+      studentId,
+      matriculeNormalized: payload.matriculeNormalized,
+      createdAt: serverTimestamp(),
+      createdBy: 'student-create-secretary'
+    });
+    batch.set(doc(db, 'studentDuplicateReservations', duplicateReservationId), {
+      id: duplicateReservationId,
+      schoolId: reservationSchoolId,
+      duplicateFingerprint: payload.duplicateFingerprint,
+      studentIds: [studentId],
+      lastStudentId: studentId,
+      createdAt: serverTimestamp(),
+      createdBy: 'student-create-secretary',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'student-create-secretary'
+    });
+    return batch.commit();
+  };
+
+  const createStudentTransactionally = ({
+    studentId,
+    matricule,
+    fingerprint,
+    confirmProbableDuplicate = false
+  }) => {
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    const db = context.firestore();
+    const matriculeReservationId = `${SCHOOL_ID}__${matricule}`;
+    const duplicateReservationId = `${SCHOOL_ID}__${fingerprint}`;
+
+    return runTransaction(db, async transaction => {
+      const studentRef = doc(db, 'students', studentId);
+      const matriculeRef = doc(db, 'studentMatriculeReservations', matriculeReservationId);
+      const duplicateRef = doc(db, 'studentDuplicateReservations', duplicateReservationId);
+      const schoolRef = doc(db, 'schools', SCHOOL_ID);
+      const [schoolSnapshot, matriculeReservation, duplicateReservation] = await Promise.all([
+        transaction.get(schoolRef),
+        transaction.get(matriculeRef),
+        transaction.get(duplicateRef)
+      ]);
+
+      if (matriculeReservation.exists()) {
+        if (matriculeReservation.data().studentId === studentId) return false;
+        throw new Error('MATRICULE_ALREADY_EXISTS');
+      }
+      if (duplicateReservation.exists() && !confirmProbableDuplicate) {
+        throw new Error('PROBABLE_DUPLICATE');
+      }
+
+      const timestamp = serverTimestamp();
+      transaction.update(schoolRef, {
+        studentsCount: schoolSnapshot.data().studentsCount + 1,
+        lastStudentCounterMutationId: studentId,
+        lastStudentCounterMutationType: 'create',
+        updatedAt: timestamp,
+        updatedBy: 'student-create-secretary'
+      });
+      transaction.set(studentRef, validStudent({
+        id: studentId,
+        matricule,
+        matriculeNormalized: matricule,
+        matriculeReservationId,
+        duplicateFingerprint: fingerprint,
+        duplicateReservationId
+      }));
+      transaction.set(doc(db, 'studentPrivate', studentId), validStudentPrivate(studentId));
+      transaction.set(doc(db, 'studentFinance', studentId), validStudentFinance(studentId));
+      transaction.set(doc(db, 'studentParentPrivate', studentId), validStudentParentPrivate(studentId));
+      transaction.set(doc(db, 'studentParentFinance', studentId), validStudentParentFinance(studentId));
+      transaction.set(matriculeRef, {
+        id: matriculeReservationId,
+        schoolId: SCHOOL_ID,
+        studentId,
+        matriculeNormalized: matricule,
+        createdAt: timestamp,
+        createdBy: 'student-create-secretary'
+      });
+      if (duplicateReservation.exists()) {
+        transaction.update(duplicateRef, {
+          studentIds: [...duplicateReservation.data().studentIds, studentId],
+          lastStudentId: studentId,
+          updatedAt: timestamp,
+          updatedBy: 'student-create-secretary'
+        });
+      } else {
+        transaction.set(duplicateRef, {
+          id: duplicateReservationId,
+          schoolId: SCHOOL_ID,
+          duplicateFingerprint: fingerprint,
+          studentIds: [studentId],
+          lastStudentId: studentId,
+          createdAt: timestamp,
+          createdBy: 'student-create-secretary',
+          updatedAt: timestamp,
+          updatedBy: 'student-create-secretary'
+        });
+      }
+      return true;
+    });
+  };
+
+  it('denies a valid direct client creation because the callable is mandatory', async () => {
+    await assertFails(createStudent(validStudent()));
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+  });
+
+  it('denies direct client creation of every modern student companion document', async () => {
+    const db = testEnv.authenticatedContext('student-create-secretary').firestore();
+    const studentId = 'direct-companion-denied';
+    const attempts = [
+      setDoc(doc(db, 'studentPrivate', studentId), validStudentPrivate(studentId)),
+      setDoc(doc(db, 'studentFinance', studentId), validStudentFinance(studentId)),
+      setDoc(doc(db, 'studentParentPrivate', studentId), validStudentParentPrivate(studentId)),
+      setDoc(doc(db, 'studentParentFinance', studentId), validStudentParentFinance(studentId)),
+      setDoc(doc(db, 'studentMatriculeReservations', `${SCHOOL_ID}__MAT-2026-2990`), {
+        id: `${SCHOOL_ID}__MAT-2026-2990`, schoolId: SCHOOL_ID, studentId,
+        matriculeNormalized: 'MAT-2026-2990', createdAt: serverTimestamp(), createdBy: 'student-create-secretary'
+      }),
+      setDoc(doc(db, 'studentDuplicateReservations', `${SCHOOL_ID}__DIRECT__DENIED`), {
+        id: `${SCHOOL_ID}__DIRECT__DENIED`, schoolId: SCHOOL_ID, duplicateFingerprint: 'DIRECT__DENIED',
+        studentIds: [studentId], lastStudentId: studentId, createdAt: serverTimestamp(),
+        createdBy: 'student-create-secretary', updatedAt: serverTimestamp(), updatedBy: 'student-create-secretary'
+      })
+    ];
+    for (const attempt of attempts) await assertFails(attempt);
+  });
+
+  it('denies creation when only the legacy studentCount is initialized', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        studentsCount: deleteField(),
+        studentCount: 0
+      });
+    });
+    await assertFails(createStudent(validStudent()));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      expect((await getDoc(doc(ctx.firestore(), 'students', 'student-create-1'))).exists()).toBe(false);
+      expect((await getDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID))).data().studentCount).toBe(0);
+    });
+  });
+
+  it('denies creation at quota and leaves the counter unchanged', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        isInternalSchool: false,
+        subscriptionPlan: 'starter',
+        studentLimit: 100,
+        studentsCount: 100
+      });
+    });
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-quota-full',
+      matricule: 'MAT-2026-2100',
+      fingerprint: 'QUOTA__FULL__2018-01-02__F'
+    }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(100);
+      expect((await getDoc(doc(db, 'students', 'student-quota-full'))).exists()).toBe(false);
+    });
+  });
+
+  it('denies direct creation even for an unlimited runtime plan', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        isInternalSchool: false,
+        subscriptionPlan: 'premium',
+        studentLimit: 1,
+        studentsCount: 500
+      });
+    });
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-unlimited',
+      matricule: 'MAT-2026-2101',
+      fingerprint: 'UNLIMITED__PLAN__2018-01-02__M'
+    }));
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    expect((await getDoc(doc(context.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(500);
+  });
+
+  it('denies both direct concurrent creations for the last quota slot', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await updateDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID), {
+        isInternalSchool: false,
+        subscriptionPlan: 'starter',
+        studentLimit: 100,
+        studentsCount: 99
+      });
+    });
+    const results = await Promise.allSettled([
+      createStudentTransactionally({
+        studentId: 'student-last-slot-1',
+        matricule: 'MAT-2026-2102',
+        fingerprint: 'LAST__SLOT__ONE__M'
+      }),
+      createStudentTransactionally({
+        studentId: 'student-last-slot-2',
+        matricule: 'MAT-2026-2103',
+        fingerprint: 'LAST__SLOT__TWO__F'
+      })
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(0);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(2);
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(99);
+      const students = await getDocs(query(collection(db, 'students'), where('id', 'in', [
+        'student-last-slot-1', 'student-last-slot-2'
+      ])));
+      expect(students.size).toBe(0);
+    });
+  });
+
+  it('denies a cross-school student creation', async () => {
+    await assertFails(createStudent(validStudent({
+      schoolId: OTHER_SCHOOL_ID,
+      academicYearId: OTHER_YEAR_ID,
+      classId: 'student-create-other-class'
+    })));
+  });
+
+  it('denies a class from another school', async () => {
+    await assertFails(createStudent(validStudent({ classId: 'student-create-other-class' })));
+  });
+
+  it('denies an inactive class', async () => {
+    await assertFails(createStudent(validStudent({ classId: 'student-create-inactive-class' })));
+  });
+
+  it('denies a missing academic year', async () => {
+    const payload = validStudent();
+    delete payload.academicYearId;
+    await assertFails(createStudent(payload));
+  });
+
+  it('denies an academic year different from the school active pointer', async () => {
+    await assertFails(createStudent(validStudent({ academicYearId: OTHER_YEAR_ID })));
+  });
+
+  it('denies invalid required field types', async () => {
+    await assertFails(createStudent(validStudent(), 'student-create-1', { parentPhone: 600000000 }));
+  });
+
+  it('denies an invalid initial schooling status', async () => {
+    await assertFails(createStudent(validStudent({ schoolingStatus: 'inactive' })));
+  });
+
+  it('denies a missing schoolId', async () => {
+    const payload = validStudent();
+    delete payload.schoolId;
+    await assertFails(createStudent(payload));
+  });
+
+  it('denies arbitrary client fields outside the creation schema', async () => {
+    await assertFails(createStudent(validStudent({ claims: { admin: true } })));
+  });
+
+  it('denies financial source fields in a modern students document', async () => {
+    await assertFails(createStudent(validStudent({ feeT1: 1000 })));
+    await assertFails(createStudent(validStudent({ financialBypass: { t1: true } })));
+  });
+
+  it('denies both direct concurrent creations for the same normalized matricule', async () => {
+    const results = await Promise.allSettled([
+      createStudentTransactionally({
+        studentId: 'student-concurrent-1',
+        matricule: 'MAT-2026-2001',
+        fingerprint: 'ALPHA__ONE__2018-01-02__M'
+      }),
+      createStudentTransactionally({
+        studentId: 'student-concurrent-2',
+        matricule: 'MAT-2026-2001',
+        fingerprint: 'BETA__TWO__2018-02-03__F'
+      })
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(0);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(2);
+
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      const students = await getDocs(query(collection(db, 'students'), where('matriculeNormalized', '==', 'MAT-2026-2001')));
+      const reservations = await getDocs(query(collection(db, 'studentMatriculeReservations'), where('matriculeNormalized', '==', 'MAT-2026-2001')));
+      expect(students.size).toBe(0);
+      expect(reservations.size).toBe(0);
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+    });
+  });
+
+  it('rejects a matricule that is already reserved', async () => {
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-existing-1',
+      matricule: 'MAT-2026-2010',
+      fingerprint: 'EXISTING__ONE__2018-01-02__M'
+    }));
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-existing-2',
+      matricule: 'MAT-2026-2010',
+      fingerprint: 'EXISTING__TWO__2018-02-03__F'
+    }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      expect((await getDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+    });
+  });
+
+  it('denies direct retries with the same student id', async () => {
+    const request = {
+      studentId: 'student-retry-1',
+      matricule: 'MAT-2026-2002',
+      fingerprint: 'RETRY__SAFE__2018-01-02__M'
+    };
+    await assertFails(createStudentTransactionally(request));
+    await assertFails(createStudentTransactionally(request));
+  });
+
+  it('signals concurrent probable duplicates with different matricules', async () => {
+    const results = await Promise.allSettled([
+      createStudentTransactionally({
+        studentId: 'student-probable-1',
+        matricule: 'MAT-2026-2003',
+        fingerprint: 'DUPONT__ALICE__2018-01-02__F'
+      }),
+      createStudentTransactionally({
+        studentId: 'student-probable-2',
+        matricule: 'MAT-2026-2004',
+        fingerprint: 'DUPONT__ALICE__2018-01-02__F'
+      })
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(0);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(2);
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      expect((await getDoc(doc(ctx.firestore(), 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+    });
+  });
+
+  it('still denies a direct client creation with an explicitly confirmed probable duplicate', async () => {
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-twin-1',
+      matricule: 'MAT-2026-2005',
+      fingerprint: 'JUMEAU__TEST__2018-01-02__M'
+    }));
+    await assertFails(createStudentTransactionally({
+      studentId: 'student-twin-2',
+      matricule: 'MAT-2026-2006',
+      fingerprint: 'JUMEAU__TEST__2018-01-02__M',
+      confirmProbableDuplicate: true
+    }));
+  });
+
+  it('denies a reservation for another school', async () => {
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    const reservationId = `${OTHER_SCHOOL_ID}__MAT-2026-2999`;
+    await assertFails(setDoc(doc(context.firestore(), 'studentMatriculeReservations', reservationId), {
+      id: reservationId,
+      schoolId: OTHER_SCHOOL_ID,
+      studentId: 'student-cross-school-reservation',
+      matriculeNormalized: 'MAT-2026-2999',
+      createdAt: serverTimestamp(),
+      createdBy: 'student-create-secretary'
+    }));
+  });
+
+  it('leaves no reservation after an atomic student creation failure', async () => {
+    const payload = validStudent({ classId: 'student-create-inactive-class' });
+    await assertFails(createStudent(payload));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'studentMatriculeReservations', payload.matriculeReservationId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentDuplicateReservations', payload.duplicateReservationId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'schools', SCHOOL_ID))).data().studentsCount).toBe(0);
+    });
+  });
+
+  it('leaves no partial student when the private document is invalid', async () => {
+    const studentId = 'student-private-failure';
+    const payload = validStudent({ id: studentId });
+    await assertFails(createStudent(payload, studentId, { schoolId: OTHER_SCHOOL_ID }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'students', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentPrivate', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentFinance', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentParentPrivate', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentParentFinance', studentId))).exists()).toBe(false);
+    });
+  });
+
+  it('leaves no partial student when the finance document is invalid', async () => {
+    const studentId = 'student-finance-failure';
+    const payload = validStudent({ id: studentId });
+    await assertFails(createStudent(payload, studentId, {}, {
+      registrationFeePaid: 100,
+      registrationFeeStatus: 'partial'
+    }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'students', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentPrivate', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentFinance', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentParentPrivate', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentParentFinance', studentId))).exists()).toBe(false);
+      const matriculeReservationId = payload.matriculeReservationId;
+      expect((await getDoc(doc(db, 'studentMatriculeReservations', matriculeReservationId))).exists()).toBe(false);
+    });
+  });
+
+  it('leaves no partial student when the parent private projection is invalid', async () => {
+    const studentId = 'student-parent-private-failure';
+    const payload = validStudent({ id: studentId });
+    await assertFails(createStudent(payload, studentId, {}, {}, { dob: 'invalid' }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'students', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentPrivate', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentParentPrivate', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentParentFinance', studentId))).exists()).toBe(false);
+    });
+  });
+
+  it('leaves no partial student when the parent finance projection is invalid', async () => {
+    const studentId = 'student-parent-finance-failure';
+    const payload = validStudent({ id: studentId });
+    await assertFails(createStudent(payload, studentId, {}, {}, {}, { feeT1: 'invalid' }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      expect((await getDoc(doc(db, 'students', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentFinance', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentParentFinance', studentId))).exists()).toBe(false);
+      expect((await getDoc(doc(db, 'studentMatriculeReservations', payload.matriculeReservationId))).exists()).toBe(false);
+    });
+  });
+
+  it('denies deletion or reassignment of an existing matricule reservation', async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'studentMatriculeReservations', `${SCHOOL_ID}__${DEFAULT_MATRICULE}`), {
+        id: `${SCHOOL_ID}__${DEFAULT_MATRICULE}`,
+        schoolId: SCHOOL_ID,
+        studentId: 'student-create-1',
+        matriculeNormalized: DEFAULT_MATRICULE
+      });
+    });
+    const context = testEnv.authenticatedContext('student-create-secretary');
+    const reservationRef = doc(context.firestore(), 'studentMatriculeReservations', `${SCHOOL_ID}__${DEFAULT_MATRICULE}`);
+    await assertFails(updateDoc(reservationRef, { studentId: 'student-create-other' }));
+    await assertFails(deleteDoc(reservationRef));
+  });
+});
+
+describe('Student Privacy Security Rules', () => {
+  const SCHOOL_ID = 'privacy-school';
+  const OTHER_SCHOOL_ID = 'privacy-other-school';
+  const STUDENT_ID = 'privacy-student';
+  const OTHER_STUDENT_ID = 'privacy-other-student';
+  const LEGACY_STUDENT_ID = 'privacy-legacy-student';
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      for (const [id, role, schoolId] of [
+        ['privacy-owner', 'owner', SCHOOL_ID],
+        ['privacy-director', 'director', SCHOOL_ID],
+        ['privacy-secretary', 'secretary', SCHOOL_ID],
+        ['privacy-teacher', 'teacher', SCHOOL_ID],
+        ['privacy-accountant', 'accountant', SCHOOL_ID],
+        ['privacy-board', 'boardViewer', SCHOOL_ID],
+        ['privacy-driver', 'driver', SCHOOL_ID],
+        ['privacy-parent', 'parent', SCHOOL_ID],
+        ['privacy-cross-parent', 'parent', OTHER_SCHOOL_ID],
+        ['privacy-other-owner', 'owner', OTHER_SCHOOL_ID],
+        ['privacy-other-secretary', 'secretary', OTHER_SCHOOL_ID],
+        ['privacy-superadmin', 'superAdmin', null]
+      ]) {
+        await setDoc(doc(db, 'users', id), { role, schoolId, active: true });
+      }
+      await updateDoc(doc(db, 'users', 'privacy-parent'), { studentIds: [STUDENT_ID] });
+      await updateDoc(doc(db, 'users', 'privacy-cross-parent'), { studentIds: [STUDENT_ID] });
+      await setDoc(doc(db, 'students', STUDENT_ID), {
+        id: STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        name: 'Élève Confidentialité',
+        studentLastName: 'Élève',
+        studentFirstName: 'Confidentialité',
+        gender: 'F',
+        section: 'francophone',
+        classId: 'privacy-class',
+        schoolingStatus: 'active',
+        matriculeReservationId: `${SCHOOL_ID}__MAT-PRIVACY-1`
+      });
+      await setDoc(doc(db, 'studentPrivate', STUDENT_ID), {
+        id: STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        studentId: STUDENT_ID,
+        dob: '2018-01-02',
+        parentName: 'Parent Privé',
+        parentPhone: '+237600000000',
+        allergies: 'Information médicale fictive'
+      });
+      await setDoc(doc(db, 'studentFinance', STUDENT_ID), {
+        id: STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        studentId: STUDENT_ID,
+        registrationFeePaid: 0,
+        registrationFeeStatus: 'unpaid',
+        feeT1: 1000,
+        feeT2: 2000,
+        feeT3: 3000,
+        financialBypass: { t1: false, t2: false, t3: false }
+      });
+      await setDoc(doc(db, 'studentParentPrivate', STUDENT_ID), {
+        id: STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        studentId: STUDENT_ID,
+        dob: '2018-01-02'
+      });
+      await setDoc(doc(db, 'studentParentFinance', STUDENT_ID), {
+        id: STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        studentId: STUDENT_ID,
+        feeT1: 1000,
+        feeT2: 2000,
+        feeT3: 3000,
+        financialBypass: { t1: false, t2: false, t3: false }
+      });
+      await setDoc(doc(db, 'students', OTHER_STUDENT_ID), {
+        id: OTHER_STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        name: 'Autre Élève',
+        studentLastName: 'Autre',
+        studentFirstName: 'Élève',
+        gender: 'M',
+        section: 'francophone',
+        classId: 'privacy-class',
+        schoolingStatus: 'active'
+      });
+      await setDoc(doc(db, 'students', LEGACY_STUDENT_ID), {
+        id: LEGACY_STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        name: 'Élève Legacy',
+        studentLastName: 'Legacy',
+        studentFirstName: 'Élève',
+        gender: 'F',
+        section: 'francophone',
+        classId: 'privacy-class',
+        schoolingStatus: 'active'
+      });
+      await setDoc(doc(db, 'studentFinance', OTHER_STUDENT_ID), {
+        id: OTHER_STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        studentId: OTHER_STUDENT_ID,
+        registrationFeePaid: 0,
+        registrationFeeStatus: 'unpaid'
+      });
+      await setDoc(doc(db, 'studentParentPrivate', OTHER_STUDENT_ID), {
+        id: OTHER_STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        studentId: OTHER_STUDENT_ID,
+        dob: '2018-02-03'
+      });
+      await setDoc(doc(db, 'studentParentFinance', OTHER_STUDENT_ID), {
+        id: OTHER_STUDENT_ID,
+        schoolId: SCHOOL_ID,
+        studentId: OTHER_STUDENT_ID,
+        feeT1: 1000,
+        feeT2: 2000,
+        feeT3: 3000,
+        financialBypass: { t1: false, t2: false, t3: false }
+      });
+      await setDoc(doc(db, 'payments', 'privacy-payment-own'), {
+        schoolId: SCHOOL_ID,
+        studentId: STUDENT_ID,
+        amount: 1000
+      });
+      await setDoc(doc(db, 'payments', 'privacy-payment-other'), {
+        schoolId: SCHOOL_ID,
+        studentId: OTHER_STUDENT_ID,
+        amount: 1000
+      });
+    });
+  });
+
+  const readAs = (uid, collectionName) => {
+    const context = testEnv.authenticatedContext(uid);
+    return getDoc(doc(context.firestore(), collectionName, STUDENT_ID));
+  };
+
+  it('allows owner to read school and private student data in the same school', async () => {
+    await assertSucceeds(readAs('privacy-owner', 'students'));
+    await assertSucceeds(readAs('privacy-owner', 'studentPrivate'));
+  });
+
+  it('returns missing separated projections for a same-school legacy student without permission errors', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    const db = context.firestore();
+    const missingPrivate = await assertSucceeds(getDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID)));
+    const missingFinance = await assertSucceeds(getDoc(doc(db, 'studentFinance', LEGACY_STUDENT_ID)));
+    const missingParentPrivate = await assertSucceeds(getDoc(doc(db, 'studentParentPrivate', LEGACY_STUDENT_ID)));
+    const missingParentFinance = await assertSucceeds(getDoc(doc(db, 'studentParentFinance', LEGACY_STUDENT_ID)));
+
+    expect(missingPrivate.exists()).toBe(false);
+    expect(missingFinance.exists()).toBe(false);
+    expect(missingParentPrivate.exists()).toBe(false);
+    expect(missingParentFinance.exists()).toBe(false);
+  });
+
+  it('allows a manager to create missing private projections without writing medical data publicly', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    const db = context.firestore();
+    const batch = writeBatch(db);
+    const audit = {
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-owner',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-owner'
+    };
+    batch.set(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      dob: '2018-01-02',
+      allergies: 'Arachides',
+      medicalConditions: 'Asthme',
+      ...audit
+    });
+    batch.set(doc(db, 'studentParentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      dob: '2018-01-02',
+      ...audit
+    });
+
+    await assertSucceeds(batch.commit());
+    const publicStudent = await getDoc(doc(db, 'students', LEGACY_STUDENT_ID));
+    expect(publicStudent.data()).not.toHaveProperty('allergies');
+    expect(publicStudent.data()).not.toHaveProperty('medicalConditions');
+  });
+
+  it('denies cross-school creation of a missing private projection', async () => {
+    const context = testEnv.authenticatedContext('privacy-other-owner');
+    const db = context.firestore();
+    await assertFails(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-other-owner',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-other-owner'
+    }));
+  });
+
+  it('denies unauthenticated creation of a missing private projection', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'anonymous',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'anonymous'
+    }));
+  });
+
+  it('denies a non-manager role creating a missing private projection', async () => {
+    const context = testEnv.authenticatedContext('privacy-teacher');
+    const db = context.firestore();
+    await assertFails(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-teacher',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-teacher'
+    }));
+  });
+
+  it('allows superAdmin to create a missing private projection for the selected school', async () => {
+    const context = testEnv.authenticatedContext('privacy-superadmin');
+    const db = context.firestore();
+    await assertSucceeds(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      allergies: 'Arachides',
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-superadmin',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-superadmin'
+    }));
+  });
+
+  it('allows director and secretary to read private student data in the same school', async () => {
+    await assertSucceeds(readAs('privacy-director', 'studentPrivate'));
+    await assertSucceeds(readAs('privacy-secretary', 'studentPrivate'));
+  });
+
+  it('allows teacher to read school data but denies private data', async () => {
+    await assertSucceeds(readAs('privacy-teacher', 'students'));
+    await assertFails(readAs('privacy-teacher', 'studentPrivate'));
+    await assertFails(readAs('privacy-teacher', 'studentParentPrivate'));
+    await assertFails(readAs('privacy-teacher', 'studentParentFinance'));
+  });
+
+  it('allows accountant finance data but denies private and medical data', async () => {
+    await assertSucceeds(readAs('privacy-accountant', 'studentFinance'));
+    await assertFails(readAs('privacy-accountant', 'studentPrivate'));
+    await assertFails(readAs('privacy-accountant', 'studentParentPrivate'));
+    await assertFails(readAs('privacy-accountant', 'studentParentFinance'));
+  });
+
+  it('denies private data to boardViewer and driver', async () => {
+    await assertSucceeds(readAs('privacy-board', 'students'));
+    await assertFails(readAs('privacy-board', 'studentPrivate'));
+    await assertFails(readAs('privacy-board', 'studentFinance'));
+    await assertFails(readAs('privacy-board', 'studentParentPrivate'));
+    await assertFails(readAs('privacy-board', 'studentParentFinance'));
+    await assertFails(readAs('privacy-driver', 'studentPrivate'));
+  });
+
+  it('denies private data cross-school to owner and secretary', async () => {
+    await assertFails(readAs('privacy-other-owner', 'studentPrivate'));
+    await assertFails(readAs('privacy-other-secretary', 'studentPrivate'));
+  });
+
+  it('allows a linked parent to read the school and parent-private projection only', async () => {
+    await assertSucceeds(readAs('privacy-parent', 'students'));
+    await assertFails(readAs('privacy-parent', 'studentPrivate'));
+    await assertSucceeds(readAs('privacy-parent', 'studentParentPrivate'));
+    const context = testEnv.authenticatedContext('privacy-parent');
+    await assertFails(getDoc(doc(context.firestore(), 'studentParentPrivate', OTHER_STUDENT_ID)));
+    await assertFails(readAs('privacy-cross-parent', 'studentParentPrivate'));
+  });
+
+  it('allows a linked parent projection finance and payments for their child only', async () => {
+    const context = testEnv.authenticatedContext('privacy-parent');
+    const db = context.firestore();
+    await assertFails(getDoc(doc(db, 'studentFinance', STUDENT_ID)));
+    await assertFails(getDoc(doc(db, 'studentFinance', OTHER_STUDENT_ID)));
+    await assertSucceeds(getDoc(doc(db, 'studentParentFinance', STUDENT_ID)));
+    await assertFails(getDoc(doc(db, 'studentParentFinance', OTHER_STUDENT_ID)));
+    await assertFails(readAs('privacy-cross-parent', 'studentParentFinance'));
+    await assertSucceeds(getDoc(doc(db, 'payments', 'privacy-payment-own')));
+    await assertFails(getDoc(doc(db, 'payments', 'privacy-payment-other')));
+  });
+
+  it('denies parent writes to parent projections', async () => {
+    const context = testEnv.authenticatedContext('privacy-parent');
+    const db = context.firestore();
+    await assertFails(updateDoc(doc(db, 'studentParentPrivate', STUDENT_ID), { dob: '2018-04-05' }));
+    await assertFails(updateDoc(doc(db, 'studentParentFinance', STUDENT_ID), { feeT1: 0 }));
+    await assertFails(deleteDoc(doc(db, 'studentParentFinance', STUDENT_ID)));
+  });
+
+  it('keeps all parent finance fields synchronized in administrative transactions', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    const db = context.firestore();
+    for (const [field, value] of [
+      ['feeT1', 1100],
+      ['feeT2', 2200],
+      ['feeT3', 3300],
+      ['financialBypass', { t1: true, t2: false, t3: false }]
+    ]) {
+      await assertSucceeds(runTransaction(db, async transaction => {
+        const timestamp = serverTimestamp();
+        transaction.update(doc(db, 'studentFinance', STUDENT_ID), {
+          [field]: value, updatedAt: timestamp, updatedBy: 'privacy-owner'
+        });
+        transaction.update(doc(db, 'studentParentFinance', STUDENT_ID), {
+          [field]: value, updatedAt: timestamp, updatedBy: 'privacy-owner'
+        });
+      }));
+    }
+  });
+
+  it('rolls back finance when the parent projection write is inconsistent', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    const db = context.firestore();
+    await assertFails(runTransaction(db, async transaction => {
+      const timestamp = serverTimestamp();
+      transaction.update(doc(db, 'studentFinance', STUDENT_ID), {
+        feeT1: 9999, updatedAt: timestamp, updatedBy: 'privacy-owner'
+      });
+      transaction.update(doc(db, 'studentParentFinance', STUDENT_ID), {
+        feeT1: 1, updatedAt: timestamp, updatedBy: 'privacy-owner'
+      });
+    }));
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const dbAdmin = ctx.firestore();
+      expect((await getDoc(doc(dbAdmin, 'studentFinance', STUDENT_ID))).data().feeT1).toBe(1000);
+      expect((await getDoc(doc(dbAdmin, 'studentParentFinance', STUDENT_ID))).data().feeT1).toBe(1000);
+    });
+  });
+
+  it('denies changing the schoolId of a private document and denies physical delete', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    const privateRef = doc(context.firestore(), 'studentPrivate', STUDENT_ID);
+    await assertFails(updateDoc(privateRef, { schoolId: OTHER_SCHOOL_ID }));
+    await assertFails(deleteDoc(privateRef));
+  });
+
+  it('denies reinjecting a private field into a separated student document', async () => {
+    const context = testEnv.authenticatedContext('privacy-owner');
+    await assertFails(updateDoc(doc(context.firestore(), 'students', STUDENT_ID), {
+      parentPhone: '+237699999999'
+    }));
+  });
+
+  for (const uid of [
+    'privacy-owner',
+    'privacy-director',
+    'privacy-secretary',
+    'privacy-superadmin'
+  ]) {
+    it(`denies medical and financial writes to a legacy public student for ${uid}`, async () => {
+      const context = testEnv.authenticatedContext(uid);
+      const publicRef = doc(context.firestore(), 'students', LEGACY_STUDENT_ID);
+
+      await assertFails(updateDoc(publicRef, { allergies: 'Arachides' }));
+      await assertFails(updateDoc(publicRef, { medicalConditions: 'Asthme' }));
+      await assertFails(updateDoc(publicRef, { tuitionPaid: 1000 }));
+    });
+  }
+
+  it('denies unauthenticated medical writes to a legacy public student', async () => {
+    const publicRef = doc(testEnv.unauthenticatedContext().firestore(), 'students', LEGACY_STUDENT_ID);
+    await assertFails(updateDoc(publicRef, { allergies: 'Arachides' }));
+  });
+
+  it('allows same-school creation of missing finance and denies cross-school creation', async () => {
+    const ownerDb = testEnv.authenticatedContext('privacy-owner').firestore();
+    const audit = {
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-owner',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-owner'
+    };
+    await assertSucceeds(setDoc(doc(ownerDb, 'studentFinance', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      feeT1: 1100,
+      ...audit
+    }));
+
+    const otherDb = testEnv.authenticatedContext('privacy-other-owner').firestore();
+    await assertFails(updateDoc(doc(otherDb, 'studentFinance', LEGACY_STUDENT_ID), {
+      feeT1: 2200,
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-other-owner'
+    }));
   });
 });
 

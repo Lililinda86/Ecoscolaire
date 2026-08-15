@@ -1,6 +1,6 @@
 import { type Page } from '@playwright/test';
 
-export async function loginAs(page: Page, email: string, password: string = 'Test@2026Alpha!') {
+export async function loginAs(page: Page, email: string, password: string) {
   const logs: string[] = [];
   page.on('console', msg => logs.push(`[BROWSER] ${msg.text()}`));
 

@@ -1,8 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test('F5 Persistence after login', async ({ page }) => {
-  await loginAs(page, 'owner.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+  await loginAs(page, 'owner.alpha@ecoscolaire.com', alphaPassword);
   
   await page.waitForTimeout(2000);
   await page.reload();

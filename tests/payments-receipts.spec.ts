@@ -2,10 +2,14 @@ import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
 import { attachConsoleMonitor } from './helpers/console-monitor';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test.describe('Payments and Receipts', () => {
   test('Create payment and verify receipt as Accountant', async ({ page }) => {
     const monitor = attachConsoleMonitor(page);
-    await loginAs(page, 'accountant.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+    await loginAs(page, 'accountant.alpha@ecoscolaire.com', alphaPassword);
     
     await page.getByTestId('nav-payments').click();
     // Listen to page console

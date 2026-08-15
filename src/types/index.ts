@@ -47,6 +47,10 @@ export interface School {
   trialEndsAt?: string;
   isInternalSchool?: boolean;
   studentCount?: number;
+  studentsCount?: number;
+  studentLimit?: number | null;
+  lastStudentCounterMutationId?: string;
+  lastStudentCounterMutationType?: 'create' | 'deactivate' | 'reactivate';
   amountPaid?: number;
   nextPaymentDate?: string;
   // --- Fin champs SaaS ---
@@ -184,7 +188,14 @@ export interface Subject {
 export interface Student {
   id: string;
   schoolId?: string;
+  /** Active academic year used when this student record was created. Legacy records may omit it. */
+  academicYearId?: string;
   matricule?: string;
+  /** Deterministic uniqueness metadata; optional only for legacy records. */
+  matriculeNormalized?: string;
+  matriculeReservationId?: string;
+  duplicateFingerprint?: string;
+  duplicateReservationId?: string;
   name: string;
   gender: 'M' | 'F';
   dob: string;
@@ -267,6 +278,10 @@ export interface Student {
   guardianRelation?: string;
 
   primaryContactType?: "mother" | "father" | "guardian";
+  createdAt?: DateLike;
+  createdBy?: string;
+  updatedAt?: DateLike;
+  updatedBy?: string;
 }
 
 export type StudentImportJobStatus = 'PENDING' | 'VALIDATING' | 'VALIDATING_COMPLETE' | 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED' | 'CANCELED';

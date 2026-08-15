@@ -1,16 +1,18 @@
 import { test, expect } from '@playwright/test';
+import { attachConsoleMonitor } from './helpers/console-monitor';
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
 
 const roles = [
-  { name: 'owner', email: 'owner.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-  { name: 'director', email: 'director.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-  { name: 'secretary', email: 'secretary.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-  { name: 'accountant', email: 'accountant.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-  { name: 'teacher', email: 'teacher1.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-  { name: 'driver', email: 'driver.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
-  { name: 'parent', email: 'parent1.alpha@ecoscolaire.com', pass: 'Test@2026Alpha!' },
+  { name: 'owner', email: 'owner.alpha@ecoscolaire.com', pass: alphaPassword },
+  { name: 'director', email: 'director.alpha@ecoscolaire.com', pass: alphaPassword },
+  { name: 'secretary', email: 'secretary.alpha@ecoscolaire.com', pass: alphaPassword },
+  { name: 'accountant', email: 'accountant.alpha@ecoscolaire.com', pass: alphaPassword },
+  { name: 'teacher', email: 'teacher1.alpha@ecoscolaire.com', pass: alphaPassword },
+  { name: 'driver', email: 'driver.alpha@ecoscolaire.com', pass: alphaPassword },
+  { name: 'parent', email: 'parent1.alpha@ecoscolaire.com', pass: alphaPassword },
 ];
-
-import { attachConsoleMonitor } from './helpers/console-monitor';
 
 for (const role of roles) {
   test(`Login with role: ${role.name}`, async ({ page }) => {

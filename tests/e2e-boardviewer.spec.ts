@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { attachConsoleMonitor } from './helpers/console-monitor';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test.describe('BoardViewer UI Restrictions', () => {
   test('BoardViewer sees read-only UI and no write buttons', async ({ page }) => {
     page.on('console', msg => console.log(`BROWSER CONSOLE: ${msg.type()}: ${msg.text()}`));
@@ -10,7 +14,7 @@ test.describe('BoardViewer UI Restrictions', () => {
     const isEmulator = await page.evaluate(() => (window as unknown as { __auth_emulator_connected__?: boolean }).__auth_emulator_connected__);
     console.log('Emulator connected:', isEmulator);
     await page.getByTestId('login-email').fill('boardviewer.alpha@ecoscolaire.com');
-    await page.getByTestId('login-password').fill('Test@2026Alpha!');
+    await page.getByTestId('login-password').fill(alphaPassword);
     await page.getByTestId('login-submit').click();
 
     // Check banner directly

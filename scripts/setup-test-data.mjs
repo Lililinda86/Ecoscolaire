@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { writeStudentSeedDocuments } from './student-seed-data.mjs';
 
 dotenv.config({ path: '.env.staging' }); // Priority to staging
 dotenv.config(); // Fallback to .env
@@ -98,7 +99,10 @@ const findOrCreateUser = async (email, passwordForCreation) => {
 const cleanupTestData = async () => {
   console.log("Starting cleanup for Alpha and Beta...");
   const schoolIds = ['school-alpha-001', 'school-beta-002'];
-  const collectionsList = ['schools', 'users', 'classes', 'students', 'payments', 'grades', 'attendance', 'subjects'];
+  const collectionsList = [
+    'schools', 'users', 'classes', 'students', 'studentPrivate', 'studentFinance',
+    'studentParentPrivate', 'studentParentFinance', 'payments', 'grades', 'attendance', 'subjects'
+  ];
   
   for (const c of collectionsList) {
     for (const sid of schoolIds) {
@@ -250,27 +254,27 @@ const setupTestData = async () => {
     for(let i=1; i<=20; i++) {
       const classRef = i <= 7 ? classes[0].id : (i <= 14 ? classes[1].id : classes[2].id);
       if (!isDryRun) {
-        await db.collection('students').doc(studentIds[i-1]).set({
-          id: studentIds[i-1], schoolId: alphaId, classId: classRef,
+        await writeStudentSeedDocuments(db, {
+          studentId: studentIds[i-1], schoolId: alphaId, classId: classRef,
           name: `Élève${i} TestAlpha`, matricule: `MAT2026${i.toString().padStart(3,'0')}`,
-          gender: i%2===0?'F':'M', createdAt: isoDate(),
+          gender: i%2===0?'F':'M', timestamp: isoDate(),
           section: 'francophone',
           parentName: `Parent ${i}`,
           parentPhone: `+2376000000${i.toString().padStart(2,'0')}`,
           feeT1: 50000, feeT2: 0, feeT3: 0
-        }, { merge: true });
+        });
       }
     }
     if (!isDryRun) {
-      await db.collection('students').doc('beta-student-1').set({
-        id: 'beta-student-1', schoolId: betaId, classId: 'beta-class-cp',
+      await writeStudentSeedDocuments(db, {
+        studentId: 'beta-student-1', schoolId: betaId, classId: 'beta-class-cp',
         name: 'Élève1 TestBeta', matricule: 'BETAMAT001',
-        gender: 'M', createdAt: isoDate(),
+        gender: 'M', timestamp: isoDate(),
         section: 'francophone',
         parentName: 'Parent Beta',
         parentPhone: '+237600000099',
         feeT1: 50000, feeT2: 0, feeT3: 0
-      }, { merge: true });
+      });
     }
     logAction('Students', '20 Alpha + 1 Beta idempotent students generated.');
 

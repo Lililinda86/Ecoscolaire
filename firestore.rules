@@ -101,6 +101,8 @@ service cloud.firestore {
         'studentLimit',
         'studentsCount',
         'studentCount',
+        'lastStudentCounterMutationId',
+        'lastStudentCounterMutationType',
         'pilot',
         'billingStatus',
         'billingCycle',
@@ -350,64 +352,193 @@ service cloud.firestore {
 
     function hasValidStudentClass(studentData) {
       let classPath = /databases/$(database)/documents/classes/$(studentData.classId);
+      let classData = get(classPath).data;
       return studentData.classId is string
         && studentData.classId.size() > 0
         && exists(classPath)
-        && get(classPath).data.schoolId == studentData.schoolId
+        && classData.schoolId == studentData.schoolId
         && (
-          !('isActive' in get(classPath).data)
-          || get(classPath).data.isActive != false
+          !('isActive' in classData)
+          || classData.isActive != false
         );
     }
 
-    function canCreateStudentWithinLimits(schoolId) {
-      let school = get(/databases/$(database)/documents/schools/$(schoolId)).data;
+    function hasValidStudentAcademicYear(studentData) {
+      let yearPath = /databases/$(database)/documents/academicYears/$(studentData.academicYearId);
+      let schoolPath = /databases/$(database)/documents/schools/$(studentData.schoolId);
+      let yearData = get(yearPath).data;
+      let schoolData = get(schoolPath).data;
+      return studentData.academicYearId is string
+        && studentData.academicYearId.size() > 0
+        && exists(yearPath)
+        && exists(schoolPath)
+        && yearData.schoolId == studentData.schoolId
+        && yearData.status == 'active'
+        && studentData.registrationYear == yearData.name
+        && (
+          !('activeAcademicYearId' in schoolData)
+          || schoolData.activeAcademicYearId == studentData.academicYearId
+        );
+    }
+
+    function isValidStudentCreate(studentData, studentId) {
+      return studentData.keys().hasAll([
+          'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
+          'matricule', 'matriculeNormalized', 'matriculeReservationId',
+          'duplicateFingerprint', 'duplicateReservationId',
+          'name', 'studentLastName', 'studentFirstName', 'gender',
+          'section', 'classId', 'studentStatus',
+          'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+        ])
+        && studentData.keys().hasOnly([
+          'id', 'schoolId', 'academicYearId', 'registrationYear', 'schoolingStatus',
+          'matricule', 'matriculeNormalized', 'matriculeReservationId',
+          'duplicateFingerprint', 'duplicateReservationId',
+          'name', 'studentLastName', 'studentFirstName', 'gender',
+          'section', 'classId', 'studentStatus',
+          'busId', 'usesTransport', 'transportFleet', 'transportStatus',
+          'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+        ])
+        && studentData.id is string
+        && studentData.id == studentId
+        && studentData.schoolId is string
+        && studentData.schoolId.size() > 0
+        && studentData.registrationYear is string
+        && studentData.registrationYear.size() > 0
+        && studentData.schoolingStatus == 'active'
+        && studentData.matricule is string
+        && studentData.matricule.size() > 0
+        && studentData.matricule == studentData.matriculeNormalized
+        && studentData.matriculeNormalized.matches('^[A-Z0-9][A-Z0-9._-]{0,63}$')
+        && studentData.matriculeReservationId == studentData.schoolId + '__' + studentData.matriculeNormalized
+        && studentData.duplicateFingerprint is string
+        && studentData.duplicateFingerprint.size() > 0
+        && studentData.duplicateFingerprint.size() <= 300
+        && studentData.duplicateReservationId == studentData.schoolId + '__' + studentData.duplicateFingerprint
+        && studentData.name is string
+        && studentData.name.size() > 0
+        && studentData.studentLastName is string
+        && studentData.studentLastName.size() > 0
+        && studentData.studentFirstName is string
+        && studentData.studentFirstName.size() > 0
+        && studentData.gender in ['M', 'F']
+        && studentData.section in ['francophone', 'anglophone']
+        && studentData.classId is string
+        && studentData.classId.size() > 0
+        && studentData.studentStatus in ['nouveau', 'ancien']
+        && studentData.createdAt == request.time
+        && studentData.updatedAt == request.time
+        && studentData.createdBy == request.auth.uid
+        && studentData.updatedBy == request.auth.uid
+        && hasValidStudentAcademicYear(studentData)
+        && hasValidStudentCreationReservations(studentData, studentId)
+        && hasValidStudentRestrictedDocuments(studentData, studentId);
+    }
+
+    function hasValidStudentRestrictedDocuments(studentData, studentId) {
+      let privatePath = /databases/$(database)/documents/studentPrivate/$(studentId);
+      let financePath = /databases/$(database)/documents/studentFinance/$(studentId);
+      let parentPrivatePath = /databases/$(database)/documents/studentParentPrivate/$(studentId);
+      let parentFinancePath = /databases/$(database)/documents/studentParentFinance/$(studentId);
+      let privateData = getAfter(privatePath).data;
+      let financeData = getAfter(financePath).data;
+      let parentPrivateData = getAfter(parentPrivatePath).data;
+      let parentFinanceData = getAfter(parentFinancePath).data;
+      return existsAfter(privatePath)
+        && privateData.schoolId == studentData.schoolId
+        && privateData.studentId == studentId
+        && existsAfter(financePath)
+        && financeData.schoolId == studentData.schoolId
+        && financeData.studentId == studentId
+        && existsAfter(parentPrivatePath)
+        && parentPrivateData.schoolId == studentData.schoolId
+        && parentPrivateData.studentId == studentId
+        && existsAfter(parentFinancePath)
+        && parentFinanceData.schoolId == studentData.schoolId
+        && parentFinanceData.studentId == studentId;
+    }
+
+    function hasValidStudentCreationReservations(studentData, studentId) {
+      let matriculePath = /databases/$(database)/documents/studentMatriculeReservations/$(studentData.matriculeReservationId);
+      let duplicatePath = /databases/$(database)/documents/studentDuplicateReservations/$(studentData.duplicateReservationId);
+      let matriculeData = getAfter(matriculePath).data;
+      let duplicateData = getAfter(duplicatePath).data;
+      return existsAfter(matriculePath)
+        && matriculeData.schoolId == studentData.schoolId
+        && matriculeData.studentId == studentId
+        && matriculeData.matriculeNormalized == studentData.matriculeNormalized
+        && existsAfter(duplicatePath)
+        && duplicateData.schoolId == studentData.schoolId
+        && duplicateData.duplicateFingerprint == studentData.duplicateFingerprint
+        && studentId in duplicateData.studentIds;
+    }
+
+    function hasInitializedStudentCounter(school) {
+      return 'studentsCount' in school
+          && school.studentsCount is int
+          && school.studentsCount >= 0;
+    }
+
+    function hasStudentQuotaCapacity(school) {
       let isInternal = school.get('isInternalSchool', false) == true;
       let plan = school.get('subscriptionPlan', 'starter');
-      let count = school.get('studentsCount', 0);
+      let hasConfiguredLimit = 'studentLimit' in school
+          && school.studentLimit is int
+          && school.studentLimit >= 0;
 
       return isInternal
           || plan == 'premium'
-          || (plan == 'pilot' && count < 1000)
-          || (plan == 'standard' && count < 1000)
-          || (plan == 'starter' && count < 200);
+          || (hasConfiguredLimit && school.studentsCount < school.studentLimit)
+          || (!hasConfiguredLimit && plan == 'pilot' && school.studentsCount < 1000)
+          || (!hasConfiguredLimit && plan == 'standard' && school.studentsCount < 1000)
+          || (!hasConfiguredLimit && plan == 'starter' && school.studentsCount < 200);
     }
 
-    function isAccountantRegistrationFeeUpdate() {
-      return isAccountant()
-          && hasSchoolAccess(resource.data.schoolId)
-          && request.resource.data.schoolId == resource.data.schoolId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'registrationFeePaid',
-            'registrationFeeStatus'
-          ])
-          && request.resource.data.registrationFeePaid is number
-          && request.resource.data.registrationFeePaid >= 0
-          && request.resource.data.registrationFeeStatus in ['unpaid', 'partial', 'paid'];
+    function isValidStudentCounterMutation(schoolId, school, nextSchool) {
+      let studentId = nextSchool.get('lastStudentCounterMutationId', '');
+      let mutationType = nextSchool.get('lastStudentCounterMutationType', '');
+      let studentPath = /databases/$(database)/documents/students/$(studentId);
+      let onlyCounterFields = nextSchool.diff(school).affectedKeys().hasOnly([
+        'studentsCount', 'lastStudentCounterMutationId', 'lastStudentCounterMutationType',
+        'updatedAt', 'updatedBy'
+      ]);
+      let commonValid = canManagePedagogy(schoolId)
+          && hasInitializedStudentCounter(school)
+          && nextSchool.studentsCount is int
+          && nextSchool.studentsCount >= 0
+          && nextSchool.updatedAt == request.time
+          && nextSchool.updatedBy == request.auth.uid
+          && studentId != ''
+          && onlyCounterFields;
+      return commonValid && (
+        mutationType == 'deactivate' ? (
+          school.studentsCount > 0
+          && exists(studentPath)
+          && get(studentPath).data.schoolId == schoolId
+          && get(studentPath).data.get('schoolingStatus', 'active') == 'active'
+          && getAfter(studentPath).data.schoolingStatus == 'inactive'
+          && nextSchool.studentsCount == school.studentsCount - 1
+        ) : mutationType == 'reactivate' && (
+          hasStudentQuotaCapacity(school)
+          && exists(studentPath)
+          && get(studentPath).data.schoolId == schoolId
+          && get(studentPath).data.schoolingStatus == 'inactive'
+          && getAfter(studentPath).data.schoolingStatus == 'active'
+          && nextSchool.studentsCount == school.studentsCount + 1
+        )
+      );
     }
 
-    function isAccountantTuitionUpdate() {
-      return isAccountant()
-          && hasSchoolAccess(resource.data.schoolId)
-          && request.resource.data.schoolId == resource.data.schoolId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'tuitionPaid',
-            'tuitionStatus'
-          ])
-          && request.resource.data.tuitionPaid is number
-          && request.resource.data.tuitionPaid >= 0
-          && request.resource.data.tuitionStatus in ['unpaid', 'partial', 'paid'];
-    }
-
-    function isAccountantTransportUpdate() {
-      return isAccountant()
-          && hasSchoolAccess(resource.data.schoolId)
-          && request.resource.data.schoolId == resource.data.schoolId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'transportPaid'
-          ])
-          && request.resource.data.transportPaid is number
-          && request.resource.data.transportPaid >= 0;
+    function hasAtomicCounterForStudentStatusUpdate(studentId, student, nextStudent) {
+      let changesStatus = nextStudent.diff(student).affectedKeys().hasAny(['schoolingStatus']);
+      let expectedType = student.get('schoolingStatus', 'active') == 'active'
+          ? 'deactivate'
+          : 'reactivate';
+      return !changesStatus || (
+        nextStudent.schoolId == student.schoolId
+        && getAfter(/databases/$(database)/documents/schools/$(student.schoolId)).data.lastStudentCounterMutationId == studentId
+        && getAfter(/databases/$(database)/documents/schools/$(student.schoolId)).data.lastStudentCounterMutationType == expectedType
+      );
     }
 
     function isValidExpense(data, expenseId) {
@@ -505,7 +636,11 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isSuperAdmin();
       // Le propriétaire peut modifier son école (mais pas l'abonnement SaaS ni le pointeur de manière non atomique)
       allow update: if isAuthenticated() && isActive() && (
-        isSuperAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasAny(['studentsCount'])
+          && isValidStudentCounterMutation(schoolId, resource.data, request.resource.data)) ||
+        (isSuperAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'studentsCount', 'lastStudentCounterMutationId', 'lastStudentCounterMutationType'
+        ])) ||
         (canManageSchool(schoolId) && !isUpdatingSaasFields() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeAcademicYearId'])) ||
         (isAcademicCalendarPointerUpdate(schoolId) && !isUpdatingTransportPolicy())
       ) && (!isUpdatingTransportPolicy() || (isValidTransportPolicy() && (isOwner() || isSuperAdmin())))
@@ -536,22 +671,461 @@ service cloud.firestore {
                     request.resource.data.usedBy == request.auth.uid;
     }
 
+    match /studentPrivate/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob', 'placeOfBirth',
+                      'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
+                      'allergies', 'medicalConditions', 'transportNeighborhood', 'transportPickupPoint',
+                      'fatherName', 'fatherPhone', 'fatherProfession', 'motherName', 'motherPhone',
+                      'motherProfession', 'guardianRelationship', 'guardianRelationshipDetails',
+                      'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+                      'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+                      'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+                      'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'dob', 'parentName', 'parentPhone',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob', 'placeOfBirth',
+                      'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
+                      'allergies', 'medicalConditions',
+                      'transportNeighborhood', 'transportPickupPoint',
+                      'fatherName', 'fatherPhone', 'fatherProfession',
+                      'motherName', 'motherPhone', 'motherProfession',
+                      'guardianRelationship', 'guardianRelationshipDetails',
+                      'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+                      'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+                      'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+                      'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.dob is string
+                    && request.resource.data.dob.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
+                    && request.resource.data.parentName is string
+                    && request.resource.data.parentName.size() > 0
+                    && request.resource.data.parentPhone is string
+                    && request.resource.data.parentPhone.size() > 0
+                    && (!('parentEmails' in request.resource.data) || request.resource.data.parentEmails is list)
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(studentId))
+                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId; */
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails',
+                      'address', 'emergencyContact', 'allergies', 'medicalConditions',
+                      'transportNeighborhood', 'transportPickupPoint',
+                      'fatherName', 'fatherPhone', 'fatherProfession',
+                      'motherName', 'motherPhone', 'motherProfession',
+                      'guardianRelationship', 'guardianRelationshipDetails',
+                      'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+                      'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+                      'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+                      'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+                      'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && (
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['dob'])
+                      || (
+                        existsAfter(/databases/$(database)/documents/studentParentPrivate/$(studentId))
+                        && getAfter(/databases/$(database)/documents/studentParentPrivate/$(studentId)).data.dob == request.resource.data.dob
+                      )
+                    );
+      allow delete: if false;
+    }
+
+    match /studentFinance/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary() || isAccountant()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'feeAmount', 'feeT1', 'feeT2', 'feeT3',
+                      'feeTransport', 'feeUniforms', 'financialBypass', 'registrationFeeExpected',
+                      'registrationFeePaid', 'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid',
+                      'tuitionStatus', 'transportMonthlyFee', 'transportPaid',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'registrationFeePaid', 'registrationFeeStatus',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId',
+                      'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
+                      'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
+                      'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
+                      'transportMonthlyFee', 'transportPaid',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.registrationFeePaid == 0
+                    && request.resource.data.registrationFeeStatus == 'unpaid'
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(studentId))
+                    && getAfter(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId; */
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
+                      'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
+                      'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
+                      'transportMonthlyFee', 'transportPaid', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && (
+                      canManagePedagogy(resource.data.schoolId)
+                      || (isAccountant() && hasSchoolAccess(resource.data.schoolId))
+                    )
+                    && (
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                        'feeT1', 'feeT2', 'feeT3', 'financialBypass'
+                      ])
+                      || (
+                        existsAfter(/databases/$(database)/documents/studentParentFinance/$(studentId))
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.feeT1 == request.resource.data.feeT1
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.feeT2 == request.resource.data.feeT2
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.feeT3 == request.resource.data.feeT3
+                        && getAfter(/databases/$(database)/documents/studentParentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass
+                      )
+                    );
+      allow delete: if false;
+    }
+
+    match /studentParentPrivate/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
+        || (isParent()
+          && studentId in getUserData().get('studentIds', [])
+          && (
+            (resource == null
+              && exists(/databases/$(database)/documents/students/$(studentId))
+              && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+            || (resource != null && hasSchoolAccess(resource.data.schoolId))
+          ))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'dob',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'dob',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.dob is string
+                    && request.resource.data.dob.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/studentPrivate/$(studentId))
+                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.dob == request.resource.data.dob; */
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dob', 'updatedAt', 'updatedBy'])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && getAfter(/databases/$(database)/documents/studentPrivate/$(studentId)).data.dob == request.resource.data.dob;
+      allow delete: if false;
+    }
+
+    match /studentParentFinance/{studentId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin()
+        || ((isOwner() || isDirector() || isSecretary()) && (
+          (resource == null
+            && exists(/databases/$(database)/documents/students/$(studentId))
+            && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+          || (resource != null && hasSchoolAccess(resource.data.schoolId))
+        ))
+        || (isParent()
+          && studentId in getUserData().get('studentIds', [])
+          && (
+            (resource == null
+              && exists(/databases/$(database)/documents/students/$(studentId))
+              && hasSchoolAccess(get(/databases/$(database)/documents/students/$(studentId)).data.schoolId))
+            || (resource != null && hasSchoolAccess(resource.data.schoolId))
+          ))
+      );
+      allow create: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && exists(/databases/$(database)/documents/students/$(studentId))
+                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasAll([
+                      'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'feeT1', 'feeT2', 'feeT3', 'financialBypass',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == studentId
+                    && request.resource.data.studentId == studentId
+                    && request.resource.data.feeT1 is number
+                    && request.resource.data.feeT2 is number
+                    && request.resource.data.feeT3 is number
+                    && request.resource.data.financialBypass is map
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/studentFinance/$(studentId))
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT1 == request.resource.data.feeT1
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT2 == request.resource.data.feeT2
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT3 == request.resource.data.feeT3
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass; */
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'feeT1', 'feeT2', 'feeT3', 'financialBypass', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT1 == request.resource.data.feeT1
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT2 == request.resource.data.feeT2
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.feeT3 == request.resource.data.feeT3
+                    && getAfter(/databases/$(database)/documents/studentFinance/$(studentId)).data.financialBypass == request.resource.data.financialBypass;
+      allow delete: if false;
+    }
+
+    match /studentMatriculeReservations/{reservationId} {
+      allow get: if isAuthenticated()
+                 && isActive()
+                 && (
+                   isSuperAdmin()
+                   || (
+                     canManagePedagogy(getUserSchoolId())
+                     && reservationId.matches('^' + getUserSchoolId() + '__.*$')
+                   )
+                 );
+      allow list: if false;
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'studentId', 'matriculeNormalized',
+                      'createdAt', 'createdBy'
+                    ])
+                    && request.resource.data.id == reservationId
+                    && request.resource.data.matriculeNormalized.matches('^[A-Z0-9][A-Z0-9._-]{0,63}$')
+                    && reservationId == request.resource.data.schoolId + '__' + request.resource.data.matriculeNormalized
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId))
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.matriculeReservationId == reservationId; */
+      allow update, delete: if false;
+    }
+
+    match /studentDuplicateReservations/{reservationId} {
+      allow get: if isAuthenticated()
+                 && isActive()
+                 && (
+                   isSuperAdmin()
+                   || (
+                     canManagePedagogy(getUserSchoolId())
+                     && reservationId.matches('^' + getUserSchoolId() + '__.*$')
+                   )
+                 );
+      allow list: if false;
+      allow create: if false;
+      /* Schéma conservé comme documentation de migration serveur.
+      allow create: if request.resource.data.keys().hasOnly([
+                      'id', 'schoolId', 'duplicateFingerprint', 'studentIds', 'lastStudentId',
+                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.id == reservationId
+                    && request.resource.data.duplicateFingerprint is string
+                    && request.resource.data.duplicateFingerprint.size() > 0
+                    && request.resource.data.duplicateFingerprint.size() <= 300
+                    && reservationId == request.resource.data.schoolId + '__' + request.resource.data.duplicateFingerprint
+                    && request.resource.data.studentIds is list
+                    && request.resource.data.studentIds.size() == 1
+                    && request.resource.data.lastStudentId == request.resource.data.studentIds[0]
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId))
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.schoolId == request.resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.duplicateReservationId == reservationId; */
+      allow update: if isAuthenticated()
+                    && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'studentIds', 'lastStudentId', 'updatedAt', 'updatedBy'
+                    ])
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.duplicateFingerprint == resource.data.duplicateFingerprint
+                    && request.resource.data.studentIds is list
+                    && request.resource.data.studentIds.size() == resource.data.studentIds.size() + 1
+                    && request.resource.data.studentIds.hasAll(resource.data.studentIds)
+                    && request.resource.data.lastStudentId in request.resource.data.studentIds
+                    && !(request.resource.data.lastStudentId in resource.data.studentIds)
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid
+                    && existsAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId))
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.schoolId == resource.data.schoolId
+                    && getAfter(/databases/$(database)/documents/students/$(request.resource.data.lastStudentId)).data.duplicateReservationId == reservationId;
+      allow delete: if false;
+    }
+
     // --- STUDENTS & PARENTS ---
     match /students/{studentId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isTeacher() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId) && (studentId in getUserData().studentIds || request.auth.token.email in resource.data.parentEmails))
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && studentId in getUserData().get('studentIds', []))
       );
       // Création par Owner, Director, Secretary AVEC limite et validation stricte de classe
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && canCreateStudentWithinLimits(request.resource.data.schoolId)
-                    && hasValidStudentClass(request.resource.data);
+      // La création moderne passe exclusivement par createStudentSecure (Admin SDK).
+      allow create: if false;
       // Update
       allow update: if isAuthenticated() && isActive() && (
-        !(isSecretary() && isUpdatingStudentActiveStatusFields())
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'matricule', 'matriculeNormalized', 'matriculeReservationId',
+          'duplicateFingerprint', 'duplicateReservationId'
+        ])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails',
+            'address', 'emergencyContact', 'allergies', 'medicalConditions',
+            'transportNeighborhood', 'transportPickupPoint',
+            'fatherName', 'fatherPhone', 'fatherProfession',
+            'motherName', 'motherPhone', 'motherProfession',
+            'guardianRelationship', 'guardianRelationshipDetails',
+            'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
+            'fatherLastName', 'fatherFirstName', 'fatherEmail', 'fatherWhatsapp',
+            'guardianLastName', 'guardianFirstName', 'guardianPhone', 'guardianEmail',
+            'guardianWhatsapp', 'guardianRelation', 'primaryContactType',
+            'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
+            'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
+            'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
+            'transportMonthlyFee', 'transportPaid'
+          ])
+        &&
+        !(
+          isSecretary()
+          && isUpdatingStudentActiveStatusFields()
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolingStatus'])
+        )
         && (
           (
             canManagePedagogy(request.resource.data.schoolId)
@@ -560,11 +1134,9 @@ service cloud.firestore {
               !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
               || hasValidStudentClass(request.resource.data)
             )
-          ) ||
-          isAccountantRegistrationFeeUpdate() ||
-          isAccountantTuitionUpdate() ||
-          isAccountantTransportUpdate()
+          )
         )
+        && hasAtomicCounterForStudentStatusUpdate(studentId, resource.data, request.resource.data)
       );
       // Delete (Désactivé physiquement pour la sécurité des données)
       allow delete: if false;
@@ -833,26 +1405,7 @@ service cloud.firestore {
     // --- STUDENT IMPORT JOBS ---
     match /student_import_jobs/{jobId} {
       allow read: if isAuthenticated() && isActive() && (isSuperAdmin() || hasSchoolAccess(resource.data.schoolId));
-      allow create: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasOnly(['id', 'schoolId', 'status', 'storagePath', 'totalRows', 'processedCount', 'createdCount', 'updatedCount', 'skippedCount', 'failedCount', 'createdBy', 'createdAt', 'startedAt', 'finishedAt', 'errorCode', 'errorMessage'])
-                    && request.resource.data.id is string
-                    && request.resource.data.schoolId is string
-                    && request.resource.data.status is string
-                    && request.resource.data.status == 'PENDING'
-                    && request.resource.data.storagePath is string
-                    && request.resource.data.storagePath.matches('^import_jobs_data/' + request.resource.data.schoolId + '/[^/]+\\.json$')
-                    && request.resource.data.totalRows is int
-                    && request.resource.data.processedCount is int && request.resource.data.processedCount == 0
-                    && request.resource.data.createdCount is int && request.resource.data.createdCount == 0
-                    && request.resource.data.updatedCount is int && request.resource.data.updatedCount == 0
-                    && request.resource.data.skippedCount is int && request.resource.data.skippedCount == 0
-                    && request.resource.data.failedCount is int && request.resource.data.failedCount == 0
-                    && request.resource.data.createdBy is string
-        && request.resource.data.createdAt is timestamp
-        && (!('startedAt' in request.resource.data) || request.resource.data.startedAt == null)
-        && (!('finishedAt' in request.resource.data) || request.resource.data.finishedAt == null)
-        && (!('errorCode' in request.resource.data) || request.resource.data.errorCode == null)
-        && (!('errorMessage' in request.resource.data) || request.resource.data.errorMessage == null);
+      allow create: if false; // Imports remain disabled before any job can be created.
       allow update, delete: if false; // Only Cloud Functions (Admin SDK) can update/delete
     }
 
@@ -1005,7 +1558,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isAccountant() || isBoardViewer()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId))
+        (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.studentId in getUserData().get('studentIds', []))
       );
       // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
       allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId)

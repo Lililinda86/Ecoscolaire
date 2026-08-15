@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test.describe('Audit Logs E2E', () => {
 
   test('Verify that sensitive actions generate an audit log and are visible in Audit Logs page', async ({ page }) => {
@@ -10,7 +14,7 @@ test.describe('Audit Logs E2E', () => {
     page.on('dialog', dialog => dialog.accept());
 
     // 1. Connect as Director to perform actions
-    await loginAs(page, 'director.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+    await loginAs(page, 'director.alpha@ecoscolaire.com', alphaPassword);
 
     // 2. Perform an action: Create a student
     await page.getByTestId('nav-students').click();
@@ -36,7 +40,7 @@ test.describe('Audit Logs E2E', () => {
     await page.waitForTimeout(1000);
 
     // 4. Connect as Owner (has access to Audit Logs)
-    await loginAs(page, 'owner.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+    await loginAs(page, 'owner.alpha@ecoscolaire.com', alphaPassword);
 
     // 5. Go to Audit Logs
     await page.getByTestId('nav-audit').click();

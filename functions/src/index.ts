@@ -11,6 +11,10 @@ import {
   makeTuitionDiscountCounterId,
   makeTuitionDiscountSlotId
 } from './utils/discountHelpers';
+import {
+  resolveStudentFinanceData,
+  writeStudentFinanceProjection
+} from './studentFinanceProjection';
 
 
 // Initialize the Firebase Admin SDK
@@ -204,6 +208,10 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
           throw new Error('Student schoolId mismatch');
         }
 
+        const studentFinanceRef = db.collection('studentFinance').doc(txData.studentId);
+        const studentFinanceSnap = await transaction.get(studentFinanceRef);
+        const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
+
         // Read 3: Counter
         const counterRef = db.collection('counters').doc(`receipts_${txData.schoolId}`);
         const counterSnap = await transaction.get(counterRef);
@@ -233,7 +241,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
             schoolId: txData.schoolId,
             studentId: txData.studentId,
             academicYear: txData.academicYear,
-            studentFees: { feeT1: student.feeT1, feeT2: student.feeT2, feeT3: student.feeT3 },
+            studentFees: { feeT1: studentFinancial.feeT1 as number | undefined, feeT2: studentFinancial.feeT2 as number | undefined, feeT3: studentFinancial.feeT3 as number | undefined },
             schoolGlobalFees: school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 },
             reader: (ref) => transaction.get(ref)
           });
@@ -397,7 +405,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
         };
         transaction.set(receiptRef, receiptData);
 
-        // Write 4: Update Student & tuitionStatus/registrationFeeStatus
+        // Write 4: Update the canonical finance projection.
         if (txData.type === 'tuition' && effectiveAnnualResult && allTuitionSnap) {
           const allTuitionList = allTuitionSnap.docs.map(doc => doc.data());
           const totalTuitionPaidForYear = allTuitionList
@@ -415,7 +423,15 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
             tuitionPaid: totalTuitionPaidForYear,
             tuitionStatus: totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid')
           };
-          transaction.update(studentRef, studentUpdate);
+          writeStudentFinanceProjection({
+            transaction,
+            financeRef: studentFinanceRef,
+            financeSnapshot: studentFinanceSnap,
+            studentId: txData.studentId,
+            schoolId: txData.schoolId,
+            patch: studentUpdate,
+            actorId: 'system:campayWebhook'
+          });
         } else if (txData.type === 'registration_fee' && allRegSnap) {
           const allRegList = allRegSnap.docs.map(doc => doc.data());
           const totalRegPaidForYear = allRegList
@@ -427,14 +443,22 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
               return sum + p.amount;
             }, 0) + txData.amount;
 
-          const registrationFeeExpected = student.registrationFeeExpected ?? 15000;
+          const registrationFeeExpected = (studentFinancial.registrationFeeExpected as number | undefined) ?? 15000;
           const registrationFeeStatus = totalRegPaidForYear >= registrationFeeExpected ? 'paid' : (totalRegPaidForYear > 0 ? 'partial' : 'unpaid');
 
           const studentUpdate: Record<string, unknown> = {
             registrationFeePaid: totalRegPaidForYear,
             registrationFeeStatus
           };
-          transaction.update(studentRef, studentUpdate);
+          writeStudentFinanceProjection({
+            transaction,
+            financeRef: studentFinanceRef,
+            financeSnapshot: studentFinanceSnap,
+            studentId: txData.studentId,
+            schoolId: txData.schoolId,
+            patch: studentUpdate,
+            actorId: 'system:campayWebhook'
+          });
         }
 
         // Write 5: Update Tuition Discount status if applicable
@@ -621,6 +645,8 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
   if (student.schoolId !== schoolId) {
     throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school.');
   }
+  const studentFinanceSnap = await db.collection('studentFinance').doc(studentId).get();
+  const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
 
   // 4. Fetch Tuition Discount Slot if applicable
   let hasValidSlot = false;
@@ -751,7 +777,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     }
   } else {
     if (type === 'registration_fee') {
-      grossExpectedAmount = student.registrationFeeExpected || 0;
+      grossExpectedAmount = (studentFinancial.registrationFeeExpected as number | undefined) || 0;
       discountAmount = 0;
       netExpectedAmount = grossExpectedAmount;
 
@@ -771,10 +797,10 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
       }
     } else if (type === 'tuition') {
       grossExpectedAmount = installment === 'T1'
-        ? (student.feeT1 ?? globalFees.feeT1 ?? 0)
+        ? (studentFinancial.feeT1 ?? globalFees.feeT1 ?? 0) as number
         : installment === 'T2'
-          ? (student.feeT2 ?? globalFees.feeT2 ?? 0)
-          : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+          ? (studentFinancial.feeT2 ?? globalFees.feeT2 ?? 0) as number
+          : (studentFinancial.feeT3 ?? globalFees.feeT3 ?? 0) as number;
       discountAmount = 0;
       netExpectedAmount = grossExpectedAmount;
 
@@ -1143,69 +1169,19 @@ export const onPaymentCreated = functions.firestore
 
 // ----------------------------------------------------------------------
 // 8. enforceStudentSaasLimits (Trigger)
-// Maintains the studentsCount on schools and deletes excess students
+// Legacy defensive trigger. Modern writes maintain studentsCount atomically.
+// This trigger deliberately performs no mutation and never deletes a student.
 // ----------------------------------------------------------------------
 export const enforceStudentSaasLimits = functions.firestore
   .document('students/{studentId}')
-  .onWrite(async (change, context) => {
-    const db = admin.firestore();
-    const studentId = context.params.studentId;
-
-    const isCreate = !change.before.exists && change.after.exists;
-    const isDelete = change.before.exists && !change.after.exists;
-    
-    if (!isCreate && !isDelete) {
-      return null;
-    }
-
-    const schoolId = isCreate ? change.after.data()?.schoolId : change.before.data()?.schoolId;
-    if (!schoolId) return null;
-
-    const schoolRef = db.collection('schools').doc(schoolId);
-    
-    return await db.runTransaction(async (transaction) => {
-      const schoolSnap = await transaction.get(schoolRef);
-      if (!schoolSnap.exists) {
-        console.error(`School ${schoolId} not found for student ${studentId}`);
-        return null;
-      }
-
-      const school = schoolSnap.data();
-      let currentCount = school?.studentsCount || 0;
-      
-      if (isDelete) {
-        currentCount = Math.max(0, currentCount - 1);
-        transaction.update(schoolRef, { studentsCount: currentCount });
-        return null;
-      }
-
-      if (isCreate) {
-        currentCount += 1;
-        
-        const isInternalSchool = school?.isInternalSchool === true;
-        const plan = school?.subscriptionPlan || 'starter';
-        
-        let limit = 200;
-        if (plan === 'premium' || isInternalSchool) limit = Infinity;
-        else if (plan === 'pilot' || plan === 'standard') limit = 1000;
-        else limit = 200;
-
-        if (currentCount > limit) {
-          console.warn(`[SaaS Limits] School ${schoolId} exceeded limit of ${limit}. Deleting student ${studentId}.`);
-          transaction.delete(change.after.ref);
-          return null;
-        } else {
-          transaction.update(schoolRef, { studentsCount: currentCount });
-          return null;
-        }
-      }
-      return null;
-    });
+  .onWrite(async (_change, context) => {
+    console.warn(`[SaaS Limits] Defensive observation for student ${context.params.studentId}; no mutation performed.`);
+    return null;
   });
 
 // ----------------------------------------------------------------------
 // 9. updateStudentFinancialStatus (Trigger)
-// Recalculates student tuition/registration/transport balances atomically
+// Recalculates the student finance projection atomically
 // whenever a payment document is created, updated, or deleted.
 // ----------------------------------------------------------------------
 export const updateStudentFinancialStatus = functions.firestore
@@ -1234,15 +1210,22 @@ export const updateStudentFinancialStatus = functions.firestore
 
       const student = studentSnap.data()!;
 
-      // Read school for discount-aware tuition status
       const studentSchoolId = typeof student.schoolId === 'string' ? student.schoolId : '';
+      if (!studentSchoolId) {
+        console.error(`[Finance Trigger] Missing schoolId; skipping update for student ${studentId}.`);
+        return null;
+      }
+
+      const studentFinanceRef = db.collection('studentFinance').doc(studentId);
+      const studentFinanceSnap = await transaction.get(studentFinanceRef);
+      const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
+
+      // Read school for discount-aware tuition status
       let schoolForTrigger: admin.firestore.DocumentData | null = null;
-      if (studentSchoolId) {
-        const triggerSchoolRef = db.collection('schools').doc(studentSchoolId);
-        const triggerSchoolSnap = await transaction.get(triggerSchoolRef);
-        if (triggerSchoolSnap.exists) {
-          schoolForTrigger = triggerSchoolSnap.data() ?? null;
-        }
+      const triggerSchoolRef = db.collection('schools').doc(studentSchoolId);
+      const triggerSchoolSnap = await transaction.get(triggerSchoolRef);
+      if (triggerSchoolSnap.exists) {
+        schoolForTrigger = triggerSchoolSnap.data() ?? null;
       }
 
       const registrationFeePaid = paymentsList
@@ -1257,7 +1240,7 @@ export const updateStudentFinancialStatus = functions.firestore
         .filter(p => p.type === 'transport')
         .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-      const registrationFeeExpected = student.registrationFeeExpected ?? 15000;
+      const registrationFeeExpected = (studentFinancial.registrationFeeExpected as number | undefined) ?? 15000;
       let registrationFeeStatus = 'unpaid';
       if (registrationFeePaid >= registrationFeeExpected) registrationFeeStatus = 'paid';
       else if (registrationFeePaid > 0) registrationFeeStatus = 'partial';
@@ -1269,7 +1252,7 @@ export const updateStudentFinancialStatus = functions.firestore
           schoolId: studentSchoolId,
           studentId,
           academicYear: triggerAcademicYear,
-          studentFees: { feeT1: student.feeT1, feeT2: student.feeT2, feeT3: student.feeT3 },
+          studentFees: { feeT1: studentFinancial.feeT1 as number | undefined, feeT2: studentFinancial.feeT2 as number | undefined, feeT3: studentFinancial.feeT3 as number | undefined },
           schoolGlobalFees: schoolForTrigger.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 },
           reader: (ref) => transaction.get(ref)
         });
@@ -1283,24 +1266,32 @@ export const updateStudentFinancialStatus = functions.firestore
           if (effectiveResult.effectiveAnnualExpected > 0 && tuitionPaid >= effectiveResult.effectiveAnnualExpected) tuitionStatus = 'paid';
           else if (tuitionPaid > 0) tuitionStatus = 'partial';
         } else {
-          const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
-          const tuitionExpected = student.tuitionExpected ?? fallbackExpected;
+          const fallbackExpected = Number(studentFinancial.feeT1 ?? 0) + Number(studentFinancial.feeT2 ?? 0) + Number(studentFinancial.feeT3 ?? 0);
+          const tuitionExpected = (studentFinancial.tuitionExpected as number | undefined) ?? fallbackExpected;
           if (tuitionExpected > 0 && tuitionPaid >= tuitionExpected) tuitionStatus = 'paid';
           else if (tuitionPaid > 0) tuitionStatus = 'partial';
         }
       } else {
-        const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
-        const tuitionExpected = student.tuitionExpected ?? fallbackExpected;
+        const fallbackExpected = Number(studentFinancial.feeT1 ?? 0) + Number(studentFinancial.feeT2 ?? 0) + Number(studentFinancial.feeT3 ?? 0);
+        const tuitionExpected = (studentFinancial.tuitionExpected as number | undefined) ?? fallbackExpected;
         if (tuitionExpected > 0 && tuitionPaid >= tuitionExpected) tuitionStatus = 'paid';
         else if (tuitionPaid > 0) tuitionStatus = 'partial';
       }
 
-      transaction.update(studentRef, {
-        registrationFeePaid,
-        registrationFeeStatus,
-        tuitionPaid,
-        tuitionStatus,
-        transportPaid
+      writeStudentFinanceProjection({
+        transaction,
+        financeRef: studentFinanceRef,
+        financeSnapshot: studentFinanceSnap,
+        studentId,
+        schoolId: studentSchoolId,
+        patch: {
+          registrationFeePaid,
+          registrationFeeStatus,
+          tuitionPaid,
+          tuitionStatus,
+          transportPaid
+        },
+        actorId: 'system:updateStudentFinancialStatus'
       });
 
       console.log(`[Finance Trigger] Recalculated balance for student ${studentId}: Reg=${registrationFeePaid}, Tuition=${tuitionPaid}, Transport=${transportPaid}`);
@@ -1486,7 +1477,7 @@ async function computeEffectiveAnnualExpected(params: {
 
 // ----------------------------------------------------------------------
 // 9. recordCashPayment
-// Atomically records a cash payment, updates student balances, increments counters,
+// Atomically records a cash payment, updates the finance projection, increments counters,
 // and creates an immutable receipt in one Firestore transaction.
 // ----------------------------------------------------------------------
 // Helper to validate Firestore Document IDs strictly
@@ -1503,7 +1494,7 @@ const isValidFirestoreId = (id: unknown): id is string => {
 
 // ----------------------------------------------------------------------
 // 9. recordCashPayment
-// Atomically records a cash payment, updates student balances, increments counters,
+// Atomically records a cash payment, updates the finance projection, increments counters,
 // and creates an immutable receipt in one Firestore transaction.
 // ----------------------------------------------------------------------
 export const recordCashPayment = functions.https.onCall(async (data, context) => {
@@ -1833,6 +1824,9 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
     if (student.schoolId !== schoolId) {
       throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school.');
     }
+    const studentFinanceRef = db.collection('studentFinance').doc(studentId);
+    const studentFinanceSnap = await transaction.get(studentFinanceRef);
+    const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
 
     // 4. Fetch Class Context
     const classId = student.classId || '';
@@ -1965,7 +1959,7 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
     if (type === 'tuition') {
       effectiveAnnualResult = await computeEffectiveAnnualExpected({
         schoolId, studentId, academicYear,
-        studentFees: { feeT1: student.feeT1, feeT2: student.feeT2, feeT3: student.feeT3 },
+        studentFees: { feeT1: studentFinancial.feeT1 as number | undefined, feeT2: studentFinancial.feeT2 as number | undefined, feeT3: studentFinancial.feeT3 as number | undefined },
         schoolGlobalFees: globalFees,
         reader: (ref) => transaction.get(ref)
       });
@@ -2103,7 +2097,15 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
 
       studentUpdate.tuitionPaid = totalTuitionPaidForYear;
       studentUpdate.tuitionStatus = totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid');
-      transaction.update(studentRef, studentUpdate);
+      writeStudentFinanceProjection({
+        transaction,
+        financeRef: studentFinanceRef,
+        financeSnapshot: studentFinanceSnap,
+        studentId,
+        schoolId,
+        patch: studentUpdate,
+        actorId: uid
+      });
 
       const discountRef = db.collection('tuitionDiscounts').doc(slotSnap!.data()!.discountId);
       const isFinalPayment = newRemaining === 0;
@@ -2189,7 +2191,7 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
 
     } else {
       if (type === 'registration_fee') {
-        expectedAmount = student.registrationFeeExpected;
+        expectedAmount = studentFinancial.registrationFeeExpected as number;
         if (!expectedAmount || expectedAmount <= 0) {
           throw new functions.https.HttpsError('failed-precondition', 'Registration fee expected amount is not defined for this student.');
         }
@@ -2202,7 +2204,7 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
           .filter(p => p.schoolId === schoolId && p.academicYear === academicYear)
           .reduce((sum, p) => sum + (p.amount || 0), 0);
       } else if (type === 'tuition') {
-        expectedAmount = installment === 'T1' ? (student.feeT1 ?? globalFees.feeT1 ?? 0) : installment === 'T2' ? (student.feeT2 ?? globalFees.feeT2 ?? 0) : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+        expectedAmount = installment === 'T1' ? Number(studentFinancial.feeT1 ?? globalFees.feeT1 ?? 0) : installment === 'T2' ? Number(studentFinancial.feeT2 ?? globalFees.feeT2 ?? 0) : Number(studentFinancial.feeT3 ?? globalFees.feeT3 ?? 0);
         if (!expectedAmount || expectedAmount <= 0) {
           throw new functions.https.HttpsError('failed-precondition', `Expected tuition fee for installment ${installment} is not defined.`);
         }
@@ -2260,7 +2262,7 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
 
       const studentUpdate: Record<string, unknown> = {};
       if (type === 'registration_fee') {
-        const totalRegPaid = (student.registrationFeePaid || 0) + amount;
+        const totalRegPaid = Number(studentFinancial.registrationFeePaid || 0) + amount;
         studentUpdate.registrationFeePaid = totalRegPaid;
         studentUpdate.registrationFeeStatus = totalRegPaid >= expectedAmount ? 'paid' : (totalRegPaid > 0 ? 'partial' : 'unpaid');
       } else if (type === 'tuition') {
@@ -2280,14 +2282,22 @@ export const recordCashPayment = functions.https.onCall(async (data, context) =>
             throw new functions.https.HttpsError('failed-precondition', 'Annual tuition paid is not a valid safe integer.');
           }
         } else {
-          const fallbackExpected = (student.feeT1 ?? globalFees.feeT1 ?? 0) + (student.feeT2 ?? globalFees.feeT2 ?? 0) + (student.feeT3 ?? globalFees.feeT3 ?? 0);
-          totalTuitionExpectedForYear = student.tuitionExpected || fallbackExpected;
+          const fallbackExpected = Number(studentFinancial.feeT1 ?? globalFees.feeT1 ?? 0) + Number(studentFinancial.feeT2 ?? globalFees.feeT2 ?? 0) + Number(studentFinancial.feeT3 ?? globalFees.feeT3 ?? 0);
+          totalTuitionExpectedForYear = Number(studentFinancial.tuitionExpected || fallbackExpected);
         }
 
         studentUpdate.tuitionPaid = totalTuitionPaidForYear;
         studentUpdate.tuitionStatus = totalTuitionPaidForYear >= totalTuitionExpectedForYear ? 'paid' : (totalTuitionPaidForYear > 0 ? 'partial' : 'unpaid');
       }
-      transaction.update(studentRef, studentUpdate);
+      writeStudentFinanceProjection({
+        transaction,
+        financeRef: studentFinanceRef,
+        financeSnapshot: studentFinanceSnap,
+        studentId,
+        schoolId,
+        patch: studentUpdate,
+        actorId: uid
+      });
 
       let schoolName = school.name || 'EcoScolaire';
       if (cycle && school.cycleNames && school.cycleNames[cycle]) {
@@ -2406,6 +2416,8 @@ export const createTuitionDiscount = functions.https.onCall(async (data, context
     const student = studentSnap.data()!;
     const schoolId = student.schoolId;
     const academicYear = student.academicYear;
+    const studentFinanceSnap = await transaction.get(db.collection('studentFinance').doc(cleanStudentId));
+    const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
 
     if (!schoolId || !academicYear) {
       throw new functions.https.HttpsError('failed-precondition', 'Student schoolId or academicYear is missing.');
@@ -2483,10 +2495,10 @@ export const createTuitionDiscount = functions.https.onCall(async (data, context
     // Resolve current tuition fee
     const globalFees = school.globalFees || { feeT1: 0, feeT2: 0, feeT3: 0 };
     const grossExpectedAmount = installment === 'T1'
-      ? (student.feeT1 ?? globalFees.feeT1 ?? 0)
+      ? (studentFinancial.feeT1 ?? globalFees.feeT1 ?? 0)
       : installment === 'T2'
-        ? (student.feeT2 ?? globalFees.feeT2 ?? 0)
-        : (student.feeT3 ?? globalFees.feeT3 ?? 0);
+        ? (studentFinancial.feeT2 ?? globalFees.feeT2 ?? 0)
+        : (studentFinancial.feeT3 ?? globalFees.feeT3 ?? 0);
 
     if (
       typeof grossExpectedAmount !== 'number' ||
@@ -3037,3 +3049,4 @@ export { setPrimaryTeacherAssignment } from './academic/setPrimaryTeacherAssignm
 export { deactivateTeacherAssignment } from './academic/deactivateTeacherAssignment';
 export { getTeacherAssignmentCandidates } from './academic/getTeacherAssignmentCandidates';
 export { updateAcademicYearBounds } from './academic/updateAcademicYearBounds';
+export { createStudentSecure } from './studentCreationSecure';

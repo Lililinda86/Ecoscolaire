@@ -1,11 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test('Debug P0-022', async ({ page }) => {
   const logs: string[] = [];
   page.on('console', msg => logs.push(msg.text()));
 
-  await loginAs(page, 'parent1.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+  await loginAs(page, 'parent1.alpha@ecoscolaire.com', alphaPassword);
   await page.waitForTimeout(3000);
   
   const result = await page.evaluate(async () => {

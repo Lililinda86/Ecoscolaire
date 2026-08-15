@@ -3,9 +3,13 @@ import * as fs from 'fs';
 import { loginAs } from './helpers/auth';
 import { attachConsoleMonitor } from './helpers/console-monitor';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { alphaPassword } = loadStagingCredentials(['alpha']);
+
 test.describe('Students CRUD', () => {
   test.beforeEach(async ({ page }) => {
-    await loginAs(page, 'owner.alpha@ecoscolaire.com', 'Test@2026Alpha!');
+    await loginAs(page, 'owner.alpha@ecoscolaire.com', alphaPassword);
     await page.getByTestId('nav-students').click();
   });
 

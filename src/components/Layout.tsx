@@ -1,12 +1,22 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
 import { useAppContext } from '../context/AppContext';
-import { Bot, Shield, Package, Bus as BusIcon, ClipboardList, BookOpen, Users, LayoutDashboard, Settings, CreditCard, Calendar, MessageSquare, ShieldAlert, Briefcase, AlertTriangle } from 'lucide-react';
+import { Bot, Shield, Package, Bus as BusIcon, ClipboardList, BookOpen, Users, LayoutDashboard, Settings, CreditCard, Calendar, MessageSquare, ShieldAlert, Briefcase, AlertTriangle, Menu, X } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
   const { currentUser, isSupervising, currentSchool, exitSupervision, logout, isSchoolSuspended } = useAppContext();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileNavOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isMobileNavOpen]);
 
   const toggleLang = () => {
     setLang(lang === 'fr' ? 'en' : 'fr');
@@ -40,9 +50,43 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           Accès en consultation uniquement
         </div>
       )}
-      <aside className="sidebar" data-testid="sidebar" style={{ paddingTop: (isSupervising || currentUser?.role === 'boardViewer' || (isSchoolSuspended && currentUser?.role !== 'superAdmin')) ? '3rem' : undefined }}>
+      <div className="mobile-menu-bar">
+        <button
+          type="button"
+          className="mobile-menu-button"
+          aria-label="Ouvrir le menu principal"
+          aria-controls="primary-navigation"
+          aria-expanded={isMobileNavOpen}
+          onClick={() => setIsMobileNavOpen(true)}
+        >
+          <Menu size={24} aria-hidden="true" />
+        </button>
+        <span>EcoScolaire</span>
+      </div>
+      {isMobileNavOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Fermer le menu principal"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
+      <aside id="primary-navigation" className={`sidebar${isMobileNavOpen ? ' sidebar-open' : ''}`} data-testid="sidebar" style={{ paddingTop: (isSupervising || currentUser?.role === 'boardViewer' || (isSchoolSuspended && currentUser?.role !== 'superAdmin')) ? '3rem' : undefined }}>
+        <button
+          type="button"
+          className="sidebar-close-button"
+          aria-label="Fermer le menu principal"
+          onClick={() => setIsMobileNavOpen(false)}
+        >
+          <X size={22} aria-hidden="true" />
+        </button>
         <h2>EcoScolaire</h2>
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}>
+        <nav
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}
+          onClick={event => {
+            if ((event.target as HTMLElement).closest('a')) setIsMobileNavOpen(false);
+          }}
+        >
           {currentUser?.role === 'superAdmin' && !currentSchool ? (
             <>
               <div className="sidebar-category">GLOBAL SUPER ADMIN</div>

@@ -1,12 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
 
+import { loadStagingCredentials } from './helpers/stagingCredentials';
+
+const { superAdminPassword } = loadStagingCredentials(['superAdmin']);
+
 test.describe('P0-024B ITALO INTERNAL VALIDATION', () => {
   test('Validations des quotas SaaS et contournement pour GS Bilingue ITALO', async ({ page }) => {
     console.log('\n--- DEBUT DU TEST E2E ITALO SUR PRODUCTION ---\n');
     
     console.log('Login SuperAdmin...');
-    await loginAs(page, 'superadmin.test@ecoscolaire.com', 'Test@2026Super!');
+    await loginAs(page, 'superadmin.test@ecoscolaire.com', superAdminPassword);
     await page.waitForTimeout(3000);
     
     console.log('\n--- Test : ECO TEST INTERNAL ITALO ---');

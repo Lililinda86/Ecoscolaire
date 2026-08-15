@@ -1,3 +1,4 @@
+const { requireStagingCredential, assertStagingProject } = require('./staging-credentials.cjs');
 const { initializeApp } = require('firebase/app');
 const { getFirestore, doc, setDoc, updateDoc } = require('firebase/firestore');
 const { getAuth, signInWithEmailAndPassword } = require('firebase/auth');
@@ -14,6 +15,8 @@ const firebaseConfig = {
   appId: process.env.VITE_FIREBASE_APP_ID
 };
 
+assertStagingProject(firebaseConfig.projectId);
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -23,7 +26,7 @@ async function testBackendLimits() {
   
   // Login as a normal owner/director to test rules
   try {
-    await signInWithEmailAndPassword(auth, "kyrialove@gmail.com", "Test@2026Super!");
+    await signInWithEmailAndPassword(auth, "superadmin.test@ecoscolaire.com", requireStagingCredential('superAdmin'));
     // Note: kyrialove@gmail.com is superAdmin in some environments, we might need a regular owner.
     // Let's use a known test owner or superAdmin since we want to test studentsCount rules.
     // Wait, superAdmin bypasses canManagePedagogy but does superAdmin bypass canCreateStudentWithinLimits?

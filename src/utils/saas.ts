@@ -1,4 +1,5 @@
 import type { School } from '../types';
+import { getConfiguredStudentLimit } from '../services/studentQuota';
 
 /**
  * Returns the maximum number of students allowed for a given school based on its SaaS plan.
@@ -6,23 +7,7 @@ import type { School } from '../types';
 export function getStudentLimit(school: School | null): number {
   if (!school) return 0;
   
-  // L'école interne GSB ITALO a un accès illimité
-  if (school.isInternalSchool) {
-    return Infinity;
-  }
-
-  const plan = school.subscriptionPlan || 'starter';
-
-  switch (plan) {
-    case 'premium':
-      return Infinity;
-    case 'pilot':
-    case 'standard':
-      return 1000;
-    case 'starter':
-    default:
-      return 200;
-  }
+  return getConfiguredStudentLimit(school);
 }
 
 /**

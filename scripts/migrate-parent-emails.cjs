@@ -1,3 +1,4 @@
+const { requireStagingCredential, assertStagingProject } = require('./staging-credentials.cjs');
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, getDocs, query, where, doc, getDoc, updateDoc, writeBatch } = require('firebase/firestore');
 const { getAuth, signInWithEmailAndPassword } = require('firebase/auth');
@@ -14,6 +15,8 @@ const firebaseConfig = {
   appId: process.env.VITE_FIREBASE_APP_ID
 };
 
+assertStagingProject(firebaseConfig.projectId);
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -24,7 +27,7 @@ async function run() {
   try {
     console.log(`Starting migration (DRY_RUN=${DRY_RUN})...`);
     // NOTE: This uses client SDK, so we need rules access or superadmin
-    await signInWithEmailAndPassword(auth, "superadmin.test@ecoscolaire.com", "Test@2026Super!");
+    await signInWithEmailAndPassword(auth, "superadmin.test@ecoscolaire.com", requireStagingCredential('superAdmin'));
     console.log("Logged in as SuperAdmin");
 
     const q = query(collection(db, 'users'), where('role', '==', 'parent'));

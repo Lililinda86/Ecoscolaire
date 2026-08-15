@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy, MessageSquare } from 'lucide-react';
@@ -12,7 +12,26 @@ import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '..
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, updateDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { resolveStudentEnrollmentAcademicYear } from '../utils/studentEnrollment';
+import {
+  acquireStudentSubmissionLock,
+  releaseStudentSubmissionLock
+} from '../services/studentCreation';
+import { createStudentSecure } from '../services/studentCreationFunctions';
+import { splitStudentData, updateStudentSeparatedData } from '../services/studentPrivacy';
+import {
+  getCanonicalStudentCount,
+  getStudentCountForDisplay,
+  updateStudentSchoolingStatusAtomically
+} from '../services/studentQuota';
+import {
+  canRoleChangeStudentStatus,
+  canRoleManageStudents,
+  getStudentCreationErrorMessage,
+  getStudentStatusErrorMessage,
+  validateRequiredStudentFields
+} from '../services/studentManagementPolicy';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -225,10 +244,12 @@ const Students: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingStudentOriginal, setEditingStudentOriginal] = useState<Student | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
+  const [isDuplicateConfirmOpen, setIsDuplicateConfirmOpen] = useState(false);
   const [, setRefresh] = useState(0);
   const { db, addStudentsLocal, updateStudentLocal, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
 
-  const currentCountDisplay = currentSchool?.studentCount ?? db.students.length;
+  const currentCountDisplay = currentSchool ? getStudentCountForDisplay(currentSchool) : db.students.length;
   const limitReached = isStudentLimitReached(currentSchool, currentCountDisplay);
   const limitLabel = getStudentLimitLabel(currentSchool, currentCountDisplay);
   const [currentStudent, setCurrentStudent] = useState<Partial<Student>>({ gender: 'M', section: 'francophone', classId: '' });
@@ -264,6 +285,7 @@ const Students: React.FC = () => {
   };
 
   const forceCloseStudentModal = () => {
+    setIsDuplicateConfirmOpen(false);
     setModalOpen(false);
   };
 
@@ -321,11 +343,9 @@ const Students: React.FC = () => {
   }, [openRowMenuId]);
 
   const effectiveRole = typeof currentUser?.role === 'string' ? currentUser.role.trim() : '';
-  const canManageStudents = ['superAdmin', 'owner', 'director', 'secretary'].includes(effectiveRole);
+  const canManageStudents = canRoleManageStudents(effectiveRole);
   const canViewSensitive = currentUser && currentUser.role !== 'boardViewer';
-  const canChangeStudentActiveStatus =
-    !!effectiveRole &&
-    ['superAdmin', 'owner', 'director'].includes(effectiveRole);
+  const canChangeStudentActiveStatus = canRoleChangeStudentStatus(effectiveRole);
 
   if (!currentUser) return null;
 
@@ -519,10 +539,20 @@ const Students: React.FC = () => {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSaving) return;
+  const handleSave = async (
+    e?: React.FormEvent,
+    confirmProbableDuplicate = false
+  ) => {
+    e?.preventDefault();
     if (currentStep !== 4) return;
+
+    if (!isEditing) {
+      const requiredFieldError = validateRequiredStudentFields(currentStudent);
+      if (requiredFieldError) {
+        setStepValidationError(requiredFieldError);
+        return;
+      }
+    }
 
     if (!currentStudent.classId) {
       alert("Veuillez choisir une classe !");
@@ -536,11 +566,12 @@ const Students: React.FC = () => {
       return;
     }
 
+    if (!acquireStudentSubmissionLock(saveInFlightRef)) return;
     setIsSaving(true);
     try {
       const normalizedEmails = normalizeParentEmails(parentEmailsInput);
       const parentPhone = currentStudent.parentPhone ? (normalizeCameroonPhoneNumber(currentStudent.parentPhone) || currentStudent.parentPhone) : '';
-      const matricule = currentStudent.matricule ? currentStudent.matricule.trim() : `MAT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const matricule = currentStudent.matricule?.trim() ?? '';
       const computedName = buildStudentDisplayName(currentStudent.studentLastName, currentStudent.studentFirstName);
       const finalName = computedName || currentStudent.name || '';
 
@@ -563,7 +594,6 @@ const Students: React.FC = () => {
       finalStudent.registrationFeeStatus = status;
 
       if (isEditing && finalStudent.id) {
-        const studentRef = doc(firestoreDb, 'students', finalStudent.id);
         const getPatchValue = <K extends keyof Student>(
           key: K,
           defaultValue: Student[K]
@@ -609,7 +639,13 @@ const Students: React.FC = () => {
           registrationYear: getPatchValue('registrationYear', '2026-2027')
         };
         const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
-        await updateDoc(studentRef, patchData);
+        await updateStudentSeparatedData({
+          firestore: firestoreDb,
+          studentId: finalStudent.id,
+          schoolId: currentSchool?.id || finalStudent.schoolId || '',
+          actorId: currentUser.id,
+          patch: patchData
+        });
 
         // Mutate local state for UI update
         const updatedLocalStudent = {
@@ -623,23 +659,85 @@ const Students: React.FC = () => {
         if (!currentSchool) throw new Error("École non définie.");
         const studentId = finalStudent.id || crypto.randomUUID();
         finalStudent.id = studentId;
-        const studentRef = doc(firestoreDb, 'students', studentId);
+        finalStudent.schoolId = currentSchool.id;
+        finalStudent.schoolingStatus = 'active';
 
-        const currentCountDisplay = currentSchool.studentCount ?? db.students.length;
-        if (isStudentLimitReached(currentSchool, currentCountDisplay)) {
-          throw new Error("QUOTA_EXCEEDED");
-        }
+        const optionalStudentFields: Partial<Student> = {
+          placeOfBirth: finalStudent.placeOfBirth,
+          fatherName: finalStudent.fatherName,
+          fatherPhone: finalStudent.fatherPhone,
+          fatherProfession: finalStudent.fatherProfession,
+          motherName: finalStudent.motherName,
+          motherPhone: finalStudent.motherPhone,
+          motherProfession: finalStudent.motherProfession,
+          guardianRelationship: finalStudent.guardianRelationship,
+          guardianRelationshipDetails: finalStudent.guardianRelationshipDetails,
+          parentEmails: finalStudent.parentEmails,
+          address: finalStudent.address,
+          emergencyContact: finalStudent.emergencyContact,
+          allergies: finalStudent.allergies,
+          medicalConditions: finalStudent.medicalConditions,
+          registrationFeeExpected: finalStudent.registrationFeeExpected,
+          tuitionExpected: finalStudent.tuitionExpected,
+          feeT1: finalStudent.feeT1,
+          feeT2: finalStudent.feeT2,
+          feeT3: finalStudent.feeT3
+        };
+        const studentToSave = Object.fromEntries(Object.entries({
+          id: studentId,
+          schoolId: currentSchool.id,
+          schoolingStatus: 'active',
+          matricule: finalStudent.matricule,
+          name: finalStudent.name,
+          studentLastName: finalStudent.studentLastName,
+          studentFirstName: finalStudent.studentFirstName,
+          gender: finalStudent.gender,
+          dob: finalStudent.dob,
+          section: finalStudent.section,
+          classId: finalStudent.classId,
+          studentStatus: finalStudent.studentStatus || 'nouveau',
+          parentName: finalStudent.parentName,
+          parentPhone: finalStudent.parentPhone,
+          registrationFeePaid: 0,
+          registrationFeeStatus: 'unpaid',
+          ...optionalStudentFields
+        }).filter(([, value]) => value !== undefined && value !== ''));
+        const { schoolData, privateData, financeData, parentPrivateData, parentFinanceData } = splitStudentData({
+          ...finalStudent,
+          ...studentToSave,
+          id: studentId,
+          schoolId: currentSchool.id
+        });
 
-        const studentToSave = Object.fromEntries(Object.entries(finalStudent).filter(([, v]) => v !== undefined));
-
-        await setDoc(studentRef, studentToSave, { merge: true });
+        const creationResult = await createStudentSecure({
+          studentId,
+          requestedMatricule: currentStudent.matricule,
+          studentData: schoolData,
+          privateData: privateData as unknown as Record<string, unknown>,
+          financeData: financeData as unknown as Record<string, unknown>,
+          parentPrivateData: parentPrivateData as unknown as Record<string, unknown>,
+          parentFinanceData: parentFinanceData as unknown as Record<string, unknown>,
+          confirmProbableDuplicate
+        });
+        finalStudent.academicYearId = creationResult.academicYearId;
+        finalStudent.registrationYear = creationResult.registrationYear;
+        finalStudent.matricule = creationResult.matricule;
+        finalStudent.matriculeNormalized = creationResult.matriculeNormalized;
+        finalStudent.matriculeReservationId = creationResult.matriculeReservationId;
+        finalStudent.duplicateFingerprint = creationResult.duplicateFingerprint;
+        finalStudent.duplicateReservationId = creationResult.duplicateReservationId;
 
         // Mutate local state
-        db.students.push(finalStudent);
-        currentSchool.studentCount = (currentSchool.studentCount || 0) + 1;
+        if (!db.students.some(student => student.id === studentId)) {
+          db.students.push(finalStudent);
+          if (creationResult.created) {
+            currentSchool.studentsCount = (getCanonicalStudentCount(currentSchool) ?? 0) + 1;
+          }
+        }
       }
 
       setRefresh(r => r + 1);
+      alert(isEditing ? 'Élève modifié avec succès.' : 'Élève créé avec succès.');
       forceCloseStudentModal();
 
       logAuditAction({
@@ -651,21 +749,24 @@ const Students: React.FC = () => {
     } catch (err: unknown) {
       const code = getErrorCode(err);
       const message = getErrorMessage(err);
-      if (message === 'QUOTA_EXCEEDED') {
-        alert("Action refusée : La limite de votre abonnement SaaS est atteinte. Veuillez passer au plan supérieur.");
-      } else if (message === 'ALREADY_EXISTS') {
-        alert("Erreur métier : Cet élève existe déjà ou une requête concurrente a réussi.");
+      const creationErrorMessage = getStudentCreationErrorMessage(message);
+      if (message === 'PROBABLE_DUPLICATE') {
+        setIsDuplicateConfirmOpen(true);
+      } else if (creationErrorMessage) {
+        alert(`Création impossible : ${creationErrorMessage}`);
       } else if (code === 'permission-denied') {
-        console.error("PERMISSION DENIED ERROR DETAILS:", err);
+        console.error('Student write denied.', { code });
         alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
       } else if (code === 'unavailable' || !navigator.onLine) {
         alert("Erreur réseau : Impossible de vérifier le quota hors ligne. Veuillez vous reconnecter.");
       } else if (code === 'aborted') {
         alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
       } else {
-        alert("Erreur lors de l'enregistrement : " + message);
+        console.error('Student save failed.', { code });
+        alert("L'enregistrement a échoué. Veuillez réessayer ou contacter un administrateur.");
       }
     } finally {
+      releaseStudentSubmissionLock(saveInFlightRef);
       setIsSaving(false);
     }
   };
@@ -708,9 +809,7 @@ const Students: React.FC = () => {
     setStatusError(null);
 
     try {
-      const studentRef = doc(firestoreDb, 'students', targetId);
       const patchData = {
-        schoolingStatus: 'inactive' as const,
         departureReason,
         departureDate,
         departureNote: departureNote.trim(),
@@ -718,7 +817,17 @@ const Students: React.FC = () => {
         deactivatedBy: actorId
       };
 
-      await updateDoc(studentRef, patchData);
+      const statusResult = await updateStudentSchoolingStatusAtomically({
+        firestore: firestoreDb,
+        schoolId: currentSchool.id,
+        studentId: targetId,
+        actorId,
+        targetStatus: 'inactive',
+        studentPatch: patchData
+      });
+      if (statusResult === 'updated') {
+        currentSchool.studentsCount = Math.max(0, (getCanonicalStudentCount(currentSchool) ?? 1) - 1);
+      }
 
       updateStudentLocal(targetId, {
         schoolingStatus: 'inactive',
@@ -743,8 +852,8 @@ const Students: React.FC = () => {
 
       alert("Élève désactivé avec succès.");
     } catch (err: unknown) {
-      console.error(err);
-      setStatusError(getErrorMessage(err));
+      console.error("Student status update failed.", { code: getErrorCode(err) });
+      setStatusError(getStudentStatusErrorMessage(getErrorMessage(err)));
     } finally {
       setIsStatusSaving(false);
     }
@@ -780,14 +889,22 @@ const Students: React.FC = () => {
     setStatusError(null);
 
     try {
-      const studentRef = doc(firestoreDb, 'students', targetId);
       const patchData = {
-        schoolingStatus: 'active' as const,
         reactivatedAt: serverTimestamp(),
         reactivatedBy: actorId
       };
 
-      await updateDoc(studentRef, patchData);
+      const statusResult = await updateStudentSchoolingStatusAtomically({
+        firestore: firestoreDb,
+        schoolId: currentSchool.id,
+        studentId: targetId,
+        actorId,
+        targetStatus: 'active',
+        studentPatch: patchData
+      });
+      if (statusResult === 'updated') {
+        currentSchool.studentsCount = (getCanonicalStudentCount(currentSchool) ?? 0) + 1;
+      }
 
       updateStudentLocal(targetId, {
         schoolingStatus: 'active',
@@ -806,8 +923,8 @@ const Students: React.FC = () => {
 
       alert("Élève réactivé avec succès.");
     } catch (err: unknown) {
-      console.error(err);
-      setStatusError(getErrorMessage(err));
+      console.error("Student status update failed.", { code: getErrorCode(err) });
+      setStatusError(getStudentStatusErrorMessage(getErrorMessage(err)));
     } finally {
       setIsStatusSaving(false);
     }
@@ -823,16 +940,24 @@ const Students: React.FC = () => {
 
     if (confirm("Retirer cet élève de la liste des élèves actifs ?")) {
       try {
-        const studentRef = doc(firestoreDb, 'students', student.id);
         const patchData = {
-          schoolingStatus: 'inactive' as const,
           departureReason: 'withdrawn' as const,
           departureDate: new Date().toISOString().split('T')[0],
           departureNote: 'Retiré des élèves actifs',
           deactivatedAt: serverTimestamp(),
           deactivatedBy: currentUser.id
         };
-        await updateDoc(studentRef, patchData);
+        const statusResult = await updateStudentSchoolingStatusAtomically({
+          firestore: firestoreDb,
+          schoolId: currentSchool.id,
+          studentId: student.id,
+          actorId: currentUser.id,
+          targetStatus: 'inactive',
+          studentPatch: patchData
+        });
+        if (statusResult === 'updated') {
+          currentSchool.studentsCount = Math.max(0, (getCanonicalStudentCount(currentSchool) ?? 1) - 1);
+        }
 
         // Mutate local state
         const idx = db.students.findIndex(s => s.id === student.id);
@@ -851,7 +976,7 @@ const Students: React.FC = () => {
 
         alert("Élève désactivé avec succès.");
         logAuditAction({
-          action: 'DELETE_STUDENT',
+          action: 'DEACTIVATE_STUDENT',
           targetType: 'STUDENT',
           targetId: student.id,
           targetName: student.name
@@ -860,7 +985,7 @@ const Students: React.FC = () => {
         const code = getErrorCode(err);
         const message = getErrorMessage(err);
         if (message === 'NOT_FOUND') {
-          alert("Erreur métier : Cet élève n'existe pas ou a déjà été supprimé.");
+          alert("Erreur métier : Cet élève n'existe pas ou son statut a déjà changé.");
         } else if (code === 'permission-denied') {
           alert("Action refusée : Vous n'avez pas les droits nécessaires pour effectuer cette action.");
         } else if (code === 'unavailable' || !navigator.onLine) {
@@ -868,7 +993,8 @@ const Students: React.FC = () => {
         } else if (code === 'aborted') {
           alert("Erreur de concurrence : La transaction a été interrompue. Veuillez réessayer.");
         } else {
-          alert("Erreur lors de la suppression : " + message);
+          console.error('Student deactivation failed.', { code });
+          alert("La désactivation a échoué. Veuillez réessayer.");
         }
       }
     }
@@ -1146,7 +1272,7 @@ const Students: React.FC = () => {
 
         setPreviewStudents(newStudents);
       } catch (err) {
-        console.error(err);
+        console.error("Student import validation failed.", { code: getErrorCode(err) });
         alert("Erreur lors de la lecture du fichier Excel.");
       }
     };
@@ -1277,7 +1403,7 @@ const Students: React.FC = () => {
       setExcelFile(null);
       alert("Importation finalisée avec succès !");
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Student import failed.", { code: getErrorCode(err) });
       alert("Erreur lors de l'enregistrement du lot. Zéro élève n'a été importé. Détails : " + getErrorMessage(err));
     } finally {
       setIsSaving(false);
@@ -1369,7 +1495,7 @@ const Students: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Student export failed.", { code: getErrorCode(err) });
       alert("Une erreur est survenue lors de la génération de l'export.");
     }
   };
@@ -1538,8 +1664,13 @@ const Students: React.FC = () => {
               <button onClick={() => handleOpenModal()} disabled={isSchoolSuspended} aria-label="Ajouter un élève">
                 <Plus size={18} /> {t('add', 'Ajouter un élève')}
               </button>
-              <button className="secondary" onClick={() => setImportModalOpen(true)} disabled={isSchoolSuspended} aria-label="Importer depuis Excel">
-                <FileSpreadsheet size={18} /> Importer Excel
+              <button
+                className="secondary"
+                disabled
+                aria-label="Import temporairement indisponible"
+                title="Import temporairement indisponible — utilisez l’ajout manuel sécurisé."
+              >
+                <FileSpreadsheet size={18} /> Import temporairement indisponible
               </button>
             </>
           )}
@@ -1951,10 +2082,11 @@ const Students: React.FC = () => {
                 )}
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   <div className="form-group" style={{ flex: '1 1 180px' }}>
-                    <label>Matricule <span style={{ fontSize: '0.8rem', color: '#64748b' }}>(Facultatif)</span></label>
+                    <label>Matricule <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{isEditing ? '(non modifiable)' : '(Facultatif)'}</span></label>
                     <input
                       value={currentStudent.matricule || ''}
                       onChange={e => setCurrentStudent({...currentStudent, matricule: e.target.value})}
+                      readOnly={isEditing}
                       placeholder="Laisser vide pour générer automatiquement"
                     />
                   </div>
@@ -1975,6 +2107,8 @@ const Students: React.FC = () => {
                     <label>Prénom(s) <span style={{ color: 'red' }}>*</span></label>
                     <input
                       required
+                      aria-invalid={stepValidationError === 'Veuillez renseigner le ou les prénoms.'}
+                      aria-describedby="student-first-name-error"
                       value={currentStudent.studentFirstName || ''}
                       onChange={e => {
                         const f = e.target.value;
@@ -1983,6 +2117,11 @@ const Students: React.FC = () => {
                       }}
                       placeholder="Ex: Mballa Élise"
                     />
+                    {stepValidationError === 'Veuillez renseigner le ou les prénoms.' && (
+                      <div id="student-first-name-error" role="alert" style={{ marginTop: '0.35rem', color: '#dc2626', fontSize: '0.82rem' }}>
+                        {stepValidationError}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -2111,7 +2250,15 @@ const Students: React.FC = () => {
                   </div>
                   <div className="form-group" style={{ flex: '1 1 200px' }}>
                     <label>Année Scolaire</label>
-                    <input value={currentStudent.registrationYear || '2026-2027'} onChange={e => setCurrentStudent({...currentStudent, registrationYear: e.target.value})} />
+                    <input
+                      readOnly
+                      value={
+                        isEditing
+                          ? (currentStudent.registrationYear || 'Année non renseignée (fiche legacy)')
+                          : (resolveStudentEnrollmentAcademicYear(db.academicYears, currentSchool)?.name || 'Aucune année active configurée')
+                      }
+                      aria-label="Année scolaire active"
+                    />
                   </div>
                 </div>
               </div>
@@ -2352,11 +2499,11 @@ const Students: React.FC = () => {
                     e.stopPropagation();
                     setStepValidationError(null);
                     if (currentStep === 1) {
-                      if (!currentStudent.studentLastName && !currentStudent.name) {
+                      if (!currentStudent.studentLastName?.trim()) {
                         setStepValidationError('Veuillez renseigner le nom.');
                         return;
                       }
-                      if (!currentStudent.studentFirstName && !currentStudent.name) {
+                      if (!currentStudent.studentFirstName?.trim()) {
                         setStepValidationError('Veuillez renseigner le ou les prénoms.');
                         return;
                       }
@@ -2393,17 +2540,8 @@ const Students: React.FC = () => {
                   type="submit"
                   disabled={isSaving}
                   onClick={(e) => {
+                    e.stopPropagation();
                     setStepValidationError(null);
-                    const hasAllergies = Boolean((currentStudent.allergies || '').trim());
-                    const hasMedical = Boolean((currentStudent.medicalConditions || '').trim());
-                    if (!hasAllergies && !hasMedical && !noMedicalConditionConfirmed) {
-                      e.preventDefault();
-                      setStepValidationError('Veuillez renseigner les informations médicales ou confirmer qu’aucune condition connue n’est à signaler.');
-                      setTimeout(() => {
-                        const el = document.getElementById('student-allergies-input');
-                        if (el) el.focus();
-                      }, 50);
-                    }
                   }}
                 >
                   {isSaving ? 'Enregistrement...' : t('save', 'Enregistrer')}
@@ -2412,6 +2550,43 @@ const Students: React.FC = () => {
             </div>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={isDuplicateConfirmOpen}
+        onClose={() => setIsDuplicateConfirmOpen(false)}
+        title="Doublon probable détecté"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+      >
+        <div style={{ padding: '0.25rem 0' }}>
+          <p style={{ margin: '0 0 1rem 0' }}>
+            Un élève de la même école possède déjà les mêmes nom, prénom, date de naissance et sexe.
+          </p>
+          <p style={{ margin: '0 0 1.5rem 0', color: '#92400e' }}>
+            Vérifiez la saisie. Ne confirmez que s’il s’agit réellement de deux enfants différents.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setIsDuplicateConfirmOpen(false)}
+              disabled={isSaving}
+            >
+              Revenir à la saisie
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDuplicateConfirmOpen(false);
+                void handleSave(undefined, true);
+              }}
+              disabled={isSaving}
+            >
+              Confirmer deux enfants différents
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Abandon Confirmation Modal */}

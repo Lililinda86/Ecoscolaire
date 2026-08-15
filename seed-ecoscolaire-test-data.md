@@ -15,15 +15,15 @@ L'exécution du script d'amorçage va populer la base Firestore avec les éléme
   - **École Beta** (ID: `school-beta-002`, Code: `BETA002`) : Un environnement vierge servant exclusivement à vérifier la stricte isolation des données (Test de non-fuite d'Alpha vers Beta).
 
 * **Super Admin :**
-  - `superadmin.test@ecoscolaire.com` (`Test@2026Super!`)
+  - `superadmin.test@ecoscolaire.com` (`STAGING_TEST_SUPERADMIN_PASSWORD`)
 
 * **Comptes Utilisateurs (École Alpha) :**
   - 8 rôles incluant Owner, Director, Secretary, Accountant, Teacher, Parent, Driver.
-  - *Mot de passe universel Alpha :* `Test@2026Alpha!`
+  - *Mot de passe universel Alpha :* `STAGING_TEST_ALPHA_PASSWORD` (GitHub Actions secret)
 
 * **Comptes Utilisateurs (École Beta) :**
   - Owner, Director, Teacher, Parent.
-  - *Mot de passe universel Beta :* `Test@2026Beta!`
+  - *Mot de passe universel Beta :* `STAGING_TEST_BETA_PASSWORD` (GitHub Actions secret)
 
 * **Pédagogie & Finances (École Alpha) :**
   - **3 Classes :** CP, CE1, CE2.
@@ -76,7 +76,7 @@ node scripts/setup-test-data.mjs --cleanup
 
 ## 4. Checklist de validation (Pour l'agent QA)
 
-- [ ] **Multi-tenant :** Se connecter avec `owner.beta@ecoscolaire.com` (`Test@2026Beta!`). S'assurer qu'absolument aucun élève de l'École Alpha n'est visible.
+- [ ] **Multi-tenant :** Se connecter avec `owner.beta@ecoscolaire.com` (`STAGING_TEST_BETA_PASSWORD`). S'assurer qu'absolument aucun élève de l'École Alpha n'est visible.
 - [ ] **Super Admin :** Se connecter avec `superadmin.test@ecoscolaire.com`. Vérifier que l'interface SA gère correctement l'affichage de plusieurs écoles.
 - [ ] **Permissions Parents :** Se connecter avec `parent1.alpha@ecoscolaire.com`. Vérifier que seuls les enfants assignés sont visibles.
 - [ ] **Blocage Impayé :** Essayer d'accéder au bulletin d'un élève lié à un paiement en attente. Le Paywall doit s'afficher.
