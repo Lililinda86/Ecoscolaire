@@ -7,6 +7,10 @@ import { chromium } from '@playwright/test';
 import { deleteApp, initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import {
+  assertStagingFirebasePrecheck,
+  classifyFirebaseRequest,
+} from './staging-firebase-precheck.mjs';
 
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
 const FORBIDDEN_PROJECT = 'ecoscolaire-c5861';
@@ -129,9 +133,9 @@ const run = async () => {
     recordVideo: undefined,
   });
   const page = await context.newPage();
-  let productionRequests = 0;
+  const firebaseRequestUrls = [];
   page.on('request', (request) => {
-    if (request.url().includes(FORBIDDEN_PROJECT)) productionRequests += 1;
+    if (classifyFirebaseRequest(request.url()).relevant) firebaseRequestUrls.push(request.url());
   });
 
   let clientApp;
@@ -144,11 +148,24 @@ const run = async () => {
 
   try {
     console.log('PRECHECK: staging target and secretary authentication');
-    await page.goto(`${appUrl}/#/diagnostic`, { waitUntil: 'domcontentloaded' });
-    await assert.doesNotReject(async () => {
-      await page.getByText(EXPECTED_PROJECT, { exact: true }).waitFor({ timeout: 20_000 });
+    const stagingRequest = page.waitForRequest(
+      (request) => classifyFirebaseRequest(request.url()).staging,
+      { timeout: 30_000 },
+    );
+    await page.goto(`${appUrl}/#/diagnostic`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.getByRole('heading', { name: /Outil de Diagnostic et Preuves d.Audit/ })
+      .waitFor({ state: 'visible', timeout: 30_000 });
+    const runtimeProjectElement = page.getByTestId('diagnostic-firebase-project');
+    await runtimeProjectElement.waitFor({ state: 'visible', timeout: 30_000 });
+    const runtimeProject = (await runtimeProjectElement.textContent())?.trim() || '';
+    await stagingRequest;
+    const isolation = assertStagingFirebasePrecheck({
+      runtimeProject,
+      requestUrls: firebaseRequestUrls,
     });
-    assert.equal(await page.getByText(FORBIDDEN_PROJECT, { exact: true }).count(), 0);
+    console.log(
+      `PRECHECK: runtime=${isolation.runtimeProject}, staging requests=${isolation.stagingRequests}, production requests=0`,
+    );
 
     await page.goto(`${appUrl}/#/login`, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('login-email').fill(SECRETARY_EMAIL);
@@ -158,7 +175,7 @@ const run = async () => {
     await page.goto(`${appUrl}/#/payments`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: /Comptabilité Générale/i }).waitFor({ timeout: 20_000 });
     await page.getByRole('button', { name: /Encaissement/i }).first().waitFor({ timeout: 20_000 });
-    assert.equal(productionRequests, 0, 'A staging browser request targeted Production Firebase.');
+    assertStagingFirebasePrecheck({ runtimeProject, requestUrls: firebaseRequestUrls });
 
     const secretaryAccount = await adminAuth.getUserByEmail(SECRETARY_EMAIL);
     secretaryUid = secretaryAccount.uid;
@@ -389,7 +406,7 @@ const run = async () => {
     assert.ok(await page.getByRole('button', { name: /Imprimer/i }).count() > 0);
     await page.getByRole('button', { name: /Brouillard de Caisse/i }).click();
     await page.getByText(/Clôture & Brouillard de Caisse/i).waitFor({ timeout: 20_000 });
-    assert.equal(productionRequests, 0, 'A staging browser request targeted Production Firebase.');
+    assertStagingFirebasePrecheck({ runtimeProject, requestUrls: firebaseRequestUrls });
 
     console.log('SECRETARY STAGING AUTH: PASS');
     console.log('STAGING COLLECTIONS E2E: PASS');

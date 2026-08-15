@@ -21,7 +21,10 @@ test('runner fails closed against Production and always executes exact cleanup',
   assert.match(source, /EXPECTED_PROJECT = 'ecoscolaire-staging'/);
   assert.match(source, /FORBIDDEN_PROJECT = 'ecoscolaire-c5861'/);
   assert.match(source, /immutable Vercel Preview URL/);
-  assert.match(source, /assert\.equal\(productionRequests, 0/);
+  assert.match(source, /getByTestId\('diagnostic-firebase-project'\)/);
+  assert.match(source, /assertStagingFirebasePrecheck/);
+  assert.doesNotMatch(source, /getByText\(EXPECTED_PROJECT/);
+  assert.doesNotMatch(source, /waitForTimeout/);
   assert.match(source, /finally \{[\s\S]*CLEANUP: deleting only exact E2E fixture records/);
   assert.match(source, /STAGING FIXTURE CLEANUP: PASS/);
   assert.doesNotMatch(source, /console\.(?:log|error)\([^\n]*(?:PASSWORD|SERVICE_ACCOUNT|API_KEY)/);
