@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "test:secrets": "node scripts/check-staging-credential-regressions.mjs",
     "test:functions:secure-student": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"vitest run tests/functions/createStudentSecure.spec.ts\"",
+    "test:functions:secretary-collections": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"node tests/functions/test-record-cash-payment-privacy.cjs && node tests/functions/test-secretary-collections-emulator.cjs\"",
     "test:production-workflow": "node --test tests/security/production-deploy-workflow.spec.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test",

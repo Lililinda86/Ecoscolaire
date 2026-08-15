@@ -228,7 +228,13 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
       return (
         r.receiptNumber?.toLowerCase().includes(lowerTerm) ||
         r.id?.toLowerCase().includes(lowerTerm) ||
-        (student?.name || '').toLowerCase().includes(lowerTerm)
+        (student?.name || '').toLowerCase().includes(lowerTerm) ||
+        (student?.matricule || '').toLowerCase().includes(lowerTerm) ||
+        String(r.type || r.paymentType || '').toLowerCase().includes(lowerTerm) ||
+        String(r.installment || '').toLowerCase().includes(lowerTerm) ||
+        String(r.period || r.month || '').toLowerCase().includes(lowerTerm) ||
+        String(r.date || '').toLowerCase().includes(lowerTerm) ||
+        String(r.collectedByName || '').toLowerCase().includes(lowerTerm)
       );
     })
     .sort((a, b) => {
@@ -313,7 +319,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
           <Search size={18} color="var(--text-muted)" style={{ marginRight: '0.5rem' }} />
           <input 
             type="text" 
-            placeholder="Rechercher (N° reçu, Élève, Transaction ID)..." 
+            placeholder="Rechercher reçu, élève, matricule, date, type, tranche, mois ou opérateur…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }}
@@ -417,6 +423,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                               <div style={{ fontWeight: 500 }}>
                                 {displayModel.nature}
                                 {displayModel.tranche ? ` (${displayModel.tranche})` : ''}
+                                {displayModel.period ? ` — ${displayModel.period}` : ''}
                               </div>
                             </div>
                             <div>
@@ -433,14 +440,28 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Matricule Élève</div>
                               <div style={{ fontWeight: 500 }}>{displayModel.studentRegistrationNumber}</div>
                             </div>
+                            {displayModel.collectedByName && (
+                              <div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Opérateur</div>
+                                <div style={{ fontWeight: 500 }}>{displayModel.collectedByName}</div>
+                              </div>
+                            )}
                           </div>
 
                           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
                             {displayModel.hasSnapshots ? (
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', background: '#fff', padding: '1rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                                 <div>
-                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Montant attendu</div>
-                                  <div style={{ fontWeight: 'bold' }}>{displayModel.formattedExpectedAmount}</div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Montant brut</div>
+                                  <div style={{ fontWeight: 'bold' }}>{displayModel.formattedGrossExpectedAmount || displayModel.formattedExpectedAmount}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bourse / réduction</div>
+                                  <div style={{ fontWeight: 'bold' }}>- {displayModel.formattedDiscountAmount || '0 FCFA'}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Montant net dû</div>
+                                  <div style={{ fontWeight: 'bold' }}>{displayModel.formattedNetExpectedAmount || displayModel.formattedExpectedAmount}</div>
                                 </div>
                                 <div>
                                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Déjà payé avant</div>

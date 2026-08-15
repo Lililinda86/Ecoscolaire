@@ -51,6 +51,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Secretary collections UI tests
+        run: npx vitest run tests/unit/FinancialBenefitsPanel.spec.tsx tests/unit/paymentReceipt.spec.ts
+
       - name: Upload Artifact
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
@@ -103,6 +106,7 @@ jobs:
           node tests/functions/test-student-import-recovery.cjs
           node tests/functions/test-student-import-bulk-writer.cjs
           node tests/functions/test-student-finance-projection.cjs
+          node tests/functions/test-secretary-collection-calculations.cjs
           node tests/functions/test-academic-resolvers.cjs
           node tests/functions/test-ensure-class-program-draft.cjs
           node tests/functions/test-publish-class-program-draft.cjs
@@ -110,6 +114,11 @@ jobs:
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student
+        env:
+          FIREBASE_PROJECT: demo-ecoscolaire
+
+      - name: Test Secretary Collections
+        run: npm run test:functions:secretary-collections
         env:
           FIREBASE_PROJECT: demo-ecoscolaire
 

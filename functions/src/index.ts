@@ -1497,7 +1497,7 @@ const isValidFirestoreId = (id: unknown): id is string => {
 // Atomically records a cash payment, updates the finance projection, increments counters,
 // and creates an immutable receipt in one Firestore transaction.
 // ----------------------------------------------------------------------
-export const recordCashPayment = functions.https.onCall(async (data, context) => {
+const recordCashPaymentLegacy = functions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
   }
@@ -3050,3 +3050,14 @@ export { deactivateTeacherAssignment } from './academic/deactivateTeacherAssignm
 export { getTeacherAssignmentCandidates } from './academic/getTeacherAssignmentCandidates';
 export { updateAcademicYearBounds } from './academic/updateAcademicYearBounds';
 export { createStudentSecure } from './studentCreationSecure';
+// Kept temporarily for source-compatible migration tests while Production exports
+// the generalized implementation below. This reference prevents dead-code errors
+// without exposing the legacy callable to Firebase.
+void recordCashPaymentLegacy;
+export {
+  approveFinancialBenefit,
+  cancelFinancialBenefit,
+  createFinancialBenefit,
+  getCollectionQuote,
+  recordCashPayment
+} from './secretaryCollections';

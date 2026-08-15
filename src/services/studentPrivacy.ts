@@ -58,6 +58,14 @@ export type StudentFinance = Pick<Student,
   | 'tuitionStatus'
   | 'transportMonthlyFee'
   | 'transportPaid'
+  | 'tuitionExpectedGross'
+  | 'tuitionDiscountTotal'
+  | 'tuitionExpectedNet'
+  | 'tuitionByInstallment'
+  | 'transportExpectedGross'
+  | 'transportDiscountTotal'
+  | 'transportExpectedNet'
+  | 'transportByPeriod'
 > & {
   id: string;
   schoolId: string;
@@ -98,7 +106,9 @@ const FINANCE_KEYS: ReadonlyArray<keyof StudentFinance> = [
   'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
   'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
   'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
-  'transportMonthlyFee', 'transportPaid'
+  'transportMonthlyFee', 'transportPaid',
+  'tuitionExpectedGross', 'tuitionDiscountTotal', 'tuitionExpectedNet', 'tuitionByInstallment',
+  'transportExpectedGross', 'transportDiscountTotal', 'transportExpectedNet', 'transportByPeriod'
 ];
 
 const pickDefined = <T extends object>(

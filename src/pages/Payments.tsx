@@ -17,6 +17,7 @@ import {
   mergeStudentRestrictedData,
   type StudentFinance
 } from '../services/studentPrivacy';
+import FinancialBenefitsPanel from '../components/FinancialBenefitsPanel';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -245,8 +246,9 @@ interface RecordCashPaymentInput {
   schoolId: string;
   studentId: string;
   amount: number;
-  type: 'tuition' | 'registration_fee';
+  type: 'tuition' | 'registration_fee' | 'transport';
   installment?: 'T1' | 'T2' | 'T3';
+  period?: string;
   description?: string;
   academicYear: string;
 }
@@ -259,7 +261,21 @@ interface RecordCashPaymentResult {
   previousPaid: number;
   newPaid: number;
   remainingBalance: number;
+  grossExpectedAmount: number;
+  discountAmount: number;
+  netExpectedAmount: number;
+  benefits: Array<{ benefitId: string; benefitType: string; reference?: string; discountAmount: number }>;
   idempotentReplay: boolean;
+}
+
+interface CollectionQuote {
+  grossExpectedAmount: number;
+  discountAmount: number;
+  netExpectedAmount: number;
+  previousPaid: number;
+  remainingBalance: number;
+  status: 'UNPAID' | 'PARTIAL' | 'PAID';
+  benefits: Array<{ benefitId: string; benefitType: string; reference?: string; discountAmount: number }>;
 }
 
 const computeSHA256 = async (text: string): Promise<string> => {
@@ -285,7 +301,9 @@ const Payments: React.FC = () => {
   const [isProcessingMoMo, setIsProcessingMoMo] = useState(false);
   const [momoSuccess, setMomoSuccess] = useState(false);
   const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({ date: new Date().toISOString().split('T')[0], type: 'tuition', amount: '' as unknown as number });
-  const [modalExpectedAmount, setModalExpectedAmount] = useState(0);
+  const [collectionQuote, setCollectionQuote] = useState<CollectionQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteRefresh, setQuoteRefresh] = useState(0);
   const [isConfirmingTx, setIsConfirmingTx] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingAttempt, setPendingAttemptState] = useState<PendingAttempt | null>(() => {
@@ -446,33 +464,45 @@ const Payments: React.FC = () => {
     }
   };
 
-  // 1. Reset input amount to empty string strictly when student, type or installment changes
+  // Reset the amount whenever the authoritative target changes.
   React.useEffect(() => {
     setCurrentPayment(prev => ({ ...prev, amount: '' as unknown as number }));
-  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment]);
+  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, currentPayment.period]);
 
-  // 2. Fetch modal expected amount details (no amount prefilling)
+  // Fetch a server-side quote. The browser displays it but never authorizes the amount.
   React.useEffect(() => {
-    if (isModalOpen && currentPayment.studentId && currentPayment.type !== 'other') {
-      const student = db.students.find(s => s.id === currentPayment.studentId);
-      if (student) {
-        let expected = 0;
-        const g = db.school?.globalFees || {feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0};
-        if (currentPayment.type === 'tuition') {
-          expected = currentPayment.installment === 'T1' ? (student.feeT1 ?? g.feeT1) : currentPayment.installment === 'T2' ? (student.feeT2 ?? g.feeT2) : (student.feeT3 ?? g.feeT3);
-        } else if (currentPayment.type === 'transport') {
-          expected = student.feeTransport ?? g.feeTransport;
-        } else if (currentPayment.type === 'uniforms') {
-          expected = student.feeUniforms ?? g.feeUniforms;
-        } else if (currentPayment.type === 'registration_fee') {
-          expected = student.registrationFeeExpected ?? 15000;
-        }
-        setModalExpectedAmount(expected);
-      }
-    } else {
-      setModalExpectedAmount(0);
+    let cancelled = false;
+    const supported = currentPayment.type === 'tuition'
+      || currentPayment.type === 'transport'
+      || currentPayment.type === 'registration_fee';
+    const targetReady = currentPayment.type !== 'transport' || !!currentPayment.period;
+    if (!isModalOpen || !supported || !targetReady || !currentPayment.studentId
+        || !currentSchool?.id || !currentSchool.academicYear) {
+      setCollectionQuote(null);
+      return () => { cancelled = true; };
     }
-  }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, isModalOpen, db.payments, db.school?.globalFees, db.students]);
+    setQuoteLoading(true);
+    const getQuote = httpsCallable<Record<string, unknown>, CollectionQuote>(functions, 'getCollectionQuote');
+    getQuote({
+      schoolId: currentSchool.id,
+      studentId: currentPayment.studentId,
+      academicYear: currentSchool.academicYear,
+      type: currentPayment.type,
+      ...(currentPayment.type === 'tuition' ? { installment: currentPayment.installment || 'T1' } : {}),
+      ...(currentPayment.type === 'transport' ? { period: currentPayment.period } : {})
+    }).then(result => {
+      if (!cancelled) setCollectionQuote(result.data);
+    }).catch(error => {
+      console.warn('Unable to calculate collection quote', error);
+      if (!cancelled) setCollectionQuote(null);
+    }).finally(() => {
+      if (!cancelled) setQuoteLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [
+    currentPayment.studentId, currentPayment.type, currentPayment.installment, currentPayment.period,
+    currentSchool?.academicYear, currentSchool?.id, isModalOpen, quoteRefresh
+  ]);
 
   const allowedRoles = ['owner', 'director', 'accountant', 'superAdmin', 'secretary', 'boardViewer'];
   if (!currentUser || !allowedRoles.includes(currentUser.role)) {
@@ -491,6 +521,7 @@ const Payments: React.FC = () => {
       date: new Date().toISOString().split('T')[0],
       type: 'tuition',
       installment: 'T1',
+      period: todayStr.substring(0, 7),
       amount: '' as unknown as number
     });
     setPaymentMethod('cash');
@@ -585,12 +616,6 @@ const Payments: React.FC = () => {
 
     setIsSaving(true);
     try {
-      // 1. Périmètre & blocage temporaire (Phase 4)
-      if (currentPayment.type === 'transport') {
-        alert("Le paiement du transport sera activé après la mise en place des tarifs par période, des réductions familiales et des paiements par tranches.");
-        setIsSaving(false);
-        return;
-      }
       if (currentPayment.type === 'uniforms' || currentPayment.type === 'other') {
         alert("Ce type de paiement n’est pas encore disponible dans le circuit sécurisé.");
         setIsSaving(false);
@@ -636,7 +661,12 @@ const Payments: React.FC = () => {
         setIsSaving(false);
         return;
       }
-      if (currentPayment.type !== 'tuition' && currentPayment.type !== 'registration_fee') {
+      if (currentPayment.type === 'transport' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(currentPayment.period || '')) {
+        alert("Veuillez sélectionner un mois de transport valide.");
+        setIsSaving(false);
+        return;
+      }
+      if (currentPayment.type !== 'tuition' && currentPayment.type !== 'registration_fee' && currentPayment.type !== 'transport') {
         alert("Ce type de paiement n'est pas pris en charge en espèces.");
         setIsSaving(false);
         return;
@@ -649,6 +679,7 @@ const Payments: React.FC = () => {
         amount,
         currentPayment.type,
         currentPayment.installment ?? null,
+        currentPayment.period ?? null,
         currentSchool.academicYear,
         (currentPayment.description || '').trim()
       ]);
@@ -679,15 +710,19 @@ const Payments: React.FC = () => {
         schoolId: currentSchool.id,
         studentId: currentPayment.studentId,
         amount,
-        type: currentPayment.type as 'tuition' | 'registration_fee',
+        type: currentPayment.type as 'tuition' | 'registration_fee' | 'transport',
         ...(currentPayment.description ? { description: currentPayment.description } : {}),
         academicYear: currentSchool.academicYear,
-        ...(currentPayment.type === 'tuition' ? { installment: currentPayment.installment } : {})
+        ...(currentPayment.type === 'tuition' ? { installment: currentPayment.installment } : {}),
+        ...(currentPayment.type === 'transport' ? { period: currentPayment.period } : {})
       } as RecordCashPaymentInput;
 
       // Sécurité supplémentaire : suppression de la clé installment si type !== tuition
       if (payload.type !== 'tuition' && 'installment' in payload) {
         delete (payload as Partial<RecordCashPaymentInput>).installment;
+      }
+      if (payload.type !== 'transport' && 'period' in payload) {
+        delete (payload as Partial<RecordCashPaymentInput>).period;
       }
 
       const result = await recordCashPaymentCall(payload);
@@ -703,12 +738,20 @@ const Payments: React.FC = () => {
       const natureText = translatePaymentType(currentPayment.type);
       const trancheText = currentPayment.type === 'tuition' ? translateInstallment(currentPayment.installment) : '';
 
-      const cumulLabel = currentPayment.type === 'tuition' ? "Cumul sur la tranche" : "Cumul des frais d’inscription";
-      const resteLabel = currentPayment.type === 'tuition' ? "Reste sur la tranche" : "Reste des frais d’inscription";
+      const cumulLabel = currentPayment.type === 'tuition'
+        ? "Cumul sur la tranche"
+        : currentPayment.type === 'transport' ? "Cumul sur le mois" : "Cumul des frais d’inscription";
+      const resteLabel = currentPayment.type === 'tuition'
+        ? "Reste sur la tranche"
+        : currentPayment.type === 'transport' ? "Reste sur le mois" : "Reste des frais d’inscription";
 
       const detailsMsg =
         `Nature : ${natureText}\n` +
         (trancheText ? `Tranche : ${trancheText}\n` : '') +
+        (currentPayment.type === 'transport' ? `Période : ${currentPayment.period}\n` : '') +
+        `Montant brut : ${formatCurrency(resData.grossExpectedAmount)}\n` +
+        `Bourses / réductions : ${formatCurrency(resData.discountAmount)}\n` +
+        `Montant net dû : ${formatCurrency(resData.netExpectedAmount)}\n` +
         `Versement : ${formatCurrency(resData.amount)}\n` +
         `Payé avant ce versement : ${formatCurrency(resData.previousPaid)}\n` +
         `${cumulLabel} : ${formatCurrency(resData.newPaid)}\n` +
@@ -770,8 +813,9 @@ const Payments: React.FC = () => {
 
     } catch (err: unknown) {
       // 7. Gestion des erreurs (Phase 8)
-      const error = err as { code?: string; message?: string };
+      const error = err as { code?: string; message?: string; details?: { businessCode?: string } };
       const errCode = error.code || '';
+      const businessCode = error.details?.businessCode;
       let errorMsg = "Le résultat du paiement n’a pas pu être confirmé. Ne modifiez pas le formulaire et utilisez Réessayer afin de conserver la même référence.";
 
       // Déterminer s'il s'agit d'une erreur définitive pour abandonner le requestId
@@ -801,7 +845,9 @@ const Payments: React.FC = () => {
         } else if (errCode.includes('not-found')) {
           errorMsg = "L’école ou l’élève est introuvable.";
         } else if (errCode.includes('failed-precondition')) {
-          errorMsg = "Le paiement ne peut pas être enregistré dans l’état actuel du dossier.";
+          errorMsg = businessCode === 'OVERPAYMENT_DENIED'
+            ? "Le montant saisi dépasse le reste à payer."
+            : "Le paiement ne peut pas être enregistré dans l’état actuel du dossier.";
         } else if (errCode.includes('already-exists')) {
           errorMsg = "Cette tentative existe déjà avec des informations différentes.";
         }
@@ -1057,15 +1103,6 @@ const Payments: React.FC = () => {
     }
   };
 
-
-  const getFeeDetails = () => {
-    if (!currentPayment.studentId || currentPayment.type === 'other') return null;
-    const student = db.students.find(s => s.id === currentPayment.studentId);
-    if (!student) return null;
-    const alreadyPaid = db.payments.filter(p => p.studentId === student.id && p.type === currentPayment.type && (currentPayment.type !== 'tuition' || p.installment === currentPayment.installment)).reduce((s, p) => s + p.amount, 0);
-    return { alreadyPaid };
-  };
-  const feeDetails = getFeeDetails();
 
   const totalCashReceived = db.payments.filter(p => isCashPaymentForSchool(p, currentSchool?.id || '')).reduce((sum, p) => sum + p.amount, 0);
   const totalMoMoReceived = db.payments.filter(p => p.method === 'mobile_money' && String(p.schoolId || '') === currentSchool?.id).reduce((sum, p) => sum + p.amount, 0);
@@ -1474,33 +1511,41 @@ const Payments: React.FC = () => {
                   const g = db.school?.globalFees || {feeT1:0, feeT2:0, feeT3:0, feeTransport:0, feeUniforms:0};
 
                   if (bilanType === 'tuition') {
-                    const t1Expected = s.feeT1 ?? g.feeT1;
-                    const t2Expected = s.feeT2 ?? g.feeT2;
-                    const t3Expected = s.feeT3 ?? g.feeT3;
+                    const t1Summary = s.tuitionByInstallment?.T1;
+                    const t2Summary = s.tuitionByInstallment?.T2;
+                    const t3Summary = s.tuitionByInstallment?.T3;
+                    const t1Expected = t1Summary?.netExpectedAmount ?? s.feeT1 ?? g.feeT1;
+                    const t2Expected = t2Summary?.netExpectedAmount ?? s.feeT2 ?? g.feeT2;
+                    const t3Expected = t3Summary?.netExpectedAmount ?? s.feeT3 ?? g.feeT3;
                     const totalExpected = t1Expected + t2Expected + t3Expected;
 
-                    const t1Paid = db.payments.filter(p => p.studentId === s.id && p.type === 'tuition' && p.installment === 'T1').reduce((sum, p) => sum + p.amount, 0);
-                    const t2Paid = db.payments.filter(p => p.studentId === s.id && p.type === 'tuition' && p.installment === 'T2').reduce((sum, p) => sum + p.amount, 0);
-                    const t3Paid = db.payments.filter(p => p.studentId === s.id && p.type === 'tuition' && p.installment === 'T3').reduce((sum, p) => sum + p.amount, 0);
+                    const t1Paid = t1Summary?.paidAmount ?? db.payments.filter(p => p.studentId === s.id && p.type === 'tuition' && p.installment === 'T1').reduce((sum, p) => sum + p.amount, 0);
+                    const t2Paid = t2Summary?.paidAmount ?? db.payments.filter(p => p.studentId === s.id && p.type === 'tuition' && p.installment === 'T2').reduce((sum, p) => sum + p.amount, 0);
+                    const t3Paid = t3Summary?.paidAmount ?? db.payments.filter(p => p.studentId === s.id && p.type === 'tuition' && p.installment === 'T3').reduce((sum, p) => sum + p.amount, 0);
 
-                    const totalPaid = db.payments.filter(p => p.studentId === s.id && p.type === 'tuition').reduce((sum, p) => sum + p.amount, 0);
-                    const totalBalance = totalExpected - totalPaid;
+                    const totalBalance = (t1Summary?.remainingBalance ?? t1Expected - t1Paid)
+                      + (t2Summary?.remainingBalance ?? t2Expected - t2Paid)
+                      + (t3Summary?.remainingBalance ?? t3Expected - t3Paid);
                     const balanceColor = totalBalance <= 0 && totalExpected > 0 ? 'var(--success)' : (totalBalance > 0 ? 'var(--danger)' : 'var(--text-muted)');
 
-                    const renderTranche = (expected: number, paid: number) => {
+                    const renderTranche = (expected: number, paid: number, summary?: typeof t1Summary) => {
                       if (expected === 0 && paid === 0) return <span style={{ color:'var(--text-muted)'}}>-</span>;
                       const reste = expected - paid;
-                      if (reste <= 0) return <span style={{ color:'var(--success)', fontWeight:'bold' }}>Soldé ✓</span>;
-                      return <span><strong style={{color:'var(--success)'}}>{paid.toLocaleString('fr-FR')}</strong> <small style={{color:'var(--text-muted)'}}>/ {expected.toLocaleString('fr-FR')}</small></span>;
+                      const status = summary?.status === 'PAID' || reste <= 0 ? 'SOLDÉ' : paid > 0 ? 'PARTIEL' : 'NON PAYÉ';
+                      return <span style={{ display: 'grid', gap: 2 }}>
+                        {summary && <small>Brut {summary.grossExpectedAmount.toLocaleString('fr-FR')} − remise {summary.discountAmount.toLocaleString('fr-FR')}</small>}
+                        <strong>{status}</strong>
+                        <small>Net {expected.toLocaleString('fr-FR')} · Payé {paid.toLocaleString('fr-FR')} · Reste {Math.max(0, summary?.remainingBalance ?? reste).toLocaleString('fr-FR')}</small>
+                      </span>;
                     };
 
                     return (
                       <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '1rem', fontWeight: 500 }}>{s.name}</td>
                         <td style={{ padding: '1rem' }}>{db.classes.find(c => c.id === s.classId)?.name || s.section}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9em' }}>{renderTranche(t1Expected, t1Paid)}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9em' }}>{renderTranche(t2Expected, t2Paid)}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9em' }}>{renderTranche(t3Expected, t3Paid)}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9em' }}>{renderTranche(t1Expected, t1Paid, t1Summary)}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9em' }}>{renderTranche(t2Expected, t2Paid, t2Summary)}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9em' }}>{renderTranche(t3Expected, t3Paid, t3Summary)}</td>
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {totalExpected === 0 ? '-' : (totalBalance <= 0 ? 'Soldé ✓' : totalBalance.toLocaleString('fr-FR') + ' FCFA')}
                         </td>
@@ -1514,9 +1559,12 @@ const Payments: React.FC = () => {
                   }
 
                   if (bilanType === 'transport') {
-                    const expected = s.feeTransport ?? g.feeTransport;
-                    const paid = db.payments.filter(p => p.studentId === s.id && p.type === 'transport').reduce((sum, p) => sum + p.amount, 0);
-                    const reste = expected - paid;
+                    const periodEntries = Object.entries(s.transportByPeriod || {}).sort(([a], [b]) => a.localeCompare(b));
+                    const expected = s.transportExpectedNet ?? (s.feeTransport ?? g.feeTransport);
+                    const paid = s.transportPaid ?? db.payments.filter(p => p.studentId === s.id && p.type === 'transport').reduce((sum, p) => sum + p.amount, 0);
+                    const reste = periodEntries.length > 0
+                      ? periodEntries.reduce((sum, [, period]) => sum + period.remainingBalance, 0)
+                      : expected - paid;
                     const balanceColor = reste <= 0 && expected > 0 ? 'var(--success)' : (reste > 0 ? 'var(--danger)' : 'var(--text-muted)');
                     const busName = db.buses.find(b => b.id === s.busId)?.name || <span style={{color:'var(--text-muted)'}}>Non assigné</span>;
 
@@ -1525,7 +1573,13 @@ const Payments: React.FC = () => {
                         <td style={{ padding: '1rem', fontWeight: 500 }}>{s.name}</td>
                         <td style={{ padding: '1rem' }}>{db.classes.find(c => c.id === s.classId)?.name || s.section}</td>
                         <td style={{ padding: '1rem' }}>{busName}</td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>{expected > 0 ? `${expected.toLocaleString('fr-FR')} FCFA` : '-'}</td>
+                        <td style={{ padding: '1rem', textAlign: 'left' }}>
+                          {periodEntries.length === 0 ? (expected > 0 ? `${expected.toLocaleString('fr-FR')} FCFA` : '-') : periodEntries.map(([period, summary]) => (
+                            <div key={period} style={{ marginBottom: '.35rem', whiteSpace: 'nowrap' }}>
+                              <strong>{period}</strong> · Brut {summary.grossExpectedAmount.toLocaleString('fr-FR')} · Remise {summary.discountAmount.toLocaleString('fr-FR')} · Net {summary.netExpectedAmount.toLocaleString('fr-FR')} · Payé {summary.paidAmount.toLocaleString('fr-FR')} · Reste {summary.remainingBalance.toLocaleString('fr-FR')} · {summary.status === 'PAID' ? 'SOLDÉ' : summary.status === 'PARTIAL' ? 'PARTIEL' : 'NON PAYÉ'}
+                            </div>
+                          ))}
+                        </td>
                         <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--success)' }}>{paid > 0 ? `+ ${paid.toLocaleString('fr-FR')}` : '-'}</td>
                         <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: balanceColor }}>
                           {expected === 0 ? '-' : (reste <= 0 ? 'Soldé ✓' : `${reste.toLocaleString('fr-FR')} FCFA`)}
@@ -2127,6 +2181,19 @@ const Payments: React.FC = () => {
                     installment: 'T1',
                     amount: '' as unknown as number
                   }));
+                } else if (newType === 'transport') {
+                  setPaymentMethod('cash');
+                  setCurrentPayment(prev => {
+                    const nextPayment: Partial<Payment> = {
+                      ...prev,
+                      type: 'transport',
+                      period: prev.period || todayStr.substring(0, 7),
+                      month: prev.period || todayStr.substring(0, 7),
+                      amount: '' as unknown as number
+                    };
+                    delete nextPayment.installment;
+                    return nextPayment;
+                  });
                 } else {
                   setCurrentPayment(prev => {
                     const nextPayment: Partial<Payment> = { ...prev, type: newType, amount: '' as unknown as number };
@@ -2155,19 +2222,12 @@ const Payments: React.FC = () => {
             {currentPayment.type === 'transport' && (
               <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Mois (Transport)</label>
-                <select required value={currentPayment.month || 'Septembre'} onChange={e => setCurrentPayment({...currentPayment, month: e.target.value})}>
-                  <option value="Septembre">Septembre</option>
-                  <option value="Octobre">Octobre</option>
-                  <option value="Novembre">Novembre</option>
-                  <option value="Décembre">Décembre</option>
-                  <option value="Janvier">Janvier</option>
-                  <option value="Février">Février</option>
-                  <option value="Mars">Mars</option>
-                  <option value="Avril">Avril</option>
-                  <option value="Mai">Mai</option>
-                  <option value="Juin">Juin</option>
-                  <option value="Autre">Autre</option>
-                </select>
+                <input
+                  type="month"
+                  required
+                  value={currentPayment.period || todayStr.substring(0, 7)}
+                  onChange={e => setCurrentPayment({ ...currentPayment, period: e.target.value, month: e.target.value })}
+                />
               </div>
             )}
             <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
@@ -2176,11 +2236,38 @@ const Payments: React.FC = () => {
             </div>
           </div>
           {currentPayment.type !== 'other' && (
-            <div className="form-group">
-              <label>Montant Attendu (Total pour ce motif)</label>
-              <input type="number" min="0" step="1" required value={modalExpectedAmount ?? ''} onChange={e => setModalExpectedAmount(parseFloat(e.target.value) || 0)} />
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>*Vous pouvez définir ou modifier le montant total exigé pour cet élève directement ici.</div>
+            <div className="form-group" aria-live="polite">
+              <label>Situation financière calculée par le serveur</label>
+              {quoteLoading && <div style={{ padding: '.75rem', background: '#f8fafc' }}>Calcul en cours…</div>}
+              {!quoteLoading && !collectionQuote && (
+                <div role="alert" style={{ padding: '.75rem', background: '#fef2f2', color: '#991b1b' }}>
+                  Sélectionnez un élève et une échéance disposant d’un tarif configuré.
+                </div>
+              )}
+              {collectionQuote && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '.5rem', padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
+                  <div><small>Montant brut</small><br/><strong>{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
+                  <div><small>Bourse / réduction</small><br/><strong>- {formatCurrency(collectionQuote.discountAmount)}</strong></div>
+                  <div><small>Montant net dû</small><br/><strong>{formatCurrency(collectionQuote.netExpectedAmount)}</strong></div>
+                  <div><small>Déjà payé</small><br/><strong>{formatCurrency(collectionQuote.previousPaid)}</strong></div>
+                  <div><small>Reste à payer</small><br/><strong>{formatCurrency(collectionQuote.remainingBalance)}</strong></div>
+                  <div><small>Statut</small><br/><strong>{collectionQuote.status === 'PAID' ? 'SOLDÉ' : collectionQuote.status === 'PARTIAL' ? 'PARTIEL' : 'NON PAYÉ'}</strong></div>
+                </div>
+              )}
             </div>
+          )}
+          {currentPayment.studentId && currentSchool?.id && currentSchool.academicYear
+            && (currentPayment.type === 'tuition' || currentPayment.type === 'transport') && (
+            <FinancialBenefitsPanel
+              schoolId={currentSchool.id}
+              studentId={currentPayment.studentId}
+              academicYear={currentSchool.academicYear}
+              paymentType={currentPayment.type}
+              installment={currentPayment.type === 'tuition' ? currentPayment.installment : undefined}
+              period={currentPayment.type === 'transport' ? currentPayment.period : undefined}
+              currentRole={currentUser.role}
+              onChanged={() => setQuoteRefresh(value => value + 1)}
+            />
           )}
           <div className="form-group">
             <label>Montant Versé (FCFA)</label>
@@ -2196,16 +2283,12 @@ const Payments: React.FC = () => {
               onWheel={(e) => e.currentTarget.blur()}
             />
 
-            {feeDetails && currentPayment.type !== 'other' && (() => {
-               const expected = modalExpectedAmount;
-               const paidBefore = feeDetails.alreadyPaid;
-               const resteAvant = Math.max(0, expected - paidBefore);
+            {collectionQuote && currentPayment.type !== 'other' && (() => {
+               const resteAvant = collectionQuote.remainingBalance;
                const saisi = Number(currentPayment.amount) || 0;
                const resteApres = Math.max(0, resteAvant - saisi);
                return (
                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f3f4f6', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
-                   <div>• <strong>Montant attendu :</strong> {expected.toLocaleString('fr-FR')} FCFA</div>
-                   <div>• <strong>{currentPayment.type === 'tuition' ? 'Déjà payé sur la tranche :' : 'Déjà payé :'}</strong> {paidBefore.toLocaleString('fr-FR')} FCFA</div>
                    <div>• <strong>Reste avant versement :</strong> {resteAvant.toLocaleString('fr-FR')} FCFA</div>
                    {saisi > 0 && <div>• <strong>Montant saisi :</strong> {saisi.toLocaleString('fr-FR')} FCFA</div>}
                    <div style={{ color: resteApres > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold', marginTop: '0.25rem' }}>
@@ -2230,7 +2313,7 @@ const Payments: React.FC = () => {
                 💵 Espèces
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 1rem', background: paymentMethod === 'mobile_money' ? '#fff' : 'transparent', border: paymentMethod === 'mobile_money' ? '1px solid #f97316' : '1px solid transparent', borderRadius: '4px', boxShadow: paymentMethod === 'mobile_money' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                <input type="radio" name="method" checked={paymentMethod === 'mobile_money'} onChange={() => setPaymentMethod('mobile_money')} style={{ margin: 0 }} />
+                <input type="radio" name="method" checked={paymentMethod === 'mobile_money'} onChange={() => setPaymentMethod('mobile_money')} disabled={currentPayment.type === 'transport'} style={{ margin: 0 }} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ color: '#ea580c', fontWeight: paymentMethod === 'mobile_money' ? 600 : 400 }}>📱 Mobile Money (En Ligne)</span>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
@@ -2277,7 +2360,12 @@ const Payments: React.FC = () => {
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
             <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isProcessingMoMo || momoSuccess || isSaving}>Annuler</button>
-            <button type="submit" disabled={isProcessingMoMo || momoSuccess || isSaving} style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)' }}>
+            <button
+              type="submit"
+              disabled={isProcessingMoMo || momoSuccess || isSaving
+                || (paymentMethod === 'cash' && (!collectionQuote || collectionQuote.remainingBalance <= 0))}
+              style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)' }}
+            >
               {isSaving ? "Enregistrement..." : (paymentMethod === 'cash' ? "Enregistrer l'encaissement" : "Lancer le paiement Mobile")}
             </button>
           </div>

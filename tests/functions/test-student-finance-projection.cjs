@@ -90,12 +90,15 @@ const createTransaction = () => {
   assert.equal((source.match(/writeStudentFinanceProjection\(\{/g) ?? []).length, 5,
     'all five active finance writer branches must target studentFinance');
 
-  const cashPaymentSource = source.slice(
-    source.indexOf('export const recordCashPayment'),
-    source.indexOf('export const createTuitionDiscount')
+  const collectionSource = fs.readFileSync(
+    path.join(__dirname, '../../functions/src/secretaryCollections.ts'), 'utf8'
   );
+  assert.doesNotMatch(collectionSource, /transaction\.(?:set|update)\(studentRef/,
+    'generalized collection paths must never write financial data to public students');
+  const cashPaymentSource = collectionSource.slice(collectionSource.indexOf('export const recordCashPayment'));
   assert.ok(
-    cashPaymentSource.indexOf('if (paymentSnap.exists)') < cashPaymentSource.indexOf('const studentFinanceRef'),
+    cashPaymentSource.indexOf('if (paymentSnap.exists || receiptSnap.exists)')
+      < cashPaymentSource.indexOf('const contextData = await readQuoteContext'),
     'idempotent payment replay must return before any finance projection write path'
   );
 })();

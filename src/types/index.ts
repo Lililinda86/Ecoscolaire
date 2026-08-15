@@ -233,6 +233,14 @@ export interface Student {
   transportFleet?: string;
   transportStatus?: 'none' | 'active' | 'suspended';
   transportPaid?: number;
+  tuitionExpectedGross?: number;
+  tuitionDiscountTotal?: number;
+  tuitionExpectedNet?: number;
+  tuitionByInstallment?: Record<'T1' | 'T2' | 'T3', FinancialPeriodSummary>;
+  transportExpectedGross?: number;
+  transportDiscountTotal?: number;
+  transportExpectedNet?: number;
+  transportByPeriod?: Record<string, FinancialPeriodSummary>;
 
   schoolingStatus?: 'active' | 'inactive';
   departureReason?: 'school_change' | 'graduated' | 'withdrawn' | 'other';
@@ -549,6 +557,52 @@ export interface Breakdown {
 
 export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'registration_fee' | 'other';
 
+export interface FinancialPeriodSummary {
+  grossExpectedAmount: number;
+  discountAmount: number;
+  netExpectedAmount: number;
+  paidAmount: number;
+  remainingBalance: number;
+  status: 'UNPAID' | 'PARTIAL' | 'PAID';
+}
+
+export type FinancialBenefitType =
+  | 'SCHOLARSHIP'
+  | 'DISCOUNT_VOUCHER'
+  | 'FAMILY_DISCOUNT'
+  | 'EXCEPTIONAL_DISCOUNT';
+
+export type FinancialBenefitMode = 'FIXED_AMOUNT' | 'PERCENTAGE';
+
+export interface FinancialBenefit {
+  id: string;
+  schoolId: string;
+  studentId: string;
+  academicYear: string;
+  benefitType: FinancialBenefitType;
+  paymentType: 'TUITION' | 'TRANSPORT';
+  mode: FinancialBenefitMode;
+  value: number;
+  installment?: 'T1' | 'T2' | 'T3' | 'ALL_TUITION';
+  transportStartPeriod?: string;
+  transportEndPeriod?: string;
+  stackable: boolean;
+  reason: string;
+  reference?: string;
+  singleUse?: boolean;
+  maximumUses?: number;
+  validFrom?: string;
+  validUntil?: string;
+  status: 'draft' | 'approved' | 'applied' | 'settled' | 'cancelled';
+  createdBy: string;
+  createdAt: DateLike;
+  approvedBy?: string;
+  approvedAt?: DateLike;
+  cancelledBy?: string;
+  cancelledAt?: DateLike;
+  cancellationReason?: string;
+}
+
 export interface SchoolPaymentSettingsPublic {
   campayPublic?: string;
   flutterwavePublic?: string;
@@ -600,6 +654,7 @@ export interface Payment {
   type: PaymentType;
   installment?: 'T1' | 'T2' | 'T3';
   month?: string;
+  period?: string;
   date: string;
   description?: string;
   method?: 'cash' | 'mobile_money';
@@ -609,6 +664,12 @@ export interface Payment {
   createdAt?: DateLike;
   requestId?: string;
   byRecordCashPayment?: boolean;
+  grossExpectedAmount?: number;
+  discountAmount?: number;
+  netExpectedAmount?: number;
+  previousPaid?: number;
+  newPaid?: number;
+  remainingBalance?: number;
 }
 
 export interface ReceiptLike {
