@@ -8,14 +8,15 @@ import { deleteApp, initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
+  assertAutomationBypassSecret,
+  assertProtectedPreviewLoaded,
   assertStagingFirebasePrecheck,
+  assertStagingRuntimeProject,
   classifyFirebaseRequest,
 } from './staging-firebase-precheck.mjs';
 
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
-const FORBIDDEN_PROJECT = 'ecoscolaire-c5861';
 const SECRETARY_EMAIL = 'secretary.alpha@ecoscolaire.com';
-const EXPECTED_SCHOOL = 'school-alpha-001';
 const REQUIRED_ENV = [
   'STAGING_APP_URL',
   'STAGING_FIREBASE_SERVICE_ACCOUNT',
@@ -26,11 +27,13 @@ const REQUIRED_ENV = [
   'STAGING_FIREBASE_STORAGE_BUCKET',
   'STAGING_FIREBASE_MESSAGING_SENDER_ID',
   'STAGING_FIREBASE_APP_ID',
+  'VERCEL_AUTOMATION_BYPASS_SECRET',
 ];
 
 const requireEnvironment = () => {
   const missing = REQUIRED_ENV.filter((name) => !process.env[name]?.trim());
   if (missing.length) throw new Error(`Missing required staging secrets: ${missing.join(', ')}`);
+  assertAutomationBypassSecret(process.env.VERCEL_AUTOMATION_BYPASS_SECRET);
   if (process.env.STAGING_FIREBASE_PROJECT_ID !== EXPECTED_PROJECT) {
     throw new Error('Refusing to run: the configured Firebase project is not staging.');
   }
@@ -102,7 +105,7 @@ const run = async () => {
   const transportBenefitId = `e2e-benefit-transport-${suffix}`;
   const draftBenefitId = `e2e-benefit-draft-${suffix}`;
   const voucherReference = `E2E-BON-${suffix}`.slice(0, 80).toUpperCase();
-  const referenceId = hashId('benefitref', [EXPECTED_SCHOOL, voucherReference]);
+  let referenceId = null;
   const requestIds = {
     tuitionPartial: `e2e-tuition-partial-${suffix}`,
     tuitionFull: `e2e-tuition-full-${suffix}`,
@@ -133,6 +136,15 @@ const run = async () => {
     recordVideo: undefined,
   });
   const page = await context.newPage();
+  await page.route(`${appUrl}/**`, async (route) => {
+    await route.continue({
+      headers: {
+        ...route.request().headers(),
+        'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+        'x-vercel-set-bypass-cookie': 'true',
+      },
+    });
+  });
   const firebaseRequestUrls = [];
   page.on('request', (request) => {
     if (classifyFirebaseRequest(request.url()).relevant) firebaseRequestUrls.push(request.url());
@@ -142,6 +154,7 @@ const run = async () => {
   let clientAuth;
   let closureId = null;
   let secretaryUid = null;
+  let testSchoolId = null;
   const paymentIds = new Set();
   const receiptNumbers = new Set();
   const targetIds = new Set([tuitionBenefitId, transportBenefitId, draftBenefitId]);
@@ -153,11 +166,21 @@ const run = async () => {
       { timeout: 30_000 },
     );
     await page.goto(`${appUrl}/#/diagnostic`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    assertProtectedPreviewLoaded({ expectedOrigin: appUrl, actualUrl: page.url() });
     await page.getByRole('heading', { name: /Outil de Diagnostic et Preuves d.Audit/ })
       .waitFor({ state: 'visible', timeout: 30_000 });
     const runtimeProjectElement = page.getByTestId('diagnostic-firebase-project');
     await runtimeProjectElement.waitFor({ state: 'visible', timeout: 30_000 });
     const runtimeProject = (await runtimeProjectElement.textContent())?.trim() || '';
+    assertStagingRuntimeProject(runtimeProject);
+    const networkProbeUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(runtimeProject)}/databases/(default)/documents/__e2e_precheck__/network-probe`;
+    await page.evaluate(async (url) => {
+      await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'omit',
+      }).catch(() => undefined);
+    }, networkProbeUrl);
     await stagingRequest;
     const isolation = assertStagingFirebasePrecheck({
       runtimeProject,
@@ -183,10 +206,12 @@ const run = async () => {
     assert.equal(secretarySnapshot.exists, true);
     const secretary = secretarySnapshot.data() || {};
     assert.equal(secretary.role, 'secretary');
-    assert.equal(secretary.schoolId, EXPECTED_SCHOOL);
+    testSchoolId = String(secretary.schoolId || '').trim();
+    assert.ok(testSchoolId, 'The staging secretary has no schoolId.');
     assert.equal(secretary.active === true || secretary.isActive === true, true);
+    referenceId = hashId('benefitref', [testSchoolId, voucherReference]);
 
-    const schoolSnapshot = await db.collection('schools').doc(EXPECTED_SCHOOL).get();
+    const schoolSnapshot = await db.collection('schools').doc(testSchoolId).get();
     assert.equal(schoolSnapshot.exists, true);
     const school = schoolSnapshot.data() || {};
     assert.match(String(school.academicYear || ''), /^\d{4}-\d{4}$/);
@@ -195,11 +220,11 @@ const run = async () => {
     assert.equal(endYear, startYear + 1);
     const september = `${startYear}-09`;
     const october = `${startYear}-10`;
-    const classSnapshot = await db.collection('classes').where('schoolId', '==', EXPECTED_SCHOOL).limit(1).get();
+    const classSnapshot = await db.collection('classes').where('schoolId', '==', testSchoolId).limit(1).get();
     assert.equal(classSnapshot.empty, false, 'No same-school staging class is available for the fixture.');
     const classId = classSnapshot.docs[0].id;
     const today = doualaDate();
-    const expectedClosureId = `${EXPECTED_SCHOOL}__${today}`;
+    const expectedClosureId = `${testSchoolId}__${today}`;
     assert.equal((await db.collection('cashClosures').doc(expectedClosureId).get()).exists, false,
       'A staging cash closure already exists for today; refusing to overwrite it.');
 
@@ -207,18 +232,18 @@ const run = async () => {
     const now = FieldValue.serverTimestamp();
     await Promise.all([
       db.collection('students').doc(studentId).create({
-        id: studentId, schoolId: EXPECTED_SCHOOL, name: studentName, matricule,
+        id: studentId, schoolId: testSchoolId, name: studentName, matricule,
         classId, academicYear, gender: 'F', section: 'francophone', active: true, isActive: true,
         createdAt: now, testFixture: true, testRunId: suffix,
       }),
       db.collection('studentFinance').doc(studentId).create({
-        id: studentId, studentId, schoolId: EXPECTED_SCHOOL,
+        id: studentId, studentId, schoolId: testSchoolId,
         registrationFeeExpected: 15_000, registrationFeePaid: 0,
         feeT1: 70_000, feeT2: 70_000, feeT3: 70_000, transportMonthlyFee: 6_000,
         createdAt: now, testFixture: true, testRunId: suffix,
       }),
       db.collection('financialBenefits').doc(tuitionBenefitId).create({
-        id: tuitionBenefitId, schoolId: EXPECTED_SCHOOL, studentId, academicYear,
+        id: tuitionBenefitId, schoolId: testSchoolId, studentId, academicYear,
         requestId: `e2e-benefit-tuition-${suffix}`, benefitType: 'SCHOLARSHIP',
         paymentType: 'TUITION', mode: 'FIXED_AMOUNT', value: 10_000, installment: 'T1',
         stackable: true, reason: 'Bourse fictive E2E staging', status: 'approved',
@@ -226,7 +251,7 @@ const run = async () => {
         approvedBy: 'e2e-admin', createdAt: now, approvedAt: now, testFixture: true, testRunId: suffix,
       }),
       db.collection('financialBenefits').doc(transportBenefitId).create({
-        id: transportBenefitId, schoolId: EXPECTED_SCHOOL, studentId, academicYear,
+        id: transportBenefitId, schoolId: testSchoolId, studentId, academicYear,
         requestId: `e2e-benefit-transport-${suffix}`, benefitType: 'DISCOUNT_VOUCHER',
         paymentType: 'TRANSPORT', mode: 'FIXED_AMOUNT', value: 1_000,
         transportStartPeriod: september, transportEndPeriod: september,
@@ -236,7 +261,7 @@ const run = async () => {
         createdAt: now, approvedAt: now, testFixture: true, testRunId: suffix,
       }),
       db.collection('financialBenefits').doc(draftBenefitId).create({
-        id: draftBenefitId, schoolId: EXPECTED_SCHOOL, studentId, academicYear,
+        id: draftBenefitId, schoolId: testSchoolId, studentId, academicYear,
         requestId: `e2e-benefit-draft-${suffix}`, benefitType: 'EXCEPTIONAL_DISCOUNT',
         paymentType: 'TUITION', mode: 'FIXED_AMOUNT', value: 500, installment: 'T3',
         stackable: true, reason: 'Remise fictive non approuvée', status: 'draft',
@@ -244,7 +269,7 @@ const run = async () => {
         createdAt: now, testFixture: true, testRunId: suffix,
       }),
       db.collection('financialBenefitReferences').doc(referenceId).create({
-        id: referenceId, schoolId: EXPECTED_SCHOOL, reference: voucherReference,
+        id: referenceId, schoolId: testSchoolId, reference: voucherReference,
         benefitId: transportBenefitId, singleUse: true, maximumUses: 1,
         createdAt: now, createdBy: 'e2e-admin', testFixture: true, testRunId: suffix,
       }),
@@ -269,11 +294,11 @@ const run = async () => {
     const approveCall = httpsCallable(functions, 'approveFinancialBenefit');
     const closeCall = httpsCallable(functions, 'closeCashDrawer');
     const quote = async (type, extra = {}) => (await quoteCall({
-      schoolId: EXPECTED_SCHOOL, studentId, academicYear, type, ...extra,
+      schoolId: testSchoolId, studentId, academicYear, type, ...extra,
     })).data;
     const pay = async (requestId, amount, type, extra = {}) => {
       const result = (await payCall({
-        schoolId: EXPECTED_SCHOOL, studentId, academicYear, requestId, amount, type, ...extra,
+        schoolId: testSchoolId, studentId, academicYear, requestId, amount, type, ...extra,
       })).data;
       paymentIds.add(result.paymentId);
       targetIds.add(result.paymentId);
@@ -366,9 +391,9 @@ const run = async () => {
     ]) assert.equal(publicStudent[forbidden], undefined, `${forbidden} leaked into students`);
 
     const allTodayPayments = await db.collection('payments')
-      .where('schoolId', '==', EXPECTED_SCHOOL).where('date', '==', today).get();
+      .where('schoolId', '==', testSchoolId).where('date', '==', today).get();
     const allTodayExpenses = await db.collection('expenses')
-      .where('schoolId', '==', EXPECTED_SCHOOL).where('date', '==', today).get();
+      .where('schoolId', '==', testSchoolId).where('date', '==', today).get();
     const cashReceived = allTodayPayments.docs.reduce((sum, doc) => {
       const payment = doc.data();
       const status = String(payment.status || 'completed').toLowerCase();
@@ -383,7 +408,7 @@ const run = async () => {
     const openingBalance = Math.max(0, cashExpenses - cashReceived);
     const countedBalance = openingBalance + cashReceived - cashExpenses;
     const closure = (await closeCall({
-      schoolId: EXPECTED_SCHOOL, academicYear, date: today,
+      schoolId: testSchoolId, academicYear, date: today,
       openingBalance, countedBalance, notes: `E2E encaissements ${suffix}`,
     })).data;
     closureId = closure.closureId;
@@ -419,17 +444,20 @@ const run = async () => {
       const benefitSnapshots = await db.collection('financialBenefits').where('studentId', '==', studentId).get();
       paymentSnapshots.docs.forEach((doc) => targetIds.add(doc.id));
       receiptSnapshots.docs.forEach((doc) => targetIds.add(doc.id));
-      const auditSnapshots = secretaryUid
-        ? await db.collection('audit_logs').where('schoolId', '==', EXPECTED_SCHOOL).get()
+      const auditSnapshots = secretaryUid && testSchoolId
+        ? await db.collection('audit_logs').where('schoolId', '==', testSchoolId).get()
         : { docs: [] };
       const exactAudits = auditSnapshots.docs.filter((doc) => targetIds.has(String(doc.data().targetId || '')));
       await deleteSnapshots(db, [paymentSnapshots, receiptSnapshots, benefitSnapshots]);
       await deleteSnapshots(db, exactAudits);
-      await Promise.all([
-        db.collection('financialBenefitReferences').doc(referenceId).delete(),
+      const directCleanup = [
         db.collection('studentFinance').doc(studentId).delete(),
         db.collection('students').doc(studentId).delete(),
-      ]);
+      ];
+      if (referenceId) directCleanup.push(
+        db.collection('financialBenefitReferences').doc(referenceId).delete(),
+      );
+      await Promise.all(directCleanup);
       if (closureId) {
         const closureRef = db.collection('cashClosures').doc(closureId);
         const closureSnapshot = await closureRef.get();
@@ -446,7 +474,8 @@ const run = async () => {
         payments: (await db.collection('payments').where('studentId', '==', studentId).get()).size,
         receipts: (await db.collection('receipts').where('studentId', '==', studentId).get()).size,
         benefits: (await db.collection('financialBenefits').where('studentId', '==', studentId).get()).size,
-        references: (await db.collection('financialBenefitReferences').doc(referenceId).get()).exists ? 1 : 0,
+        references: referenceId
+          && (await db.collection('financialBenefitReferences').doc(referenceId).get()).exists ? 1 : 0,
         closure: closureId && (await db.collection('cashClosures').doc(closureId).get()).exists ? 1 : 0,
       };
       assert.deepEqual(remaining, {

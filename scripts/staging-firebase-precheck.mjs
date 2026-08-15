@@ -1,6 +1,13 @@
 export const STAGING_FIREBASE_PROJECT = 'ecoscolaire-staging';
 export const PRODUCTION_FIREBASE_PROJECT = 'ecoscolaire-c5861';
 
+export const assertAutomationBypassSecret = (value) => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error('PRECHECK_FAILED: VERCEL_AUTOMATION_BYPASS_SECRET is missing.');
+  }
+  return value;
+};
+
 export const classifyFirebaseRequest = (rawUrl) => {
   let decodedUrl = String(rawUrl || '');
   try {
@@ -17,7 +24,7 @@ export const classifyFirebaseRequest = (rawUrl) => {
   };
 };
 
-export const assertStagingFirebasePrecheck = ({ runtimeProject, requestUrls }) => {
+export const assertStagingRuntimeProject = (runtimeProject) => {
   const project = typeof runtimeProject === 'string' ? runtimeProject.trim() : '';
   if (project !== STAGING_FIREBASE_PROJECT) {
     throw new Error(
@@ -26,6 +33,29 @@ export const assertStagingFirebasePrecheck = ({ runtimeProject, requestUrls }) =
         : 'PRECHECK_FAILED: runtime Firebase project is absent or unknown.',
     );
   }
+  return project;
+};
+
+export const assertProtectedPreviewLoaded = ({ expectedOrigin, actualUrl }) => {
+  let expected;
+  let actual;
+  try {
+    expected = new URL(expectedOrigin);
+    actual = new URL(actualUrl);
+  } catch {
+    throw new Error('PRECHECK_FAILED: protected Preview URL is invalid.');
+  }
+  if (actual.hostname === 'vercel.com' && actual.pathname.startsWith('/login')) {
+    throw new Error('PRECHECK_FAILED: Vercel login page was returned instead of the Preview.');
+  }
+  if (actual.origin !== expected.origin) {
+    throw new Error('PRECHECK_FAILED: navigation left the expected protected Preview origin.');
+  }
+  return actual.origin;
+};
+
+export const assertStagingFirebasePrecheck = ({ runtimeProject, requestUrls }) => {
+  const project = assertStagingRuntimeProject(runtimeProject);
 
   const classified = (Array.isArray(requestUrls) ? requestUrls : []).map(classifyFirebaseRequest);
   const productionRequests = classified.filter((request) => request.production).length;
