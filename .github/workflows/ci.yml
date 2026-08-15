@@ -51,6 +51,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate Vercel environment routing
+        run: npm run test:vercel-build
+
       - name: Secretary collections UI tests
         run: npx vitest run tests/unit/FinancialBenefitsPanel.spec.tsx tests/unit/paymentReceipt.spec.ts
 

@@ -190,10 +190,10 @@ Voulez-vous corriger le compteur sur la base de données Firestore ?`);
   };
 
   const firebaseConfigValues = {
-    projectId: "ecoscolaire-c5861",
-    authDomain: "ecoscolaire-c5861.firebaseapp.com",
-    storageBucket: "ecoscolaire-c5861.firebasestorage.app",
-    appId: "1:329523025972:web:052855ab83a9da2ea49261",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
   };
 
   return (
