@@ -162,6 +162,9 @@ const run = async () => {
   let duplicateReservationId = null;
   let schoolStudentsCountBefore = null;
   let schoolBeforeData = null;
+  let schoolActiveAcademicYearIdBefore = null;
+  let academicYearFixtureId = null;
+  let secondaryClassFixtureId = null;
   const paymentIds = new Set();
   const receiptNumbers = new Set();
   const targetIds = new Set([tuitionBenefitId, transportBenefitId, draftBenefitId]);
@@ -222,9 +225,25 @@ const run = async () => {
     assert.equal(schoolSnapshot.exists, true);
     const school = schoolSnapshot.data() || {};
     schoolBeforeData = school;
-    assert.ok(typeof school.activeAcademicYearId === 'string' && school.activeAcademicYearId
-      && !school.activeAcademicYearId.includes('/'), 'The staging active academic year pointer is invalid.');
-    const academicYearSnapshot = await db.collection('academicYears').doc(school.activeAcademicYearId).get();
+    schoolActiveAcademicYearIdBefore = typeof school.activeAcademicYearId === 'string'
+      && school.activeAcademicYearId && !school.activeAcademicYearId.includes('/')
+      ? school.activeAcademicYearId : null;
+    let activeAcademicYearId = schoolActiveAcademicYearIdBefore;
+    if (!activeAcademicYearId) {
+      assert.match(String(school.academicYear || ''), /^\d{4}-\d{4}$/,
+        'The staging school has neither a canonical pointer nor a valid legacy year label.');
+      academicYearFixtureId = `e2e-academic-year-${suffix}`;
+      const fixtureYearRef = db.collection('academicYears').doc(academicYearFixtureId);
+      assert.equal((await fixtureYearRef.get()).exists, false,
+        'The exact academic year fixture ID already exists.');
+      await fixtureYearRef.create({
+        id: academicYearFixtureId, schoolId: testSchoolId, name: school.academicYear,
+        status: 'active', testFixture: true, testRunId: suffix, createdAt: FieldValue.serverTimestamp(),
+      });
+      await db.collection('schools').doc(testSchoolId).update({ activeAcademicYearId: academicYearFixtureId });
+      activeAcademicYearId = academicYearFixtureId;
+    }
+    const academicYearSnapshot = await db.collection('academicYears').doc(activeAcademicYearId).get();
     assert.equal(academicYearSnapshot.exists, true, 'The staging active academic year document is missing.');
     const academicYearData = academicYearSnapshot.data() || {};
     assert.equal(academicYearData.schoolId, testSchoolId);
@@ -253,9 +272,21 @@ const run = async () => {
       );
     });
     assert.ok(primaryClass, 'No canonical primary staging class is available for the fixture.');
-    assert.ok(secondaryClass, 'No canonical secondary staging class is available for the denial test.');
     primaryClassId = primaryClass.id;
-    secondaryClassId = secondaryClass.id;
+    if (secondaryClass) {
+      secondaryClassId = secondaryClass.id;
+    } else {
+      secondaryClassFixtureId = `e2e-secondary-class-${suffix}`;
+      const secondaryClassRef = db.collection('classes').doc(secondaryClassFixtureId);
+      assert.equal((await secondaryClassRef.get()).exists, false,
+        'The exact secondary class fixture ID already exists.');
+      await secondaryClassRef.create({
+        id: secondaryClassFixtureId, schoolId: testSchoolId, name: '6e', section: 'francophone',
+        cycle: 'secondary', isActive: true, testFixture: true, testRunId: suffix,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      secondaryClassId = secondaryClassFixtureId;
+    }
     schoolStudentsCountBefore = school.studentsCount;
     assert.ok(Number.isSafeInteger(schoolStudentsCountBefore), 'The staging student counter is not initialized.');
     const today = doualaDate();
@@ -303,7 +334,7 @@ const run = async () => {
       parentFinanceData: { feeT1: 70_000, feeT2: 70_000, feeT3: 70_000 },
     })).data;
     assert.equal(creation.studentId, studentId);
-    assert.equal(creation.academicYearId, school.activeAcademicYearId);
+    assert.equal(creation.academicYearId, activeAcademicYearId);
     const createdStudent = await db.collection('students').doc(studentId).get();
     assert.equal(createdStudent.exists, true);
     matriculeReservationId = createdStudent.data()?.matriculeReservationId;
@@ -529,19 +560,25 @@ const run = async () => {
               ? transaction.get(db.collection('studentDuplicateReservations').doc(duplicateReservationId))
               : Promise.resolve(null),
           ]);
+          const schoolPatch = {};
           if (currentStudent.exists) {
             assert.equal(currentStudent.data()?.schoolId, testSchoolId);
             assert.equal(currentStudent.data()?.name, studentName);
             assert.equal(currentSchool.data()?.studentsCount, schoolStudentsCountBefore + 1);
-            const schoolPatch = { studentsCount: schoolStudentsCountBefore };
+            schoolPatch.studentsCount = schoolStudentsCountBefore;
             if (currentSchool.data()?.lastStudentCounterMutationId === studentId) {
               schoolPatch.lastStudentCounterMutationId = schoolBeforeData?.lastStudentCounterMutationId ?? FieldValue.delete();
               schoolPatch.lastStudentCounterMutationType = schoolBeforeData?.lastStudentCounterMutationType ?? FieldValue.delete();
               schoolPatch.updatedAt = schoolBeforeData?.updatedAt ?? FieldValue.delete();
               schoolPatch.updatedBy = schoolBeforeData?.updatedBy ?? FieldValue.delete();
             }
-            transaction.update(schoolRef, schoolPatch);
           }
+          if (academicYearFixtureId) {
+            assert.equal(currentSchool.data()?.activeAcademicYearId, academicYearFixtureId,
+              'Refusing to restore an academic year pointer changed by another operation.');
+            schoolPatch.activeAcademicYearId = schoolActiveAcademicYearIdBefore ?? FieldValue.delete();
+          }
+          if (Object.keys(schoolPatch).length > 0) transaction.update(schoolRef, schoolPatch);
           for (const name of [
             'students', 'studentPrivate', 'studentFinance', 'studentParentPrivate', 'studentParentFinance',
           ]) transaction.delete(db.collection(name).doc(studentId));
@@ -555,6 +592,24 @@ const run = async () => {
             else transaction.update(duplicate.ref, { studentIds: remainingIds });
           }
         });
+      }
+      if (academicYearFixtureId) {
+        const fixtureYearRef = db.collection('academicYears').doc(academicYearFixtureId);
+        const fixtureYear = await fixtureYearRef.get();
+        if (fixtureYear.exists) {
+          assert.equal(fixtureYear.data()?.testRunId, suffix);
+          assert.equal(fixtureYear.data()?.schoolId, testSchoolId);
+          await fixtureYearRef.delete();
+        }
+      }
+      if (secondaryClassFixtureId) {
+        const fixtureClassRef = db.collection('classes').doc(secondaryClassFixtureId);
+        const fixtureClass = await fixtureClassRef.get();
+        if (fixtureClass.exists) {
+          assert.equal(fixtureClass.data()?.testRunId, suffix);
+          assert.equal(fixtureClass.data()?.schoolId, testSchoolId);
+          await fixtureClassRef.delete();
+        }
       }
       if (closureId) {
         const closureRef = db.collection('cashClosures').doc(closureId);
@@ -583,14 +638,23 @@ const run = async () => {
           duplicateReservationId
             ? db.collection('studentDuplicateReservations').doc(duplicateReservationId).get() : null,
         ].filter(Boolean))).filter((item) => item.exists).length,
+        academicYearFixture: academicYearFixtureId
+          && (await db.collection('academicYears').doc(academicYearFixtureId).get()).exists ? 1 : 0,
+        secondaryClassFixture: secondaryClassFixtureId
+          && (await db.collection('classes').doc(secondaryClassFixtureId).get()).exists ? 1 : 0,
       };
       assert.deepEqual(remaining, {
         student: 0, privateDocs: 0, payments: 0, receipts: 0, benefits: 0,
-        references: 0, closure: 0, reservations: 0,
+        references: 0, closure: 0, reservations: 0, academicYearFixture: 0, secondaryClassFixture: 0,
       });
       if (testSchoolId) {
-        assert.equal((await db.collection('schools').doc(testSchoolId).get()).data()?.studentsCount,
-          schoolStudentsCountBefore);
+        const schoolAfter = (await db.collection('schools').doc(testSchoolId).get()).data() || {};
+        if (Number.isSafeInteger(schoolStudentsCountBefore)) {
+          assert.equal(schoolAfter.studentsCount, schoolStudentsCountBefore);
+        }
+        if (academicYearFixtureId) {
+          assert.equal(schoolAfter.activeAcademicYearId ?? null, schoolActiveAcademicYearIdBefore);
+        }
       }
       console.log('STAGING FIXTURE CLEANUP: PASS');
     } finally {
