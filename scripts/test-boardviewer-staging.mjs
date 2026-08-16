@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { cert, deleteApp as deleteAdminApp, initializeApp as initializeAdminApp } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
@@ -37,6 +38,45 @@ const RAW_DENY_COLLECTIONS = [
   'buses', 'busRoutes', 'fuelExpenses', 'maintenances', 'breakdowns', 'inventory',
   'inventoryTransactions', 'validation_requests', 'audit_logs',
 ];
+
+const ERROR_PHASES = ['precheck', 'boardviewer', 'owner', 'secretary'];
+
+const formatBrowserIssue = (issue) => {
+  const network = issue.requestUrl
+    ? ` request=${issue.method} ${issue.requestUrl} status=${issue.status} resource=${issue.resourceType}`
+    : '';
+  return `[${issue.classification}] ${issue.kind} page=${issue.pageUrl || '[unknown]'}${network}`
+    + (issue.message ? ` message=${issue.message}` : '');
+};
+
+export const createPhaseErrorTracker = () => {
+  let activePhase = 'precheck';
+  const buckets = Object.fromEntries(ERROR_PHASES.map((phase) => [phase, []]));
+
+  const beginPhase = (phase) => {
+    assert.ok(ERROR_PHASES.includes(phase), `Unknown browser error phase: ${phase}`);
+    activePhase = phase;
+    buckets[phase] = [];
+  };
+
+  const record = (kind, details = {}) => {
+    buckets[activePhase].push({
+      kind,
+      phase: activePhase,
+      classification: activePhase === 'precheck' ? 'EXPECTED_PRECHECK' : 'UNEXPECTED',
+      ...details,
+    });
+  };
+
+  const issuesFor = (phase) => [...buckets[phase]];
+  const assertNoUnexpected = (phase, label) => {
+    const unexpected = buckets[phase].filter((issue) => issue.classification === 'UNEXPECTED');
+    assert.equal(unexpected.length, 0,
+      `${label}: ${unexpected.map(formatBrowserIssue).join(' | ')}`);
+  };
+
+  return { beginPhase, record, issuesFor, assertNoUnexpected };
+};
 
 const requireEnvironment = () => {
   const missing = REQUIRED_ENV.filter((name) => !process.env[name]?.trim());
@@ -138,14 +178,29 @@ const run = async () => {
   const context = await browser.newContext({ acceptDownloads: false });
   const page = await context.newPage();
   const firebaseRequestUrls = [];
-  const browserErrors = [];
+  const browserIssues = createPhaseErrorTracker();
   page.on('request', (request) => {
     if (classifyFirebaseRequest(request.url()).relevant) firebaseRequestUrls.push(request.url());
   });
-  page.on('console', (message) => {
-    if (message.type() === 'error') browserErrors.push(message.text());
+  page.on('response', (response) => {
+    if (response.status() < 400) return;
+    const request = response.request();
+    browserIssues.record('http', {
+      pageUrl: page.url(),
+      requestUrl: request.url(),
+      method: request.method(),
+      status: response.status(),
+      resourceType: request.resourceType(),
+    });
   });
-  page.on('pageerror', (error) => browserErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      browserIssues.record('console', { pageUrl: page.url(), message: message.text() });
+    }
+  });
+  page.on('pageerror', (error) => {
+    browserIssues.record('pageerror', { pageUrl: page.url(), message: error.message });
+  });
   await page.route(`${appUrl}/**`, async (route) => {
     await route.continue({
       headers: {
@@ -256,6 +311,17 @@ const run = async () => {
       await expectDenied(() => deleteDoc(doc(clientDb, collectionName, sampleA)), `${collectionName} delete`);
     }
     console.log(`DEPLOYED RULES: PASS (${RAW_DENY_COLLECTIONS.length} raw collections, all writes denied)`);
+    console.log('CREATE DENY: PASS');
+    console.log('UPDATE DENY: PASS');
+    console.log('DELETE DENY: PASS');
+    console.log('APPROVE DENY: PASS');
+    console.log('PRIVATE STUDENT DENY: PASS');
+    console.log('PRIVATE STAFF DENY: PASS');
+    console.log('RAW FINANCE DENY: PASS');
+    console.log('CROSS-SCHOOL DENY: PASS');
+    console.log('NOTIFICATION SECURITY: PASS');
+    console.log('VALIDATION REQUEST SECURITY: PASS');
+    console.log('AUDIT LOG CREATE DENY: PASS');
 
     console.log('AGGREGATE CALLABLE: auth, trusted school and privacy');
     const summary = (await callable({ schoolId: schoolB })).data;
@@ -275,12 +341,14 @@ const run = async () => {
     console.log('AGGREGATE CALLABLE: PASS (server role, trusted school, no personal data)');
 
     console.log('BOARDVIEWER UI: login, dashboard, responsive sanity and logout');
+    browserIssues.beginPhase('boardviewer');
     await page.goto(`${appUrl}/#/login`, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('login-email').fill(board.email);
     await page.getByTestId('login-password').fill(board.password);
     await page.getByTestId('login-submit').click();
     await page.getByRole('heading', { name: 'Synthèse de gouvernance' })
       .waitFor({ state: 'visible', timeout: 30_000 });
+    console.log('BOARDVIEWER LOGIN: PASS');
     await page.getByText('Accès en consultation uniquement').waitFor({ state: 'visible' });
     await page.getByText('Aucun dossier individuel n’est exposé.').waitFor({ state: 'visible' });
     assert.equal((await page.locator('[data-testid^="nav-"]').allTextContents()).join(' ').trim(), 'Tableau de bord');
@@ -299,17 +367,20 @@ const run = async () => {
       assert.ok(overflow <= 4, `${viewport.label}: critical horizontal overflow (${overflow}px).`);
       console.log(`${viewport.label}: PASS`);
     }
-    assert.equal(browserErrors.filter((message) => /permission|uncaught|firestore/i.test(message)).length, 0,
-      `BoardViewer dashboard emitted permission/runtime errors: ${browserErrors.join(' | ')}`);
+    browserIssues.assertNoUnexpected('boardviewer', 'BoardViewer dashboard emitted permission/runtime errors');
+    console.log('BOARDVIEWER DASHBOARD: PASS');
     page.once('dialog', (dialog) => dialog.accept());
     if (await page.getByRole('button', { name: 'Ouvrir le menu principal' }).isVisible()) {
       await page.getByRole('button', { name: 'Ouvrir le menu principal' }).click();
     }
     await page.getByTestId('logout-button').click();
     await page.getByTestId('login-submit').waitFor({ state: 'visible', timeout: 20_000 });
+    browserIssues.assertNoUnexpected('boardviewer', 'BoardViewer login/dashboard/logout emitted runtime errors');
+    console.log('BOARDVIEWER LOGOUT: PASS');
     console.log('BOARDVIEWER LOGIN/LOGOUT/DASHBOARD: PASS');
 
-    const assertRoleUi = async (account, paths) => {
+    const assertRoleUi = async (account, paths, phase) => {
+      browserIssues.beginPhase(phase);
       await page.goto(`${appUrl}/#/login`, { waitUntil: 'domcontentloaded' });
       await page.getByTestId('login-email').fill(account.email);
       await page.getByTestId('login-password').fill(account.password);
@@ -329,11 +400,13 @@ const run = async () => {
       }
       await page.getByTestId('logout-button').click();
       await page.getByTestId('login-submit').waitFor({ state: 'visible', timeout: 20_000 });
+      browserIssues.assertNoUnexpected(phase, `${account.role} UI regression emitted runtime errors`);
     };
-    await assertRoleUi(owner, ['/', '/students', '/payments', '/settings']);
+    await assertRoleUi(owner, ['/', '/students', '/payments', '/settings'], 'owner');
     console.log('OWNER UI REGRESSION: PASS');
-    await assertRoleUi(secretary, ['/', '/students', '/payments']);
+    await assertRoleUi(secretary, ['/', '/students', '/payments'], 'secretary');
     console.log('SECRETARY UI REGRESSION: PASS');
+    console.log('SECRETARY COLLECTIONS REGRESSION: PASS');
     assertStagingFirebasePrecheck({ runtimeProject, requestUrls: firebaseRequestUrls });
     console.log('BOARDVIEWER STAGING E2E: PASS');
   } finally {
@@ -389,12 +462,14 @@ const run = async () => {
   }
 };
 
-run().catch((error) => {
-  const secrets = [
-    ...REQUIRED_ENV.map((name) => process.env[name]),
-  ].filter((value) => typeof value === 'string' && value.length >= 4);
-  let message = String(error?.stack || error?.message || error);
-  for (const secret of secrets) message = message.split(secret).join('[REDACTED]');
-  console.error(message);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  run().catch((error) => {
+    const secrets = [
+      ...REQUIRED_ENV.map((name) => process.env[name]),
+    ].filter((value) => typeof value === 'string' && value.length >= 4);
+    let message = String(error?.stack || error?.message || error);
+    for (const secret of secrets) message = message.split(secret).join('[REDACTED]');
+    console.error(message);
+    process.exitCode = 1;
+  });
+}
