@@ -31,6 +31,9 @@ jobs:
       - name: Validate staging collections E2E safety contract
         run: node --check scripts/test-secretary-collections-staging.mjs && node --test tests/security/staging-collections-e2e.spec.mjs tests/security/staging-firebase-precheck.spec.mjs
 
+      - name: Validate Production financial E2E safety contract
+        run: node --check scripts/test-production-financial-e2e.mjs && node --test tests/security/production-financial-e2e.spec.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
