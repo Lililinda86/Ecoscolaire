@@ -121,6 +121,7 @@ const run = async () => {
     t2A: `${marker}-T2-A`, t2B: `${marker}-T2-B`, t2Full: `${marker}-T2-FULL`,
     t3Double: `${marker}-T3-DOUBLE`,
     transportPartial: `${marker}-TR-PART`, transportFull: `${marker}-TR-FULL`, transportOver: `${marker}-TR-OVER`,
+    secondaryTransport: `${marker}-TR-SECONDARY-DENIED`,
     scholarship: `${marker}-SCHOLARSHIP`, voucher: `${marker}-VOUCHER`, deniedBenefit: `${marker}-DENIED`
   };
 
@@ -133,8 +134,15 @@ const run = async () => {
   const schoolBefore = await schoolRef.get();
   assert.equal(schoolBefore.exists, true, 'ITALO school is missing.');
   const school = schoolBefore.data() || {};
-  assert.match(String(school.academicYear || ''), /^\d{4}-\d{4}$/);
-  const academicYear = String(school.academicYear);
+  assert.ok(typeof school.activeAcademicYearId === 'string' && school.activeAcademicYearId
+    && !school.activeAcademicYearId.includes('/'), 'P1 CONFIGURATION: active academic year pointer is invalid.');
+  const academicYearSnapshot = await db.collection('academicYears').doc(school.activeAcademicYearId).get();
+  assert.equal(academicYearSnapshot.exists, true, 'P1 CONFIGURATION: active academic year document is missing.');
+  const academicYearData = academicYearSnapshot.data() || {};
+  assert.equal(academicYearData.schoolId, EXPECTED_SCHOOL);
+  assert.equal(academicYearData.status, 'active');
+  assert.match(String(academicYearData.name || ''), /^\d{4}-\d{4}$/);
+  const academicYear = String(academicYearData.name);
   const [startYear, endYear] = academicYear.split('-').map(Number);
   assert.equal(endYear, startYear + 1);
   const september = `${startYear}-09`;
@@ -142,6 +150,33 @@ const run = async () => {
   const configuredTransport = school.globalFees?.feeTransport;
   assert.ok(Number.isSafeInteger(configuredTransport) && configuredTransport > 0,
     'P1 CONFIGURATION: no positive Production transport tariff is configured.');
+  const classes = await db.collection('classes').where('schoolId', '==', EXPECTED_SCHOOL).get();
+  const structuredCycle = data => {
+    for (const value of [data.cycle, data.level, data.type]) {
+      const normalized = String(value || '').toLowerCase().trim();
+      if (['primary', 'primaire'].includes(normalized)) return 'primary';
+      if (['secondary', 'secondaire'].includes(normalized)) return 'secondary';
+      if (['nursery', 'preschool', 'maternelle'].includes(normalized)) return 'nursery';
+    }
+    return null;
+  };
+  const primaryClass = classes.docs.find(item => {
+    const data = item.data();
+    const fees = school.classFees?.[data.name];
+    return data.isActive !== false && data.section === 'francophone'
+      && (structuredCycle(data) === 'primary' || ['SIL', 'CP', 'CE1', 'CE2', 'CM1'].includes(data.name))
+      && ['registration', 't1', 't2', 't3'].every(key => Number.isSafeInteger(fees?.[key]) && fees[key] > 0);
+  });
+  const secondaryClass = classes.docs.find(item => {
+    const data = item.data();
+    return data.isActive !== false
+      && (structuredCycle(data) === 'secondary' || /^(6e|5e|4e|3e|Form [1-4])$/.test(String(data.name)))
+      && /^(6e|5e|4e|3e|Form [1-4])$/.test(String(data.name));
+  });
+  assert.ok(primaryClass, 'P1 CONFIGURATION: no active, configured primary ITALO class is available.');
+  assert.ok(secondaryClass, 'P1 CONFIGURATION: no active mapped secondary ITALO class is available.');
+  const primaryClassId = primaryClass.id;
+  const secondaryClassId = secondaryClass.id;
 
   const preInventory = await inventory(db, EXPECTED_SCHOOL);
   const existingClosure = await db.collection('cashClosures').doc(`${EXPECTED_SCHOOL}__${today}`).get();
@@ -224,7 +259,7 @@ const run = async () => {
     await page.locator('input[type="date"]').first().fill('2015-01-01');
     await page.getByRole('button', { name: 'Suivant', exact: true }).click();
     const studentForm = page.locator('form').filter({ has: page.getByRole('button', { name: 'Suivant', exact: true }) });
-    await studentForm.locator('select[required]').first().selectOption({ index: 1 });
+    await studentForm.locator('select[required]').first().selectOption(primaryClassId);
     await page.getByRole('button', { name: 'Suivant', exact: true }).click();
     await page.getByPlaceholder('Ex: Paul Dupont').fill(`${marker}-GUARDIAN`);
     await page.getByPlaceholder('Ex: +237650336558').last().fill('000000000');
@@ -236,6 +271,8 @@ const run = async () => {
     studentId = studentSnapshot.id;
     const student = studentSnapshot.data();
     assert.ok(student.matricule && /^MAT-\d{4}-\d{4}$/.test(String(student.matricule)));
+    assert.equal(student.classId, primaryClassId);
+    assert.equal(student.academicYearId, school.activeAcademicYearId);
     matriculeReservationId = String(student.matriculeReservationId);
     duplicateReservationId = String(student.duplicateReservationId);
     assert.ok(matriculeReservationId && duplicateReservationId);
@@ -366,6 +403,20 @@ const run = async () => {
     const octoberQuote = await quote('transport', { period: october });
     assert.equal(octoberQuote.grossExpectedAmount, configuredTransport);
     assert.equal(octoberQuote.previousPaid, 0);
+
+    // Only the exact TEST student is temporarily moved to a real secondary class.
+    // Both authoritative backends must deny transport, then the primary class is restored.
+    const studentRef = db.collection('students').doc(studentId);
+    await studentRef.update({ classId: secondaryClassId });
+    try {
+      await expectFailure(() => quote('transport', { period: october }),
+        ['TRANSPORT_NOT_AVAILABLE_FOR_CLASS']);
+      await expectFailure(() => pay(requestIds.secondaryTransport, 1, 'transport', { period: october }),
+        ['TRANSPORT_NOT_AVAILABLE_FOR_CLASS']);
+    } finally {
+      await studentRef.update({ classId: primaryClassId });
+    }
+    assert.equal((await studentRef.get()).data()?.classId, primaryClassId);
 
     await expectFailure(() => secretaryQuote({
       schoolId: `${EXPECTED_SCHOOL}-other`, studentId, academicYear, type: 'tuition', installment: 'T1'

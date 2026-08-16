@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const {
   calculateBenefitAmount,
   calculateBenefits,
-  isTransportPeriod
+  isTransportPeriod,
+  resolveCanonicalClassCycle
 } = require('../../functions/lib/secretaryCollections');
 
 assert.equal(calculateBenefitAmount(70000, 'FIXED_AMOUNT', 10000), 10000);
@@ -32,5 +33,14 @@ assert.throws(() => calculateBenefits(70000, [
 assert.equal(isTransportPeriod('2026-09'), true);
 assert.equal(isTransportPeriod('2026-13'), false);
 assert.equal(isTransportPeriod('Septembre'), false);
+
+for (const name of ['6e', 'Form 1', '5e', 'Form 2', '4e', 'Form 3', '3e', 'Form 4']) {
+  assert.equal(resolveCanonicalClassCycle({ name }), 'secondary', `${name} must resolve to secondary`);
+}
+assert.equal(resolveCanonicalClassCycle({ name: 'CP', level: 'primary' }), 'primary');
+assert.equal(resolveCanonicalClassCycle({ name: '6e', cycle: 'primary' }), 'primary',
+  'structured cycle must take precedence over the display name');
+assert.equal(resolveCanonicalClassCycle({ name: 'CP', catalogLevelId: 'fr-secondary-6e' }), 'secondary',
+  'catalogLevelId must be authoritative when cycle and level are absent');
 
 console.log('secretary collection calculation tests passed');

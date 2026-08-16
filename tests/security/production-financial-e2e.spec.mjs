@@ -32,12 +32,16 @@ test('runner exercises the real UI and the authoritative Production callables', 
   assert.match(runner, /Ajouter un élève/);
   assert.match(runner, /#\/payments/);
   assert.match(runner, /Enregistrer l'encaissement/);
+  assert.match(runner, /academicYears.*school\.activeAcademicYearId/);
   for (const callable of [
     'createFinancialBenefit', 'approveFinancialBenefit', 'getCollectionQuote',
     'recordCashPayment', 'closeCashDrawer'
   ]) assert.match(runner, new RegExp(`'${callable}'`));
   assert.match(runner, /Promise\.allSettled/);
   assert.match(runner, /idempotentReplay/);
+  assert.match(runner, /TRANSPORT_NOT_AVAILABLE_FOR_CLASS/);
+  assert.match(runner, /classId: secondaryClassId/);
+  assert.match(runner, /classId: primaryClassId/);
   assert.match(runner, /ecoscolaire-staging/);
 });
 
