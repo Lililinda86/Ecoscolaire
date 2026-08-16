@@ -26,6 +26,12 @@ const requiredFunctions = new Set([
   'cancelFinancialBenefit',
   'getCollectionQuote',
   'closeCashDrawer',
+  'getBoardViewerGovernanceSummary',
+  'recordAuthenticatedAudit',
+]);
+
+const requiredBoardViewerFunctions = new Set([
+  'getBoardViewerGovernanceSummary',
   'recordAuthenticatedAudit',
 ]);
 
@@ -77,9 +83,19 @@ test('Production deploy eligibility is fail-closed for every configured trigger'
   assert.equal(productionDeployJobEligible('workflow_dispatch', 'refs/heads/feature/example'), false);
 });
 
-test('Production deployment includes Firestore Rules and the exact fifteen Functions', () => {
+test('Production deployment includes Firestore Rules and the exact sixteen Functions', () => {
   assert.ok(deployTargets.includes('firestore:rules'));
   assert.deepEqual(deployedFunctions, requiredFunctions);
+});
+
+test('Production deployment manifest includes every BoardViewer-required Function', () => {
+  for (const functionName of requiredBoardViewerFunctions) {
+    assert.equal(
+      deployedFunctions.has(functionName),
+      true,
+      `Production deployment manifest must include functions:${functionName}`,
+    );
+  }
 });
 
 test('Production deployment excludes import Functions and Storage Rules', () => {
