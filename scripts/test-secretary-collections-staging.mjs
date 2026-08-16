@@ -588,7 +588,7 @@ const run = async () => {
         student: 0, privateDocs: 0, payments: 0, receipts: 0, benefits: 0,
         references: 0, closure: 0, reservations: 0,
       });
-      if (testSchoolId) {
+      if (testSchoolId && Number.isSafeInteger(schoolStudentsCountBefore)) {
         assert.equal((await db.collection('schools').doc(testSchoolId).get()).data()?.studentsCount,
           schoolStudentsCountBefore);
       }

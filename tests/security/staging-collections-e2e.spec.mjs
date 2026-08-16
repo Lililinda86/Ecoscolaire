@@ -45,6 +45,7 @@ test('runner fails closed against Production and always executes exact cleanup',
   assert.match(source, /classId: primaryClassId/);
   assert.match(source, /studentMatriculeReservations/);
   assert.match(source, /studentDuplicateReservations/);
+  assert.match(source, /testSchoolId && Number\.isSafeInteger\(schoolStudentsCountBefore\)/);
   assert.match(source, /finally \{[\s\S]*CLEANUP: deleting only exact E2E fixture records/);
   assert.match(source, /STAGING FIXTURE CLEANUP: PASS/);
   assert.doesNotMatch(source, /console\.(?:log|error)\([^\n]*(?:PASSWORD|SERVICE_ACCOUNT|API_KEY)/);
