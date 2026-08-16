@@ -163,7 +163,8 @@ const run = async () => {
   const primaryClass = classes.docs.find(item => {
     const data = item.data();
     const fees = school.classFees?.[data.name];
-    return data.isActive !== false && data.section === 'francophone'
+    const section = String(data.section || data.type || '').toLowerCase().trim();
+    return data.isActive !== false && section === 'francophone'
       && (structuredCycle(data) === 'primary' || ['SIL', 'CP', 'CE1', 'CE2', 'CM1'].includes(data.name))
       && ['registration', 't1', 't2', 't3'].every(key => Number.isSafeInteger(fees?.[key]) && fees[key] > 0);
   });
