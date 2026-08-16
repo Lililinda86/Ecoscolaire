@@ -104,6 +104,17 @@ const expectDenied = async (operation, label) => {
   }
 };
 
+const expectRejected = async (operation, label, pattern) => {
+  try {
+    await operation();
+    assert.fail(`${label}: operation unexpectedly succeeded.`);
+  } catch (error) {
+    if (error?.code === 'ERR_ASSERTION') throw error;
+    assert.match(String(error?.code || error?.message || ''), pattern,
+      `${label}: unexpected failure ${error?.code || error?.message || 'unknown'}`);
+  }
+};
+
 const assertNoPersonalData = (summary, fixtureTokens) => {
   const privacyPayload = structuredClone(summary);
   if (privacyPayload?.school) {
@@ -138,8 +149,11 @@ const run = async () => {
     { key: 'board', role: 'boardViewer', schoolId: schoolA },
     { key: 'owner', role: 'owner', schoolId: schoolA },
     { key: 'secretary', role: 'secretary', schoolId: schoolA },
-    { key: 'random', role: 'teacher', schoolId: schoolA },
+    { key: 'random', role: 'teacher', schoolId: schoolA, active: false },
+    { key: 'missing', role: 'teacher', schoolId: schoolA, profile: false },
   ].map((item) => ({
+    active: true,
+    profile: true,
     ...item,
     uid: `e2e-board-${item.key}-${suffix}`.slice(0, 128),
     email: `e2e-board-${item.key}-${suffix}@example.test`.toLowerCase(),
@@ -149,6 +163,7 @@ const run = async () => {
   const owner = roleFixtures.find((item) => item.key === 'owner');
   const secretary = roleFixtures.find((item) => item.key === 'secretary');
   const random = roleFixtures.find((item) => item.key === 'random');
+  const missing = roleFixtures.find((item) => item.key === 'missing');
 
   let serviceAccount;
   try {
@@ -173,7 +188,9 @@ const run = async () => {
   }, `board-e2e-client-${suffix}`);
   const clientAuth = getAuth(clientApp);
   const clientDb = getFirestore(clientApp);
-  const callable = httpsCallable(getFunctions(clientApp, 'us-central1'), 'getBoardViewerGovernanceSummary');
+  const clientFunctions = getFunctions(clientApp, 'us-central1');
+  const governanceCallable = httpsCallable(clientFunctions, 'getBoardViewerGovernanceSummary');
+  const auditCallable = httpsCallable(clientFunctions, 'recordAuthenticatedAudit');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: false });
   const page = await context.newPage();
@@ -219,6 +236,24 @@ const run = async () => {
     fixtureRefs.push(ref);
   };
 
+  const verifyCanonicalAudit = async (auditId, account, action) => {
+    assert.equal(typeof auditId, 'string');
+    const snapshot = await adminDb.collection('audit_logs').doc(auditId).get();
+    assert.equal(snapshot.exists, true, `Missing canonical audit ${auditId}.`);
+    const data = snapshot.data();
+    assert.equal(data?.canonicalBackendAudit, true);
+    assert.equal(data?.actorUid, account.uid);
+    assert.equal(data?.userId, account.uid);
+    assert.equal(data?.actorRole, account.role);
+    assert.equal(data?.userRole, account.role);
+    assert.equal(data?.schoolId, account.schoolId);
+    assert.equal(data?.action, action);
+    assert.equal(data?.createdAt?.constructor?.name, 'Timestamp');
+    assert.equal(data?.testFixture, true);
+    assert.equal(data?.testRunId, suffix);
+    return snapshot.ref;
+  };
+
   try {
     console.log('PRECHECK: immutable Preview and Firebase staging routing');
     const stagingRequest = page.waitForRequest(
@@ -241,9 +276,10 @@ const run = async () => {
     for (const account of roleFixtures) {
       await adminAuth.createUser({ uid: account.uid, email: account.email, password: account.password,
         emailVerified: true, disabled: false });
+      if (!account.profile) continue;
       await addFixture('users', account.uid, {
         id: account.uid, email: account.email, name: `E2E ${account.key} ${suffix}`,
-        role: account.role, schoolId: account.schoolId, active: true, isActive: true,
+        role: account.role, schoolId: account.schoolId, active: account.active, isActive: account.active,
       });
     }
     await addFixture('schools', schoolA, {
@@ -323,8 +359,32 @@ const run = async () => {
     console.log('VALIDATION REQUEST SECURITY: PASS');
     console.log('AUDIT LOG CREATE DENY: PASS');
 
+    console.log('CANONICAL BACKEND AUDIT: authenticated roles and server-derived identity');
+    const boardLogin = (await auditCallable({ action: 'LOGIN' })).data;
+    const boardLoginRef = await verifyCanonicalAudit(boardLogin.auditId, board, 'LOGIN');
+    const boardLogout = (await auditCallable({ action: 'LOGOUT' })).data;
+    await verifyCanonicalAudit(boardLogout.auditId, board, 'LOGOUT');
+    await expectDenied(() => updateDoc(doc(clientDb, 'audit_logs', boardLoginRef.id), { action: 'FORGED' }),
+      'audit update');
+    await expectDenied(() => deleteDoc(doc(clientDb, 'audit_logs', boardLoginRef.id)), 'audit delete');
+    for (const [field, value] of [
+      ['actorUid', owner.uid], ['role', 'superAdmin'], ['schoolId', schoolB],
+    ]) {
+      await expectRejected(() => auditCallable({ action: 'LOGIN', [field]: value }),
+        `forged ${field}`, /invalid-argument/i);
+    }
+    await expectRejected(() => auditCallable({ action: 'ARBITRARY_EVENT' }),
+      'arbitrary audit event', /invalid-argument/i);
+    await expectDenied(() => auditCallable({
+      action: 'CREATE_PAYMENT', targetType: 'PAYMENT', targetId: createdId, targetName: 'Forged payment',
+    }), 'BoardViewer forged business audit');
+    console.log('BACKEND LOGIN AUDIT: PASS');
+    console.log('BACKEND LOGOUT AUDIT: PASS');
+    console.log('FORGED AUDIT IDENTITY: DENY');
+    console.log('ARBITRARY AUDIT EVENT: DENY');
+
     console.log('AGGREGATE CALLABLE: auth, trusted school and privacy');
-    const summary = (await callable({ schoolId: schoolB })).data;
+    const summary = (await governanceCallable({ schoolId: schoolB })).data;
     assert.equal(summary.school.id, schoolA, 'Callable trusted an arbitrary client schoolId.');
     assert.equal(summary.students.active, 1);
     assert.equal(summary.finance.collected, 1100);
@@ -332,12 +392,29 @@ const run = async () => {
     assert.equal(summary.attendance.records, 1);
     assertNoPersonalData(summary, [sampleA, sampleB, board.uid, 'cross-school-canary', '990000']);
     await signOut(clientAuth);
-    await expectDenied(() => callable({}), 'unauthenticated aggregate');
-    for (const account of [secretary, random]) {
+    await expectDenied(() => governanceCallable({}), 'unauthenticated aggregate');
+    await expectDenied(() => auditCallable({ action: 'LOGIN' }), 'unauthenticated audit');
+    for (const account of [secretary, owner]) {
       await signInWithEmailAndPassword(clientAuth, account.email, account.password);
-      await expectDenied(() => callable({}), `${account.role} aggregate`);
+      await expectDenied(() => setDoc(doc(clientDb, 'audit_logs', `${createdId}-${account.key}`), {
+        actorUid: account.uid, actorRole: account.role, schoolId: account.schoolId, action: 'LOGIN',
+      }), `${account.role} direct audit create`);
+      const loginResult = (await auditCallable({ action: 'LOGIN' })).data;
+      await verifyCanonicalAudit(loginResult.auditId, account, 'LOGIN');
+      const logoutResult = (await auditCallable({ action: 'LOGOUT' })).data;
+      await verifyCanonicalAudit(logoutResult.auditId, account, 'LOGOUT');
+      await expectDenied(() => governanceCallable({}), `${account.role} aggregate`);
       await signOut(clientAuth);
     }
+    for (const account of [random, missing]) {
+      await signInWithEmailAndPassword(clientAuth, account.email, account.password);
+      await expectDenied(() => auditCallable({ action: 'LOGIN' }), `${account.key} audit`);
+      await signOut(clientAuth);
+    }
+    console.log('OWNER BACKEND SESSION AUDIT: PASS');
+    console.log('SECRETARY BACKEND SESSION AUDIT: PASS');
+    console.log('INACTIVE USER AUDIT: DENY');
+    console.log('MISSING PROFILE AUDIT: DENY');
     console.log('AGGREGATE CALLABLE: PASS (server role, trusted school, no personal data)');
 
     console.log('BOARDVIEWER UI: login, dashboard, responsive sanity and logout');
@@ -413,6 +490,17 @@ const run = async () => {
     console.log('CLEANUP: deleting only exact BoardViewer E2E fixture IDs');
     try {
       if (clientAuth.currentUser) await signOut(clientAuth).catch(() => undefined);
+      const fixtureUidSet = new Set(roleFixtures.map(account => account.uid));
+      const auditSnapshots = await adminDb.collection('audit_logs').where('testRunId', '==', suffix).get();
+      for (const snapshot of auditSnapshots.docs) {
+        const data = snapshot.data();
+        if (data.canonicalBackendAudit !== true) continue;
+        assert.equal(data.testFixture, true, `Refusing to delete non-fixture ${snapshot.ref.path}.`);
+        assert.equal(data.testRunId, suffix, `Refusing to delete foreign fixture ${snapshot.ref.path}.`);
+        assert.equal(fixtureUidSet.has(data.actorUid), true,
+          `Refusing to delete audit for unexpected actor ${snapshot.ref.path}.`);
+        await snapshot.ref.delete();
+      }
       for (const ref of [...fixtureRefs].reverse()) {
         const snapshot = await ref.get();
         if (!snapshot.exists) continue;
@@ -435,6 +523,10 @@ const run = async () => {
         await adminAuth.deleteUser(account.uid);
       }
       const residualDocs = [];
+      const residualAudits = (await adminDb.collection('audit_logs').where('testRunId', '==', suffix).get())
+        .docs.filter(snapshot => snapshot.data().canonicalBackendAudit === true)
+        .map(snapshot => snapshot.ref.path);
+      residualDocs.push(...residualAudits);
       for (const ref of fixtureRefs) {
         if ((await ref.get()).exists) residualDocs.push(ref.path);
       }

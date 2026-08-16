@@ -11,6 +11,7 @@ import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
 import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
 import { isUserActive, logAuthenticationFailure } from '../utils/authSecurity';
+import { recordAuthenticatedAudit } from '../services/authenticatedAudit';
 import {
   canLoadStudentFinance,
   canLoadStudentParentFinance,
@@ -921,20 +922,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logAuditAction = async (params: { action: string, targetType: string, targetId: string, targetName: string, details?: Record<string, unknown> }) => {
     if (!currentUser) return;
     try {
-      const { collection, addDoc } = await import('firebase/firestore');
-      const { db: firestoreDb } = await import('../db/firebase');
-      await addDoc(collection(firestoreDb, 'audit_logs'), {
-        userId: currentUser.id,
-        userEmail: currentUser.email,
-        userRole: currentUser.role,
-        schoolId: currentSchool?.id || currentUser.schoolId || null,
-        action: params.action,
-        targetType: params.targetType,
-        targetId: params.targetId,
-        targetName: params.targetName,
-        timestamp: new Date().toISOString(),
-        details: params.details || {}
-      });
+      await recordAuthenticatedAudit(params);
     } catch (e) {
       console.error("Failed to log audit action", e);
     }
@@ -943,29 +931,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const login = async (email: string, pin: string): Promise<LoginResult> => {
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const { auth, db: firestoreDb } = await import('../db/firebase');
+      const { auth } = await import('../db/firebase');
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const { doc, getDoc, collection, addDoc } = await import('firebase/firestore');
 
-      const cred = await signInWithEmailAndPassword(auth, normalizedEmail, pin);
+      await signInWithEmailAndPassword(auth, normalizedEmail, pin);
 
       try {
-        const userDoc = await getDoc(doc(firestoreDb, 'users', cred.user.uid));
-        const userData = userDoc.data();
-        if (userData) {
-          await addDoc(collection(firestoreDb, 'audit_logs'), {
-            userId: cred.user.uid,
-            userEmail: normalizedEmail,
-            userRole: userData.role,
-            schoolId: userData.schoolId || null,
-            action: 'LOGIN',
-            targetType: 'SYSTEM',
-            targetId: cred.user.uid,
-            targetName: normalizedEmail,
-            timestamp: new Date().toISOString(),
-            details: {}
-          });
-        }
+        await recordAuthenticatedAudit({ action: 'LOGIN' });
       } catch (e) {
         console.error("Failed to log LOGIN action", e);
       }
@@ -993,15 +965,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async () => {
-    try {
-      if (currentUser) {
-        await logAuditAction({
-          action: 'LOGOUT',
-          targetType: 'SYSTEM',
-          targetId: currentUser.id,
-          targetName: currentUser.email
-        });
+    if (currentUser) {
+      try {
+        await recordAuthenticatedAudit({ action: 'LOGOUT' });
+      } catch (e) {
+        console.error("Failed to log LOGOUT action", e);
       }
+    }
+    try {
       const { auth } = await import('../db/firebase');
       await auth.signOut();
     } catch (e) {
