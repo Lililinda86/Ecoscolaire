@@ -45,6 +45,12 @@ test('runner exercises the real UI and the authoritative Production callables', 
   assert.match(runner, /ecoscolaire-staging/);
 });
 
+test('runner accepts the live legacy section field without selecting CM2', () => {
+  assert.match(runner, /data\.section \|\| data\.type/);
+  assert.match(runner, /\['SIL', 'CP', 'CE1', 'CE2', 'CM1'\]\.includes\(data\.name\)/);
+  assert.doesNotMatch(runner, /\['SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'\]/);
+});
+
 test('cleanup is exact, mandatory and cannot rewind receipt numbers', () => {
   assert.match(runner, /\}\s*finally\s*\{/);
   assert.match(runner, /CLEANUP: exact TEST fixture IDs only/);
