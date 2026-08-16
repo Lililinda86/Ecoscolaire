@@ -17,6 +17,7 @@ const studentId = `privacy-student-${suffix}`;
 const classId = `privacy-class-${suffix}`;
 const uid = `privacy-owner-${suffix}`;
 const academicYear = '2026-2027';
+const academicYearId = `privacy-year-${suffix}`;
 
 const invokeCashPayment = (requestId, amount) => recordCashPayment.run({
   requestId,
@@ -33,7 +34,11 @@ const invokeCashPayment = (requestId, amount) => recordCashPayment.run({
       role: 'owner', schoolId, isActive: true, name: 'Privacy test owner'
     }),
     db.collection('schools').doc(schoolId).set({
-      name: 'Privacy test school', academicYear, active: true, subscriptionStatus: 'active'
+      name: 'Privacy test school', academicYear, activeAcademicYearId: academicYearId,
+      active: true, subscriptionStatus: 'active'
+    }),
+    db.collection('academicYears').doc(academicYearId).set({
+      schoolId, name: academicYear, status: 'active'
     }),
     db.collection('classes').doc(classId).set({
       name: 'Privacy test class', schoolId, level: 'primary'

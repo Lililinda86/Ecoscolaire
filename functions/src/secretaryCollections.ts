@@ -8,6 +8,7 @@ import { makeTuitionDiscountSlotId } from './utils/discountHelpers';
 type Data = Record<string, unknown>;
 type PaymentType = 'registration_fee' | 'tuition' | 'transport';
 type Installment = 'T1' | 'T2' | 'T3';
+type CanonicalClassCycle = 'nursery' | 'primary' | 'secondary' | 'unknown';
 type BenefitType = 'SCHOLARSHIP' | 'DISCOUNT_VOUCHER' | 'FAMILY_DISCOUNT' | 'EXCEPTIONAL_DISCOUNT';
 type BenefitMode = 'FIXED_AMOUNT' | 'PERCENTAGE';
 
@@ -65,6 +66,47 @@ const requireAcademicYear = (value: unknown): string => {
     throw httpsError('invalid-argument', 'academicYear is not consecutive.', 'INVALID_ACADEMIC_YEAR');
   }
   return value;
+};
+
+const normalizeClassValue = (value: unknown): string => typeof value === 'string'
+  ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ')
+  : '';
+
+export const resolveCanonicalClassCycle = (classData: Data): CanonicalClassCycle => {
+  for (const value of [classData.cycle, classData.level, classData.type]) {
+    const normalized = normalizeClassValue(value);
+    if (['preschool', 'nursery', 'maternelle', 'pre nursery'].includes(normalized)) return 'nursery';
+    if (['primary', 'primaire'].includes(normalized)) return 'primary';
+    if (['secondary', 'secondaire'].includes(normalized)) return 'secondary';
+  }
+
+  const catalogLevelId = normalizeClassValue(classData.catalogLevelId);
+  if (catalogLevelId.includes('secondary')) return 'secondary';
+  if (catalogLevelId.includes('primary')) return 'primary';
+  if (catalogLevelId.includes('nursery') || catalogLevelId.includes('preschool')) return 'nursery';
+
+  const name = normalizeClassValue(classData.name);
+  if (/^(6|5|4|3)e(me)?$/.test(name) || /^form [1-4]$/.test(name)) return 'secondary';
+  if (['sil', 'cp', 'ce1', 'ce2', 'cm1', 'cm2'].includes(name) || /^class [1-6]$/.test(name)) return 'primary';
+  if (name === 'pre maternelle' || name === 'pre nursery' || /^(maternelle|nursery) [1-3]$/.test(name)) {
+    return 'nursery';
+  }
+  return 'unknown';
+};
+
+const assertTransportAvailableForClass = (type: PaymentType, classData: Data): void => {
+  if (type !== 'transport') return;
+  const cycle = resolveCanonicalClassCycle(classData);
+  if (cycle === 'secondary') {
+    throw httpsError(
+      'failed-precondition',
+      'Le transport scolaire n’est pas facturable pour cette classe.',
+      'TRANSPORT_NOT_AVAILABLE_FOR_CLASS'
+    );
+  }
+  if (cycle === 'unknown') {
+    throw httpsError('failed-precondition', 'Le cycle de la classe est invalide.', 'INVALID_CLASS_CYCLE');
+  }
 };
 
 export const isTransportPeriod = (value: unknown): value is string => {
@@ -390,10 +432,7 @@ const validateTenant = (user: Data, schoolId: string): void => {
   }
 };
 
-const validateCollectionSchool = (school: Data, academicYear: string): void => {
-  if (school.academicYear !== academicYear) {
-    throw httpsError('failed-precondition', 'School academic year mismatch.', 'INVALID_ACADEMIC_YEAR');
-  }
+const validateCollectionSchool = (school: Data): void => {
   if (school.active === false || school.isActive === false || school.status === 'inactive') {
     throw httpsError('failed-precondition', 'School is inactive.', 'SCHOOL_INACTIVE');
   }
@@ -403,19 +442,60 @@ const validateCollectionSchool = (school: Data, academicYear: string): void => {
   }
 };
 
-const validateCollectionStudent = (
+const validateCollectionStudentTenant = (
   student: Data,
-  schoolId: string,
-  academicYear: string
+  schoolId: string
 ): void => {
   if (student.schoolId !== schoolId) {
     throw httpsError('permission-denied', 'Student tenant mismatch.', 'CROSS_SCHOOL_DENIED');
   }
-  if (student.academicYear !== academicYear) {
-    throw httpsError('failed-precondition', 'Student academic year mismatch.', 'INVALID_ACADEMIC_YEAR');
-  }
   if (student.active === false || student.isActive === false || student.status === 'inactive') {
     throw httpsError('failed-precondition', 'Student is inactive.', 'STUDENT_INACTIVE');
+  }
+};
+
+const validateCollectionAcademicYear = async (
+  transaction: admin.firestore.Transaction,
+  db: admin.firestore.Firestore,
+  school: Data,
+  student: Data,
+  schoolId: string,
+  academicYear: string
+): Promise<void> => {
+  const activeAcademicYearId = typeof school.activeAcademicYearId === 'string'
+    ? school.activeAcademicYearId.trim() : '';
+  if (!activeAcademicYearId || activeAcademicYearId.includes('/') || activeAcademicYearId.length > 128) {
+    throw httpsError('failed-precondition', 'School academic year is invalid.', 'INVALID_ACADEMIC_YEAR');
+  }
+
+  const rawStudentYearId = student.academicYearId;
+  let studentAcademicYearId: string;
+  if (rawStudentYearId !== undefined && rawStudentYearId !== null && rawStudentYearId !== '') {
+    if (typeof rawStudentYearId !== 'string' || rawStudentYearId !== rawStudentYearId.trim()
+        || rawStudentYearId.includes('/') || rawStudentYearId.length > 128) {
+      throw httpsError('failed-precondition', 'Student academic year is invalid.', 'INVALID_ACADEMIC_YEAR');
+    }
+    studentAcademicYearId = rawStudentYearId;
+  } else {
+    const legacyYear = typeof student.registrationYear === 'string'
+      ? student.registrationYear : student.academicYear;
+    if (legacyYear !== academicYear) {
+      throw httpsError('failed-precondition', 'Student academic year mismatch.', 'INVALID_ACADEMIC_YEAR');
+    }
+    studentAcademicYearId = activeAcademicYearId;
+  }
+
+  if (studentAcademicYearId !== activeAcademicYearId) {
+    throw httpsError('failed-precondition', 'Student academic year mismatch.', 'INVALID_ACADEMIC_YEAR');
+  }
+  const yearSnap = await transaction.get(db.collection('academicYears').doc(studentAcademicYearId));
+  if (!yearSnap.exists) {
+    throw httpsError('failed-precondition', 'Student academic year is invalid.', 'INVALID_ACADEMIC_YEAR');
+  }
+  const year = yearSnap.data() || {};
+  if (year.schoolId !== schoolId || year.status !== 'active' || year.active === false || year.isActive === false
+      || year.name !== academicYear) {
+    throw httpsError('failed-precondition', 'Student academic year mismatch.', 'INVALID_ACADEMIC_YEAR');
   }
 };
 
@@ -519,8 +599,13 @@ export const createFinancialBenefit = functions.https.onCall(async (raw, context
     validateTenant(user, String(input.schoolId));
     if (!schoolSnap.exists) throw httpsError('not-found', 'School not found.', 'SCHOOL_NOT_FOUND');
     if (!studentSnap.exists) throw httpsError('not-found', 'Student not found.', 'STUDENT_NOT_FOUND');
-    validateCollectionSchool(schoolSnap.data() || {}, String(input.academicYear));
-    validateCollectionStudent(studentSnap.data() || {}, String(input.schoolId), String(input.academicYear));
+    const school = schoolSnap.data() || {};
+    const student = studentSnap.data() || {};
+    validateCollectionSchool(school);
+    validateCollectionStudentTenant(student, String(input.schoolId));
+    await validateCollectionAcademicYear(
+      transaction, db, school, student, String(input.schoolId), String(input.academicYear)
+    );
     if (benefitSnap.exists) {
       const existing = benefitSnap.data() || {};
       if (existing.requestFingerprint !== fingerprint) {
@@ -569,10 +654,14 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
     ]);
     if (!schoolSnap.exists) throw httpsError('not-found', 'School not found.', 'SCHOOL_NOT_FOUND');
     if (!studentSnap.exists) throw httpsError('not-found', 'Student not found.', 'STUDENT_NOT_FOUND');
-    validateCollectionSchool(schoolSnap.data() || {}, String(benefit.academicYear));
-    validateCollectionStudent(studentSnap.data() || {}, String(benefit.schoolId), String(benefit.academicYear));
-    let bus: Data | null = null;
+    const school = schoolSnap.data() || {};
     const student = studentSnap.data() || {};
+    validateCollectionSchool(school);
+    validateCollectionStudentTenant(student, String(benefit.schoolId));
+    await validateCollectionAcademicYear(
+      transaction, db, school, student, String(benefit.schoolId), String(benefit.academicYear)
+    );
+    let bus: Data | null = null;
     if (benefit.paymentType === 'TRANSPORT' && typeof student.busId === 'string' && student.busId) {
       const busSnap = await transaction.get(db.collection('buses').doc(student.busId));
       if (!busSnap.exists || busSnap.data()?.schoolId !== benefit.schoolId) {
@@ -771,10 +860,11 @@ const readQuoteContext = async (
   validateTenant(user, input.schoolId);
   if (!schoolSnap.exists) throw httpsError('not-found', 'School not found.', 'SCHOOL_NOT_FOUND');
   const school = schoolSnap.data() || {};
-  validateCollectionSchool(school, input.academicYear);
+  validateCollectionSchool(school);
   if (!studentSnap.exists) throw httpsError('not-found', 'Student not found.', 'STUDENT_NOT_FOUND');
   const student = studentSnap.data() || {};
-  validateCollectionStudent(student, input.schoolId, input.academicYear);
+  validateCollectionStudentTenant(student, input.schoolId);
+  await validateCollectionAcademicYear(transaction, db, school, student, input.schoolId, input.academicYear);
   const finance = resolveStudentFinanceData(student, financeSnap);
   let bus: Data | null = null;
   if (input.type === 'transport' && typeof student.busId === 'string' && student.busId) {
@@ -794,6 +884,7 @@ const readQuoteContext = async (
     }
     classData = classSnap.data() || {};
   }
+  assertTransportAvailableForClass(input.type, classData);
   const canonicalBenefits = benefitsSnap.docs.map(normalizeBenefit)
     .filter(item => item.schoolId === input.schoolId && item.academicYear === input.academicYear);
   const legacyBenefits = input.type === 'tuition'
