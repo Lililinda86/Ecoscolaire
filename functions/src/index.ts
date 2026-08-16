@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 export * from './importStudents';
 export * from './academic/bulkAddSubjectsToClasses';
+export * from './boardViewerGovernance';
 import * as admin from 'firebase-admin';
 import { CampayService } from './services/campayService';
 import * as crypto from 'crypto';

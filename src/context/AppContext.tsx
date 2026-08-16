@@ -10,7 +10,6 @@ import { db as firestoreDb } from '../db/firebase';
 import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
 import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
-import { sanitizeBoardViewerData } from '../utils/boardViewerSanitizer';
 import { isUserActive, logAuthenticationFailure } from '../utils/authSecurity';
 import {
   canLoadStudentFinance,
@@ -367,6 +366,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.warn("❌ [AppContext] Erreur lecture schools (schoolDoc) :", e);
         }
 
+        // BoardViewer receives no raw operational collection in the browser.
+        // Its dashboard uses a callable that returns aggregates only.
+        if (userData.role === 'boardViewer') {
+          loadedDb.users = [userData];
+          setIsFirestoreConnected(true);
+          setFirestoreError(null);
+          setDb(loadedDb);
+          setLastSyncDate(new Date());
+          setLoading(false);
+          return;
+        }
+
         let usersData: User[] = [];
         try {
           const usersQ = query(collection(firestoreDb, 'users'), where('schoolId', '==', targetSchoolId));
@@ -436,10 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]) as { colName: keyof Database; data: unknown[] }[];
 
         results.forEach((res) => {
-          let sanitizedData = res.data;
-          if (userData.role === 'boardViewer') {
-            sanitizedData = sanitizeBoardViewerData(res.data, res.colName as string);
-          }
+          const sanitizedData = res.data;
 
           if (res.colName === 'grades') {
             const partition = partitionGradeDocuments(sanitizedData as Grade[]);
@@ -558,7 +566,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
-    if (!firebaseUser || !targetSchoolId) {
+    if (!firebaseUser || !targetSchoolId || currentUser?.role === 'boardViewer') {
       return () => {
         cancelled = true;
         if (unsubPayments) unsubPayments();
@@ -583,10 +591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cancelled) return;
           const paymentsList: Payment[] = [];
           snapshot.forEach((docSnap) => {
-            let item = { id: docSnap.id, ...docSnap.data() } as Payment;
-            if (currentUser?.role === 'boardViewer') {
-              item = sanitizeBoardViewerData(item, 'payments') as Payment;
-            }
+            const item = { id: docSnap.id, ...docSnap.data() } as Payment;
             paymentsList.push(item);
           });
           setDb(prevDb => {
@@ -613,10 +618,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cancelled) return;
           const expensesList: Expense[] = [];
           snapshot.forEach((docSnap) => {
-            let item = { id: docSnap.id, ...docSnap.data() } as Expense;
-            if (currentUser?.role === 'boardViewer') {
-              item = sanitizeBoardViewerData(item, 'expenses') as Expense;
-            }
+            const item = { id: docSnap.id, ...docSnap.data() } as Expense;
             expensesList.push(item);
           });
           setDb(prevDb => {

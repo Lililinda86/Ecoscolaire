@@ -6,6 +6,7 @@ import type { DatabasePatch } from './db/storage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
+import BoardViewerDashboard from './pages/BoardViewerDashboard';
 import Students from './pages/Students';
 import Staff from './pages/Staff';
 import Attendance from './pages/Attendance';
@@ -39,6 +40,11 @@ const ProtectedRouteForLogin = ({ children }: { children: React.ReactNode }) => 
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
+};
+
+const RoleAwareDashboard = () => {
+  const { currentUser } = useAppContext();
+  return currentUser?.role === 'boardViewer' ? <BoardViewerDashboard /> : <Dashboard />;
 };
 
 function App() {
@@ -150,34 +156,34 @@ function App() {
         {/* Routes du Dashboard avec Layout */}
         <Route path="/" element={
           <ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher', 'boardViewer']}>
-            <Layout><Dashboard /></Layout>
+            <Layout><RoleAwareDashboard /></Layout>
           </ProtectedRoute>
         } />
         
         <Route path="/dashboard" element={
           <ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher', 'boardViewer']}>
-            <Layout><Dashboard /></Layout>
+            <Layout><RoleAwareDashboard /></Layout>
           </ProtectedRoute>
         } />
         
         <Route path="/school-dashboard" element={
           <ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'teacher', 'boardViewer']}>
-            <Layout><Dashboard /></Layout>
+            <Layout><RoleAwareDashboard /></Layout>
           </ProtectedRoute>
         } />
         
-        <Route path="/students" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><Students /></Layout></ProtectedRoute>} />
-        <Route path="/classes" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><Classes /></Layout></ProtectedRoute>} />
-        <Route path="/subjects-program" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher', 'boardViewer']}><Layout><SubjectsProgram /></Layout></ProtectedRoute>} />
-        <Route path="/staff" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'superAdmin', 'boardViewer']}><Layout><Staff /></Layout></ProtectedRoute>} />
-        <Route path="/attendance" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher', 'boardViewer']}><Layout><Attendance /></Layout></ProtectedRoute>} />
-        <Route path="/buses" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'driver', 'boardViewer']}><Layout><Buses /></Layout></ProtectedRoute>} />
-        <Route path="/inventory" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'accountant', 'superAdmin', 'boardViewer']}><Layout><Inventory /></Layout></ProtectedRoute>} />
-        <Route path="/grades" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher', 'boardViewer']}><Layout><Grades /></Layout></ProtectedRoute>} />
+        <Route path="/students" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><Students /></Layout></ProtectedRoute>} />
+        <Route path="/classes" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><Classes /></Layout></ProtectedRoute>} />
+        <Route path="/subjects-program" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><SubjectsProgram /></Layout></ProtectedRoute>} />
+        <Route path="/staff" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'superAdmin']}><Layout><Staff /></Layout></ProtectedRoute>} />
+        <Route path="/attendance" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><Attendance /></Layout></ProtectedRoute>} />
+        <Route path="/buses" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'driver']}><Layout><Buses /></Layout></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'secretary', 'accountant', 'superAdmin']}><Layout><Inventory /></Layout></ProtectedRoute>} />
+        <Route path="/grades" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><Grades /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><Settings /></Layout></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'secretary', 'superAdmin', 'boardViewer']}><Layout><Payments /></Layout></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'secretary', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director']}><Layout><UsersManagement /></Layout></ProtectedRoute>} />
-        <Route path="/validations" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'boardViewer']}><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/validations" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><ValidationDashboard /></Layout></ProtectedRoute>} />
         <Route path="/ai-director" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><AIDirector /></Layout></ProtectedRoute>} />
         <Route path="/ai-teacher" element={<ProtectedRoute requireSchool allowedRoles={['teacher']}><Layout><AITeacher /></Layout></ProtectedRoute>} />
         <Route path="/communication" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'teacher']}><Layout><Communication /></Layout></ProtectedRoute>} />

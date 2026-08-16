@@ -1440,7 +1440,7 @@ describe('Student Privacy Security Rules', () => {
   });
 
   it('denies private data to boardViewer and driver', async () => {
-    await assertSucceeds(readAs('privacy-board', 'students'));
+    await assertFails(readAs('privacy-board', 'students'));
     await assertFails(readAs('privacy-board', 'studentPrivate'));
     await assertFails(readAs('privacy-board', 'studentFinance'));
     await assertFails(readAs('privacy-board', 'studentParentPrivate'));
