@@ -38,6 +38,18 @@ test('runner fails closed against Production and always executes exact cleanup',
   assert.doesNotMatch(source, /EXPECTED_SCHOOL|school-alpha-001/);
   assert.match(source, /testSchoolId = String\(secretary\.schoolId/);
   assert.match(source, /schoolId: testSchoolId/);
+  assert.match(source, /academicYears.*activeAcademicYearId/);
+  assert.match(source, /httpsCallable\(functions, 'createStudentSecure'\)/);
+  assert.match(source, /TRANSPORT_NOT_AVAILABLE_FOR_CLASS/);
+  assert.match(source, /classId: secondaryClassId/);
+  assert.match(source, /classId: primaryClassId/);
+  assert.match(source, /studentMatriculeReservations/);
+  assert.match(source, /studentDuplicateReservations/);
+  assert.match(source, /if \(Number\.isSafeInteger\(schoolStudentsCountBefore\)\)/);
+  assert.match(source, /e2e-academic-year-/);
+  assert.match(source, /e2e-secondary-class-/);
+  assert.match(source, /Refusing to restore an academic year pointer changed by another operation/);
+  assert.match(source, /academicYearFixture: 0, secondaryClassFixture: 0/);
   assert.match(source, /finally \{[\s\S]*CLEANUP: deleting only exact E2E fixture records/);
   assert.match(source, /STAGING FIXTURE CLEANUP: PASS/);
   assert.doesNotMatch(source, /console\.(?:log|error)\([^\n]*(?:PASSWORD|SERVICE_ACCOUNT|API_KEY)/);

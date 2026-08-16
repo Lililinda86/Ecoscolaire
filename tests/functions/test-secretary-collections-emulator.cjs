@@ -14,6 +14,7 @@ const {
   recordCashPayment
 } = require('../../functions/lib/index');
 const { makeTuitionDiscountSlotId } = require('../../functions/lib/utils/discountHelpers');
+const { executeCreateStudentSecure } = require('../../functions/lib/studentCreationSecure');
 
 const db = admin.firestore();
 const suffix = `${Date.now()}-${process.pid}`;
@@ -27,6 +28,7 @@ const directorId = `director-${suffix}`;
 const inactiveId = `inactive-${suffix}`;
 const crossSchoolId = `cross-school-${suffix}`;
 const academicYear = '2026-2027';
+const academicYearId = `academic-year-${suffix}`;
 const extraStudentId = label => `${label}-student-${suffix}`;
 
 const context = uid => ({ auth: { uid } });
@@ -76,21 +78,125 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     db.collection('users').doc(inactiveId).set({ role: 'secretary', schoolId, isActive: false }),
     db.collection('users').doc(crossSchoolId).set({ role: 'secretary', schoolId: otherSchoolId, isActive: true }),
     db.collection('schools').doc(schoolId).set({
-      name: 'Collections test school', academicYear, active: true,
-      subscriptionStatus: 'active', globalFees: { feeT1: 70000, feeT2: 70000, feeT3: 70000, feeTransport: 6000 }
+      name: 'Collections test school', academicYear, activeAcademicYearId: academicYearId,
+      active: true, studentsCount: 0, studentLimit: 100,
+      subscriptionStatus: 'active', globalFees: { feeT1: 70000, feeT2: 70000, feeT3: 70000, feeTransport: 4000 }
     }),
     db.collection('schools').doc(otherSchoolId).set({ name: 'Other school', academicYear, active: true }),
-    db.collection('classes').doc(classId).set({ schoolId, name: 'CP', level: 'primary' }),
+    db.collection('academicYears').doc(academicYearId).set({ schoolId, name: academicYear, status: 'active' }),
+    db.collection('classes').doc(classId).set({ schoolId, name: 'CP', level: 'primary', isActive: true, section: 'francophone' }),
     db.collection('students').doc(studentId).set({
       id: studentId, schoolId, name: 'Élève fictif', matricule: 'TEST-COLLECTIONS',
-      classId, academicYear, gender: 'M', section: 'francophone'
+      classId, academicYearId, academicYear, gender: 'M', section: 'francophone'
     }),
     db.collection('studentFinance').doc(studentId).set({
       id: studentId, studentId, schoolId,
       registrationFeeExpected: 15000, registrationFeePaid: 0, registrationFeeStatus: 'unpaid',
-      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 6000
+      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
     })
   ]);
+
+  // Canonical academic year validation is based on academicYearId and the active year document.
+  assert.equal((await quote(secretaryId, 'tuition', { installment: 'T1' })).grossExpectedAmount, 70000);
+  const academicStudent = async (label, data) => {
+    const id = extraStudentId(label);
+    await Promise.all([
+      db.collection('students').doc(id).set({
+        id, schoolId, name: `Élève année ${label}`, matricule: `TEST-YEAR-${label}`,
+        classId, gender: 'F', section: 'francophone', ...data
+      }),
+      db.collection('studentFinance').doc(id).set({
+        id, studentId: id, schoolId, registrationFeeExpected: 15000,
+        feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
+      })
+    ]);
+    return id;
+  };
+
+  const wrongYearStudent = await academicStudent('wrong-id', {
+    academicYearId: `missing-year-${suffix}`, registrationYear: academicYear
+  });
+  await expectFailure(quote(secretaryId, 'tuition', {
+    studentId: wrongYearStudent, installment: 'T1'
+  }), 'INVALID_ACADEMIC_YEAR');
+
+  const forgedYearStudent = await academicStudent('forged-name', {
+    academicYearId: `forged-year-${suffix}`, academicYear, registrationYear: academicYear
+  });
+  await expectFailure(quote(secretaryId, 'tuition', {
+    studentId: forgedYearStudent, installment: 'T1'
+  }), 'INVALID_ACADEMIC_YEAR');
+
+  const otherTenantYearId = `other-tenant-year-${suffix}`;
+  const otherTenantStudent = await academicStudent('other-tenant', { academicYearId: otherTenantYearId });
+  await db.collection('academicYears').doc(otherTenantYearId).set({
+    schoolId: otherSchoolId, name: academicYear, status: 'active'
+  });
+  await db.collection('schools').doc(schoolId).update({ activeAcademicYearId: otherTenantYearId });
+  await expectFailure(quote(secretaryId, 'tuition', {
+    studentId: otherTenantStudent, installment: 'T1'
+  }), 'INVALID_ACADEMIC_YEAR');
+
+  const inactiveYearId = `inactive-year-${suffix}`;
+  const inactiveYearStudent = await academicStudent('inactive-year', { academicYearId: inactiveYearId });
+  await db.collection('academicYears').doc(inactiveYearId).set({
+    schoolId, name: academicYear, status: 'closed'
+  });
+  await db.collection('schools').doc(schoolId).update({ activeAcademicYearId: inactiveYearId });
+  await expectFailure(quote(secretaryId, 'tuition', {
+    studentId: inactiveYearStudent, installment: 'T1'
+  }), 'INVALID_ACADEMIC_YEAR');
+  await db.collection('schools').doc(schoolId).update({ activeAcademicYearId: academicYearId });
+
+  // A student created by the secured production path is immediately collectable.
+  const secureStudentId = `secure-student-${suffix}`;
+  const secureCreation = await executeCreateStudentSecure(secretaryId, {
+    studentId: secureStudentId,
+    requestedMatricule: `MAT-SECURE-${suffix}`,
+    studentData: {
+      name: 'Élève Secure Collections', studentLastName: 'Collections', studentFirstName: `Secure-${suffix}`,
+      gender: 'F', section: 'francophone', classId, studentStatus: 'nouveau'
+    },
+    privateData: { dob: '2017-03-04', parentName: 'Parent Test', parentPhone: '600000001' },
+    financeData: {
+      registrationFeeExpected: 15000, feeT1: 70000, feeT2: 70000, feeT3: 70000,
+      transportMonthlyFee: 4000
+    },
+    parentPrivateData: { dob: '2017-03-04' },
+    parentFinanceData: { feeT1: 70000, feeT2: 70000, feeT3: 70000 }
+  }, db, () => new Date().toISOString());
+  assert.equal(secureCreation.academicYearId, academicYearId);
+  assert.equal((await quote(secretaryId, 'registration_fee', {
+    studentId: secureStudentId
+  })).grossExpectedAmount, 15000);
+  assert.equal((await pay(secretaryId, `secure-registration-${suffix}`, 1000, 'registration_fee', {
+    studentId: secureStudentId
+  })).newPaid, 1000);
+
+  // Backend transport enforcement covers every mapped secondary label for quote and payment.
+  for (const [index, name] of ['6e', 'Form 1', '5e', 'Form 2', '4e', 'Form 3', '3e', 'Form 4'].entries()) {
+    const secondaryClassId = `secondary-class-${index}-${suffix}`;
+    const secondaryStudentId = `secondary-student-${index}-${suffix}`;
+    await Promise.all([
+      db.collection('classes').doc(secondaryClassId).set({
+        schoolId, name, cycle: 'secondary', section: name.startsWith('Form') ? 'anglophone' : 'francophone'
+      }),
+      db.collection('students').doc(secondaryStudentId).set({
+        id: secondaryStudentId, schoolId, name: `Élève ${name}`, matricule: `TEST-SECONDARY-${index}`,
+        classId: secondaryClassId, academicYearId, registrationYear: academicYear
+      }),
+      db.collection('studentFinance').doc(secondaryStudentId).set({
+        id: secondaryStudentId, studentId: secondaryStudentId, schoolId,
+        feeT1: 50000, feeT2: 40000, feeT3: 25000, transportMonthlyFee: 4000
+      })
+    ]);
+    await expectFailure(quote(secretaryId, 'transport', {
+      studentId: secondaryStudentId, period: '2026-09'
+    }), 'TRANSPORT_NOT_AVAILABLE_FOR_CLASS');
+    await expectFailure(pay(secretaryId, `secondary-deny-${index}-${suffix}`, 1000, 'transport', {
+      studentId: secondaryStudentId, period: '2026-09'
+    }), 'TRANSPORT_NOT_AVAILABLE_FOR_CLASS');
+  }
 
   // Permission matrix and scholarship approval.
   await expectFailure(createBenefit(secretaryId, `secretary-create-${suffix}`), 'PERMISSION_DENIED');
@@ -133,15 +239,15 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   await approveFinancialBenefit.run({ benefitId: voucher.benefitId }, context(ownerId));
   const september = await quote(secretaryId, 'transport', { period: '2026-09' });
   assert.deepEqual({ gross: september.grossExpectedAmount, discount: september.discountAmount, net: september.netExpectedAmount },
-    { gross: 6000, discount: 1000, net: 5000 });
-  const transportPartial = await pay(secretaryId, `transport-partial-${suffix}`, 3000, 'transport', { period: '2026-09' });
-  assert.equal(transportPartial.remainingBalance, 2000);
-  const transportFull = await pay(secretaryId, `transport-full-${suffix}`, 2000, 'transport', { period: '2026-09' });
+    { gross: 4000, discount: 1000, net: 3000 });
+  const transportPartial = await pay(secretaryId, `transport-partial-${suffix}`, 2000, 'transport', { period: '2026-09' });
+  assert.equal(transportPartial.remainingBalance, 1000);
+  const transportFull = await pay(secretaryId, `transport-full-${suffix}`, 1000, 'transport', { period: '2026-09' });
   assert.equal(transportFull.remainingBalance, 0);
   await expectFailure(pay(secretaryId, `transport-over-${suffix}`, 1000, 'transport', { period: '2026-09' }), 'NO_REMAINING_BALANCE');
   const october = await quote(secretaryId, 'transport', { period: '2026-10' });
   assert.equal(october.discountAmount, 0);
-  assert.equal(october.remainingBalance, 6000);
+  assert.equal(october.remainingBalance, 4000);
   await expectFailure(quote(secretaryId, 'transport'), 'INVALID_TRANSPORT_PERIOD');
   await expectFailure(quote(secretaryId, 'transport', { period: 'September' }), 'INVALID_TRANSPORT_PERIOD');
   await expectFailure(quote(secretaryId, 'transport', { period: '2027-07' }), 'PERIOD_OUTSIDE_ACADEMIC_YEAR');
@@ -155,7 +261,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     }),
     db.collection('studentFinance').doc(percentageStudentId).set({
       id: percentageStudentId, studentId: percentageStudentId, schoolId,
-      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 6000
+      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
     })
   ]);
   const percentScholarship = await createBenefit(ownerId, `percent-scholarship-${suffix}`, {
@@ -182,7 +288,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     }),
     db.collection('studentFinance').doc(invalidStudentId).set({
       id: invalidStudentId, studentId: invalidStudentId, schoolId,
-      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 6000
+      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
     })
   ]);
   const expiredVoucher = await createBenefit(ownerId, `expired-voucher-${suffix}`, {
@@ -211,7 +317,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     }),
     db.collection('studentFinance').doc(conflictStudentId).set({
       id: conflictStudentId, studentId: conflictStudentId, schoolId,
-      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 6000
+      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
     })
   ]);
   const nonStackable = await createBenefit(ownerId, `non-stackable-${suffix}`, {
@@ -234,7 +340,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
       classId, academicYear, gender: 'M', section: 'francophone'
     }),
     db.collection('studentFinance').doc(singleUseStudentId).set({
-      id: singleUseStudentId, studentId: singleUseStudentId, schoolId, transportMonthlyFee: 6000,
+      id: singleUseStudentId, studentId: singleUseStudentId, schoolId, transportMonthlyFee: 4000,
       feeT1: 70000, feeT2: 70000, feeT3: 70000
     })
   ]);
@@ -244,7 +350,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     reference: `BON-RANGE-${suffix}`, singleUse: true, maximumUses: 1, value: 1000
   });
   await approveFinancialBenefit.run({ benefitId: rangedVoucher.benefitId }, context(ownerId));
-  await pay(secretaryId, `single-use-september-${suffix}`, 5000, 'transport', {
+  await pay(secretaryId, `single-use-september-${suffix}`, 3000, 'transport', {
     studentId: singleUseStudentId, period: '2026-09'
   });
   assert.equal((await quote(secretaryId, 'transport', {
@@ -259,7 +365,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     }),
     db.collection('studentFinance').doc(transportStackStudentId).set({
       id: transportStackStudentId, studentId: transportStackStudentId, schoolId,
-      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 6000
+      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
     })
   ]);
   const transportScholarship = await createBenefit(ownerId, `transport-scholarship-${suffix}`, {
@@ -278,7 +384,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     studentId: transportStackStudentId, period: '2026-09'
   });
   assert.equal(transportStackQuote.discountAmount, 1500);
-  assert.equal(transportStackQuote.netExpectedAmount, 4500);
+  assert.equal(transportStackQuote.netExpectedAmount, 2500);
 
   // Existing approved tuitionDiscountSlots remain compatible with the generalized quote/payment path.
   const legacyStudentId = extraStudentId('legacy');
@@ -289,7 +395,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     }),
     db.collection('studentFinance').doc(legacyStudentId).set({
       id: legacyStudentId, studentId: legacyStudentId, schoolId,
-      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 6000
+      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
     })
   ]);
   const legacyDiscountId = `legacy-discount-${suffix}`;
