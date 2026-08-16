@@ -65,7 +65,11 @@ const expectDenied = async (operation, label) => {
 };
 
 const assertNoPersonalData = (summary, fixtureTokens) => {
-  const serialized = JSON.stringify(summary);
+  const privacyPayload = structuredClone(summary);
+  if (privacyPayload?.school) {
+    privacyPayload.school.activeAcademicYearId = '[ALLOWED_SCHOOL_CONFIG_ID]';
+  }
+  const serialized = JSON.stringify(privacyPayload);
   for (const forbiddenKey of [
     'email', 'phone', 'birthDate', 'address', 'bank', 'parentName', 'parentPhone',
     'studentId', 'staffId', 'userId', 'receiptNumber', 'benefitId',

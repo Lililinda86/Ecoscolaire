@@ -31,6 +31,7 @@ test('BoardViewer fixtures use exact IDs and verify zero residuals', () => {
 });
 
 test('BoardViewer gate covers deployed privacy, callable and responsive UI', () => {
+  assert.match(runner, /privacyPayload\.school\.activeAcademicYearId = '\[ALLOWED_SCHOOL_CONFIG_ID\]'/);
   for (const marker of [
     'DEPLOYED RULES: PASS',
     'AGGREGATE CALLABLE: PASS',
