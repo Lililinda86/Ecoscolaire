@@ -94,4 +94,16 @@ describe('BoardViewer strict read-only and privacy boundary', () => {
     await assertSucceeds(getDoc(doc(secretaryDb, 'receipts', 'sample-a')));
     await assertSucceeds(getDoc(doc(secretaryDb, 'notifications', 'own-notification')));
   });
+
+  test('denies direct audit creation, update and deletion for every active client role', async () => {
+    for (const uid of ['board-a', 'owner-a', 'secretary-a']) {
+      const db = testEnv.authenticatedContext(uid).firestore();
+      await assertFails(setDoc(doc(db, 'audit_logs', `direct-${uid}`), {
+        actorUid: uid, actorRole: uid.split('-')[0], schoolId: schoolA,
+        action: 'LOGIN', createdAt: new Date().toISOString(),
+      }));
+      await assertFails(updateDoc(doc(db, 'audit_logs', 'sample-a'), { action: 'FORGED' }));
+      await assertFails(deleteDoc(doc(db, 'audit_logs', 'sample-a')));
+    }
+  });
 });

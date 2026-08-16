@@ -29,6 +29,8 @@ test('BoardViewer fixtures use exact IDs and verify zero residuals', () => {
   assert.match(runner, /assert\.deepEqual\(residualDocs, \[\]\)/);
   assert.match(runner, /assert\.deepEqual\(residualUsers, \[\]\)/);
   assert.match(runner, /STAGING ORPHANS: 0/);
+  assert.match(runner, /canonicalBackendAudit/);
+  assert.match(runner, /where\('testRunId', '==', suffix\)/);
 });
 
 test('BoardViewer gate covers deployed privacy, callable and responsive UI', () => {
@@ -51,10 +53,19 @@ test('BoardViewer gate covers deployed privacy, callable and responsive UI', () 
     'NOTIFICATION SECURITY: PASS',
     'VALIDATION REQUEST SECURITY: PASS',
     'AUDIT LOG CREATE DENY: PASS',
+    'BACKEND LOGIN AUDIT: PASS',
+    'BACKEND LOGOUT AUDIT: PASS',
+    'OWNER BACKEND SESSION AUDIT: PASS',
+    'SECRETARY BACKEND SESSION AUDIT: PASS',
+    'INACTIVE USER AUDIT: DENY',
+    'MISSING PROFILE AUDIT: DENY',
+    'FORGED AUDIT IDENTITY: DENY',
+    'ARBITRARY AUDIT EVENT: DENY',
     'MOBILE 360',
     'TABLET 768',
     'DESKTOP 1440',
   ]) assert.match(runner, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(runner, /'recordAuthenticatedAudit'/);
 });
 
 test('diagnostic errors cannot populate the BoardViewer dashboard bucket', () => {

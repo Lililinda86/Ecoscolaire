@@ -1415,7 +1415,7 @@ service cloud.firestore {
 
     // --- GRADES & ATTENDANCE ---
     match /audit_logs/{logId} {
-      allow create: if isAuthenticated() && !isBoardViewer();
+      allow create: if false; // Canonical audit records are written only by the trusted backend.
       allow read: if isSuperAdmin() || ((isOwner() || isDirector()) && resource.data.schoolId == getUserSchoolId());
       allow update, delete: if false; // Immuable
     }
