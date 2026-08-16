@@ -10,8 +10,8 @@ import { db as firestoreDb } from '../db/firebase';
 import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
 import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
-import { sanitizeBoardViewerData } from '../utils/boardViewerSanitizer';
 import { isUserActive, logAuthenticationFailure } from '../utils/authSecurity';
+import { recordAuthenticatedAudit } from '../services/authenticatedAudit';
 import {
   canLoadStudentFinance,
   canLoadStudentParentFinance,
@@ -367,6 +367,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.warn("❌ [AppContext] Erreur lecture schools (schoolDoc) :", e);
         }
 
+        // BoardViewer receives no raw operational collection in the browser.
+        // Its dashboard uses a callable that returns aggregates only.
+        if (userData.role === 'boardViewer') {
+          loadedDb.users = [userData];
+          setIsFirestoreConnected(true);
+          setFirestoreError(null);
+          setDb(loadedDb);
+          setLastSyncDate(new Date());
+          setLoading(false);
+          return;
+        }
+
         let usersData: User[] = [];
         try {
           const usersQ = query(collection(firestoreDb, 'users'), where('schoolId', '==', targetSchoolId));
@@ -436,10 +448,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]) as { colName: keyof Database; data: unknown[] }[];
 
         results.forEach((res) => {
-          let sanitizedData = res.data;
-          if (userData.role === 'boardViewer') {
-            sanitizedData = sanitizeBoardViewerData(res.data, res.colName as string);
-          }
+          const sanitizedData = res.data;
 
           if (res.colName === 'grades') {
             const partition = partitionGradeDocuments(sanitizedData as Grade[]);
@@ -558,7 +567,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
-    if (!firebaseUser || !targetSchoolId) {
+    if (!firebaseUser || !targetSchoolId || currentUser?.role === 'boardViewer') {
       return () => {
         cancelled = true;
         if (unsubPayments) unsubPayments();
@@ -583,10 +592,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cancelled) return;
           const paymentsList: Payment[] = [];
           snapshot.forEach((docSnap) => {
-            let item = { id: docSnap.id, ...docSnap.data() } as Payment;
-            if (currentUser?.role === 'boardViewer') {
-              item = sanitizeBoardViewerData(item, 'payments') as Payment;
-            }
+            const item = { id: docSnap.id, ...docSnap.data() } as Payment;
             paymentsList.push(item);
           });
           setDb(prevDb => {
@@ -613,10 +619,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cancelled) return;
           const expensesList: Expense[] = [];
           snapshot.forEach((docSnap) => {
-            let item = { id: docSnap.id, ...docSnap.data() } as Expense;
-            if (currentUser?.role === 'boardViewer') {
-              item = sanitizeBoardViewerData(item, 'expenses') as Expense;
-            }
+            const item = { id: docSnap.id, ...docSnap.data() } as Expense;
             expensesList.push(item);
           });
           setDb(prevDb => {
@@ -919,20 +922,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logAuditAction = async (params: { action: string, targetType: string, targetId: string, targetName: string, details?: Record<string, unknown> }) => {
     if (!currentUser) return;
     try {
-      const { collection, addDoc } = await import('firebase/firestore');
-      const { db: firestoreDb } = await import('../db/firebase');
-      await addDoc(collection(firestoreDb, 'audit_logs'), {
-        userId: currentUser.id,
-        userEmail: currentUser.email,
-        userRole: currentUser.role,
-        schoolId: currentSchool?.id || currentUser.schoolId || null,
-        action: params.action,
-        targetType: params.targetType,
-        targetId: params.targetId,
-        targetName: params.targetName,
-        timestamp: new Date().toISOString(),
-        details: params.details || {}
-      });
+      await recordAuthenticatedAudit(params);
     } catch (e) {
       console.error("Failed to log audit action", e);
     }
@@ -941,29 +931,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const login = async (email: string, pin: string): Promise<LoginResult> => {
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const { auth, db: firestoreDb } = await import('../db/firebase');
+      const { auth } = await import('../db/firebase');
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const { doc, getDoc, collection, addDoc } = await import('firebase/firestore');
 
-      const cred = await signInWithEmailAndPassword(auth, normalizedEmail, pin);
+      await signInWithEmailAndPassword(auth, normalizedEmail, pin);
 
       try {
-        const userDoc = await getDoc(doc(firestoreDb, 'users', cred.user.uid));
-        const userData = userDoc.data();
-        if (userData) {
-          await addDoc(collection(firestoreDb, 'audit_logs'), {
-            userId: cred.user.uid,
-            userEmail: normalizedEmail,
-            userRole: userData.role,
-            schoolId: userData.schoolId || null,
-            action: 'LOGIN',
-            targetType: 'SYSTEM',
-            targetId: cred.user.uid,
-            targetName: normalizedEmail,
-            timestamp: new Date().toISOString(),
-            details: {}
-          });
-        }
+        await recordAuthenticatedAudit({ action: 'LOGIN' });
       } catch (e) {
         console.error("Failed to log LOGIN action", e);
       }
@@ -991,15 +965,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async () => {
-    try {
-      if (currentUser) {
-        await logAuditAction({
-          action: 'LOGOUT',
-          targetType: 'SYSTEM',
-          targetId: currentUser.id,
-          targetName: currentUser.email
-        });
+    if (currentUser) {
+      try {
+        await recordAuthenticatedAudit({ action: 'LOGOUT' });
+      } catch (e) {
+        console.error("Failed to log LOGOUT action", e);
       }
+    }
+    try {
       const { auth } = await import('../db/firebase');
       await auth.signOut();
     } catch (e) {

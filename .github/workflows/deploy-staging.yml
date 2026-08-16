@@ -94,6 +94,8 @@ jobs:
           node tests/functions/test-publish-class-program-draft.cjs
           node tests/functions/test-bulk-add-subjects.cjs
           node tests/functions/test-secretary-collection-calculations.cjs
+          node tests/functions/test-boardviewer-governance.cjs
+          node tests/functions/test-authenticated-audit.cjs
 
       - name: Emulator Tests
         run: |
