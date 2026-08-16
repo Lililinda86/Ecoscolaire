@@ -705,6 +705,14 @@ export interface Expense {
   date: string;
   person: string;
   reason: string;
+  category?: string;
+  kind?: 'EXPENSE' | 'REVERSAL';
+  status?: 'DRAFT' | 'POSTED' | 'REVERSED';
+  originalExpenseId?: string;
+  originalAmount?: number;
+  createdBy?: string;
+  createdByRole?: string;
+  createdAt?: DateLike;
 }
 
 export interface InventoryItem {

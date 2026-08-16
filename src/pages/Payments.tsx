@@ -6,11 +6,11 @@ import Modal from '../components/Modal';
 import TransactionHistory from '../components/TransactionHistory';
 import ReceiptHistory from '../components/ReceiptHistory';
 import FinanceDashboard from '../components/FinanceDashboard';
-import { Plus, Minus, Wallet, ClipboardList, Trash2, History, FileText, TrendingUp, Lock, Calendar, CheckCircle } from 'lucide-react';
+import { Plus, Minus, Wallet, ClipboardList, Undo2, History, FileText, TrendingUp, Lock, Calendar, CheckCircle } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, setDoc, deleteDoc, runTransaction, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { translatePaymentType, translateInstallment, formatCurrency, translatePaymentMethod } from '../utils/paymentReceipt';
 import {
   canUseStudentContactWhatsApp,
@@ -18,6 +18,8 @@ import {
   type StudentFinance
 } from '../services/studentPrivacy';
 import FinancialBenefitsPanel from '../components/FinancialBenefitsPanel';
+import { createExpense, reverseExpense } from '../services/expenses';
+import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from '../utils/expenseLedger';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -286,7 +288,7 @@ const computeSHA256 = async (text: string): Promise<string> => {
 };
 
 const Payments: React.FC = () => {
-  const { db, updateLocalState, patchLocalEntities, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, patchLocalEntities, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const canUseWhatsApp = canUseStudentContactWhatsApp(currentUser?.role ?? '');
   const { t } = useI18n();
 
@@ -348,7 +350,7 @@ const Payments: React.FC = () => {
   };
 
   const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
-  const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0] });
+  const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0], category: 'GENERAL' });
   const [receiptToPrint, setReceiptToPrint] = useState<Payment | null>(null);
 
   // --- State pour Clôtures de Caisse ---
@@ -412,9 +414,8 @@ const Payments: React.FC = () => {
     const cashIn = db.payments
       .filter(p => p.date === selectedClosureDate && isCashPaymentForSchool(p, currentSchool?.id || ''))
       .reduce((sum, p) => sum + p.amount, 0);
-    const cashOut = (db.expenses || [])
-      .filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id)
-      .reduce((sum, e) => sum + e.amount, 0);
+    const cashOut = calculateNetExpenseTotal((db.expenses || [])
+      .filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id));
     const theoretical = opening + cashIn - cashOut;
     const disc = counted - theoretical;
 
@@ -532,7 +533,7 @@ const Payments: React.FC = () => {
   };
 
   const handleOpenExpenseModal = () => {
-    setCurrentExpense({ date: new Date().toISOString().split('T')[0], amount: 0, person: '', reason: '' });
+    setCurrentExpense({ date: new Date().toISOString().split('T')[0], amount: 0, person: '', reason: '', category: 'GENERAL' });
     setExpenseModalOpen(true);
   };
 
@@ -880,6 +881,7 @@ const Payments: React.FC = () => {
 
     const person = (currentExpense.person || '').trim();
     const reason = (currentExpense.reason || '').trim();
+    const category = (currentExpense.category || '').trim();
     const date = (currentExpense.date || '').trim();
 
     if (!person) {
@@ -888,6 +890,10 @@ const Payments: React.FC = () => {
     }
     if (!reason) {
       alert("Le motif / but de la dépense est requis.");
+      return;
+    }
+    if (!category) {
+      alert("La catégorie est requise.");
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -903,37 +909,14 @@ const Payments: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const canSaveDirectly = rawAmount <= 50000 || ['superAdmin', 'owner'].includes(currentUser.role);
-
-      const expenseObj: Expense = {
-        id: currentExpense.id || crypto.randomUUID(),
+      await createExpense({
         amount: rawAmount,
         date,
         person,
         reason,
-        schoolId: currentSchool.id
-      };
-
-      if (canSaveDirectly) {
-        await setDoc(doc(firestoreDb, 'expenses', expenseObj.id), expenseObj, { merge: true });
-        alert("Dépense enregistrée avec succès.");
-      } else {
-        const reqId = crypto.randomUUID();
-        await setDoc(doc(firestoreDb, 'validation_requests', reqId), {
-          id: reqId,
-          schoolId: currentSchool.id,
-          requesterId: currentUser.id,
-          requesterRole: currentUser.role,
-          actionType: 'HIGH_EXPENSE',
-          targetCollection: 'expenses',
-          targetDocumentId: expenseObj.id,
-          proposedData: expenseObj,
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        }, { merge: true });
-        alert(`Dépense de ${rawAmount} FCFA soumise pour validation au Fondateur.`);
-      }
-
+        category
+      });
+      alert("Dépense enregistrée et publiée avec succès.");
       setExpenseModalOpen(false);
     } catch (err: unknown) {
       const message = getErrorMessage(err);
@@ -941,90 +924,6 @@ const Payments: React.FC = () => {
       alert("Erreur lors de l'enregistrement de la dépense: " + message);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const checkPin = () => {
-    const targetPin = db.school?.adminPin || '0000';
-    const pin = window.prompt("Sécurité : Veuillez entrer le code PIN Administrateur pour valider cette suppression :");
-    return pin === targetPin || pin === '778899';
-  };
-
-  const handleDeletePayment = async (id: string) => {
-    const paymentToDelete = db.payments.find(p => p.id === id);
-    if (paymentToDelete?.byRecordCashPayment) {
-      alert("Paiement sécurisé. Toute correction doit passer par une annulation ou une contre-opération.");
-      return;
-    }
-    if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
-    if (window.confirm('Voulez-vous vraiment supprimer cet encaissement ? Cela annulera le paiement.')) {
-      setIsSaving(true);
-      try {
-        console.log(`[FRONTEND] Deleting payment ${id}`, paymentToDelete);
-
-        await deleteDoc(doc(firestoreDb, 'payments', id));
-        console.log(`[FRONTEND] deleteDoc completed for ${id}`);
-
-        if (paymentToDelete && paymentToDelete.studentId) {
-          const student = db.students.find(s => s.id === paymentToDelete.studentId);
-          console.log(`[FRONTEND] Reactively updating local student state ${paymentToDelete.studentId}`, student);
-
-          if (student) {
-            const remainingPayments = db.payments.filter(p => p.id !== id && p.studentId === paymentToDelete.studentId);
-
-            if (paymentToDelete.type === 'registration_fee') {
-              const newPaid = remainingPayments.filter(p => p.type === 'registration_fee').reduce((sum, p) => sum + (p.amount || 0), 0);
-              const expected = student.registrationFeeExpected ?? 15000;
-              let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-              if (newPaid >= expected) status = 'paid';
-              else if (newPaid > 0) status = 'partial';
-
-              if (db) {
-                const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
-                updateLocalState({ students: newStudents });
-              }
-            }
-            else if (paymentToDelete.type === 'tuition') {
-              const newPaid = remainingPayments.filter(p => p.type === 'tuition').reduce((sum, p) => sum + (p.amount || 0), 0);
-              const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
-              const expected = student.tuitionExpected ?? fallbackExpected;
-              let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-              if (expected > 0 && newPaid >= expected) status = 'paid';
-              else if (newPaid > 0) status = 'partial';
-
-              if (db) {
-                const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
-                updateLocalState({ students: newStudents });
-              }
-            }
-            else if (paymentToDelete.type === 'transport') {
-              const newPaid = remainingPayments.filter(p => p.type === 'transport').reduce((sum, p) => sum + (p.amount || 0), 0);
-              if (db) {
-                const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
-                updateLocalState({ students: newStudents });
-              }
-            }
-          }
-        }
-
-        if (db) {
-          updateLocalState({ payments: db.payments.filter(p => p.id !== id) });
-        }
-
-        logAuditAction({
-          action: 'DELETE_PAYMENT',
-          targetType: 'PAYMENT',
-          targetId: id,
-          targetName: 'Paiement supprimé'
-        });
-
-      } catch (err: unknown) {
-        console.error("[FRONTEND] Error in handleDeletePayment:", err);
-        const message = getErrorMessage(err);
-        alert("Erreur lors de la suppression: " + message);
-      } finally {
-        setIsSaving(false);
-      }
     }
   };
 
@@ -1039,37 +938,6 @@ const Payments: React.FC = () => {
 
       if (data.success) {
         alert(data.message || "Paiement simulé avec succès.");
-
-        await runTransaction(firestoreDb, async (transaction) => {
-          const txRef = doc(firestoreDb, 'transactions', transactionId);
-          const txSnap = await transaction.get(txRef);
-
-          if (!txSnap.exists()) {
-            throw new Error("Transaction introuvable");
-          }
-
-          const txData = txSnap.data();
-          if (txData.status === 'SUCCESS') {
-            return;
-          }
-
-          transaction.update(txRef, { status: 'SUCCESS' });
-
-          if (!data.alreadyConfirmed) {
-            const paymentRef = doc(firestoreDb, 'payments', transactionId);
-            transaction.set(paymentRef, {
-              id: transactionId,
-              schoolId: txData.schoolId,
-              studentId: txData.studentId,
-              amount: txData.amount,
-              type: txData.type,
-              method: 'mobile_money',
-              installment: txData.installment || null,
-              date: new Date().toISOString().split('T')[0],
-              transactionId: transactionId
-            });
-          }
-        });
       } else {
          console.error(`[FRONTEND] Erreur retournée par mockConfirmPayment:`, data);
          alert("Erreur lors de la simulation.");
@@ -1082,31 +950,42 @@ const Payments: React.FC = () => {
     setIsConfirmingTx(null);
   };
 
-  const handleDeleteExpense = async (id: string) => {
+  const handleReverseExpense = async (id: string) => {
     if (isSaving) return;
     const expense = (db.expenses || []).find(e => e.id === id);
     if (!expense || expense.schoolId !== currentSchool?.id) {
       alert("Erreur : Cette dépense n'appartient pas à l'école active.");
       return;
     }
-    if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
-    if (window.confirm("Voulez-vous vraiment annuler cette sortie d'argent ?")) {
-      setIsSaving(true);
-      try {
-        await deleteDoc(doc(firestoreDb, 'expenses', id));
-      } catch (err: unknown) {
-        const message = getErrorMessage(err);
-        alert("Erreur lors de l'annulation: " + message);
-      } finally {
-        setIsSaving(false);
-      }
+    if (currentUser?.role !== 'owner' && currentUser?.role !== 'superAdmin') {
+      alert("Seul le propriétaire peut contre-passer une dépense publiée.");
+      return;
+    }
+    if (expense.kind === 'REVERSAL' || expense.status === 'REVERSED') {
+      alert("Une contre-passation ne peut pas être contre-passée.");
+      return;
+    }
+    const reason = window.prompt("Motif obligatoire de la contre-passation :")?.trim();
+    if (!reason) return;
+    if (!window.confirm("Confirmer la contre-passation ? La dépense originale restera immuable.")) return;
+    setIsSaving(true);
+    try {
+      await reverseExpense(id, reason);
+      alert("Contre-passation enregistrée avec succès.");
+    } catch (err: unknown) {
+      alert("Erreur lors de la contre-passation: " + getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
     }
   };
 
 
   const totalCashReceived = db.payments.filter(p => isCashPaymentForSchool(p, currentSchool?.id || '')).reduce((sum, p) => sum + p.amount, 0);
-  const totalMoMoReceived = db.payments.filter(p => p.method === 'mobile_money' && String(p.schoolId || '') === currentSchool?.id).reduce((sum, p) => sum + p.amount, 0);
-  const totalExpenses = (db.expenses || []).filter(e => String(e.schoolId || '') === currentSchool?.id).reduce((sum, e) => sum + e.amount, 0);
+  const totalMoMoReceived = calculateCollectedPaymentTotal(
+    db.payments.filter(p => String(p.schoolId || '') === currentSchool?.id),
+    'mobile_money'
+  );
+  const totalExpenses = calculateNetExpenseTotal((db.expenses || []).filter(e => String(e.schoolId || '') === currentSchool?.id));
 
   const soldeTiroirCaisse = totalCashReceived - totalExpenses;
 
@@ -1405,13 +1284,7 @@ const Payments: React.FC = () => {
                           <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => { setReceiptToPrint(p); setTimeout(() => window.print(), 100); }} title="Imprimer Reçu">
                             🖨️
                           </button>
-                          {!p.byRecordCashPayment ? (
-                            <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeletePayment(p.id)} title="Supprimer">
-                              <Trash2 size={14} />
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sécurisé</span>
-                          )}
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Immuable</span>
                         </div>
                       </td>
                     </tr>
@@ -1440,18 +1313,21 @@ const Payments: React.FC = () => {
               {(!db.expenses || db.expenses.length === 0) ? (
                 <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucune dépense enregistrée</td></tr>
               ) : (
-                db.expenses.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(e => (
+                [...db.expenses].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(e => (
                   <tr key={e.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '1rem' }}>{new Date(e.date).toLocaleDateString('fr-FR')}</td>
                     <td style={{ padding: '1rem', fontWeight: 500 }}>{e.reason}</td>
                     <td style={{ padding: '1rem' }}>{e.person}</td>
                     <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--danger)' }}>
-                      - {e.amount.toLocaleString('fr-FR')} FCFA
+                      {e.amount < 0 ? '+' : '-'} {Math.abs(e.amount).toLocaleString('fr-FR')} FCFA
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeleteExpense(e.id)} title="Annuler">
-                          <Trash2 size={14} />
-                        </button>
+                        {currentUser?.role === 'owner' && e.kind !== 'REVERSAL' && e.status !== 'REVERSED'
+                          && !db.expenses.some(entry => entry.originalExpenseId === e.id) ? (
+                          <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleReverseExpense(e.id)} title="Contre-passer">
+                            <Undo2 size={14} />
+                          </button>
+                        ) : <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Immuable</span>}
                     </td>
                   </tr>
                 ))
@@ -1735,7 +1611,7 @@ const Payments: React.FC = () => {
               const cashPaymentsDate = db.payments.filter(p => p.date === selectedClosureDate && isCashPaymentForSchool(p, currentSchool?.id || ''));
               const expensesDate = (db.expenses || []).filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id);
               const cashIn = cashPaymentsDate.reduce((sum, p) => sum + p.amount, 0);
-              const cashOut = expensesDate.reduce((sum, e) => sum + e.amount, 0);
+              const cashOut = calculateNetExpenseTotal(expensesDate);
 
               const opening = typeof openingBalanceInput === 'number' ? openingBalanceInput : Number(String(openingBalanceInput || 0).trim());
               const counted = typeof countedBalanceInput === 'number' ? countedBalanceInput : (countedBalanceInput === '' ? 0 : Number(countedBalanceInput));
@@ -1963,7 +1839,7 @@ const Payments: React.FC = () => {
                           const pList = (db.payments || []).filter(p => p.date === dateStr && isCashPaymentForSchool(p, currentSchool?.id || ''));
                           const eList = (db.expenses || []).filter(e => e.date === dateStr && String(e.schoolId || '') === currentSchool?.id);
                           cashReceived = pList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                          cashExpenses = eList.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                          cashExpenses = calculateNetExpenseTotal(eList);
                         }
 
                         totalEncaissementsPeriode += cashReceived;
@@ -2388,6 +2264,16 @@ const Payments: React.FC = () => {
           <div className="form-group">
             <label>Motif / But de la dépense</label>
             <input required placeholder="ex: Achat de craie, Réparation de porte..." value={currentExpense.reason || ''} onChange={e => setCurrentExpense({...currentExpense, reason: e.target.value})} />
+          </div>
+          <div className="form-group">
+            <label>Catégorie</label>
+            <select required value={currentExpense.category || 'GENERAL'} onChange={e => setCurrentExpense({...currentExpense, category: e.target.value})}>
+              <option value="GENERAL">Général</option>
+              <option value="SUPPLIES">Fournitures</option>
+              <option value="MAINTENANCE">Maintenance</option>
+              <option value="SERVICES">Services</option>
+              <option value="OTHER">Autre</option>
+            </select>
           </div>
           <div className="form-group">
             <label>Auteur / Personne impliquée</label>

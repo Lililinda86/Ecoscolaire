@@ -51,17 +51,6 @@ service cloud.firestore {
       );
     }
 
-    function isProtectedCashPayment(data) {
-      return (
-        (data.keys().hasAll(['byRecordCashPayment']) && data.byRecordCashPayment == true)
-        || (
-          data.keys().hasAll(['type', 'method'])
-          && (data.type == 'tuition' || data.type == 'registration_fee')
-          && data.method == 'cash'
-        )
-      );
-    }
-
     function currentUserDocExists() {
       return isAuthenticated()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid));
@@ -539,34 +528,6 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/schools/$(student.schoolId)).data.lastStudentCounterMutationId == studentId
         && getAfter(/databases/$(database)/documents/schools/$(student.schoolId)).data.lastStudentCounterMutationType == expectedType
       );
-    }
-
-    function isValidExpense(data, expenseId) {
-      return data.keys().hasAll(['id', 'schoolId', 'amount', 'date', 'person', 'reason'])
-          && data.keys().hasOnly(['id', 'schoolId', 'amount', 'date', 'person', 'reason'])
-          && data.id is string
-          && data.id == expenseId
-          && data.schoolId is string
-          && data.schoolId.size() > 0
-          && data.amount is int
-          && data.amount > 0
-          && data.date is string
-          && data.date.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
-          && data.person is string
-          && data.person.matches('.*\\S.*')
-          && data.reason is string
-          && data.reason.matches('.*\\S.*');
-    }
-
-    function canCreateExpense(data) {
-      return isAdminOrOwner()
-          || isDirector()
-          || ((isAccountant() || isSecretary()) && data.amount <= 50000);
-    }
-
-    function canUpdateExpense(data) {
-      return isAdminOrOwner()
-          || ((isAccountant() || isSecretary()) && data.amount <= 50000);
     }
 
     // ==========================================
@@ -1583,16 +1544,8 @@ service cloud.firestore {
         ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
         (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.studentId in getUserData().get('studentIds', []))
       );
-      // Seuls le comptable, le propriétaire et le superAdmin gèrent l'argent.
-      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(request.resource.data.schoolId)
-                    && !isProtectedCashPayment(request.resource.data);
-      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant())
-                    && hasSchoolAccess(resource.data.schoolId)
-                    && hasSchoolAccess(request.resource.data.schoolId)
-                    && !isProtectedCashPayment(resource.data)
-                    && !isProtectedCashPayment(request.resource.data);
-      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)
-                    && !isProtectedCashPayment(resource.data);
+      // Le grand livre des encaissements est alimenté uniquement par le backend canonique.
+      allow create, update, delete: if false;
     }
     match /receipts/{receiptId} {
       allow read: if isAuthenticated() && isActive() && (
@@ -1622,18 +1575,9 @@ service cloud.firestore {
           )
         );
       allow list: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
-      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector() || isAccountant() || isSecretary())
-                    && hasSchoolAccess(request.resource.data.schoolId)
-                    && isValidExpense(request.resource.data, expenseId)
-                    && canCreateExpense(request.resource.data);
-      allow update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary())
-                    && hasSchoolAccess(resource.data.schoolId)
-                    && hasSchoolAccess(request.resource.data.schoolId)
-                    && request.resource.data.schoolId == resource.data.schoolId
-                    && request.resource.data.id == resource.data.id
-                    && isValidExpense(request.resource.data, expenseId)
-                    && canUpdateExpense(request.resource.data);
-      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isAccountant() || isSecretary()) && hasSchoolAccess(resource.data.schoolId);
+      // Création et contre-passation passent exclusivement par les callables atomiques.
+      // Un document financier publié n'est jamais modifié ni supprimé par un client.
+      allow create, update, delete: if false;
     }
 
     // --- INVENTORY ---

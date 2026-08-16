@@ -141,7 +141,6 @@ const Settings: React.FC = () => {
 
   const handleSaveCampaySecret = async () => {
     if (!db.school || !campaySecretInput.trim()) return;
-    if (!checkPin()) { alert("Code PIN incorrect."); return; }
     
     try {
       const secretRef = doc(firestoreDb, `schools/${db.school.id}/secrets/payment`);
@@ -318,7 +317,6 @@ const Settings: React.FC = () => {
   };
 
   const handleDeleteClass = (id: string) => {
-    if (!checkPin()) { alert("Code PIN incorrect."); return; }
     if (confirm("Voulez-vous vraiment supprimer cette classe ?")) {
       safeMergeDB({ ...db, classes: db.classes.filter(c => c.id !== id) });
     }
@@ -333,27 +331,14 @@ const Settings: React.FC = () => {
 
 
 
-  const checkPin = () => {
-    const targetPin = db.school?.adminPin || '0000';
-    const pin = prompt("Sécurité : Veuillez entrer votre code PIN Administrateur pour valider cette action sensible :");
-    return pin === targetPin || pin === '778899';
-  };
-
   const handleNewAcademicYear = () => {
-    if (!checkPin()) {
-      alert("Code PIN incorrect. Opération annulée.");
-      return;
-    }
-    if(window.confirm("NOUVELLE ANNÉE : Voulez-vous archiver et effacer toutes les notes, présences, et transactions comptables de cette année ? Les élèves, le personnel et les classes seront conservés !")) {
+    if(window.confirm("NOUVELLE ANNÉE : Voulez-vous réinitialiser les données pédagogiques courantes ? Les écritures financières publiées resteront conservées et immuables.")) {
       safeMergeDB({
         ...db,
         grades: [],
         attendance: [],
-        staffAttendance: [],
-        payments: [],
-        expenses: [],
-        inventoryTransactions: []
-        // Retains students, classes, subjects, staff, inventory items, buses
+        staffAttendance: []
+        // Retains all financial ledgers, students, classes, staff and inventory.
       });
       alert("L'application a été rafraîchie avec succès pour entamer la nouvelle année scolaire !");
     }

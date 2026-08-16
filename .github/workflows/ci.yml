@@ -122,6 +122,7 @@ jobs:
           node tests/functions/test-bulk-add-subjects.cjs
           node tests/functions/test-boardviewer-governance.cjs
           node tests/functions/test-authenticated-audit.cjs
+          node tests/functions/test-expense-ledger.cjs
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student

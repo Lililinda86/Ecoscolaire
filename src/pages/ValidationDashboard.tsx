@@ -30,6 +30,10 @@ const ValidationDashboard: React.FC = () => {
   const historyRequests = requests.filter(r => r.status !== 'pending').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleApprove = async (req: ValidationRequest) => {
+    if (String(req.actionType) === 'HIGH_EXPENSE') {
+      alert("Ce circuit historique est désactivé. Les dépenses sont publiées exclusivement par le backend canonique.");
+      return;
+    }
     if (!window.confirm("Confirmer l'approbation de cette action ?")) return;
     const approverUid = auth.currentUser?.uid;
     if (!approverUid) {
@@ -96,7 +100,7 @@ const ValidationDashboard: React.FC = () => {
               throw new Error("Une dépense existante avec cet identifiant possède des données différentes.");
             }
           } else {
-            transaction.set(expenseRef, proposed);
+            throw new Error("La création directe d'une dépense est définitivement désactivée.");
           }
 
           transaction.update(reqRef, {
