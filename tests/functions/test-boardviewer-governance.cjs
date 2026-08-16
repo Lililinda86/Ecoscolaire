@@ -11,7 +11,10 @@ const summary = buildBoardViewerGovernanceSummary({
   ],
   attendance: [{ studentId: 'student-secret-id', status: 'present' }],
   payments: [{ studentId: 'student-secret-id', receiptId: 'private-receipt', amount: 12000, status: 'completed' }],
-  expenses: [{ vendor: 'Private Vendor', amount: 2000, status: 'approved' }],
+  expenses: [
+    { vendor: 'Private Vendor', amount: 2000, status: 'POSTED' },
+    { vendor: 'Private Vendor', amount: -2000, status: 'REVERSED', originalExpenseId: 'expense-a' },
+  ],
   buses: [{ active: true }],
   busRoutes: [{ isActive: true }],
   breakdowns: [{ status: 'open' }],
@@ -28,7 +31,8 @@ assert.equal(summary.students.active, 1);
 assert.deepEqual(summary.students.byClass, [{ className: 'Class A', count: 1 }]);
 assert.equal(summary.attendance.rate, 100);
 assert.equal(summary.finance.collected, 12000);
-assert.equal(summary.finance.netCash, 10000);
+assert.equal(summary.finance.expenses, 0);
+assert.equal(summary.finance.netCash, 12000);
 assert.equal(summary.inventory.lowStockItems, 1);
 assert.equal(summary.academics.averageOutOf20, 15);
 

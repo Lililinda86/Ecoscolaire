@@ -89,27 +89,10 @@ test.describe('Payments and Receipts', () => {
       // verify it appears
       await expect(page.locator('table').last()).toContainText('Scolarité (T1)', { timeout: 15000 });
 
-      // ---- ITALO-5B Deletion Test ----
-      // Count rows before
-      const rowsBefore = await page.locator('table').last().locator('tr').filter({ hasText: 'Scolarité (T1)' }).count();
-
-      // Handle native dialogs for deletion
-      page.on('dialog', async dialog => {
-        console.log(`DIALOG: [${dialog.type()}] ${dialog.message()}`);
-        if (dialog.type() === 'prompt') {
-          await dialog.accept('778899');
-        } else {
-          await dialog.accept();
-        }
-      });
-
-      // Click delete button for the tuition payment
-      const deleteBtn = page.locator('table').last().locator('tr').filter({ hasText: 'Scolarité (T1)' }).first().locator('button[title="Supprimer"]');
-      await deleteBtn.click();
-
-      // Verify it is removed from table
-      await expect(page.locator('table').last().locator('tr').filter({ hasText: 'Scolarité (T1)' })).toHaveCount(rowsBefore - 1, { timeout: 15000 });
-      // --------------------------------
+      // Posted financial entries are immutable in the client.
+      const paymentRow = page.locator('table').last().locator('tr').filter({ hasText: 'Scolarité (T1)' }).first();
+      await expect(paymentRow.getByText('Immuable')).toBeVisible();
+      await expect(paymentRow.locator('button[title="Supprimer"]')).toHaveCount(0);
     }
     
     monitor.assertNoCriticalErrors();

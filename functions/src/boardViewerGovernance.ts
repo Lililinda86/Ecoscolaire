@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { calculateNetExpenseTotal } from './expenseLedger';
 
 type Row = Record<string, unknown>;
 
@@ -71,9 +72,7 @@ export const buildBoardViewerGovernanceSummary = (source: GovernanceSourceData) 
   const collected = source.payments
     .filter(isSuccessfulPayment)
     .reduce((sum, row) => sum + numberValue(row.amount, row.paidAmount, row.totalAmount), 0);
-  const expenses = source.expenses
-    .filter(row => !['cancelled', 'canceled', 'rejected'].includes(stringValue(row.status).toLowerCase()))
-    .reduce((sum, row) => sum + numberValue(row.amount, row.totalAmount), 0);
+  const expenses = calculateNetExpenseTotal(source.expenses);
 
   const publishedGrades = source.grades.filter(row =>
     row.published === true || ['published', 'validated'].includes(stringValue(row.status).toLowerCase())

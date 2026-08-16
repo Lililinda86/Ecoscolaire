@@ -3,6 +3,7 @@ export * from './importStudents';
 export * from './academic/bulkAddSubjectsToClasses';
 export * from './boardViewerGovernance';
 export * from './authenticatedAudit';
+export * from './expenseLedger';
 import * as admin from 'firebase-admin';
 import { CampayService } from './services/campayService';
 import * as crypto from 'crypto';
@@ -17,6 +18,7 @@ import {
   resolveStudentFinanceData,
   writeStudentFinanceProjection
 } from './studentFinanceProjection';
+import { calculateNetExpenseTotal } from './expenseLedger';
 
 
 // Initialize the Firebase Admin SDK
@@ -2994,16 +2996,7 @@ export const closeCashDrawer = functions.https.onCall(async (data, context) => {
       .where('date', '==', date);
     const expensesSnap = await transaction.get(expensesQuery);
 
-    let cashExpenses = 0;
-    expensesSnap.forEach(docSnap => {
-      const e = docSnap.data();
-      if (e) {
-        const amt = Number(e.amount) || 0;
-        if (Number.isSafeInteger(amt) && amt > 0) {
-          cashExpenses += amt;
-        }
-      }
-    });
+    const cashExpenses = calculateNetExpenseTotal(expensesSnap.docs.map(docSnap => docSnap.data()));
 
     const theoreticalBalance = openingBalance + cashReceived - cashExpenses;
     const discrepancy = countedBalance - theoreticalBalance;

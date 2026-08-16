@@ -96,6 +96,7 @@ jobs:
           node tests/functions/test-secretary-collection-calculations.cjs
           node tests/functions/test-boardviewer-governance.cjs
           node tests/functions/test-authenticated-audit.cjs
+          node tests/functions/test-expense-ledger.cjs
 
       - name: Emulator Tests
         run: |
