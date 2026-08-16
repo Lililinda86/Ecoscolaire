@@ -13,11 +13,12 @@
     "test:secrets": "node scripts/check-staging-credential-regressions.mjs",
     "test:functions:secure-student": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"vitest run tests/functions/createStudentSecure.spec.ts\"",
     "test:functions:secretary-collections": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"node tests/functions/test-record-cash-payment-privacy.cjs && node tests/functions/test-secretary-collections-emulator.cjs\"",
+    "test:functions:boardviewer-governance": "npm --prefix functions run build && node tests/functions/test-boardviewer-governance.cjs",
     "test:production-workflow": "node --test tests/security/production-deploy-workflow.spec.mjs",
     "test:vercel-build": "node --test tests/security/vercel-build-target.spec.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs --config=playwright.rules.config.ts\"",
+    "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs tests/security/boardviewer-readonly.spec.mjs --config=playwright.rules.config.ts\"",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "seed:staging": "node scripts/setup-test-data.mjs"

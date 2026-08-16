@@ -110,10 +110,10 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 {t('dashboard')}
               </NavLink>
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'accountant', 'boardViewer'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'accountant'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">ACADÉMIQUE</div>
-                  {['superAdmin', 'owner', 'director', 'secretary', 'boardViewer'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
                     <>
                       <NavLink to="/students" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-students">
                         <Users size={20} />
@@ -125,7 +125,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                       </NavLink>
                     </>
                   )}
-                  {['superAdmin', 'owner', 'director', 'teacher', 'secretary', 'boardViewer'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'teacher', 'secretary'].includes(currentUser.role) && (
                     <>
                       <NavLink to="/subjects-program" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-subjects-program">
                         <BookOpen size={20} />
@@ -144,22 +144,22 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'driver', 'boardViewer'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'accountant', 'driver'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">ADMINISTRATION</div>
-                  {['superAdmin', 'owner', 'director', 'secretary', 'boardViewer'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
                     <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-staff">
                       <Briefcase size={20} />
                       {t('staff')}
                     </NavLink>
                   )}
-                  {['superAdmin', 'owner', 'director', 'secretary', 'driver', 'boardViewer'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'secretary', 'driver'].includes(currentUser.role) && (
                     <NavLink to="/buses" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-bus">
                       <BusIcon size={20} />
                       {t('buses')}
                     </NavLink>
                   )}
-                  {['superAdmin', 'owner', 'director', 'accountant', 'secretary', 'boardViewer'].includes(currentUser.role) && (
+                  {['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
                     <NavLink to="/inventory" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-inventory">
                       <Package size={20} />
                       {t('inventory')}
@@ -168,7 +168,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary', 'boardViewer'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">FINANCES</div>
                   <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-payments">
@@ -214,7 +214,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
               
-              {currentUser && ['superAdmin', 'owner', 'director', 'boardViewer'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
                 <>
                   <NavLink to="/validations" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-validations">
                     <ShieldAlert size={20} />
