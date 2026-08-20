@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const {
+  calculateCollectedPaymentTotal,
   calculateNetExpenseTotal,
   handleCreateExpense,
   handleReverseExpense,
@@ -125,6 +126,11 @@ const expectCode = async (operation, code) => assert.rejects(operation, error =>
     { amount: -5000, status: 'REVERSED' },
     { amount: 9000, status: 'DRAFT' },
   ]), 0);
+  assert.equal(calculateCollectedPaymentTotal([
+    { id: 'payment-a', amount: 5000, method: 'cash', status: 'completed' },
+    { amount: -5000, method: 'cash', status: 'completed', kind: 'PAYMENT_REVERSAL', originalPaymentId: 'payment-a' },
+    { amount: -9999, method: 'cash', status: 'completed' },
+  ], 'cash'), 0);
 
   console.log('Expense ledger create/reversal/concurrency/audit/dashboard tests: PASS');
 })().catch(error => {

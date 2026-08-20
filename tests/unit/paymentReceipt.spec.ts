@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReceiptDisplayModel } from '../../src/utils/paymentReceipt';
+import { buildReceiptDisplayModel, isOperationalMobileMoneyProvider } from '../../src/utils/paymentReceipt';
 
 describe('secure collection receipt display model', () => {
   it('renders the immutable financial and transport snapshots stored on the receipt', () => {
@@ -28,5 +28,27 @@ describe('secure collection receipt display model', () => {
     expect(model.benefits).toEqual([expect.objectContaining({
       benefitType: 'DISCOUNT_VOUCHER', reference: 'BON-TEST-001', discountAmount: 1000
     })]);
+  });
+
+  it('fails closed when no operational Mobile Money provider is configured', () => {
+    expect(isOperationalMobileMoneyProvider('campay')).toBe(true);
+    expect(isOperationalMobileMoneyProvider('flutterwave')).toBe(true);
+    expect(isOperationalMobileMoneyProvider('none')).toBe(false);
+    expect(isOperationalMobileMoneyProvider(undefined)).toBe(false);
+  });
+
+  it('identifies an immutable correction receipt and preserves its traceability', () => {
+    const model = buildReceiptDisplayModel({
+      id: 'reversal-1', paymentId: 'reversal-1', receiptNumber: 'ANN-REC-2026-0001',
+      studentId: 'student-1', type: 'tuition', installment: 'T1', amount: -30000,
+      expectedAmount: 60000, previousPaid: 60000, newPaid: 30000, remainingBalance: 30000,
+      kind: 'PAYMENT_REVERSAL', originalPaymentId: 'payment-1', reason: 'Erreur de saisie',
+      correctedByRole: 'owner'
+    }, [], []);
+    expect(model.isCorrection).toBe(true);
+    expect(model.correctionReason).toBe('Erreur de saisie');
+    expect(model.originalPaymentId).toBe('payment-1');
+    expect(model.amount).toBe(-30000);
+    expect(model.collectedByName).toBe('owner');
   });
 });

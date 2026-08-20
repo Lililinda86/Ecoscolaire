@@ -3,7 +3,8 @@ const {
   calculateBenefitAmount,
   calculateBenefits,
   isTransportPeriod,
-  resolveCanonicalClassCycle
+  resolveCanonicalClassCycle,
+  resolvePaymentSchedule
 } = require('../../functions/lib/secretaryCollections');
 
 assert.equal(calculateBenefitAmount(70000, 'FIXED_AMOUNT', 10000), 10000);
@@ -42,5 +43,49 @@ assert.equal(resolveCanonicalClassCycle({ name: '6e', cycle: 'primary' }), 'prim
   'structured cycle must take precedence over the display name');
 assert.equal(resolveCanonicalClassCycle({ name: 'CP', catalogLevelId: 'fr-secondary-6e' }), 'secondary',
   'catalogLevelId must be authoritative when cycle and level are absent');
+
+const deadlineSchool = {
+  paymentDeadlines: {
+    registrationFee: '2026-09-15',
+    tuition: { T1: '2026-09-30', T2: '2027-01-31', T3: '2027-04-30' },
+    transport: { '2026-09': '2026-09-10' }
+  }
+};
+const schedule = overrides => resolvePaymentSchedule({
+  school: deadlineSchool,
+  moratoriums: [],
+  type: 'tuition',
+  installment: 'T1',
+  period: null,
+  today: '2026-09-01',
+  remainingBalance: 40000,
+  ...overrides
+});
+
+assert.deepEqual(schedule({ school: {} }), {
+  originalDueDate: null, effectiveDueDate: null, nextDueDate: null,
+  moratoriumStatus: 'NONE', moratoriumId: null, overdue: false, dueStatus: 'UNCONFIGURED'
+});
+assert.equal(schedule({}).dueStatus, 'NOT_DUE', 'an installment before its due date is not overdue');
+assert.equal(schedule({ today: '2026-10-01' }).dueStatus, 'OVERDUE');
+assert.equal(schedule({ today: '2026-10-01' }).overdue, true);
+const deferred = schedule({
+  today: '2026-10-01',
+  moratoriums: [{
+    id: 'moratorium-test', status: 'approved', paymentType: 'tuition', installment: 'T1',
+    effectiveDueDate: '2026-11-30', reason: 'Report temporaire TEST'
+  }]
+});
+assert.equal(deferred.originalDueDate, '2026-09-30');
+assert.equal(deferred.effectiveDueDate, '2026-11-30');
+assert.equal(deferred.moratoriumStatus, 'ACTIVE');
+assert.equal(deferred.dueStatus, 'NOT_DUE');
+assert.equal(deferred.remainingBalance, undefined, 'schedule logic must not mutate or discount the debt');
+assert.equal(schedule({ today: '2026-12-01', moratoriums: [{
+  id: 'moratorium-test', status: 'approved', paymentType: 'tuition', installment: 'T1',
+  effectiveDueDate: '2026-11-30', reason: 'Report temporaire TEST'
+}] }).moratoriumStatus, 'EXPIRED');
+assert.equal(schedule({ remainingBalance: 0 }).dueStatus, 'PAID');
+assert.equal(schedule({ remainingBalance: 0 }).nextDueDate, null);
 
 console.log('secretary collection calculation tests passed');

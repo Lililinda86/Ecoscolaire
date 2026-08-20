@@ -6,6 +6,7 @@ import fs from 'node:fs';
 let testEnv;
 const schoolA = 'expense-school-a';
 const schoolB = 'expense-school-b';
+const fixture = { testFixture: true, testRunId: 'expense-immutability-local' };
 
 test.beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
@@ -19,17 +20,22 @@ test.beforeEach(async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await Promise.all([
-      setDoc(doc(db, 'users', 'owner-a'), { role: 'owner', schoolId: schoolA, active: true }),
-      setDoc(doc(db, 'users', 'secretary-a'), { role: 'secretary', schoolId: schoolA, active: true }),
-      setDoc(doc(db, 'users', 'board-a'), { role: 'boardViewer', schoolId: schoolA, active: true }),
-      setDoc(doc(db, 'users', 'owner-b'), { role: 'owner', schoolId: schoolB, active: true }),
+      setDoc(doc(db, 'users', 'owner-a'), { role: 'owner', schoolId: schoolA, active: true, ...fixture }),
+      setDoc(doc(db, 'users', 'secretary-a'), { role: 'secretary', schoolId: schoolA, active: true, ...fixture }),
+      setDoc(doc(db, 'users', 'board-a'), { role: 'boardViewer', schoolId: schoolA, active: true, ...fixture }),
+      setDoc(doc(db, 'users', 'owner-b'), { role: 'owner', schoolId: schoolB, active: true, ...fixture }),
       setDoc(doc(db, 'expenses', 'posted-a'), {
         id: 'posted-a', schoolId: schoolA, amount: 5000, date: '2026-08-16', person: 'Vendor',
-        reason: 'Supplies', category: 'SUPPLIES', kind: 'EXPENSE', status: 'POSTED', createdBy: 'owner-a',
+        reason: 'Supplies', category: 'SUPPLIES', kind: 'EXPENSE', status: 'POSTED', createdBy: 'owner-a', ...fixture,
       }),
       setDoc(doc(db, 'payments', 'posted-payment-a'), {
         id: 'posted-payment-a', schoolId: schoolA, studentId: 'student-a', amount: 5000,
-        date: '2026-08-16', method: 'cash', status: 'completed',
+        date: '2026-08-16', method: 'cash', status: 'completed', ...fixture,
+      }),
+      setDoc(doc(db, 'paymentMoratoriums', 'moratorium-a'), {
+        id: 'moratorium-a', schoolId: schoolA, studentId: 'student-a', academicYear: '2026-2027',
+        paymentType: 'tuition', installment: 'T1', status: 'approved',
+        effectiveDueDate: '2026-11-30', reason: 'Report TEST', ...fixture,
       }),
     ]);
   });
@@ -84,4 +90,18 @@ test('posted payments deny direct update and delete without changing authorized 
   await assertFails(deleteDoc(doc(ownerDb, 'payments', 'posted-payment-a')));
   await assertFails(setDoc(doc(ownerDb, 'payments', 'forged-payment'), { schoolId: schoolA, amount: 1 }));
   expect(true).toBe(true);
+});
+
+test('moratoriums are tenant-readable but immutable from every client role', async () => {
+  const ownerDb = testEnv.authenticatedContext('owner-a').firestore();
+  const secretaryDb = testEnv.authenticatedContext('secretary-a').firestore();
+  const otherSchoolDb = testEnv.authenticatedContext('owner-b').firestore();
+  await assertSucceeds(getDoc(doc(ownerDb, 'paymentMoratoriums', 'moratorium-a')));
+  await assertSucceeds(getDoc(doc(secretaryDb, 'paymentMoratoriums', 'moratorium-a')));
+  await assertFails(getDoc(doc(otherSchoolDb, 'paymentMoratoriums', 'moratorium-a')));
+  await assertFails(updateDoc(doc(ownerDb, 'paymentMoratoriums', 'moratorium-a'), { effectiveDueDate: '2027-01-01' }));
+  await assertFails(deleteDoc(doc(ownerDb, 'paymentMoratoriums', 'moratorium-a')));
+  await assertFails(setDoc(doc(ownerDb, 'paymentMoratoriums', 'forged'), {
+    schoolId: schoolA, studentId: 'student-a', ...fixture,
+  }));
 });

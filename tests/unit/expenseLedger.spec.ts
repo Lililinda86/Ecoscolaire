@@ -22,4 +22,13 @@ describe('expense ledger KPI', () => {
       { amount: 5000, method: 'mobile_money', status: 'reversed' },
     ])).toBe(10000);
   });
+
+  it('deducts only canonical payment reversals from cash totals', () => {
+    expect(calculateCollectedPaymentTotal([
+      { amount: 5000, method: 'cash', status: 'completed' },
+      { amount: -5000, method: 'cash', status: 'completed', kind: 'PAYMENT_REVERSAL', originalPaymentId: 'payment-1' },
+      { amount: -9000, method: 'cash', status: 'completed' },
+      { amount: 9000, method: 'cash', status: 'completed', kind: 'PAYMENT_REVERSAL', originalPaymentId: 'payment-2' },
+    ], 'cash')).toBe(0);
+  });
 });
