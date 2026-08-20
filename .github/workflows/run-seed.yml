@@ -74,7 +74,9 @@ jobs:
           STAGING_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
           STAGING_FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: node scripts/test-secretary-collections-staging.mjs
+        run: |
+          node scripts/test-secretary-collections-staging.mjs
+          node scripts/test-secretary-collections-staging-completion.mjs
 
   boardviewer-e2e:
     if: inputs.operation == 'boardviewer-e2e'
