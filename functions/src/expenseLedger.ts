@@ -125,6 +125,24 @@ export const calculateNetExpenseTotal = (rows: Data[]): number => rows.reduce((s
   return typeof amount === 'number' && Number.isSafeInteger(amount) ? sum + amount : sum;
 }, 0);
 
+export const calculateCollectedPaymentTotal = (
+  rows: Data[],
+  method?: 'cash' | 'mobile_money',
+): number => rows.reduce((sum, row) => {
+  const status = typeof row.status === 'string' ? row.status.toLowerCase() : 'completed';
+  if (['pending', 'failed', 'cancelled', 'canceled', 'refunded', 'reversed'].includes(status)) return sum;
+  const paymentMethod = typeof row.method === 'string' ? row.method.toLowerCase() : 'cash';
+  if (method && paymentMethod !== method) return sum;
+  const amount = row.amount;
+  if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount === 0) return sum;
+  if (amount < 0) {
+    return row.kind === 'PAYMENT_REVERSAL' && typeof row.originalPaymentId === 'string'
+      ? sum + amount
+      : sum;
+  }
+  return row.kind === 'PAYMENT_REVERSAL' ? sum : sum + amount;
+}, 0);
+
 export const handleCreateExpense = async (
   raw: unknown,
   auth: Auth,

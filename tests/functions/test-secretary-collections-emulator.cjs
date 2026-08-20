@@ -11,7 +11,8 @@ const {
   closeCashDrawer,
   createFinancialBenefit,
   getCollectionQuote,
-  recordCashPayment
+  recordCashPayment,
+  reversePayment
 } = require('../../functions/lib/index');
 const { makeTuitionDiscountSlotId } = require('../../functions/lib/utils/discountHelpers');
 const { executeCreateStudentSecure } = require('../../functions/lib/studentCreationSecure');
@@ -24,6 +25,7 @@ const studentId = `collections-student-${suffix}`;
 const classId = `collections-class-${suffix}`;
 const secretaryId = `secretary-${suffix}`;
 const ownerId = `owner-${suffix}`;
+const otherOwnerId = `other-owner-${suffix}`;
 const directorId = `director-${suffix}`;
 const inactiveId = `inactive-${suffix}`;
 const crossSchoolId = `cross-school-${suffix}`;
@@ -54,6 +56,9 @@ const quote = (uid, type, extra = {}) => getCollectionQuote.run({
 const pay = (uid, requestId, amount, type, extra = {}) => recordCashPayment.run({
   schoolId, studentId, academicYear, requestId, amount, type, ...extra
 }, context(uid));
+const reverse = (uid, paymentId, requestId, reason) => reversePayment.run({
+  paymentId, requestId, reason
+}, context(uid));
 
 const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit.run({
   schoolId,
@@ -74,6 +79,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   await Promise.all([
     db.collection('users').doc(secretaryId).set({ role: 'secretary', schoolId, isActive: true }),
     db.collection('users').doc(ownerId).set({ role: 'owner', schoolId, isActive: true }),
+    db.collection('users').doc(otherOwnerId).set({ role: 'owner', schoolId: otherSchoolId, isActive: true }),
     db.collection('users').doc(directorId).set({ role: 'director', schoolId, isActive: true }),
     db.collection('users').doc(inactiveId).set({ role: 'secretary', schoolId, isActive: false }),
     db.collection('users').doc(crossSchoolId).set({ role: 'secretary', schoolId: otherSchoolId, isActive: true }),
@@ -81,6 +87,11 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
       name: 'Collections test school', academicYear, activeAcademicYearId: academicYearId,
       active: true, studentsCount: 0, studentLimit: 100,
       subscriptionStatus: 'active', globalFees: { feeT1: 70000, feeT2: 70000, feeT3: 70000, feeTransport: 4000 }
+      , paymentDeadlines: {
+        registrationFee: '2026-09-15',
+        tuition: { T1: '2026-09-30', T2: '2027-01-31', T3: '2027-04-30' },
+        transport: { '2026-09': '2026-09-10', '2026-10': '2026-10-10' }
+      }
     }),
     db.collection('schools').doc(otherSchoolId).set({ name: 'Other school', academicYear, active: true }),
     db.collection('academicYears').doc(academicYearId).set({ schoolId, name: academicYear, status: 'active' }),
@@ -169,9 +180,25 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   assert.equal((await quote(secretaryId, 'registration_fee', {
     studentId: secureStudentId
   })).grossExpectedAmount, 15000);
-  assert.equal((await pay(secretaryId, `secure-registration-${suffix}`, 1000, 'registration_fee', {
+  const secureRegistration = await pay(secretaryId, `secure-registration-${suffix}`, 1000, 'registration_fee', {
     studentId: secureStudentId
-  })).newPaid, 1000);
+  });
+  assert.equal(secureRegistration.newPaid, 1000);
+
+  // A moratorium changes exigibility only; gross/net liability remains unchanged.
+  await db.collection('paymentMoratoriums').doc(`moratorium-${suffix}`).set({
+    id: `moratorium-${suffix}`, schoolId, studentId, academicYear,
+    paymentType: 'tuition', installment: 'T1', status: 'approved',
+    effectiveDueDate: '2026-11-30', reason: 'Moratoire fictif de test',
+    testFixture: true, testRunId: suffix
+  });
+  const moratoriumQuote = await quote(secretaryId, 'tuition', { installment: 'T1' });
+  assert.equal(moratoriumQuote.grossExpectedAmount, 70000);
+  assert.equal(moratoriumQuote.netExpectedAmount, 70000);
+  assert.equal(moratoriumQuote.originalDueDate, '2026-09-30');
+  assert.equal(moratoriumQuote.effectiveDueDate, '2026-11-30');
+  assert.equal(moratoriumQuote.moratoriumStatus, 'ACTIVE');
+  assert.equal(moratoriumQuote.overdue, false);
 
   // Backend transport enforcement covers every mapped secondary label for quote and payment.
   for (const [index, name] of ['6e', 'Form 1', '5e', 'Form 2', '4e', 'Form 3', '3e', 'Form 4'].entries()) {
@@ -440,6 +467,41 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   assert.equal((await db.collection('counters').doc(`receipts_${schoolId}`).get()).data().lastReceiptNumber,
     counterBeforeDuplicate + 1, 'idempotent replay increments the receipt counter once');
 
+  // Owner-only immutable payment reversal, with exact idempotence and tenant isolation.
+  await expectFailure(reverse(secretaryId, secureRegistration.paymentId, `reverse-secretary-${suffix}`, 'Erreur test'), 'PERMISSION_DENIED');
+  await expectFailure(reverse(directorId, secureRegistration.paymentId, `reverse-director-${suffix}`, 'Erreur test'), 'PERMISSION_DENIED');
+  await expectFailure(reverse(otherOwnerId, secureRegistration.paymentId, `reverse-cross-${suffix}`, 'Erreur test'), 'CROSS_SCHOOL_DENIED');
+  await expectFailure(reversePayment.run({
+    paymentId: secureRegistration.paymentId, requestId: `reverse-missing-${suffix}`
+  }, context(ownerId)), 'code:invalid-argument');
+  await expectFailure(reverse(ownerId, secureRegistration.paymentId, `reverse-empty-${suffix}`, ''), 'code:invalid-argument');
+  await expectFailure(reverse(ownerId, secureRegistration.paymentId, `reverse-short-${suffix}`, 'x'), 'code:invalid-argument');
+  await expectFailure(reverse(ownerId, `unknown-payment-${suffix}`, `reverse-unknown-${suffix}`, 'Paiement inconnu'), 'PAYMENT_NOT_FOUND');
+  const originalSecurePayment = (await db.collection('payments').doc(secureRegistration.paymentId).get()).data();
+  const originalSecureReceipt = (await db.collection('receipts').doc(secureRegistration.receiptId).get()).data();
+  const reversalRequest = `reverse-secure-${suffix}`;
+  const secureReversal = await reverse(ownerId, secureRegistration.paymentId, reversalRequest, 'Erreur de saisie fictive');
+  assert.equal(secureReversal.amount, -1000);
+  assert.equal((await reverse(ownerId, secureRegistration.paymentId, reversalRequest, 'Erreur de saisie fictive')).idempotentReplay, true);
+  assert.deepEqual((await db.collection('payments').doc(secureRegistration.paymentId).get()).data(), originalSecurePayment);
+  assert.deepEqual((await db.collection('receipts').doc(secureRegistration.receiptId).get()).data(), originalSecureReceipt);
+  const reversalDoc = (await db.collection('payments').doc(secureReversal.reversalId).get()).data();
+  const correctionReceipt = (await db.collection('receipts').doc(secureReversal.correctionReceiptId).get()).data();
+  assert.equal(reversalDoc.kind, 'PAYMENT_REVERSAL');
+  assert.equal(reversalDoc.originalPaymentId, secureRegistration.paymentId);
+  assert.equal(correctionReceipt.receiptNumber.startsWith('ANN-'), true);
+  assert.equal((await quote(secretaryId, 'registration_fee', { studentId: secureStudentId })).remainingBalance, 15000);
+
+  const duplicatePaymentId = duplicateResults[0].paymentId;
+  const reversalRace = await Promise.allSettled([
+    reverse(ownerId, duplicatePaymentId, `reverse-race-a-${suffix}`, 'Correction concurrente A'),
+    reverse(ownerId, duplicatePaymentId, `reverse-race-b-${suffix}`, 'Correction concurrente B')
+  ]);
+  assert.equal(reversalRace.filter(item => item.status === 'fulfilled').length, 1);
+  assert.equal(reversalRace.filter(item => item.status === 'rejected').length, 1);
+  assert.equal((await db.collection('payments').where('originalPaymentId', '==', duplicatePaymentId).get()).size, 1);
+  assert.equal((await db.collection('receipts').where('originalPaymentId', '==', duplicatePaymentId).get()).size, 1);
+
   // Two concurrent payments cannot both spend the same T2 balance.
   await pay(secretaryId, `t2-prime-${suffix}`, 60000, 'tuition', { installment: 'T2' });
   const concurrent = await Promise.allSettled([
@@ -491,7 +553,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
 
   const auditActions = new Set((await db.collection('audit_logs').where('schoolId', '==', schoolId).get())
     .docs.map(item => item.data().action));
-  for (const action of ['BENEFIT_CREATED', 'BENEFIT_APPROVED', 'BENEFIT_CANCELLED', 'BENEFIT_APPLIED', 'PAYMENT_CREATED', 'TRANSPORT_PAYMENT_CREATED', 'RECEIPT_CREATED']) {
+  for (const action of ['BENEFIT_CREATED', 'BENEFIT_APPROVED', 'BENEFIT_CANCELLED', 'BENEFIT_APPLIED', 'PAYMENT_CREATED', 'TRANSPORT_PAYMENT_CREATED', 'RECEIPT_CREATED', 'PAYMENT_REVERSED', 'PAYMENT_REVERSAL_RECEIPT_CREATED']) {
     assert.equal(auditActions.has(action), true, `missing audit action ${action}`);
   }
 

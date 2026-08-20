@@ -7,6 +7,8 @@ export type PaymentAmountRow = {
   amount?: number;
   status?: string;
   method?: string;
+  kind?: string;
+  originalPaymentId?: string;
 };
 
 export const calculateCollectedPaymentTotal = (
@@ -16,9 +18,13 @@ export const calculateCollectedPaymentTotal = (
   const status = typeof row.status === 'string' ? row.status.toLowerCase() : 'completed';
   if (['pending', 'failed', 'cancelled', 'canceled', 'refunded', 'reversed'].includes(status)) return sum;
   if (method && (row.method || 'cash').toLowerCase() !== method) return sum;
-  return typeof row.amount === 'number' && Number.isSafeInteger(row.amount) && row.amount > 0
-    ? sum + row.amount
-    : sum;
+  if (typeof row.amount !== 'number' || !Number.isSafeInteger(row.amount) || row.amount === 0) return sum;
+  if (row.amount < 0) {
+    return row.kind === 'PAYMENT_REVERSAL' && typeof row.originalPaymentId === 'string'
+      ? sum + row.amount
+      : sum;
+  }
+  return row.kind === 'PAYMENT_REVERSAL' ? sum : sum + row.amount;
 }, 0);
 
 export const calculateNetExpenseTotal = (rows: ExpenseAmountRow[]): number => rows.reduce((sum, row) => {

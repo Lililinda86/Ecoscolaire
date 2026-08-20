@@ -18,7 +18,7 @@ import {
   resolveStudentFinanceData,
   writeStudentFinanceProjection
 } from './studentFinanceProjection';
-import { calculateNetExpenseTotal } from './expenseLedger';
+import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from './expenseLedger';
 
 
 // Initialize the Firebase Admin SDK
@@ -2975,21 +2975,10 @@ export const closeCashDrawer = functions.https.onCall(async (data, context) => {
       .where('date', '==', date);
     const paymentsSnap = await transaction.get(paymentsQuery);
 
-    let cashReceived = 0;
-    paymentsSnap.forEach(docSnap => {
-      const p = docSnap.data();
-      if (p) {
-        const method = p.method ? String(p.method).toLowerCase() : 'cash';
-        const status = p.status ? String(p.status).toLowerCase() : 'completed';
-        const excludedStatuses = ['pending', 'failed', 'cancelled', 'canceled', 'refunded', 'reversed'];
-        if (method === 'cash' && !excludedStatuses.includes(status)) {
-          const amt = Number(p.amount) || 0;
-          if (Number.isSafeInteger(amt) && amt > 0) {
-            cashReceived += amt;
-          }
-        }
-      }
-    });
+    const cashReceived = calculateCollectedPaymentTotal(
+      paymentsSnap.docs.map(docSnap => docSnap.data()),
+      'cash'
+    );
 
     const expensesQuery = db.collection('expenses')
       .where('schoolId', '==', schoolId)
@@ -3054,5 +3043,6 @@ export {
   cancelFinancialBenefit,
   createFinancialBenefit,
   getCollectionQuote,
-  recordCashPayment
+  recordCashPayment,
+  reversePayment
 } from './secretaryCollections';
