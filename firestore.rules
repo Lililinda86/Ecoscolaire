@@ -1529,6 +1529,17 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /paymentMoratoriums/{moratoriumId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary() || isAccountant())
+          && hasSchoolAccess(resource.data.schoolId))
+      );
+      // Un moratoire déplace l'exigibilité sans diminuer la dette. Il est géré
+      // exclusivement par le backend afin de préserver son historique.
+      allow create, update, delete: if false;
+    }
+
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && isActive() && !isBoardViewer() && (
         resource.data.userId == request.auth.uid ||

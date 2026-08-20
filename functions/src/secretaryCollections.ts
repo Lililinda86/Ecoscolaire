@@ -11,6 +11,8 @@ type Installment = 'T1' | 'T2' | 'T3';
 type CanonicalClassCycle = 'nursery' | 'primary' | 'secondary' | 'unknown';
 type BenefitType = 'SCHOLARSHIP' | 'DISCOUNT_VOUCHER' | 'FAMILY_DISCOUNT' | 'EXCEPTIONAL_DISCOUNT';
 type BenefitMode = 'FIXED_AMOUNT' | 'PERCENTAGE';
+type PaymentDueStatus = 'PAID' | 'UNCONFIGURED' | 'NOT_DUE' | 'DUE_TODAY' | 'OVERDUE';
+type MoratoriumStatus = 'NONE' | 'ACTIVE' | 'EXPIRED';
 
 const PAYMENT_ROLES = new Set(['owner', 'director', 'accountant', 'secretary', 'superAdmin']);
 const APPROVAL_ROLES = new Set(['owner', 'director', 'superAdmin']);
@@ -55,6 +57,33 @@ const requireMoney = (value: unknown, field: string, allowZero = false): number 
     throw httpsError('invalid-argument', `${field} must be a safe integer FCFA amount.`, 'INVALID_MONEY');
   }
   return value;
+};
+
+const requireSignedPaymentAmount = (payment: Data): number => {
+  const amount = payment.amount;
+  if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount === 0) {
+    throw httpsError(
+      'failed-precondition',
+      'Historical payment amount is invalid.',
+      'FINANCIAL_HISTORY_INCONSISTENT'
+    );
+  }
+  const isReversal = payment.kind === 'PAYMENT_REVERSAL';
+  if (amount < 0 && (!isReversal || typeof payment.originalPaymentId !== 'string')) {
+    throw httpsError(
+      'failed-precondition',
+      'Negative payment without an immutable reversal reference.',
+      'FINANCIAL_HISTORY_INCONSISTENT'
+    );
+  }
+  if (amount > 0 && isReversal) {
+    throw httpsError(
+      'failed-precondition',
+      'Payment reversal amount must be negative.',
+      'FINANCIAL_HISTORY_INCONSISTENT'
+    );
+  }
+  return amount;
 };
 
 const requireAcademicYear = (value: unknown): string => {
@@ -193,6 +222,117 @@ export const calculateBenefitAmount = (gross: number, mode: BenefitMode, value: 
 const paymentTargetKey = (type: PaymentType, installment: Installment | null, period: string | null): string =>
   type === 'tuition' ? `tuition:${installment}` : type === 'transport' ? `transport:${period}` : 'registration_fee';
 
+const paymentDeadline = (
+  school: Data,
+  type: PaymentType,
+  installment: Installment | null,
+  period: string | null
+): string | null => {
+  const deadlines = school.paymentDeadlines && typeof school.paymentDeadlines === 'object'
+    ? school.paymentDeadlines as Data : {};
+  let value: unknown;
+  if (type === 'registration_fee') {
+    value = deadlines.registrationFee;
+  } else if (type === 'tuition') {
+    const tuition = deadlines.tuition && typeof deadlines.tuition === 'object'
+      ? deadlines.tuition as Data : {};
+    value = installment ? tuition[installment] : null;
+  } else {
+    const transport = deadlines.transport && typeof deadlines.transport === 'object'
+      ? deadlines.transport as Data : {};
+    value = period ? transport[period] : null;
+  }
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !isCalendarDate(value)) {
+    throw httpsError(
+      'failed-precondition',
+      'Payment deadline configuration is invalid.',
+      'PAYMENT_DEADLINE_CORRUPTED'
+    );
+  }
+  return value;
+};
+
+const moratoriumMatchesTarget = (
+  moratorium: Data,
+  type: PaymentType,
+  installment: Installment | null,
+  period: string | null
+): boolean => moratorium.paymentType === type
+  && (type !== 'tuition' || moratorium.installment === installment)
+  && (type !== 'transport' || moratorium.period === period);
+
+export interface PaymentScheduleSnapshot {
+  originalDueDate: string | null;
+  effectiveDueDate: string | null;
+  nextDueDate: string | null;
+  moratoriumStatus: MoratoriumStatus;
+  moratoriumId: string | null;
+  overdue: boolean;
+  dueStatus: PaymentDueStatus;
+}
+
+export const resolvePaymentSchedule = ({
+  school, moratoriums, type, installment, period, today, remainingBalance
+}: {
+  school: Data;
+  moratoriums: Data[];
+  type: PaymentType;
+  installment: Installment | null;
+  period: string | null;
+  today: string;
+  remainingBalance: number;
+}): PaymentScheduleSnapshot => {
+  if (!isCalendarDate(today) || !Number.isSafeInteger(remainingBalance) || remainingBalance < 0) {
+    throw httpsError('failed-precondition', 'Payment schedule input is invalid.', 'PAYMENT_SCHEDULE_INVALID');
+  }
+  const originalDueDate = paymentDeadline(school, type, installment, period);
+  const applicable = moratoriums
+    .filter(item => item.status === 'approved')
+    .filter(item => moratoriumMatchesTarget(item, type, installment, period));
+  if (applicable.length > 1) {
+    throw httpsError(
+      'failed-precondition',
+      'Several active moratoriums target the same payment deadline.',
+      'MORATORIUM_CONFLICT'
+    );
+  }
+  const moratorium = applicable[0] || null;
+  let effectiveDueDate = originalDueDate;
+  if (moratorium) {
+    if (typeof moratorium.id !== 'string' || typeof moratorium.effectiveDueDate !== 'string'
+        || !isCalendarDate(moratorium.effectiveDueDate) || typeof moratorium.reason !== 'string'
+        || !moratorium.reason.trim()) {
+      throw httpsError('failed-precondition', 'Moratorium data is invalid.', 'MORATORIUM_CORRUPTED');
+    }
+    if (originalDueDate && moratorium.effectiveDueDate < originalDueDate) {
+      throw httpsError(
+        'failed-precondition',
+        'A moratorium cannot shorten the original deadline.',
+        'MORATORIUM_CORRUPTED'
+      );
+    }
+    effectiveDueDate = moratorium.effectiveDueDate;
+  }
+  const moratoriumStatus: MoratoriumStatus = !moratorium
+    ? 'NONE' : effectiveDueDate && today <= effectiveDueDate ? 'ACTIVE' : 'EXPIRED';
+  let dueStatus: PaymentDueStatus;
+  if (remainingBalance === 0) dueStatus = 'PAID';
+  else if (!effectiveDueDate) dueStatus = 'UNCONFIGURED';
+  else if (today < effectiveDueDate) dueStatus = 'NOT_DUE';
+  else if (today === effectiveDueDate) dueStatus = 'DUE_TODAY';
+  else dueStatus = 'OVERDUE';
+  return {
+    originalDueDate,
+    effectiveDueDate,
+    nextDueDate: remainingBalance > 0 ? effectiveDueDate : null,
+    moratoriumStatus,
+    moratoriumId: moratorium ? String(moratorium.id) : null,
+    overdue: dueStatus === 'OVERDUE',
+    dueStatus
+  };
+};
+
 const countTransportPeriods = (start: string, end: string): number => {
   const [startYear, startMonth] = start.split('-').map(Number);
   const [endYear, endMonth] = end.split('-').map(Number);
@@ -270,7 +410,7 @@ export interface BenefitSnapshot {
   netExpectedAmount: number;
 }
 
-export interface CollectionQuote {
+export interface CollectionQuote extends PaymentScheduleSnapshot {
   grossExpectedAmount: number;
   discountAmount: number;
   netExpectedAmount: number;
@@ -381,11 +521,13 @@ const paymentMatchesTarget = (
   && isConfirmedPayment(payment);
 
 const buildQuote = ({
-  gross, benefits, payments, schoolId, academicYear, type, installment, period, today
+  gross, benefits, payments, moratoriums, school, schoolId, academicYear, type, installment, period, today
 }: {
   gross: number;
   benefits: Data[];
   payments: Data[];
+  moratoriums: Data[];
+  school: Data;
   schoolId: string;
   academicYear: string;
   type: PaymentType;
@@ -399,12 +541,15 @@ const buildQuote = ({
   for (const payment of payments.filter(item => paymentMatchesTarget(
     item, schoolId, academicYear, type, installment, period
   ))) {
-    previousPaid = safeAdd(previousPaid, requireMoney(payment.amount, 'historical payment amount'), 'previousPaid');
+    previousPaid = safeAdd(previousPaid, requireSignedPaymentAmount(payment), 'previousPaid');
   }
-  if (previousPaid > calculated.netExpectedAmount) {
+  if (previousPaid < 0 || previousPaid > calculated.netExpectedAmount) {
     throw httpsError('failed-precondition', 'Le cumul historique dépasse le montant net dû.', 'FINANCIAL_HISTORY_INCONSISTENT');
   }
   const remainingBalance = calculated.netExpectedAmount - previousPaid;
+  const schedule = resolvePaymentSchedule({
+    school, moratoriums, type, installment, period, today, remainingBalance
+  });
   return {
     grossExpectedAmount: gross,
     discountAmount: calculated.discountAmount,
@@ -412,7 +557,8 @@ const buildQuote = ({
     previousPaid,
     remainingBalance,
     status: remainingBalance === 0 ? 'PAID' : previousPaid > 0 ? 'PARTIAL' : 'UNPAID',
-    benefits: calculated.snapshots
+    benefits: calculated.snapshots,
+    ...schedule
   };
 };
 
@@ -843,6 +989,7 @@ const readQuoteContext = async (
   input: ReturnType<typeof parseQuoteInput>
 ): Promise<{
   user: Data; school: Data; student: Data; finance: Data; benefits: Data[]; payments: Data[];
+  moratoriums: Data[];
   quote: CollectionQuote; classData: Data; financeRef: admin.firestore.DocumentReference;
   financeSnap: admin.firestore.DocumentSnapshot;
 }> => {
@@ -852,9 +999,10 @@ const readQuoteContext = async (
   const financeRef = db.collection('studentFinance').doc(input.studentId);
   const benefitsQuery = db.collection('financialBenefits').where('studentId', '==', input.studentId);
   const paymentsQuery = db.collection('payments').where('studentId', '==', input.studentId);
-  const [userSnap, schoolSnap, studentSnap, financeSnap, benefitsSnap, paymentsSnap] = await Promise.all([
+  const moratoriumsQuery = db.collection('paymentMoratoriums').where('studentId', '==', input.studentId);
+  const [userSnap, schoolSnap, studentSnap, financeSnap, benefitsSnap, paymentsSnap, moratoriumsSnap] = await Promise.all([
     transaction.get(userRef), transaction.get(schoolRef), transaction.get(studentRef), transaction.get(financeRef),
-    transaction.get(benefitsQuery), transaction.get(paymentsQuery)
+    transaction.get(benefitsQuery), transaction.get(paymentsQuery), transaction.get(moratoriumsQuery)
   ]);
   const user = validateActiveUser(userSnap, PAYMENT_ROLES);
   validateTenant(user, input.schoolId);
@@ -892,12 +1040,20 @@ const readQuoteContext = async (
     : [];
   const benefits = [...canonicalBenefits, ...legacyBenefits];
   const payments = paymentsSnap.docs.map(doc => doc.data());
+  const moratoriums = moratoriumsSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }) as Data)
+    .filter(item => item.schoolId === input.schoolId && item.studentId === input.studentId
+      && item.academicYear === input.academicYear);
   const gross = resolveGross(input.type, input.installment, finance, school, bus);
   const quote = buildQuote({
-    gross, benefits, payments, schoolId: input.schoolId, academicYear: input.academicYear,
+    gross, benefits, payments, moratoriums, school,
+    schoolId: input.schoolId, academicYear: input.academicYear,
     type: input.type, installment: input.installment, period: input.period, today: getDoualaDate()
   });
-  return { user, school, student, finance, benefits, payments, quote, classData, financeRef, financeSnap };
+  return {
+    user, school, student, finance, benefits, payments, moratoriums,
+    quote, classData, financeRef, financeSnap
+  };
 };
 
 export const getCollectionQuote = functions.https.onCall(async (raw, context) => {
@@ -915,6 +1071,7 @@ const buildTuitionProjection = (
   school: Data,
   benefits: Data[],
   payments: Data[],
+  moratoriums: Data[],
   schoolId: string,
   academicYear: string,
   today: string,
@@ -928,7 +1085,7 @@ const buildTuitionProjection = (
   for (const installment of ['T1', 'T2', 'T3'] as Installment[]) {
     const gross = resolveGross('tuition', installment, finance, school, null);
     const targetPayments = [...payments, pendingPayment];
-    const quote = buildQuote({ gross, benefits, payments: targetPayments, schoolId, academicYear,
+    const quote = buildQuote({ gross, benefits, payments: targetPayments, moratoriums, school, schoolId, academicYear,
       type: 'tuition', installment, period: null, today });
     grossTotal = safeAdd(grossTotal, gross, 'tuitionExpectedGross');
     discountTotal = safeAdd(discountTotal, quote.discountAmount, 'tuitionDiscountTotal');
@@ -937,7 +1094,10 @@ const buildTuitionProjection = (
     byInstallment[installment] = {
       grossExpectedAmount: gross, discountAmount: quote.discountAmount,
       netExpectedAmount: quote.netExpectedAmount, paidAmount: quote.previousPaid,
-      remainingBalance: quote.remainingBalance, status: quote.status
+      remainingBalance: quote.remainingBalance, status: quote.status,
+      originalDueDate: quote.originalDueDate, effectiveDueDate: quote.effectiveDueDate,
+      nextDueDate: quote.nextDueDate, moratoriumStatus: quote.moratoriumStatus,
+      moratoriumId: quote.moratoriumId, overdue: quote.overdue, dueStatus: quote.dueStatus
     };
   }
   return {
@@ -945,6 +1105,53 @@ const buildTuitionProjection = (
     tuitionDiscountTotal: discountTotal, tuitionExpectedNet: netTotal,
     tuitionPaid: paidTotal, tuitionExpected: netTotal,
     tuitionStatus: paidTotal >= netTotal ? 'paid' : paidTotal > 0 ? 'partial' : 'unpaid'
+  };
+};
+
+const buildTransportProjection = (
+  finance: Data,
+  quote: CollectionQuote,
+  period: string,
+  paidAmount: number
+): Data => {
+  if (!Number.isSafeInteger(paidAmount) || paidAmount < 0 || paidAmount > quote.netExpectedAmount) {
+    throw httpsError(
+      'failed-precondition',
+      'Transport payment projection is invalid.',
+      'FINANCIAL_HISTORY_INCONSISTENT'
+    );
+  }
+  const remainingBalance = quote.netExpectedAmount - paidAmount;
+  const existingPeriods = finance.transportByPeriod && typeof finance.transportByPeriod === 'object'
+    ? finance.transportByPeriod as Data : {};
+  const transportByPeriod = {
+    ...existingPeriods,
+    [period]: {
+      grossExpectedAmount: quote.grossExpectedAmount,
+      discountAmount: quote.discountAmount,
+      netExpectedAmount: quote.netExpectedAmount,
+      paidAmount,
+      remainingBalance,
+      status: remainingBalance === 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID',
+      originalDueDate: quote.originalDueDate,
+      effectiveDueDate: quote.effectiveDueDate,
+      nextDueDate: remainingBalance > 0 ? quote.effectiveDueDate : null,
+      moratoriumStatus: quote.moratoriumStatus,
+      moratoriumId: quote.moratoriumId,
+      overdue: remainingBalance > 0 && quote.overdue,
+      dueStatus: remainingBalance === 0 ? 'PAID' : quote.dueStatus
+    }
+  };
+  const values = Object.values(transportByPeriod) as Data[];
+  const aggregate = (key: string) => values.reduce((sum, value) => safeAdd(
+    sum, typeof value[key] === 'number' ? value[key] as number : 0, key
+  ), 0);
+  return {
+    transportByPeriod,
+    transportExpectedGross: aggregate('grossExpectedAmount'),
+    transportDiscountTotal: aggregate('discountAmount'),
+    transportExpectedNet: aggregate('netExpectedAmount'),
+    transportPaid: aggregate('paidAmount')
   };
 };
 
@@ -994,7 +1201,10 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     }
 
     const contextData = await readQuoteContext(transaction, db, uid, input);
-    const { user, school, student, finance, benefits, payments, quote, classData, financeRef, financeSnap } = contextData;
+    const {
+      user, school, student, finance, benefits, payments, moratoriums,
+      quote, classData, financeRef, financeSnap
+    } = contextData;
     if (quote.remainingBalance <= 0) {
       throw httpsError('failed-precondition', 'Aucun reste à payer.', 'NO_REMAINING_BALANCE');
     }
@@ -1014,6 +1224,11 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     const date = getDoualaDate();
     const nextNumber = safeAdd(lastNumber, 1, 'receipt number');
     const receiptNumber = `REC-${date.slice(0, 4)}-${String(nextNumber).padStart(4, '0')}`;
+    const fixtureSnapshot = student.testFixture === true
+      && typeof student.testRunId === 'string'
+      && /^[A-Za-z0-9_-]{1,128}$/.test(student.testRunId)
+      ? { testFixture: true, testRunId: student.testRunId }
+      : {};
     const commonSnapshot = {
       grossExpectedAmount: quote.grossExpectedAmount,
       discountAmount: quote.discountAmount,
@@ -1022,7 +1237,15 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       previousPaid: quote.previousPaid,
       newPaid,
       remainingBalance,
-      benefits: quote.benefits
+      benefits: quote.benefits,
+      originalDueDate: quote.originalDueDate,
+      effectiveDueDate: quote.effectiveDueDate,
+      nextDueDate: remainingBalance > 0 ? quote.effectiveDueDate : null,
+      moratoriumStatus: quote.moratoriumStatus,
+      moratoriumId: quote.moratoriumId,
+      overdue: remainingBalance > 0 && quote.overdue,
+      dueStatus: remainingBalance === 0 ? 'PAID' : quote.dueStatus,
+      ...fixtureSnapshot
     };
     const paymentData = {
       id: paymentId, paymentId, requestId, requestFingerprint: paymentFingerprint,
@@ -1059,30 +1282,11 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       };
     } else if (input.type === 'tuition') {
       financePatch = buildTuitionProjection(
-        finance, school, benefits, payments, input.schoolId, input.academicYear, date, paymentData
+        finance, school, benefits, payments, moratoriums,
+        input.schoolId, input.academicYear, date, paymentData
       );
     } else {
-      const existingPeriods = finance.transportByPeriod && typeof finance.transportByPeriod === 'object'
-        ? finance.transportByPeriod as Data : {};
-      const transportByPeriod = {
-        ...existingPeriods,
-        [String(input.period)]: {
-          grossExpectedAmount: quote.grossExpectedAmount, discountAmount: quote.discountAmount,
-          netExpectedAmount: quote.netExpectedAmount, paidAmount: newPaid,
-          remainingBalance, status: remainingBalance === 0 ? 'PAID' : 'PARTIAL'
-        }
-      };
-      const values = Object.values(transportByPeriod) as Data[];
-      const aggregate = (key: string) => values.reduce((sum, value) => safeAdd(
-        sum, typeof value[key] === 'number' ? value[key] as number : 0, key
-      ), 0);
-      financePatch = {
-        transportByPeriod,
-        transportExpectedGross: aggregate('grossExpectedAmount'),
-        transportDiscountTotal: aggregate('discountAmount'),
-        transportExpectedNet: aggregate('netExpectedAmount'),
-        transportPaid: aggregate('paidAmount')
-      };
+      financePatch = buildTransportProjection(finance, quote, String(input.period), newPaid);
     }
     writeStudentFinanceProjection({
       transaction, financeRef, financeSnapshot: financeSnap, studentId: input.studentId,
@@ -1130,6 +1334,263 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     return {
       paymentId, receiptId: paymentId, receiptNumber, amount,
       ...commonSnapshot, benefits: quote.benefits, idempotentReplay: false
+    };
+  });
+});
+
+export const reversePayment = functions.https.onCall(async (raw, context) => {
+  if (!context.auth?.uid) {
+    throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
+  }
+  const source = (raw || {}) as Data;
+  const paymentId = requireId(source.paymentId, 'paymentId');
+  const requestId = requireId(source.requestId, 'requestId');
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(requestId)) {
+    throw httpsError('invalid-argument', 'requestId format is invalid.', 'INVALID_REQUEST_ID');
+  }
+  const reason = requireText(source.reason, 'reason', 3, 500);
+  const uid = context.auth.uid;
+  const db = admin.firestore();
+  const reversalId = hashId('payment_reversal', [paymentId]);
+  const reversalFingerprint = crypto.createHash('sha256').update(JSON.stringify({
+    paymentId, requestId, reason
+  }), 'utf8').digest('hex');
+
+  return db.runTransaction(async transaction => {
+    const userRef = db.collection('users').doc(uid);
+    const paymentRef = db.collection('payments').doc(paymentId);
+    const receiptRef = db.collection('receipts').doc(paymentId);
+    const reversalRef = db.collection('payments').doc(reversalId);
+    const correctionReceiptRef = db.collection('receipts').doc(reversalId);
+    const [userSnap, paymentSnap, receiptSnap, reversalSnap, correctionReceiptSnap] = await Promise.all([
+      transaction.get(userRef), transaction.get(paymentRef), transaction.get(receiptRef),
+      transaction.get(reversalRef), transaction.get(correctionReceiptRef)
+    ]);
+
+    const user = validateActiveUser(userSnap, new Set(['owner', 'superAdmin']));
+    if (reversalSnap.exists || correctionReceiptSnap.exists) {
+      if (!reversalSnap.exists || !correctionReceiptSnap.exists) {
+        throw httpsError(
+          'failed-precondition',
+          'Idempotent reversal pair is incomplete.',
+          'IDEMPOTENCY_CORRUPTION'
+        );
+      }
+      const reversal = reversalSnap.data() || {};
+      const correctionReceipt = correctionReceiptSnap.data() || {};
+      if (reversal.requestFingerprint !== reversalFingerprint
+          || correctionReceipt.requestFingerprint !== reversalFingerprint
+          || reversal.originalPaymentId !== paymentId) {
+        throw httpsError(
+          'already-exists',
+          'This payment has already been reversed by another request.',
+          'PAYMENT_ALREADY_REVERSED'
+        );
+      }
+      return {
+        paymentId,
+        reversalId,
+        correctionReceiptId: reversalId,
+        correctionReceiptNumber: correctionReceipt.receiptNumber,
+        amount: reversal.amount,
+        idempotentReplay: true
+      };
+    }
+
+    if (!paymentSnap.exists) {
+      throw httpsError('not-found', 'Payment not found.', 'PAYMENT_NOT_FOUND');
+    }
+    if (!receiptSnap.exists) {
+      throw httpsError(
+        'failed-precondition',
+        'Original receipt is missing.',
+        'PAYMENT_RECEIPT_MISSING'
+      );
+    }
+    const original = paymentSnap.data() || {};
+    const originalReceipt = receiptSnap.data() || {};
+    if (original.kind === 'PAYMENT_REVERSAL' || original.byReversePayment === true
+        || original.byRecordCashPayment !== true || original.method !== 'cash'
+        || original.status !== 'completed') {
+      throw httpsError(
+        'failed-precondition',
+        'Only a completed canonical CASH payment can be reversed.',
+        'PAYMENT_NOT_REVERSIBLE'
+      );
+    }
+    const schoolId = requireId(original.schoolId, 'payment.schoolId');
+    validateTenant(user, schoolId);
+    const studentId = requireId(original.studentId, 'payment.studentId');
+    const academicYear = requireAcademicYear(original.academicYear);
+    const target = requirePaymentTarget(original);
+    const originalAmount = requireMoney(original.amount, 'payment.amount');
+    if (originalReceipt.paymentId !== paymentId || originalReceipt.schoolId !== schoolId
+        || originalReceipt.studentId !== studentId || originalReceipt.amount !== originalAmount) {
+      throw httpsError(
+        'failed-precondition',
+        'Original payment and receipt are inconsistent.',
+        'PAYMENT_RECEIPT_MISMATCH'
+      );
+    }
+
+    const input = parseQuoteInput({ schoolId, studentId, academicYear, ...target });
+    const contextData = await readQuoteContext(transaction, db, uid, input);
+    const {
+      school, student, finance, benefits, payments, moratoriums,
+      quote, classData, financeRef, financeSnap
+    } = contextData;
+    const newPaid = safeAdd(quote.previousPaid, -originalAmount, 'newPaid');
+    if (newPaid < 0) {
+      throw httpsError(
+        'failed-precondition',
+        'Reversal would make the historical paid amount negative.',
+        'FINANCIAL_HISTORY_INCONSISTENT'
+      );
+    }
+    const remainingBalance = quote.netExpectedAmount - newPaid;
+    const date = getDoualaDate();
+    const correctionNumber = `ANN-${String(originalReceipt.receiptNumber || paymentId)}`;
+    const fixtureSnapshot = original.testFixture === true
+      && typeof original.testRunId === 'string'
+      && /^[A-Za-z0-9_-]{1,128}$/.test(original.testRunId)
+      ? { testFixture: true, testRunId: original.testRunId }
+      : {};
+    const reversalData = {
+      id: reversalId,
+      paymentId: reversalId,
+      requestId,
+      requestFingerprint: reversalFingerprint,
+      schoolId,
+      studentId,
+      academicYear,
+      type: target.type,
+      ...(target.installment ? { installment: target.installment } : {}),
+      ...(target.period ? { period: target.period, month: target.period } : {}),
+      amount: -originalAmount,
+      originalAmount,
+      originalPaymentId: paymentId,
+      originalReceiptId: paymentId,
+      reason,
+      description: `Contre-opération: ${reason}`,
+      method: 'cash',
+      status: 'completed',
+      kind: 'PAYMENT_REVERSAL',
+      date,
+      createdBy: uid,
+      createdByRole: user.role,
+      createdAt: FieldValue.serverTimestamp(),
+      byReversePayment: true,
+      grossExpectedAmount: quote.grossExpectedAmount,
+      discountAmount: quote.discountAmount,
+      netExpectedAmount: quote.netExpectedAmount,
+      expectedAmount: quote.netExpectedAmount,
+      previousPaid: quote.previousPaid,
+      newPaid,
+      remainingBalance,
+      benefits: quote.benefits,
+      originalDueDate: quote.originalDueDate,
+      effectiveDueDate: quote.effectiveDueDate,
+      nextDueDate: remainingBalance > 0 ? quote.effectiveDueDate : null,
+      moratoriumStatus: quote.moratoriumStatus,
+      moratoriumId: quote.moratoriumId,
+      overdue: remainingBalance > 0 && quote.overdue,
+      dueStatus: remainingBalance === 0 ? 'PAID' : quote.dueStatus,
+      ...fixtureSnapshot
+    };
+    const correctionReceiptData = {
+      id: reversalId,
+      paymentId: reversalId,
+      requestId,
+      requestFingerprint: reversalFingerprint,
+      receiptNumber: correctionNumber,
+      schoolId,
+      studentId,
+      studentName: student.name || originalReceipt.studentName || '',
+      studentRegistrationNumber: student.matricule || originalReceipt.studentRegistrationNumber || '',
+      classId: student.classId || originalReceipt.classId || '',
+      className: classData.name || originalReceipt.className || '',
+      academicYear,
+      schoolName: school.name || originalReceipt.schoolName || 'EcoScolaire',
+      type: target.type,
+      paymentType: target.type,
+      ...(target.installment ? { installment: target.installment } : {}),
+      ...(target.period ? { period: target.period, month: target.period } : {}),
+      method: 'cash',
+      paymentMethod: 'cash',
+      date,
+      paymentDate: date,
+      amount: -originalAmount,
+      originalAmount,
+      originalPaymentId: paymentId,
+      originalReceiptId: paymentId,
+      reason,
+      kind: 'PAYMENT_REVERSAL',
+      correctedByUserId: uid,
+      correctedByRole: user.role,
+      createdAt: FieldValue.serverTimestamp(),
+      grossExpectedAmount: quote.grossExpectedAmount,
+      discountAmount: quote.discountAmount,
+      netExpectedAmount: quote.netExpectedAmount,
+      expectedAmount: quote.netExpectedAmount,
+      previousPaid: quote.previousPaid,
+      newPaid,
+      remainingBalance,
+      benefits: quote.benefits,
+      originalDueDate: quote.originalDueDate,
+      effectiveDueDate: quote.effectiveDueDate,
+      nextDueDate: remainingBalance > 0 ? quote.effectiveDueDate : null,
+      moratoriumStatus: quote.moratoriumStatus,
+      moratoriumId: quote.moratoriumId,
+      overdue: remainingBalance > 0 && quote.overdue,
+      dueStatus: remainingBalance === 0 ? 'PAID' : quote.dueStatus,
+      ...fixtureSnapshot
+    };
+
+    transaction.create(reversalRef, reversalData);
+    transaction.create(correctionReceiptRef, correctionReceiptData);
+
+    let financePatch: Data;
+    if (target.type === 'registration_fee') {
+      financePatch = {
+        registrationFeePaid: newPaid,
+        registrationFeeStatus: newPaid === 0 ? 'unpaid' : remainingBalance === 0 ? 'paid' : 'partial'
+      };
+    } else if (target.type === 'tuition') {
+      financePatch = buildTuitionProjection(
+        finance, school, benefits, payments, moratoriums,
+        schoolId, academicYear, date, reversalData
+      );
+    } else {
+      financePatch = buildTransportProjection(finance, quote, String(target.period), newPaid);
+    }
+    writeStudentFinanceProjection({
+      transaction,
+      financeRef,
+      financeSnapshot: financeSnap,
+      studentId,
+      schoolId,
+      patch: financePatch,
+      actorId: uid
+    });
+    transaction.create(db.collection('audit_logs').doc(), auditData(
+      'PAYMENT_REVERSED', schoolId, uid, 'PAYMENT', paymentId,
+      { reversalId, correctionReceiptId: reversalId, amount: originalAmount, reason }
+    ));
+    transaction.create(db.collection('audit_logs').doc(), auditData(
+      'PAYMENT_REVERSAL_RECEIPT_CREATED', schoolId, uid, 'RECEIPT', reversalId,
+      { originalPaymentId: paymentId, correctionNumber }
+    ));
+
+    return {
+      paymentId,
+      reversalId,
+      correctionReceiptId: reversalId,
+      correctionReceiptNumber: correctionNumber,
+      amount: -originalAmount,
+      previousPaid: quote.previousPaid,
+      newPaid,
+      remainingBalance,
+      idempotentReplay: false
     };
   });
 });
