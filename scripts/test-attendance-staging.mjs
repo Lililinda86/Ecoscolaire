@@ -143,7 +143,7 @@ const run = async () => {
     assert.equal(profiles.secretary.schoolId, schoolId);
     assert.equal(profiles.teacher.schoolId, schoolId);
     const school = await db.collection('schools').doc(schoolId).get();
-    academicYearId = String(school.data()?.activeAcademicYearId || '');
+    academicYearId = String(school.data()?.activeAcademicYearId || school.data()?.academicYear || '');
     assert.ok(schoolId && academicYearId, 'Canonical school/year pointers are required.');
     const teacherLink = await db.collection('staffUserLinkByUser').doc(profiles.teacher.uid).get();
     assert.equal(teacherLink.exists, true, 'Teacher staff link missing.');

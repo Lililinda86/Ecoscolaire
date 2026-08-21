@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { attendanceDocumentId, handleRecordStudentAttendance } = require('../../functions/lib/studentAttendance.js');
+const { attendanceDocumentId, handleRecordStudentAttendance, resolveAcademicYearId } = require('../../functions/lib/studentAttendance.js');
 
 const users = new Map([
   ['super', { role: 'superAdmin', active: true }],
@@ -67,6 +67,8 @@ const expectCode = (operation, code) => assert.rejects(operation, error => {
 });
 
 (async () => {
+  assert.equal(resolveAcademicYearId({ activeAcademicYearId: 'year-id', academicYear: '2026-2027' }), 'year-id');
+  assert.equal(resolveAcademicYearId({ academicYear: '2026-2027' }), '2026-2027');
   assert.equal(
     attendanceDocumentId('school-a', 'year-a', '2026-08-21', 'student-a'),
     attendanceDocumentId('school-a', 'year-a', '2026-08-21', 'student-a'),
