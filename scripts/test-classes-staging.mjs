@@ -208,15 +208,19 @@ const run = async () => {
     await page.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 20_000 });
 
     const selectDetailedClass = async className => {
-      const picker = page.getByRole('button', { name: /classe.*élève|Choisir une classe/i }).first();
+      const picker = page.locator('button[aria-haspopup="listbox"]').first();
       await picker.click();
-      await page.getByPlaceholder(/Rechercher une classe/i).fill(className);
-      await page.getByRole('option', { name: new RegExp(className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
+      const search = page.getByPlaceholder(/Rechercher une classe/i);
+      await search.fill(className);
+      await page
+        .getByRole('listbox', { name: 'Classes disponibles' })
+        .getByRole('option', { name: new RegExp(className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })
+        .click();
       await page.getByRole('heading', { name: className, exact: true }).waitFor({ timeout: 20_000 });
     };
     const assignThroughUi = async (fromName, targetClassId) => {
       await page.goto(`${appUrl}/#/classes`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: /Gestion des Classes/i }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: /Classes/i }).first().waitFor({ timeout: 20_000 });
       await selectDetailedClass(fromName);
       const row = page.getByRole('row').filter({ hasText: names.student });
       await row.waitFor({ state: 'visible', timeout: 20_000 });
@@ -240,7 +244,7 @@ const run = async () => {
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${appUrl}/#/classes`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: /Gestion des Classes/i }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: /Classes/i }).first().waitFor({ timeout: 20_000 });
       await selectDetailedClass(names.classB);
       const row = page.getByRole('row').filter({ hasText: names.student });
       await row.waitFor({ state: 'visible', timeout: 20_000 });
