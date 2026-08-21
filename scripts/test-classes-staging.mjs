@@ -216,7 +216,7 @@ const run = async () => {
     };
     const assignThroughUi = async (fromName, targetClassId) => {
       await page.goto(`${appUrl}/#/classes`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: /Gestion des Classes/i }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: /Classes.*Vue d'ensemble/i }).waitFor({ timeout: 20_000 });
       await selectDetailedClass(fromName);
       const row = page.getByRole('row').filter({ hasText: names.student });
       await row.waitFor({ state: 'visible', timeout: 20_000 });
@@ -240,7 +240,7 @@ const run = async () => {
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${appUrl}/#/classes`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: /Gestion des Classes/i }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: /Classes.*Vue d'ensemble/i }).waitFor({ timeout: 20_000 });
       await selectDetailedClass(names.classB);
       const row = page.getByRole('row').filter({ hasText: names.student });
       await row.waitFor({ state: 'visible', timeout: 20_000 });
