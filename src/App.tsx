@@ -1,7 +1,5 @@
-import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAppContext } from './context/AppContext';
-import type { DatabasePatch } from './db/storage';
 
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -48,80 +46,6 @@ const RoleAwareDashboard = () => {
 };
 
 function App() {
-  const { db, safePatchDB, currentUser } = useAppContext();
-
-  useEffect(() => {
-    // Ce scrubbing écrit dans Firestore (classes) — restreint aux rôles autorisés à écrire dans classes
-    if (!db?.school || !db?.classes || !db?.students || !db?.staff) return;
-    if (!currentUser || !['superAdmin', 'owner', 'director'].includes(currentUser.role)) return;
-
-    let shouldSave = false;
-    let newClasses = [...db.classes];
-
-    // 1. Scrub Mère -> Maternelle
-    newClasses = newClasses.map(c => {
-      if (c.name.match(/m[èe]re/i)) {
-        shouldSave = true;
-        return { ...c, name: c.name.replace(/m[èe]re/ig, 'Maternelle') };
-      }
-      return c;
-    });
-
-    const standardFranco = ['Maternelle 1', 'Maternelle 2', 'Maternelle 3', 'SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'];
-    const standardAnglo = ['Nursery 1', 'Nursery 2', 'Nursery 3', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6'];
-    
-    const normalize = (name: string) => name.toLowerCase().trim().replace(/m[èe]re/gi, 'maternelle');
-
-    const existingFranco = newClasses.filter(c => c.type === 'francophone').map(c => normalize(c.name));
-    const existingAnglo = newClasses.filter(c => c.type === 'anglophone').map(c => normalize(c.name));
-
-    standardFranco.forEach(name => {
-      if (!existingFranco.includes(normalize(name))) {
-        shouldSave = true;
-        newClasses.push({ id: crypto.randomUUID(), name, type: 'francophone' as const });
-      }
-    });
-
-    standardAnglo.forEach(name => {
-      if (!existingAnglo.includes(normalize(name))) {
-        shouldSave = true;
-        newClasses.push({ id: crypto.randomUUID(), name, type: 'anglophone' as const });
-      }
-    });
-
-    const uniqueClassesMap = new Map<string, string>(); // hash -> id
-    const duplicateClassIdsToRemap = new Map<string, string>(); // oldId -> newId
-    const deduplicatedClasses: typeof newClasses = [];
-
-    newClasses.forEach(c => {
-      const hash = `${c.type}_${normalize(c.name)}`;
-      if (!uniqueClassesMap.has(hash)) {
-        uniqueClassesMap.set(hash, c.id);
-        deduplicatedClasses.push(c);
-      } else {
-        shouldSave = true;
-        duplicateClassIdsToRemap.set(c.id, uniqueClassesMap.get(hash)!);
-      }
-    });
-
-    if (shouldSave) {
-      const patch: DatabasePatch = { classes: deduplicatedClasses };
-      
-      if (duplicateClassIdsToRemap.size > 0) {
-        patch.students = db.students.map((s) => s.classId && duplicateClassIdsToRemap.has(s.classId) 
-          ? { ...s, classId: duplicateClassIdsToRemap.get(s.classId)! } 
-          : s
-        );
-        patch.staff = db.staff.map((s) => s.assignedClassId && duplicateClassIdsToRemap.has(s.assignedClassId)
-          ? { ...s, assignedClassId: duplicateClassIdsToRemap.get(s.assignedClassId)! }
-          : s
-        );
-      }
-
-      safePatchDB(patch);
-    }
-  }, [db?.classes, db?.school, db?.students, db?.staff, safePatchDB, currentUser]);
-
   return (
     <HashRouter>
       <Routes>
