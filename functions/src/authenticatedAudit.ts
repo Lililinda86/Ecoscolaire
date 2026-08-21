@@ -65,6 +65,7 @@ const requirePlainObject = (value: unknown, field: string): Data => {
 
 const requireText = (value: unknown, field: string, max: number): string => {
   if (typeof value !== 'string' || value !== value.trim() || value.length < 1 || value.length > max
+      // eslint-disable-next-line no-control-regex
       || /[\u0000-\u001f\u007f]/.test(value)) {
     throw httpsError('invalid-argument', `${field} is invalid.`);
   }

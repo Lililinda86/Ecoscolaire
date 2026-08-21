@@ -6,6 +6,7 @@ import {
   CheckCircle2, XCircle, FileText, MessageSquare, Briefcase, PlusCircle,
   Users, Bus, AlertTriangle, Activity
 } from 'lucide-react';
+import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from '../utils/expenseLedger';
 
 const formatReasons = (reasons: string[]) => {
   if (reasons.length <= 2) return reasons.join(' · ');
@@ -384,13 +385,11 @@ const Dashboard: React.FC = () => {
     const fuelExpensesList = db?.fuelExpenses || [];
     const maintenancesList = db?.maintenances || [];
 
-    const revenues = paymentsList
-      .filter(p => p && normalizeDateKey(p.date)?.startsWith(currentMonthPrefix) === true)
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const revenues = calculateCollectedPaymentTotal(paymentsList
+      .filter(p => p && normalizeDateKey(p.date)?.startsWith(currentMonthPrefix) === true));
 
-    const exp = expensesList
-      .filter(e => e && normalizeDateKey(e.date)?.startsWith(currentMonthPrefix) === true)
-      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const exp = calculateNetExpenseTotal(expensesList
+      .filter(e => e && normalizeDateKey(e.date)?.startsWith(currentMonthPrefix) === true));
 
     const fuel = fuelExpensesList
       .filter(fe => fe && normalizeDateKey(fe.date)?.startsWith(currentMonthPrefix) === true)

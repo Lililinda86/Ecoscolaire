@@ -3,6 +3,7 @@ export * from './importStudents';
 export * from './academic/bulkAddSubjectsToClasses';
 export * from './boardViewerGovernance';
 export * from './authenticatedAudit';
+export * from './expenseLedger';
 import * as admin from 'firebase-admin';
 import { CampayService } from './services/campayService';
 import * as crypto from 'crypto';
@@ -17,6 +18,7 @@ import {
   resolveStudentFinanceData,
   writeStudentFinanceProjection
 } from './studentFinanceProjection';
+import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from './expenseLedger';
 
 
 // Initialize the Firebase Admin SDK
@@ -2973,37 +2975,17 @@ export const closeCashDrawer = functions.https.onCall(async (data, context) => {
       .where('date', '==', date);
     const paymentsSnap = await transaction.get(paymentsQuery);
 
-    let cashReceived = 0;
-    paymentsSnap.forEach(docSnap => {
-      const p = docSnap.data();
-      if (p) {
-        const method = p.method ? String(p.method).toLowerCase() : 'cash';
-        const status = p.status ? String(p.status).toLowerCase() : 'completed';
-        const excludedStatuses = ['pending', 'failed', 'cancelled', 'canceled', 'refunded', 'reversed'];
-        if (method === 'cash' && !excludedStatuses.includes(status)) {
-          const amt = Number(p.amount) || 0;
-          if (Number.isSafeInteger(amt) && amt > 0) {
-            cashReceived += amt;
-          }
-        }
-      }
-    });
+    const cashReceived = calculateCollectedPaymentTotal(
+      paymentsSnap.docs.map(docSnap => docSnap.data()),
+      'cash'
+    );
 
     const expensesQuery = db.collection('expenses')
       .where('schoolId', '==', schoolId)
       .where('date', '==', date);
     const expensesSnap = await transaction.get(expensesQuery);
 
-    let cashExpenses = 0;
-    expensesSnap.forEach(docSnap => {
-      const e = docSnap.data();
-      if (e) {
-        const amt = Number(e.amount) || 0;
-        if (Number.isSafeInteger(amt) && amt > 0) {
-          cashExpenses += amt;
-        }
-      }
-    });
+    const cashExpenses = calculateNetExpenseTotal(expensesSnap.docs.map(docSnap => docSnap.data()));
 
     const theoreticalBalance = openingBalance + cashReceived - cashExpenses;
     const discrepancy = countedBalance - theoreticalBalance;
@@ -3061,5 +3043,6 @@ export {
   cancelFinancialBenefit,
   createFinancialBenefit,
   getCollectionQuote,
-  recordCashPayment
+  recordCashPayment,
+  reversePayment
 } from './secretaryCollections';

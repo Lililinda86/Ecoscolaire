@@ -39,7 +39,13 @@ export interface ReceiptDisplayModel {
   formattedGrossExpectedAmount: string;
   formattedDiscountAmount: string;
   formattedNetExpectedAmount: string;
+  isCorrection: boolean;
+  correctionReason: string | null;
+  originalPaymentId: string | null;
 }
+
+export const isOperationalMobileMoneyProvider = (provider?: string | null): boolean =>
+  provider === 'campay' || provider === 'flutterwave';
 
 // Centralized Translation Mappings
 export const translatePaymentType = (type?: string): string => {
@@ -155,7 +161,7 @@ export const buildReceiptDisplayModel = (
       ? String(receipt.period || receipt.month || '') || null
       : null,
     method: translatePaymentMethod(receipt.method as string | undefined || receipt.paymentMethod as string | undefined),
-    amount: receipt.amount || 0,
+    amount: receipt.amount ?? 0,
     hasSnapshots,
     expectedAmount: receipt.expectedAmount,
     grossExpectedAmount: receipt.grossExpectedAmount as number | undefined,
@@ -173,10 +179,13 @@ export const buildReceiptDisplayModel = (
     formattedNewPaid: formatCurrency(receipt.newPaid),
     formattedRemainingBalance: formatCurrency(receipt.remainingBalance),
     paymentType: (receipt.type || receipt.paymentType) as string | undefined,
-    collectedByName: receipt.collectedByName as string | undefined,
+    collectedByName: (receipt.collectedByName || receipt.correctedByRole || receipt.correctedByUserId) as string | undefined,
     benefits: Array.isArray(receipt.benefits) ? receipt.benefits as Array<{ benefitType?: string; reference?: string | null; discountAmount?: number }> : [],
     formattedGrossExpectedAmount: formatCurrency(receipt.grossExpectedAmount as number | undefined),
     formattedDiscountAmount: formatCurrency(receipt.discountAmount as number | undefined),
-    formattedNetExpectedAmount: formatCurrency(receipt.netExpectedAmount as number | undefined)
+    formattedNetExpectedAmount: formatCurrency(receipt.netExpectedAmount as number | undefined),
+    isCorrection: receipt.kind === 'PAYMENT_REVERSAL',
+    correctionReason: typeof receipt.reason === 'string' ? receipt.reason : null,
+    originalPaymentId: typeof receipt.originalPaymentId === 'string' ? receipt.originalPaymentId : null
   };
 };

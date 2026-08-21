@@ -165,6 +165,7 @@ const run = async () => {
   let schoolActiveAcademicYearIdBefore = null;
   let academicYearFixtureId = null;
   let secondaryClassFixtureId = null;
+  let mobileMoneyExpected = false;
   const paymentIds = new Set();
   const receiptNumbers = new Set();
   const targetIds = new Set([tuitionBenefitId, transportBenefitId, draftBenefitId]);
@@ -224,6 +225,7 @@ const run = async () => {
     const schoolSnapshot = await db.collection('schools').doc(testSchoolId).get();
     assert.equal(schoolSnapshot.exists, true);
     const school = schoolSnapshot.data() || {};
+    mobileMoneyExpected = ['campay', 'flutterwave'].includes(school.paymentSettings?.activeProvider);
     schoolBeforeData = school;
     schoolActiveAcademicYearIdBefore = typeof school.activeAcademicYearId === 'string'
       && school.activeAcademicYearId && !school.activeAcademicYearId.includes('/')
@@ -337,6 +339,9 @@ const run = async () => {
     assert.equal(creation.academicYearId, activeAcademicYearId);
     const createdStudent = await db.collection('students').doc(studentId).get();
     assert.equal(createdStudent.exists, true);
+    await Promise.all([
+      'students', 'studentPrivate', 'studentFinance', 'studentParentPrivate', 'studentParentFinance',
+    ].map((name) => db.collection(name).doc(studentId).update({ testFixture: true, testRunId: suffix })));
     matriculeReservationId = createdStudent.data()?.matriculeReservationId;
     duplicateReservationId = createdStudent.data()?.duplicateReservationId;
     assert.ok(matriculeReservationId && duplicateReservationId);
@@ -530,6 +535,25 @@ const run = async () => {
     assert.ok(await page.getByRole('button', { name: /Imprimer/i }).count() > 0);
     await page.getByRole('button', { name: /Brouillard de Caisse/i }).click();
     await page.getByText(/Clôture & Brouillard de Caisse/i).waitFor({ timeout: 20_000 });
+    console.log('RESPONSIVE: secretary cash flow at 360, 768 and 1440 pixels');
+    for (const width of [360, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${appUrl}/#/payments`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /Encaissement/i }).first().click();
+      await page.getByTestId('cash-payment-student').selectOption(studentId);
+      await page.getByTestId('cash-payment-amount').waitFor({ state: 'visible' });
+      await page.getByTestId('cash-payment-submit').waitFor({ state: 'visible' });
+      if (!mobileMoneyExpected) {
+        assert.equal(await page.getByTestId('mobile-money-method').count(), 0,
+          `Mobile Money must be hidden at ${width}px when activeProvider=none.`);
+        await page.getByText(/encaissement en espèces uniquement/i).waitFor({ state: 'visible' });
+      }
+      await page.getByRole('button', { name: 'Annuler', exact: true }).click();
+      await page.getByRole('button', { name: 'Reçus', exact: true }).click();
+      await page.getByText(firstReceiptNumber, { exact: true }).waitFor({ timeout: 20_000 });
+      assert.ok(await page.getByRole('button', { name: /Imprimer/i }).count() > 0,
+        `Receipt print action must remain available at ${width}px.`);
+    }
     assertStagingFirebasePrecheck({ runtimeProject, requestUrls: firebaseRequestUrls });
 
     console.log('SECRETARY STAGING AUTH: PASS');

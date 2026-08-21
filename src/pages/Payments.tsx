@@ -6,18 +6,20 @@ import Modal from '../components/Modal';
 import TransactionHistory from '../components/TransactionHistory';
 import ReceiptHistory from '../components/ReceiptHistory';
 import FinanceDashboard from '../components/FinanceDashboard';
-import { Plus, Minus, Wallet, ClipboardList, Trash2, History, FileText, TrendingUp, Lock, Calendar, CheckCircle } from 'lucide-react';
+import { Plus, Minus, Wallet, ClipboardList, Undo2, History, FileText, TrendingUp, Lock, Calendar, CheckCircle } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, setDoc, deleteDoc, runTransaction, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { translatePaymentType, translateInstallment, formatCurrency, translatePaymentMethod } from '../utils/paymentReceipt';
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { formatCurrency, isOperationalMobileMoneyProvider, translateInstallment, translatePaymentMethod, translatePaymentType } from '../utils/paymentReceipt';
 import {
   canUseStudentContactWhatsApp,
   mergeStudentRestrictedData,
   type StudentFinance
 } from '../services/studentPrivacy';
 import FinancialBenefitsPanel from '../components/FinancialBenefitsPanel';
+import { createExpense, reverseExpense } from '../services/expenses';
+import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from '../utils/expenseLedger';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -62,47 +64,6 @@ const getAfricaDoualaDateStr = (dateObj = new Date()): string => {
 
   const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
   return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
-};
-
-const isCashPaymentForSchool = (
-  payment: unknown,
-  schoolId: string
-): boolean => {
-  if (!payment || typeof payment !== 'object' || !schoolId) return false;
-
-  const value = payment as {
-    schoolId?: unknown;
-    method?: unknown;
-    status?: unknown;
-    amount?: unknown;
-  };
-
-  if (String(value.schoolId || '') !== schoolId) return false;
-
-  const method = value.method
-    ? String(value.method).toLowerCase()
-    : 'cash';
-
-  const status = value.status
-    ? String(value.status).toLowerCase()
-    : 'completed';
-
-  const excludedStatuses = [
-    'pending',
-    'failed',
-    'cancelled',
-    'canceled',
-    'refunded',
-    'reversed'
-  ];
-
-  if (method !== 'cash' || excludedStatuses.includes(status)) {
-    return false;
-  }
-
-  const amount = Number(value.amount);
-
-  return Number.isSafeInteger(amount) && amount > 0;
 };
 
 const formatClosureAuthor = (cl: CashClosure, currentUser?: { id?: string; name?: string; displayName?: string; email?: string; role?: string } | null): { name: string; role?: string } => {
@@ -241,6 +202,10 @@ interface PendingAttempt {
   requestId: string;
 }
 
+interface PendingReversalAttempt extends PendingAttempt {
+  paymentId: string;
+}
+
 interface RecordCashPaymentInput {
   requestId: string;
   schoolId: string;
@@ -276,6 +241,25 @@ interface CollectionQuote {
   remainingBalance: number;
   status: 'UNPAID' | 'PARTIAL' | 'PAID';
   benefits: Array<{ benefitId: string; benefitType: string; reference?: string; discountAmount: number }>;
+  originalDueDate: string | null;
+  effectiveDueDate: string | null;
+  nextDueDate: string | null;
+  moratoriumStatus: 'NONE' | 'ACTIVE' | 'EXPIRED';
+  moratoriumId: string | null;
+  dueStatus: 'PAID' | 'UNCONFIGURED' | 'NOT_DUE' | 'DUE_TODAY' | 'OVERDUE';
+  overdue: boolean;
+}
+
+interface ReversePaymentResult {
+  paymentId: string;
+  reversalId: string;
+  correctionReceiptId: string;
+  correctionReceiptNumber: string;
+  amount: number;
+  previousPaid?: number;
+  newPaid?: number;
+  remainingBalance?: number;
+  idempotentReplay: boolean;
 }
 
 const computeSHA256 = async (text: string): Promise<string> => {
@@ -286,7 +270,7 @@ const computeSHA256 = async (text: string): Promise<string> => {
 };
 
 const Payments: React.FC = () => {
-  const { db, updateLocalState, patchLocalEntities, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
+  const { db, patchLocalEntities, currentUser, currentSchool, logAuditAction, isSchoolSuspended } = useAppContext();
   const canUseWhatsApp = canUseStudentContactWhatsApp(currentUser?.role ?? '');
   const { t } = useI18n();
 
@@ -306,6 +290,7 @@ const Payments: React.FC = () => {
   const [quoteRefresh, setQuoteRefresh] = useState(0);
   const [isConfirmingTx, setIsConfirmingTx] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [reversingPaymentId, setReversingPaymentId] = useState<string | null>(null);
   const [pendingAttempt, setPendingAttemptState] = useState<PendingAttempt | null>(() => {
     try {
       const saved = sessionStorage.getItem('ecoscolaire_pending_cash_payment');
@@ -346,9 +331,41 @@ const Payments: React.FC = () => {
       console.warn("sessionStorage is not accessible.");
     }
   };
+  const [pendingReversal, setPendingReversalState] = useState<PendingReversalAttempt | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('ecoscolaire_pending_payment_reversal');
+      if (!saved) return null;
+      const parsed = JSON.parse(saved) as PendingReversalAttempt;
+      return parsed && typeof parsed.paymentId === 'string'
+        && /^[A-Za-z0-9_-]{16,128}$/.test(parsed.requestId || '')
+        && /^[a-f0-9]{64}$/.test(parsed.fingerprintHash || '') ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+  const setPendingReversal = (attempt: PendingReversalAttempt | null) => {
+    setPendingReversalState(attempt);
+    try {
+      if (attempt) sessionStorage.setItem('ecoscolaire_pending_payment_reversal', JSON.stringify(attempt));
+      else sessionStorage.removeItem('ecoscolaire_pending_payment_reversal');
+    } catch {
+      console.warn('sessionStorage is not accessible.');
+    }
+  };
+
+  const mobileMoneyEnabled = isOperationalMobileMoneyProvider(db.school?.paymentSettings?.activeProvider);
+
+  useEffect(() => {
+    if (!mobileMoneyEnabled) {
+      setPaymentMethod('cash');
+      if (activeTab === 'historique-momo' || activeTab === 'finance-momo') {
+        setActiveTab('encaissements');
+      }
+    }
+  }, [activeTab, mobileMoneyEnabled]);
 
   const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
-  const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0] });
+  const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0], category: 'GENERAL' });
   const [receiptToPrint, setReceiptToPrint] = useState<Payment | null>(null);
 
   // --- State pour Clôtures de Caisse ---
@@ -409,12 +426,12 @@ const Payments: React.FC = () => {
       return;
     }
 
-    const cashIn = db.payments
-      .filter(p => p.date === selectedClosureDate && isCashPaymentForSchool(p, currentSchool?.id || ''))
-      .reduce((sum, p) => sum + p.amount, 0);
-    const cashOut = (db.expenses || [])
-      .filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id)
-      .reduce((sum, e) => sum + e.amount, 0);
+    const cashIn = calculateCollectedPaymentTotal(
+      db.payments.filter(p => p.date === selectedClosureDate && String(p.schoolId || '') === currentSchool?.id),
+      'cash'
+    );
+    const cashOut = calculateNetExpenseTotal((db.expenses || [])
+      .filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id));
     const theoretical = opening + cashIn - cashOut;
     const disc = counted - theoretical;
 
@@ -532,7 +549,7 @@ const Payments: React.FC = () => {
   };
 
   const handleOpenExpenseModal = () => {
-    setCurrentExpense({ date: new Date().toISOString().split('T')[0], amount: 0, person: '', reason: '' });
+    setCurrentExpense({ date: new Date().toISOString().split('T')[0], amount: 0, person: '', reason: '', category: 'GENERAL' });
     setExpenseModalOpen(true);
   };
 
@@ -541,6 +558,11 @@ const Payments: React.FC = () => {
     if (!currentPayment.studentId || isSaving) return;
 
     if (paymentMethod === 'mobile_money') {
+      if (!mobileMoneyEnabled) {
+        setPaymentMethod('cash');
+        alert("Mobile Money est désactivé pour cette école. Utilisez uniquement l'encaissement en espèces.");
+        return;
+      }
       let normalizedPhone = (parentPhone || '').replace(/\s+/g, '');
       if (normalizedPhone.startsWith('+')) {
         normalizedPhone = normalizedPhone.substring(1);
@@ -576,9 +598,9 @@ const Payments: React.FC = () => {
         const normalizedAmount = rawAmount;
 
         const initiatePayment = httpsCallable(functions, 'initiatePayment');
-        let provider = db.school?.paymentSettings?.activeProvider;
+        const provider = db.school?.paymentSettings?.activeProvider;
         if (provider !== 'campay' && provider !== 'flutterwave') {
-          provider = 'campay';
+          throw new Error('Aucun fournisseur Mobile Money actif.');
         }
 
         const payload = {
@@ -880,6 +902,7 @@ const Payments: React.FC = () => {
 
     const person = (currentExpense.person || '').trim();
     const reason = (currentExpense.reason || '').trim();
+    const category = (currentExpense.category || '').trim();
     const date = (currentExpense.date || '').trim();
 
     if (!person) {
@@ -888,6 +911,10 @@ const Payments: React.FC = () => {
     }
     if (!reason) {
       alert("Le motif / but de la dépense est requis.");
+      return;
+    }
+    if (!category) {
+      alert("La catégorie est requise.");
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -903,37 +930,14 @@ const Payments: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const canSaveDirectly = rawAmount <= 50000 || ['superAdmin', 'owner'].includes(currentUser.role);
-
-      const expenseObj: Expense = {
-        id: currentExpense.id || crypto.randomUUID(),
+      await createExpense({
         amount: rawAmount,
         date,
         person,
         reason,
-        schoolId: currentSchool.id
-      };
-
-      if (canSaveDirectly) {
-        await setDoc(doc(firestoreDb, 'expenses', expenseObj.id), expenseObj, { merge: true });
-        alert("Dépense enregistrée avec succès.");
-      } else {
-        const reqId = crypto.randomUUID();
-        await setDoc(doc(firestoreDb, 'validation_requests', reqId), {
-          id: reqId,
-          schoolId: currentSchool.id,
-          requesterId: currentUser.id,
-          requesterRole: currentUser.role,
-          actionType: 'HIGH_EXPENSE',
-          targetCollection: 'expenses',
-          targetDocumentId: expenseObj.id,
-          proposedData: expenseObj,
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        }, { merge: true });
-        alert(`Dépense de ${rawAmount} FCFA soumise pour validation au Fondateur.`);
-      }
-
+        category
+      });
+      alert("Dépense enregistrée et publiée avec succès.");
       setExpenseModalOpen(false);
     } catch (err: unknown) {
       const message = getErrorMessage(err);
@@ -941,90 +945,6 @@ const Payments: React.FC = () => {
       alert("Erreur lors de l'enregistrement de la dépense: " + message);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const checkPin = () => {
-    const targetPin = db.school?.adminPin || '0000';
-    const pin = window.prompt("Sécurité : Veuillez entrer le code PIN Administrateur pour valider cette suppression :");
-    return pin === targetPin || pin === '778899';
-  };
-
-  const handleDeletePayment = async (id: string) => {
-    const paymentToDelete = db.payments.find(p => p.id === id);
-    if (paymentToDelete?.byRecordCashPayment) {
-      alert("Paiement sécurisé. Toute correction doit passer par une annulation ou une contre-opération.");
-      return;
-    }
-    if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
-    if (window.confirm('Voulez-vous vraiment supprimer cet encaissement ? Cela annulera le paiement.')) {
-      setIsSaving(true);
-      try {
-        console.log(`[FRONTEND] Deleting payment ${id}`, paymentToDelete);
-
-        await deleteDoc(doc(firestoreDb, 'payments', id));
-        console.log(`[FRONTEND] deleteDoc completed for ${id}`);
-
-        if (paymentToDelete && paymentToDelete.studentId) {
-          const student = db.students.find(s => s.id === paymentToDelete.studentId);
-          console.log(`[FRONTEND] Reactively updating local student state ${paymentToDelete.studentId}`, student);
-
-          if (student) {
-            const remainingPayments = db.payments.filter(p => p.id !== id && p.studentId === paymentToDelete.studentId);
-
-            if (paymentToDelete.type === 'registration_fee') {
-              const newPaid = remainingPayments.filter(p => p.type === 'registration_fee').reduce((sum, p) => sum + (p.amount || 0), 0);
-              const expected = student.registrationFeeExpected ?? 15000;
-              let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-              if (newPaid >= expected) status = 'paid';
-              else if (newPaid > 0) status = 'partial';
-
-              if (db) {
-                const newStudents = db.students.map(s => s.id === student.id ? { ...s, registrationFeePaid: newPaid, registrationFeeStatus: status } : s);
-                updateLocalState({ students: newStudents });
-              }
-            }
-            else if (paymentToDelete.type === 'tuition') {
-              const newPaid = remainingPayments.filter(p => p.type === 'tuition').reduce((sum, p) => sum + (p.amount || 0), 0);
-              const fallbackExpected = (student.feeT1 ?? 0) + (student.feeT2 ?? 0) + (student.feeT3 ?? 0);
-              const expected = student.tuitionExpected ?? fallbackExpected;
-              let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-              if (expected > 0 && newPaid >= expected) status = 'paid';
-              else if (newPaid > 0) status = 'partial';
-
-              if (db) {
-                const newStudents = db.students.map(s => s.id === student.id ? { ...s, tuitionPaid: newPaid, tuitionStatus: status } : s);
-                updateLocalState({ students: newStudents });
-              }
-            }
-            else if (paymentToDelete.type === 'transport') {
-              const newPaid = remainingPayments.filter(p => p.type === 'transport').reduce((sum, p) => sum + (p.amount || 0), 0);
-              if (db) {
-                const newStudents = db.students.map(s => s.id === student.id ? { ...s, transportPaid: newPaid } : s);
-                updateLocalState({ students: newStudents });
-              }
-            }
-          }
-        }
-
-        if (db) {
-          updateLocalState({ payments: db.payments.filter(p => p.id !== id) });
-        }
-
-        logAuditAction({
-          action: 'DELETE_PAYMENT',
-          targetType: 'PAYMENT',
-          targetId: id,
-          targetName: 'Paiement supprimé'
-        });
-
-      } catch (err: unknown) {
-        console.error("[FRONTEND] Error in handleDeletePayment:", err);
-        const message = getErrorMessage(err);
-        alert("Erreur lors de la suppression: " + message);
-      } finally {
-        setIsSaving(false);
-      }
     }
   };
 
@@ -1039,37 +959,6 @@ const Payments: React.FC = () => {
 
       if (data.success) {
         alert(data.message || "Paiement simulé avec succès.");
-
-        await runTransaction(firestoreDb, async (transaction) => {
-          const txRef = doc(firestoreDb, 'transactions', transactionId);
-          const txSnap = await transaction.get(txRef);
-
-          if (!txSnap.exists()) {
-            throw new Error("Transaction introuvable");
-          }
-
-          const txData = txSnap.data();
-          if (txData.status === 'SUCCESS') {
-            return;
-          }
-
-          transaction.update(txRef, { status: 'SUCCESS' });
-
-          if (!data.alreadyConfirmed) {
-            const paymentRef = doc(firestoreDb, 'payments', transactionId);
-            transaction.set(paymentRef, {
-              id: transactionId,
-              schoolId: txData.schoolId,
-              studentId: txData.studentId,
-              amount: txData.amount,
-              type: txData.type,
-              method: 'mobile_money',
-              installment: txData.installment || null,
-              date: new Date().toISOString().split('T')[0],
-              transactionId: transactionId
-            });
-          }
-        });
       } else {
          console.error(`[FRONTEND] Erreur retournée par mockConfirmPayment:`, data);
          alert("Erreur lors de la simulation.");
@@ -1082,31 +971,131 @@ const Payments: React.FC = () => {
     setIsConfirmingTx(null);
   };
 
-  const handleDeleteExpense = async (id: string) => {
+  const handleReverseExpense = async (id: string) => {
     if (isSaving) return;
     const expense = (db.expenses || []).find(e => e.id === id);
     if (!expense || expense.schoolId !== currentSchool?.id) {
       alert("Erreur : Cette dépense n'appartient pas à l'école active.");
       return;
     }
-    if (!checkPin()) { alert("Code PIN incorrect. Annulation."); return; }
-    if (window.confirm("Voulez-vous vraiment annuler cette sortie d'argent ?")) {
-      setIsSaving(true);
-      try {
-        await deleteDoc(doc(firestoreDb, 'expenses', id));
-      } catch (err: unknown) {
-        const message = getErrorMessage(err);
-        alert("Erreur lors de l'annulation: " + message);
-      } finally {
-        setIsSaving(false);
+    if (currentUser?.role !== 'owner' && currentUser?.role !== 'superAdmin') {
+      alert("Seul le propriétaire peut contre-passer une dépense publiée.");
+      return;
+    }
+    if (expense.kind === 'REVERSAL' || expense.status === 'REVERSED') {
+      alert("Une contre-passation ne peut pas être contre-passée.");
+      return;
+    }
+    const reason = window.prompt("Motif obligatoire de la contre-passation :")?.trim();
+    if (!reason) return;
+    if (!window.confirm("Confirmer la contre-passation ? La dépense originale restera immuable.")) return;
+    setIsSaving(true);
+    try {
+      await reverseExpense(id, reason);
+      alert("Contre-passation enregistrée avec succès.");
+    } catch (err: unknown) {
+      alert("Erreur lors de la contre-passation: " + getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReversePayment = async (payment: Payment) => {
+    if (reversingPaymentId || isSaving) return;
+    if (currentUser?.role !== 'owner' && currentUser?.role !== 'superAdmin') {
+      alert("Seul le propriétaire ou le super administrateur peut contre-passer un encaissement.");
+      return;
+    }
+    if (!currentSchool?.id || payment.schoolId !== currentSchool.id) {
+      alert("Cet encaissement n'appartient pas à l'école active.");
+      return;
+    }
+    if (payment.kind === 'PAYMENT_REVERSAL' || payment.byReversePayment === true
+        || payment.byRecordCashPayment !== true || payment.method !== 'cash'
+        || (payment.status && payment.status !== 'completed')) {
+      alert("Cet encaissement n'est pas éligible à une contre-passation.");
+      return;
+    }
+    const reason = window.prompt("Motif obligatoire de la contre-passation (3 caractères minimum) :")?.trim();
+    if (!reason) return;
+    if (reason.length < 3 || reason.length > 500) {
+      alert("Le motif doit contenir entre 3 et 500 caractères.");
+      return;
+    }
+    if (!window.confirm(
+      `Confirmer la contre-passation de ${formatCurrency(payment.amount)} ?\n\n` +
+      "Le paiement et le reçu d'origine resteront immuables. Un reçu correctif distinct sera créé."
+    )) return;
+
+    const fingerprintHash = await computeSHA256(JSON.stringify([payment.id, reason]));
+    let requestId = pendingReversal?.paymentId === payment.id
+      && pendingReversal.fingerprintHash === fingerprintHash
+      ? pendingReversal.requestId : '';
+    if (!requestId) {
+      requestId = crypto.randomUUID();
+      setPendingReversal({ paymentId: payment.id, fingerprintHash, requestId });
+    }
+
+    setReversingPaymentId(payment.id);
+    try {
+      const reversePaymentCall = httpsCallable<
+        { paymentId: string; reason: string; requestId: string },
+        ReversePaymentResult
+      >(functions, 'reversePayment');
+      const result = await reversePaymentCall({ paymentId: payment.id, reason, requestId });
+      const response = result.data;
+      setPendingReversal(null);
+
+      const [reversalSnap, receiptSnap, studentSnap, financeSnap] = await Promise.all([
+        getDoc(doc(firestoreDb, 'payments', response.reversalId)),
+        getDoc(doc(firestoreDb, 'receipts', response.correctionReceiptId)),
+        getDoc(doc(firestoreDb, 'students', payment.studentId)),
+        getDoc(doc(firestoreDb, 'studentFinance', payment.studentId))
+      ]);
+      if (reversalSnap.exists() && receiptSnap.exists() && studentSnap.exists()) {
+        const publicStudent = { id: studentSnap.id, ...studentSnap.data() } as unknown as Student;
+        const financeRecords = financeSnap.exists()
+          ? [{ id: financeSnap.id, ...financeSnap.data() } as unknown as StudentFinance]
+          : [];
+        const [serverStudent] = mergeStudentRestrictedData([publicStudent], [], financeRecords);
+        patchLocalEntities(
+          serverStudent,
+          { id: reversalSnap.id, ...reversalSnap.data() } as unknown as Payment,
+          { id: receiptSnap.id, ...receiptSnap.data() }
+        );
       }
+      setQuoteRefresh(value => value + 1);
+      alert(
+        `Contre-passation enregistrée.\n\nReçu correctif : ${response.correctionReceiptNumber}` +
+        (response.idempotentReplay ? "\nCette demande avait déjà été traitée; aucun doublon n'a été créé." : '')
+      );
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
+      const definitive = [
+        'functions/invalid-argument', 'functions/permission-denied', 'functions/unauthenticated',
+        'functions/not-found', 'functions/failed-precondition', 'functions/already-exists',
+        'invalid-argument', 'permission-denied', 'unauthenticated', 'not-found',
+        'failed-precondition', 'already-exists'
+      ].includes(error.code || '');
+      if (definitive) setPendingReversal(null);
+      alert(definitive
+        ? `Contre-passation refusée : ${getErrorMessage(err)}`
+        : "Le résultat n'a pas pu être confirmé. Réessayez avec le même motif pour conserver la même référence.");
+    } finally {
+      setReversingPaymentId(null);
     }
   };
 
 
-  const totalCashReceived = db.payments.filter(p => isCashPaymentForSchool(p, currentSchool?.id || '')).reduce((sum, p) => sum + p.amount, 0);
-  const totalMoMoReceived = db.payments.filter(p => p.method === 'mobile_money' && String(p.schoolId || '') === currentSchool?.id).reduce((sum, p) => sum + p.amount, 0);
-  const totalExpenses = (db.expenses || []).filter(e => String(e.schoolId || '') === currentSchool?.id).reduce((sum, e) => sum + e.amount, 0);
+  const totalCashReceived = calculateCollectedPaymentTotal(
+    db.payments.filter(p => String(p.schoolId || '') === currentSchool?.id),
+    'cash'
+  );
+  const totalMoMoReceived = calculateCollectedPaymentTotal(
+    db.payments.filter(p => String(p.schoolId || '') === currentSchool?.id),
+    'mobile_money'
+  );
+  const totalExpenses = calculateNetExpenseTotal((db.expenses || []).filter(e => String(e.schoolId || '') === currentSchool?.id));
 
   const soldeTiroirCaisse = totalCashReceived - totalExpenses;
 
@@ -1143,14 +1132,21 @@ const Payments: React.FC = () => {
 
       {receiptToPrint && (
         <div className="print-area">
-          <SchoolDocumentHeader school={currentSchool} documentTitle="Reçu de Paiement" />
+          <SchoolDocumentHeader school={currentSchool} documentTitle={receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'Reçu Correctif' : 'Reçu de Paiement'} />
           <div style={{ marginTop: '2rem', border: '1px solid #ccc', padding: '2rem', borderRadius: '8px' }}>
-            <h2 style={{ color: '#0369a1' }}>Reçu N° {receiptToPrint.id.substring(0, 8).toUpperCase()}</h2>
+            <h2 style={{ color: receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'var(--danger)' : '#0369a1' }}>
+              Reçu N° {findSnapshotReceiptForPayment(receiptToPrint, db.receipts)?.receiptNumber || receiptToPrint.id.substring(0, 8).toUpperCase()}
+            </h2>
             <div style={{ margin: '1rem 0', fontSize: '1.2rem', lineHeight: '1.8' }}>
               <strong>Élève :</strong> {db.students.find(s => s.id === receiptToPrint.studentId)?.name} <br/>
               <strong>Date :</strong> {new Date(receiptToPrint.date).toLocaleDateString('fr-FR')} <br/>
               <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Frais d'inscription" : receiptToPrint.type === 'transport' ? `Transport (${receiptToPrint.month || 'Mensuel'})` : receiptToPrint.type === 'tuition' ? `Scolarité (${receiptToPrint.installment || ''})` : receiptToPrint.type} <br/>
-              <strong>Montant payé :</strong> <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>{receiptToPrint.amount.toLocaleString('fr-FR')} FCFA</span><br/>
+              <strong>{receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'Montant contre-passé' : 'Montant payé'} :</strong> <span style={{ color: receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold' }}>{receiptToPrint.amount.toLocaleString('fr-FR')} FCFA</span><br/>
+              {receiptToPrint.kind === 'PAYMENT_REVERSAL' && <>
+                <strong>Motif de correction :</strong> {receiptToPrint.reason || 'Non renseigné'}<br/>
+                <strong>Paiement original :</strong> {receiptToPrint.originalPaymentId || 'Non renseigné'}<br/>
+                <strong>Acteur autorisé :</strong> {receiptToPrint.createdByRole || receiptToPrint.createdBy || 'Non renseigné'}<br/>
+              </>}
             </div>
             <div style={{ marginTop: '4rem', display: 'flex', justifyContent: 'space-between', color: '#555' }}>
               <div>Signature Client:</div>
@@ -1240,11 +1236,11 @@ const Payments: React.FC = () => {
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', fontWeight: 'bold' }}>{soldeTiroirCaisse.toLocaleString('fr-FR')} FCFA</p>
           <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.5rem' }}>Tous les mouvements cash enregistrés, dépenses déduites</div>
         </div>
-        <div className="card" style={{ background: 'var(--primary-color)', color: '#fff', border: '1px solid #4f46e5', padding: '1.5rem' }}>
+        {mobileMoneyEnabled && <div className="card" style={{ background: 'var(--primary-color)', color: '#fff', border: '1px solid #4f46e5', padding: '1.5rem' }}>
           <h3 style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>📱 Compte Mobile Money</h3>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', fontWeight: 'bold' }}>{totalMoMoReceived.toLocaleString('fr-FR')} FCFA</p>
           <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.5rem' }}>À transférer vers Wise</div>
-        </div>
+        </div>}
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.5rem', background: '#f8f9fa' }}>
           <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--success)' }}><Wallet size={24} /></div>
           <div>
@@ -1258,19 +1254,19 @@ const Payments: React.FC = () => {
         <button className={activeTab === 'encaissements' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'encaissements' ? '' : 'none' }} onClick={() => setActiveTab('encaissements')}>Encaissements</button>
         <button className={activeTab === 'depenses' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'depenses' ? '' : 'none' }} onClick={() => setActiveTab('depenses')}>Dépenses / Sorties</button>
         <button className={activeTab === 'bilan' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'bilan' ? '' : 'none' }} onClick={() => setActiveTab('bilan')}><ClipboardList size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Bilan Scolarité</button>
-        {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+        {mobileMoneyEnabled && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
           <button className={activeTab === 'historique-momo' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-momo' ? '' : 'none' }} onClick={() => setActiveTab('historique-momo')}><History size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Historique MoMo</button>
         )}
         {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
           <button className={activeTab === 'historique-recus' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'historique-recus' ? '' : 'none' }} onClick={() => setActiveTab('historique-recus')}><FileText size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Reçus</button>
         )}
-        {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+        {mobileMoneyEnabled && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
           <button className={activeTab === 'finance-momo' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'finance-momo' ? '' : 'none' }} onClick={() => setActiveTab('finance-momo')}><TrendingUp size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/>Finance Mobile Money</button>
         )}
         <button className={activeTab === 'brouillard' ? '' : 'secondary'} style={{ whiteSpace: 'nowrap', border: activeTab === 'brouillard' ? '' : 'none', background: activeTab === 'brouillard' ? 'var(--warning)' : undefined, color: activeTab === 'brouillard' ? '#000' : undefined }} onClick={() => setActiveTab('brouillard')}>🔒 Brouillard de Caisse</button>
       </div>
 
-      {activeTab === 'historique-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+      {mobileMoneyEnabled && activeTab === 'historique-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
         <TransactionHistory
           transactions={db.transactions || []}
           students={db.students || []}
@@ -1291,7 +1287,7 @@ const Payments: React.FC = () => {
         />
       )}
 
-      {activeTab === 'finance-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
+      {mobileMoneyEnabled && activeTab === 'finance-momo' && currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
         <FinanceDashboard
           payments={db.payments || []}
           transactions={db.transactions || []}
@@ -1303,7 +1299,7 @@ const Payments: React.FC = () => {
 
       {activeTab === 'encaissements' && (
         <>
-        {db.transactions && db.transactions.filter((t: LocalTransaction) => t.status === 'PENDING').length > 0 && (
+        {mobileMoneyEnabled && db.transactions && db.transactions.filter((t: LocalTransaction) => t.status === 'PENDING').length > 0 && (
           <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '2rem', border: '1px solid var(--warning)' }}>
             <div style={{ padding: '1rem', background: '#fffbeb', borderBottom: '1px solid var(--warning)' }}>
               <h3 style={{ margin: 0, color: '#b45309' }}>⏳ Transactions Mobile Money en attente</h3>
@@ -1364,6 +1360,13 @@ const Payments: React.FC = () => {
               ) : (
                 db.payments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => {
                   const student = db.students.find(s => s.id === p.studentId);
+                  const isReversal = p.kind === 'PAYMENT_REVERSAL' || p.byReversePayment === true;
+                  const alreadyReversed = db.payments.some(candidate =>
+                    candidate.kind === 'PAYMENT_REVERSAL' && candidate.originalPaymentId === p.id
+                  );
+                  const canReversePayment = (currentUser.role === 'owner' || currentUser.role === 'superAdmin')
+                    && !isReversal && !alreadyReversed && p.byRecordCashPayment === true
+                    && p.method === 'cash' && (!p.status || p.status === 'completed');
 
                   const typeMap: Record<string, string> = {
                     transport: `Transport (${p.month || 'Mensuel'})`,
@@ -1386,6 +1389,11 @@ const Payments: React.FC = () => {
                       <td style={{ padding: '1rem' }}>{new Date(p.date).toLocaleDateString('fr-FR')}</td>
                       <td style={{ padding: '1rem', fontWeight: 500 }}>{student?.name || 'Inconnu'}</td>
                       <td style={{ padding: '1rem' }}>
+                        {isReversal && (
+                          <div style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '.25rem' }}>
+                            Contre-opération
+                          </div>
+                        )}
                         {typeMap[p.type] || p.type}
                         {p.method === 'mobile_money' ? (
                           <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.4rem', background: 'rgba(249, 115, 22, 0.1)', color: '#f97316', fontSize: '0.75em', borderRadius: '4px' }}>📱 {translatePaymentMethod(p.method)}</span>
@@ -1393,9 +1401,14 @@ const Payments: React.FC = () => {
                           <span style={{ marginLeft: '0.5rem', padding: '0.1rem 0.4rem', background: '#e5e7eb', color: '#374151', fontSize: '0.75em', borderRadius: '4px' }}>💵 {translatePaymentMethod(p.method)}</span>
                         )}
                         {p.type === 'other' && p.description && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{p.description}</div>}
+                        {isReversal && (
+                          <div style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginTop: '.25rem' }}>
+                            Motif : {p.reason || 'Non renseigné'} · Autorisé par : {p.createdByRole || p.createdBy || 'acteur autorisé'}
+                          </div>
+                        )}
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--success)' }}>
-                        + {p.amount.toLocaleString('fr-FR')} FCFA
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: p.amount < 0 ? 'var(--danger)' : 'var(--success)' }}>
+                        {p.amount > 0 ? '+ ' : ''}{p.amount.toLocaleString('fr-FR')} FCFA
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'right', color: remainingText === 'Soldé ✓' ? 'var(--success)' : 'var(--danger)', fontWeight: 500, fontSize: '0.9rem' }}>
                         {remainingText}
@@ -1405,12 +1418,21 @@ const Payments: React.FC = () => {
                           <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => { setReceiptToPrint(p); setTimeout(() => window.print(), 100); }} title="Imprimer Reçu">
                             🖨️
                           </button>
-                          {!p.byRecordCashPayment ? (
-                            <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeletePayment(p.id)} title="Supprimer">
-                              <Trash2 size={14} />
+                          {canReversePayment ? (
+                            <button
+                              type="button"
+                              className="secondary"
+                              style={{ padding: '0.25rem 0.5rem', color: 'var(--danger)' }}
+                              onClick={() => handleReversePayment(p)}
+                              disabled={reversingPaymentId !== null}
+                              title="Créer une contre-opération immuable"
+                            >
+                              <Undo2 size={15} /> {reversingPaymentId === p.id ? 'Traitement…' : 'Contre-passer'}
                             </button>
                           ) : (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sécurisé</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                              {alreadyReversed ? 'Contre-passé' : 'Immuable'}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -1440,18 +1462,21 @@ const Payments: React.FC = () => {
               {(!db.expenses || db.expenses.length === 0) ? (
                 <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucune dépense enregistrée</td></tr>
               ) : (
-                db.expenses.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(e => (
+                [...db.expenses].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(e => (
                   <tr key={e.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '1rem' }}>{new Date(e.date).toLocaleDateString('fr-FR')}</td>
                     <td style={{ padding: '1rem', fontWeight: 500 }}>{e.reason}</td>
                     <td style={{ padding: '1rem' }}>{e.person}</td>
                     <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--danger)' }}>
-                      - {e.amount.toLocaleString('fr-FR')} FCFA
+                      {e.amount < 0 ? '+' : '-'} {Math.abs(e.amount).toLocaleString('fr-FR')} FCFA
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleDeleteExpense(e.id)} title="Annuler">
-                          <Trash2 size={14} />
-                        </button>
+                        {currentUser?.role === 'owner' && e.kind !== 'REVERSAL' && e.status !== 'REVERSED'
+                          && !db.expenses.some(entry => entry.originalExpenseId === e.id) ? (
+                          <button className="danger" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleReverseExpense(e.id)} title="Contre-passer">
+                            <Undo2 size={14} />
+                          </button>
+                        ) : <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Immuable</span>}
                     </td>
                   </tr>
                 ))
@@ -1732,10 +1757,10 @@ const Payments: React.FC = () => {
                 );
               }
 
-              const cashPaymentsDate = db.payments.filter(p => p.date === selectedClosureDate && isCashPaymentForSchool(p, currentSchool?.id || ''));
+              const cashPaymentsDate = db.payments.filter(p => p.date === selectedClosureDate && String(p.schoolId || '') === currentSchool?.id);
               const expensesDate = (db.expenses || []).filter(e => e.date === selectedClosureDate && String(e.schoolId || '') === currentSchool?.id);
-              const cashIn = cashPaymentsDate.reduce((sum, p) => sum + p.amount, 0);
-              const cashOut = expensesDate.reduce((sum, e) => sum + e.amount, 0);
+              const cashIn = calculateCollectedPaymentTotal(cashPaymentsDate, 'cash');
+              const cashOut = calculateNetExpenseTotal(expensesDate);
 
               const opening = typeof openingBalanceInput === 'number' ? openingBalanceInput : Number(String(openingBalanceInput || 0).trim());
               const counted = typeof countedBalanceInput === 'number' ? countedBalanceInput : (countedBalanceInput === '' ? 0 : Number(countedBalanceInput));
@@ -1888,7 +1913,7 @@ const Payments: React.FC = () => {
               const dateSet = new Set<string>();
 
               (db.payments || []).forEach(p => {
-                if (isCashPaymentForSchool(p, currentSchool?.id || '') && p.date) {
+                if (String(p.schoolId || '') === currentSchool?.id && p.method === 'cash' && p.date) {
                   if (p.date >= synthesisStartDate && p.date <= synthesisEndDate) {
                     dateSet.add(p.date);
                   }
@@ -1960,10 +1985,10 @@ const Payments: React.FC = () => {
                           discrepancyText = `${existingClosure.discrepancy.toLocaleString('fr-FR')} FCFA`;
                           hasDiscrepancy = existingClosure.discrepancy !== 0;
                         } else {
-                          const pList = (db.payments || []).filter(p => p.date === dateStr && isCashPaymentForSchool(p, currentSchool?.id || ''));
+                          const pList = (db.payments || []).filter(p => p.date === dateStr && String(p.schoolId || '') === currentSchool?.id);
                           const eList = (db.expenses || []).filter(e => e.date === dateStr && String(e.schoolId || '') === currentSchool?.id);
-                          cashReceived = pList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                          cashExpenses = eList.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                          cashReceived = calculateCollectedPaymentTotal(pList, 'cash');
+                          cashExpenses = calculateNetExpenseTotal(eList);
                         }
 
                         totalEncaissementsPeriode += cashReceived;
@@ -2158,7 +2183,7 @@ const Payments: React.FC = () => {
         <form onSubmit={handleSavePayment}>
           <div className="form-group">
             <label>Élève</label>
-            <select required value={currentPayment.studentId || ''} onChange={e => setCurrentPayment({...currentPayment, studentId: e.target.value})}>
+            <select data-testid="cash-payment-student" required value={currentPayment.studentId || ''} onChange={e => setCurrentPayment({...currentPayment, studentId: e.target.value})}>
               <option value="">-- Choisir un élève --</option>
               {db.students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.section})</option>)}
             </select>
@@ -2245,13 +2270,32 @@ const Payments: React.FC = () => {
                 </div>
               )}
               {collectionQuote && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '.5rem', padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
-                  <div><small>Montant brut</small><br/><strong>{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
-                  <div><small>Bourse / réduction</small><br/><strong>- {formatCurrency(collectionQuote.discountAmount)}</strong></div>
-                  <div><small>Montant net dû</small><br/><strong>{formatCurrency(collectionQuote.netExpectedAmount)}</strong></div>
-                  <div><small>Déjà payé</small><br/><strong>{formatCurrency(collectionQuote.previousPaid)}</strong></div>
-                  <div><small>Reste à payer</small><br/><strong>{formatCurrency(collectionQuote.remainingBalance)}</strong></div>
-                  <div><small>Statut</small><br/><strong>{collectionQuote.status === 'PAID' ? 'SOLDÉ' : collectionQuote.status === 'PARTIAL' ? 'PARTIEL' : 'NON PAYÉ'}</strong></div>
+                <div style={{ padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '.75rem' }}>
+                    <div><small>Tarif de référence</small><br/><strong>{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
+                    <div><small>Bourse / réduction applicable</small><br/><strong>- {formatCurrency(collectionQuote.discountAmount)}</strong></div>
+                    <div><small>Montant réellement dû</small><br/><strong>{formatCurrency(collectionQuote.netExpectedAmount)}</strong></div>
+                    <div><small>Sommes déjà versées</small><br/><strong>{formatCurrency(collectionQuote.previousPaid)}</strong></div>
+                    <div><small>Reste à payer</small><br/><strong>{formatCurrency(collectionQuote.remainingBalance)}</strong></div>
+                    <div><small>Statut de paiement</small><br/><strong>{collectionQuote.status === 'PAID' ? 'SOLDÉ' : collectionQuote.status === 'PARTIAL' ? 'PARTIEL' : 'NON PAYÉ'}</strong></div>
+                    <div><small>Échéance initiale</small><br/><strong>{collectionQuote.originalDueDate ? formatIsoDateFr(collectionQuote.originalDueDate) : 'Non configurée'}</strong></div>
+                    <div><small>Échéance effective</small><br/><strong>{collectionQuote.effectiveDueDate ? formatIsoDateFr(collectionQuote.effectiveDueDate) : 'Non configurée'}</strong></div>
+                    <div><small>Moratoire</small><br/><strong>{collectionQuote.moratoriumStatus === 'ACTIVE' ? 'ACTIF — dette inchangée' : collectionQuote.moratoriumStatus === 'EXPIRED' ? 'EXPIRÉ' : 'AUCUN'}</strong></div>
+                    <div><small>Prochaine échéance</small><br/><strong>{collectionQuote.nextDueDate ? formatIsoDateFr(collectionQuote.nextDueDate) : 'Aucune'}</strong></div>
+                    <div><small>Exigibilité réelle</small><br/><strong style={{ color: collectionQuote.overdue ? 'var(--danger)' : 'inherit' }}>
+                      {collectionQuote.dueStatus === 'OVERDUE' ? 'EN RETARD' : collectionQuote.dueStatus === 'DUE_TODAY' ? "ÉCHÉANCE AUJOURD'HUI" : collectionQuote.dueStatus === 'NOT_DUE' ? 'PAS ENCORE EXIGIBLE' : collectionQuote.dueStatus === 'PAID' ? 'SOLDÉ' : 'ÉCHÉANCE NON CONFIGURÉE'}
+                    </strong></div>
+                  </div>
+                  {collectionQuote.benefits.length > 0 && (
+                    <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid var(--border-color)' }}>
+                      <small>Détail des avantages conservés dans le calcul</small>
+                      {collectionQuote.benefits.map(benefit => (
+                        <div key={benefit.benefitId} style={{ fontSize: '.85rem' }}>
+                          • {benefit.benefitType}{benefit.reference ? ` (${benefit.reference})` : ''} : - {formatCurrency(benefit.discountAmount)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2277,6 +2321,7 @@ const Payments: React.FC = () => {
               step={1}
               inputMode="numeric"
               autoComplete="off"
+              data-testid="cash-payment-amount"
               required
               value={currentPayment.amount ?? ''}
               onChange={e => setCurrentPayment({...currentPayment, amount: e.target.value as unknown as number})}
@@ -2312,7 +2357,7 @@ const Payments: React.FC = () => {
                 <input type="radio" name="method" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} style={{ margin: 0 }} />
                 💵 Espèces
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 1rem', background: paymentMethod === 'mobile_money' ? '#fff' : 'transparent', border: paymentMethod === 'mobile_money' ? '1px solid #f97316' : '1px solid transparent', borderRadius: '4px', boxShadow: paymentMethod === 'mobile_money' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+              {mobileMoneyEnabled && <label data-testid="mobile-money-method" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 1rem', background: paymentMethod === 'mobile_money' ? '#fff' : 'transparent', border: paymentMethod === 'mobile_money' ? '1px solid #f97316' : '1px solid transparent', borderRadius: '4px', boxShadow: paymentMethod === 'mobile_money' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
                 <input type="radio" name="method" checked={paymentMethod === 'mobile_money'} onChange={() => setPaymentMethod('mobile_money')} disabled={currentPayment.type === 'transport'} style={{ margin: 0 }} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ color: '#ea580c', fontWeight: paymentMethod === 'mobile_money' ? 600 : 400 }}>📱 Mobile Money (En Ligne)</span>
@@ -2321,8 +2366,13 @@ const Payments: React.FC = () => {
                     <span style={{ fontSize: '0.7rem', background: '#ffcc00', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>MTN MoMo</span>
                   </div>
                 </div>
-              </label>
+              </label>}
             </div>
+            {!mobileMoneyEnabled && (
+              <div style={{ marginTop: '.75rem', color: 'var(--text-muted)', fontSize: '.85rem' }}>
+                Mode ITALO actif : encaissement en espèces uniquement. Aucun fournisseur Mobile Money n'est configuré.
+              </div>
+            )}
           </div>
 
           {paymentMethod === 'mobile_money' && (
@@ -2362,6 +2412,7 @@ const Payments: React.FC = () => {
             <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isProcessingMoMo || momoSuccess || isSaving}>Annuler</button>
             <button
               type="submit"
+              data-testid="cash-payment-submit"
               disabled={isProcessingMoMo || momoSuccess || isSaving
                 || (paymentMethod === 'cash' && (!collectionQuote || collectionQuote.remainingBalance <= 0))}
               style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)' }}
@@ -2388,6 +2439,16 @@ const Payments: React.FC = () => {
           <div className="form-group">
             <label>Motif / But de la dépense</label>
             <input required placeholder="ex: Achat de craie, Réparation de porte..." value={currentExpense.reason || ''} onChange={e => setCurrentExpense({...currentExpense, reason: e.target.value})} />
+          </div>
+          <div className="form-group">
+            <label>Catégorie</label>
+            <select required value={currentExpense.category || 'GENERAL'} onChange={e => setCurrentExpense({...currentExpense, category: e.target.value})}>
+              <option value="GENERAL">Général</option>
+              <option value="SUPPLIES">Fournitures</option>
+              <option value="MAINTENANCE">Maintenance</option>
+              <option value="SERVICES">Services</option>
+              <option value="OTHER">Autre</option>
+            </select>
           </div>
           <div className="form-group">
             <label>Auteur / Personne impliquée</label>

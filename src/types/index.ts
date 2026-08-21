@@ -68,6 +68,11 @@ export interface School {
     t2?: number;
     t3?: number;
   }>;
+  paymentDeadlines?: {
+    registrationFee?: string;
+    tuition?: Partial<Record<'T1' | 'T2' | 'T3', string>>;
+    transport?: Record<string, string>;
+  };
   transportPolicy?: {
     secretaryManageAll?: boolean;
   };
@@ -564,6 +569,13 @@ export interface FinancialPeriodSummary {
   paidAmount: number;
   remainingBalance: number;
   status: 'UNPAID' | 'PARTIAL' | 'PAID';
+  originalDueDate?: string;
+  effectiveDueDate?: string;
+  nextDueDate?: string;
+  moratoriumStatus?: 'NONE' | 'ACTIVE' | 'EXPIRED';
+  moratoriumId?: string;
+  dueStatus?: 'PAID' | 'UNCONFIGURED' | 'NOT_DUE' | 'DUE_TODAY' | 'OVERDUE';
+  overdue?: boolean;
 }
 
 export type FinancialBenefitType =
@@ -663,6 +675,14 @@ export interface Payment {
   createdBy?: string;
   createdAt?: DateLike;
   requestId?: string;
+  status?: string;
+  kind?: 'PAYMENT' | 'PAYMENT_REVERSAL';
+  originalPaymentId?: string;
+  originalReceiptId?: string;
+  originalAmount?: number;
+  reason?: string;
+  byReversePayment?: boolean;
+  createdByRole?: GlobalRole;
   byRecordCashPayment?: boolean;
   grossExpectedAmount?: number;
   discountAmount?: number;
@@ -705,6 +725,14 @@ export interface Expense {
   date: string;
   person: string;
   reason: string;
+  category?: string;
+  kind?: 'EXPENSE' | 'REVERSAL';
+  status?: 'DRAFT' | 'POSTED' | 'REVERSED';
+  originalExpenseId?: string;
+  originalAmount?: number;
+  createdBy?: string;
+  createdByRole?: string;
+  createdAt?: DateLike;
 }
 
 export interface InventoryItem {

@@ -24,7 +24,7 @@ const Setup: React.FC = () => {
       schoolCode: `ECO-${Math.floor(Math.random() * 10000)}`,
       name: schoolName,
       academicYear: `${new Date().getFullYear()} - ${new Date().getFullYear() + 1}`,
-      adminPin: adminPin || '0000',
+      ...(adminPin.trim() ? { adminPin: adminPin.trim() } : {}),
       createdAt: new Date().toISOString()
     };
     

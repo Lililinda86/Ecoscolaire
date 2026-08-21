@@ -370,6 +370,11 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <FileText size={16} />
                           {displayModel.receiptNumber}
+                          {displayModel.isCorrection && (
+                            <span style={{ fontSize: '.7rem', color: '#b91c1c', background: '#fee2e2', borderRadius: 4, padding: '.15rem .35rem' }}>
+                              CORRECTIF
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td style={{ padding: '1rem' }}>
@@ -377,7 +382,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                       </td>
                       <td style={{ padding: '1rem', fontWeight: 500 }}>{displayModel.studentName}</td>
                       <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{displayModel.paymentId}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold' }}>{displayModel.formattedAmount}</td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: displayModel.isCorrection ? 'var(--danger)' : undefined }}>{displayModel.formattedAmount}</td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                           <button
@@ -418,6 +423,13 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                       <tr style={{ background: '#f8fafc' }}>
                         <td colSpan={7} style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                            {displayModel.isCorrection && (
+                              <div style={{ gridColumn: '1 / -1', padding: '.75rem', background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>
+                                <strong>Contre-opération immuable</strong><br />
+                                Motif : {displayModel.correctionReason || 'Non renseigné'}<br />
+                                Paiement original : {displayModel.originalPaymentId || 'Non renseigné'}
+                              </div>
+                            )}
                             <div>
                               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nature / Tranche</div>
                               <div style={{ fontWeight: 500 }}>
@@ -468,8 +480,8 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                                   <div style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>{displayModel.formattedPreviousPaid}</div>
                                 </div>
                                 <div>
-                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Versement actuel</div>
-                                  <div style={{ fontWeight: 'bold', color: 'var(--success)' }}>+ {displayModel.formattedAmount}</div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{displayModel.isCorrection ? 'Contre-opération' : 'Versement actuel'}</div>
+                                  <div style={{ fontWeight: 'bold', color: displayModel.isCorrection ? 'var(--danger)' : 'var(--success)' }}>{displayModel.isCorrection ? '' : '+ '}{displayModel.formattedAmount}</div>
                                 </div>
                                 <div>
                                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cumul après versement</div>

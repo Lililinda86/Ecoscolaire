@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Download, TrendingUp, AlertTriangle, FileText, CheckCircle, Clock } from 'lucide-react';
 import type { Payment, Student, School } from '../types';
 import ReceiptAudit from './ReceiptAudit';
+import { calculateCollectedPaymentTotal } from '../utils/expenseLedger';
 
 type DateLike =
   | string
@@ -99,8 +100,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ payments, transacti
   }, [payments, transactions, receipts, period]);
 
   const kpis = useMemo(() => {
-    const totalCash = filteredPayments.filter(p => p.method === 'cash').reduce((sum, p) => sum + p.amount, 0);
-    const totalMomo = filteredPayments.filter(p => p.method === 'mobile_money').reduce((sum, p) => sum + p.amount, 0);
+    const totalCash = calculateCollectedPaymentTotal(filteredPayments, 'cash');
+    const totalMomo = calculateCollectedPaymentTotal(filteredPayments, 'mobile_money');
 
     const txSuccess = filteredTransactions.filter(t => t.status === 'SUCCESS').length;
     const txPending = filteredTransactions.filter(t => t.status === 'PENDING').length;

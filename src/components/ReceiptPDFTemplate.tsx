@@ -46,7 +46,9 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <h2 style={{ margin: 0, color: '#374151', fontSize: '20pt', textTransform: 'uppercase' }}>REÇU DE PAIEMENT</h2>
+            <h2 style={{ margin: 0, color: displayModel.isCorrection ? '#b91c1c' : '#374151', fontSize: '20pt', textTransform: 'uppercase' }}>
+              {displayModel.isCorrection ? 'REÇU CORRECTIF' : 'REÇU DE PAIEMENT'}
+            </h2>
             <p style={{ margin: '0.5rem 0 0 0', fontWeight: 'bold', fontSize: '12pt', color: '#dc2626' }}>
               N° {displayModel.receiptNumber}
             </p>
@@ -60,6 +62,14 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
             )}
           </div>
         </div>
+
+        {displayModel.isCorrection && (
+          <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 4 }}>
+            <strong>Contre-opération immuable</strong><br />
+            Motif : {displayModel.correctionReason || 'Non renseigné'}<br />
+            Paiement original : {displayModel.originalPaymentId || 'Non renseigné'}
+          </div>
+        )}
 
         {/* Body */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
@@ -87,7 +97,7 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
             <tr style={{ background: '#f3f4f6' }}>
               <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #d1d5db', fontSize: '11pt' }}>Nature du Paiement</th>
               <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #d1d5db', fontSize: '11pt' }}>Méthode</th>
-              <th style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '2px solid #d1d5db', fontSize: '11pt' }}>Versement actuel</th>
+              <th style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '2px solid #d1d5db', fontSize: '11pt' }}>{displayModel.isCorrection ? 'Contre-opération' : 'Versement actuel'}</th>
             </tr>
           </thead>
           <tbody>
@@ -170,10 +180,10 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
 
         {/* Total Banner */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '3rem' }}>
-          <div style={{ width: '300px', background: '#f0fdf4', padding: '1rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+          <div style={{ width: '300px', background: displayModel.isCorrection ? '#fef2f2' : '#f0fdf4', padding: '1rem', borderRadius: '4px', border: `1px solid ${displayModel.isCorrection ? '#fecaca' : '#bbf7d0'}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12pt', fontWeight: 'bold', color: '#166534', whiteSpace: 'nowrap' }}>VERSEMENT REÇU :</span>
-              <span style={{ fontSize: '14pt', fontWeight: 'bold', color: '#15803d', whiteSpace: 'nowrap' }}>{displayModel.formattedAmount}</span>
+              <span style={{ fontSize: '12pt', fontWeight: 'bold', color: displayModel.isCorrection ? '#991b1b' : '#166534', whiteSpace: 'nowrap' }}>{displayModel.isCorrection ? 'MONTANT CONTRE-PASSÉ :' : 'VERSEMENT REÇU :'}</span>
+              <span style={{ fontSize: '14pt', fontWeight: 'bold', color: displayModel.isCorrection ? '#b91c1c' : '#15803d', whiteSpace: 'nowrap' }}>{displayModel.formattedAmount}</span>
             </div>
           </div>
         </div>
