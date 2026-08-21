@@ -16,6 +16,8 @@
     "test:functions:boardviewer-governance": "npm --prefix functions run build && node tests/functions/test-boardviewer-governance.cjs",
     "test:functions:authenticated-audit": "npm --prefix functions run build && node tests/functions/test-authenticated-audit.cjs",
     "test:functions:expense-ledger": "npm --prefix functions run build && node tests/functions/test-expense-ledger.cjs",
+    "test:functions:student-class-assignment": "npm --prefix functions run build && node tests/functions/test-student-class-assignment.cjs",
+    "test:no-class-write-on-load": "node --test tests/security/app-no-class-write-on-load.spec.mjs",
     "test:production-workflow": "node --test tests/security/production-deploy-workflow.spec.mjs",
     "test:vercel-build": "node --test tests/security/vercel-build-target.spec.mjs",
     "preview": "vite preview",

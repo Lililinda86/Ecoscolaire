@@ -353,6 +353,7 @@ describe('Student Active Status Security Rules', () => {
         name: 'School B', subscriptionPlan: 'starter', studentLimit: 2, studentsCount: 1
       });
       await setDoc(doc(ctx.firestore(), 'classes', 'class-1'), { schoolId: SCHOOL_ID, name: 'CP', isActive: true });
+      await setDoc(doc(ctx.firestore(), 'classes', 'class-2'), { schoolId: SCHOOL_ID, name: 'CE1', isActive: true });
       await setDoc(doc(ctx.firestore(), 'students', 'student-1'), { schoolId: SCHOOL_ID, name: 'Alice', schoolingStatus: 'active', classId: 'class-1' });
       await setDoc(doc(ctx.firestore(), 'students', 'student-B'), { schoolId: 'school-B', name: 'Bob', schoolingStatus: 'active', classId: 'class-B' });
     });
@@ -426,6 +427,20 @@ describe('Student Active Status Security Rules', () => {
   it('secretary cannot physically delete a student', async () => {
     const context = testEnv.authenticatedContext('secretary-1');
     await assertFails(deleteDoc(doc(context.firestore(), 'students', 'student-1')));
+  });
+
+  for (const actorId of ['superAdmin-1', 'owner-1', 'director-1', 'secretary-1']) {
+    it(`${actorId} cannot change classId directly`, async () => {
+      const context = testEnv.authenticatedContext(actorId);
+      await assertFails(updateDoc(doc(context.firestore(), 'students', 'student-1'), {
+        classId: 'class-2', updatedAt: serverTimestamp(), updatedBy: actorId
+      }));
+    });
+  }
+
+  it('owner and director cannot physically delete a class', async () => {
+    await assertFails(deleteDoc(doc(testEnv.authenticatedContext('owner-1').firestore(), 'classes', 'class-1')));
+    await assertFails(deleteDoc(doc(testEnv.authenticatedContext('director-1').firestore(), 'classes', 'class-1')));
   });
 
   it('owner can deactivate student', async () => {
