@@ -9,7 +9,10 @@ const summary = buildBoardViewerGovernanceSummary({
     { id: 'student-secret-id', schoolId: 'school-a', classId: 'class-a', name: 'Private Student', active: true },
     { id: 'departed-id', schoolId: 'school-a', classId: 'class-a', name: 'Departed Student', schoolingStatus: 'departed' }
   ],
-  attendance: [{ studentId: 'student-secret-id', status: 'present' }],
+  attendance: [
+    { id: 'legacy-random', schoolId: 'school-a', studentId: 'student-secret-id', date: '2026-08-21', status: 'absent' },
+    { id: 'att-canonical', schoolId: 'school-a', studentId: 'student-secret-id', date: '2026-08-21', status: 'present', canonicalAttendance: true, version: 2 },
+  ],
   payments: [{ studentId: 'student-secret-id', receiptId: 'private-receipt', amount: 12000, status: 'completed' }],
   expenses: [
     { vendor: 'Private Vendor', amount: 2000, status: 'POSTED' },
@@ -30,6 +33,7 @@ assert.equal(summary.students.total, 2);
 assert.equal(summary.students.active, 1);
 assert.deepEqual(summary.students.byClass, [{ className: 'Class A', count: 1 }]);
 assert.equal(summary.attendance.rate, 100);
+assert.equal(summary.attendance.records, 1);
 assert.equal(summary.finance.collected, 12000);
 assert.equal(summary.finance.expenses, 0);
 assert.equal(summary.finance.netCash, 12000);

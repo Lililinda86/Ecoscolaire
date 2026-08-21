@@ -27,6 +27,7 @@ import type {
   Evaluation,
   Grade,
   TeacherAssignment,
+  TeacherAssignmentSlot,
   FinancialBenefit
 } from '../types';
 
@@ -39,6 +40,7 @@ export interface Database {
   gradesStrict?: Grade[];
   invalidGradeDocumentsCount?: number;
   teacherAssignments?: TeacherAssignment[];
+  teacherAssignmentSlots?: TeacherAssignmentSlot[];
   // --- SaaS Collections (Globales) ---
   schools: School[];
   users: User[];
@@ -174,7 +176,8 @@ const initialDB: Database = {
   periods: [],
   evaluations: [],
   gradesStrict: [],
-  teacherAssignments: []
+  teacherAssignments: [],
+  teacherAssignmentSlots: []
 };
 
 export const defaultDB = initialDB;

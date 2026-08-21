@@ -32,6 +32,7 @@ const requiredFunctions = new Set([
   'createExpense',
   'reverseExpense',
   'assignStudentToClass',
+  'recordStudentAttendance',
 ]);
 
 const requiredBoardViewerFunctions = new Set([
@@ -87,7 +88,7 @@ test('Production deploy eligibility is fail-closed for every configured trigger'
   assert.equal(productionDeployJobEligible('workflow_dispatch', 'refs/heads/feature/example'), false);
 });
 
-test('Production deployment includes Firestore Rules and the exact twenty Functions', () => {
+test('Production deployment includes Firestore Rules and the exact twenty-one Functions', () => {
   assert.ok(deployTargets.includes('firestore:rules'));
   assert.deepEqual(deployedFunctions, requiredFunctions);
 });

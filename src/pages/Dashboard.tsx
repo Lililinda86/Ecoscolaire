@@ -7,6 +7,7 @@ import {
   Users, Bus, AlertTriangle, Activity
 } from 'lucide-react';
 import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from '../utils/expenseLedger';
+import { deduplicateAttendanceRecords, getAfricaDoualaDateKey, normalizeAttendanceDate, normalizeAttendanceStatus } from '../utils/attendanceRecords';
 
 const formatReasons = (reasons: string[]) => {
   if (reasons.length <= 2) return reasons.join(' · ');
@@ -71,7 +72,7 @@ const Dashboard: React.FC = () => {
   const italoStats = useMemo(() => {
     const students = db?.students ?? [];
     const classes = db?.classes ?? [];
-    const attendanceList = db?.attendance || [];
+    const attendanceList = deduplicateAttendanceRecords(db?.attendance || []);
     
     const validClassIds = new Set(classes.map(c => c.id).filter(Boolean));
     const classIdToNameMap = new Map(classes.map(c => [c.id, c.name]));
@@ -88,7 +89,7 @@ const Dashboard: React.FC = () => {
     const classDaysMap = new Map<string, Set<string>>();
     attendanceList.forEach(a => {
       if (a && a.studentId && a.date) {
-        const norm = normalizeDateKey(a.date);
+        const norm = normalizeAttendanceDate(a.date);
         if (!norm) return;
         const classId = studentClassMap.get(a.studentId);
         if (!classId) return;
@@ -109,17 +110,18 @@ const Dashboard: React.FC = () => {
     const studentStates = new Map<string, { presentDates: Set<string>; absentDates: Set<string> }>();
     attendanceList.forEach(a => {
       if (a && a.studentId && a.date) {
-        const norm = normalizeDateKey(a.date);
+        const norm = normalizeAttendanceDate(a.date);
         if (!norm) return;
 
         if (!studentStates.has(a.studentId)) {
           studentStates.set(a.studentId, { presentDates: new Set(), absentDates: new Set() });
         }
         const states = studentStates.get(a.studentId)!;
-        if (a.present === true) {
+        const status = normalizeAttendanceStatus(a);
+        if (status === 'present' || status === 'late') {
           states.presentDates.add(norm);
           states.absentDates.delete(norm);
-        } else if (a.present === false) {
+        } else if (status === 'absent' || status === 'left_early') {
           if (!states.presentDates.has(norm)) {
             states.absentDates.add(norm);
           }
@@ -343,26 +345,21 @@ const Dashboard: React.FC = () => {
   }, [db]);
 
   // Real data calculations in local timezone format (YYYY-MM-DD)
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }, []);
+  const todayStr = useMemo(() => getAfricaDoualaDateKey(), []);
 
   const currentMonthPrefix = useMemo(() => {
     return todayStr.slice(0, 7); // YYYY-MM
   }, [todayStr]);
 
   const todayStats = useMemo(() => {
-    const attendanceList = db?.attendance || [];
+    const attendanceList = deduplicateAttendanceRecords(db?.attendance || []);
     const staffAttendanceList = db?.staffAttendance || [];
     const paymentsList = db?.payments || [];
 
-    const todayAttendance = attendanceList.filter(a => a && normalizeDateKey(a.date) === todayStr);
-    const presentStudents = todayAttendance.filter(a => a.present === true).length;
-    const absentStudents = todayAttendance.filter(a => a.present === false).length;
+    const todayAttendance = attendanceList.filter(a => a && normalizeAttendanceDate(a.date) === todayStr);
+    const presentStudents = todayAttendance.filter(a => normalizeAttendanceStatus(a) === 'present').length;
+    const absentStudents = todayAttendance.filter(a => normalizeAttendanceStatus(a) === 'absent').length;
+    const lateStudents = todayAttendance.filter(a => normalizeAttendanceStatus(a) === 'late').length;
 
     const presentStaff = staffAttendanceList.filter(sa => sa && normalizeDateKey(sa.date) === todayStr && sa.present === true).length;
 
@@ -373,6 +370,7 @@ const Dashboard: React.FC = () => {
     return {
       presentStudents,
       absentStudents,
+      lateStudents,
       presentStaff,
       todayPayments,
       pendingNotifications: 0

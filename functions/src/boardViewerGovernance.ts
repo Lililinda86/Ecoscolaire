@@ -40,6 +40,33 @@ const isSuccessfulPayment = (row: Row): boolean => {
   return !['pending', 'failed', 'cancelled', 'canceled', 'refunded', 'reversed'].includes(status);
 };
 
+const attendanceDate = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(trimmed) ? trimmed.slice(0, 10) : '';
+};
+
+export const deduplicateGovernanceAttendance = (rows: Row[]): Row[] => {
+  const selected = new Map<string, Row>();
+  const unkeyed: Row[] = [];
+  rows.forEach(row => {
+    const key = `${stringValue(row.schoolId)}\u001f${attendanceDate(row.date)}\u001f${stringValue(row.studentId)}`;
+    if (!attendanceDate(row.date) || !stringValue(row.studentId)) {
+      unkeyed.push(row);
+      return;
+    }
+    const current = selected.get(key);
+    const candidateRank = `${row.canonicalAttendance === true ? 1 : 0}|${String(numberValue(row.version)).padStart(12, '0')}|${stringValue(row.correctedAt, row.updatedAt, row.createdAt)}|${stringValue(row.id)}`;
+    const currentRank = current
+      ? `${current.canonicalAttendance === true ? 1 : 0}|${String(numberValue(current.version)).padStart(12, '0')}|${stringValue(current.correctedAt, current.updatedAt, current.createdAt)}|${stringValue(current.id)}`
+      : '';
+    if (!current || candidateRank > currentRank) {
+      selected.set(key, row);
+    }
+  });
+  return [...selected.values(), ...unkeyed];
+};
+
 export const buildBoardViewerGovernanceSummary = (source: GovernanceSourceData) => {
   const activeStudents = source.students.filter(student =>
     isActive(student) && !['departed', 'excluded', 'inactive'].includes(stringValue(student.schoolingStatus).toLowerCase())
@@ -54,19 +81,21 @@ export const buildBoardViewerGovernanceSummary = (source: GovernanceSourceData) 
     studentsByClass.set(className, (studentsByClass.get(className) || 0) + 1);
   });
 
-  const attendanceTotals = source.attendance.reduce<{
+  const attendanceTotals = deduplicateGovernanceAttendance(source.attendance).reduce<{
     records: number;
     present: number;
     absent: number;
     late: number;
+    leftEarly: number;
   }>((totals, row) => {
     const status = stringValue(row.status).toLowerCase();
     if (['present', 'présent', 'presente', 'présente'].includes(status)) totals.present += 1;
     if (['absent', 'absente'].includes(status)) totals.absent += 1;
     if (['late', 'retard', 'en retard'].includes(status)) totals.late += 1;
+    if (status === 'left_early') totals.leftEarly += 1;
     totals.records += 1;
     return totals;
-  }, { records: 0, present: 0, absent: 0, late: 0 });
+  }, { records: 0, present: 0, absent: 0, late: 0, leftEarly: 0 });
   const attendanceDenominator = attendanceTotals.present + attendanceTotals.absent + attendanceTotals.late;
 
   const collected = source.payments

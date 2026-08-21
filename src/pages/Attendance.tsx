@@ -1,19 +1,26 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
+import { db as firestore } from '../db/firebase';
 
 import { sortClasses } from '../utils/sortClasses';
 import { Check, X, Calendar, Clock, LogOut, Printer } from 'lucide-react';
 import Modal from '../components/Modal';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import type { Attendance as AttendanceRecord, StaffAttendance, AttendanceStatus } from '../types';
+import { recordStudentAttendance } from '../services/studentAttendance';
+import { deduplicateAttendanceRecords, getAfricaDoualaDateKey, normalizeAttendanceDate } from '../utils/attendanceRecords';
+
+const MANAGER_ROLES = new Set(['superAdmin', 'owner', 'director', 'secretary']);
 
 const Attendance: React.FC = () => {
-  const { db, safeMergeDB, currentSchool, currentUser } = useAppContext();
+  const { db, updateLocalState, updateAttendanceLocal, currentSchool, currentUser } = useAppContext();
   const { t } = useI18n();
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [month, setMonth] = useState(new Date().toISOString().substring(0, 7));
+  const today = getAfricaDoualaDateKey();
+  const [date, setDate] = useState(today);
+  const [month, setMonth] = useState(today.slice(0, 7));
   const [target, setTarget] = useState<'students' | 'staff'>('students');
   const [sectionFilter, setSectionFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
@@ -26,97 +33,122 @@ const Attendance: React.FC = () => {
 
   // History state
   const [historyPersonId, setHistoryPersonId] = useState<string|null>(null);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [saveError, setSaveError] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
 
-  if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'teacher', 'boardViewer'].includes(currentUser.role)) return null;
+  const deduplicatedAttendance = useMemo(
+    () => deduplicateAttendanceRecords(db.attendance),
+    [db.attendance],
+  );
+  const allowedClassIds = useMemo(() => {
+    if (!currentUser || currentUser.role !== 'teacher') return null;
+    const activeYearId = currentSchool?.activeAcademicYearId || currentSchool?.academicYear;
+    return new Set((db.teacherAssignmentSlots || [])
+      .filter(slot => slot.isActive === true
+        && slot.schoolId === currentSchool?.id
+        && slot.academicYearId === activeYearId
+        )
+      .map(slot => slot.classId));
+  }, [currentSchool?.academicYear, currentSchool?.activeAcademicYearId, currentSchool?.id, currentUser, db.teacherAssignmentSlots]);
+  const availableClasses = useMemo(
+    () => db.classes.filter(row => !allowedClassIds || allowedClassIds.has(row.id)),
+    [allowedClassIds, db.classes],
+  );
+
+  if (!currentUser || ![...MANAGER_ROLES, 'teacher'].includes(currentUser.role)) return null;
 
   const students = db.students.filter(s => {
     const matchSection = sectionFilter === 'all' || s.section === sectionFilter;
     const matchClass = classFilter === 'all' || s.classId === classFilter;
-    return matchSection && matchClass;
+    const authorizedClass = !allowedClassIds || Boolean(s.classId && allowedClassIds.has(s.classId));
+    return matchSection && matchClass && authorizedClass;
   });
   const staff = db.staff;
 
-  const toggleStudentAttendance = (studentId: string, status: 'present'|'absent'|'late'|'left_early', reason?: string) => {
-    const newDb = { ...db, attendance: [...db.attendance] };
-    const existingIndex = newDb.attendance.findIndex(a => a.studentId === studentId && a.date === date);
-    const present = status !== 'absent' && status !== 'left_early';
-    
-    if (existingIndex >= 0) {
-      newDb.attendance[existingIndex] = { ...newDb.attendance[existingIndex], present, status, reason };
-    } else {
-      newDb.attendance.push({ id: crypto.randomUUID(), studentId, date, present, status, reason });
+  const withSaving = async (id: string, operation: () => Promise<void>) => {
+    setSavingIds(previous => new Set(previous).add(id));
+    setSaveError('');
+    setSaveMessage('');
+    try {
+      await operation();
+      setSaveMessage('Présence enregistrée.');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Impossible d'enregistrer la présence.");
+      throw error;
+    } finally {
+      setSavingIds(previous => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
     }
-    safeMergeDB(newDb);
   };
 
-  const toggleStaffAttendance = (staffId: string, status: 'present'|'absent'|'late'|'left_early', reason?: string) => {
-    const newDb = { ...db, staffAttendance: [...(db.staffAttendance || [])] };
-    const existingIndex = newDb.staffAttendance.findIndex(a => a.staffId === staffId && a.date === date);
-    const present = status !== 'absent' && status !== 'left_early';
-    
-    if (existingIndex >= 0) {
-      newDb.staffAttendance[existingIndex] = { ...newDb.staffAttendance[existingIndex], present, status, reason };
-    } else {
-      newDb.staffAttendance.push({ id: crypto.randomUUID(), staffId, date, present, status, reason });
-    }
-    safeMergeDB(newDb);
+  const toggleStudentAttendance = async (studentId: string, status: AttendanceStatus, reason?: string) => {
+    await withSaving(studentId, async () => {
+      const response = await recordStudentAttendance({ studentId, date, status, note: reason });
+      updateAttendanceLocal(response.attendance);
+    });
   };
 
-  const executeStatusChange = (id: string, isStaff: boolean, status: 'present'|'absent'|'late'|'left_early') => {
+  const toggleStaffAttendance = async (staffId: string, status: AttendanceStatus, reason?: string) => {
+    if (!currentSchool?.id) throw new Error('École active introuvable.');
+    await withSaving(`staff:${staffId}`, async () => {
+      const id = `staff_${encodeURIComponent(currentSchool.id)}_${date}_${encodeURIComponent(staffId)}`;
+      const record: StaffAttendance = { id, schoolId: currentSchool.id, staffId, date, status, present: status === 'present' || status === 'late', reason };
+      await setDoc(doc(firestore, 'staffAttendance', id), { ...record, updatedAt: serverTimestamp() }, { merge: true });
+      updateLocalState(previous => {
+        const rows = [...(previous.staffAttendance || [])];
+        const index = rows.findIndex(row => row.id === id);
+        if (index >= 0) rows[index] = record;
+        else rows.push(record);
+        return { staffAttendance: rows };
+      });
+    });
+  };
+
+  const executeStatusChange = async (id: string, isStaff: boolean, status: AttendanceStatus) => {
     if (status === 'left_early' || status === 'absent') {
       setPendingReasonContext({id, isStaff, status});
       setReasonText('');
       setReasonModalOpen(true);
     } else {
-      if (isStaff) toggleStaffAttendance(id, status);
-      else toggleStudentAttendance(id, status);
+      try {
+        if (isStaff) await toggleStaffAttendance(id, status);
+        else await toggleStudentAttendance(id, status);
+      } catch { /* surfaced through saveError */ }
     }
   };
 
-  const handleReasonSubmit = (e: React.FormEvent) => {
+  const handleReasonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pendingReasonContext.isStaff) {
-      toggleStaffAttendance(pendingReasonContext.id, pendingReasonContext.status, reasonText);
-    } else {
-      toggleStudentAttendance(pendingReasonContext.id, pendingReasonContext.status, reasonText);
+    try {
+      if (pendingReasonContext.isStaff) {
+        await toggleStaffAttendance(pendingReasonContext.id, pendingReasonContext.status, reasonText);
+      } else {
+        await toggleStudentAttendance(pendingReasonContext.id, pendingReasonContext.status, reasonText);
+      }
+      setReasonModalOpen(false);
+    } catch {
+      // The modal stays open and saveError explains the backend refusal.
     }
-    setReasonModalOpen(false);
   };
 
   const getStudentRecord = (studentId: string) => {
-    return db.attendance.find(a => a.studentId === studentId && a.date === date);
+    return deduplicatedAttendance.find(a => a.studentId === studentId && normalizeAttendanceDate(a.date) === date);
   };
 
   const getStaffRecord = (staffId: string) => {
     return db.staffAttendance?.find(a => a.staffId === staffId && a.date === date);
   };
 
-  const markAllStudents = (status: 'present'|'absent') => {
-    const newDb = { ...db, attendance: [...db.attendance] };
-    students.forEach(s => {
-       const existingIndex = newDb.attendance.findIndex(a => a.studentId === s.id && a.date === date);
-       const present = status === 'present';
-       if(existingIndex >= 0) {
-           newDb.attendance[existingIndex] = { ...newDb.attendance[existingIndex], present, status };
-       } else {
-           newDb.attendance.push({ id: crypto.randomUUID(), studentId: s.id, date, present, status });
-       }
-    });
-    safeMergeDB(newDb);
+  const markAllStudents = async (status: 'present'|'absent') => {
+    try { await Promise.all(students.map(student => toggleStudentAttendance(student.id, status))); } catch { /* surfaced */ }
   };
 
-  const markAllStaff = (status: 'present'|'absent') => {
-    const newDb = { ...db, staffAttendance: [...(db.staffAttendance || [])] };
-    staff.forEach(s => {
-       const existingIndex = newDb.staffAttendance.findIndex(a => a.staffId === s.id && a.date === date);
-       const present = status === 'present';
-       if(existingIndex >= 0) {
-           newDb.staffAttendance[existingIndex] = { ...newDb.staffAttendance[existingIndex], present, status };
-       } else {
-           newDb.staffAttendance.push({ id: crypto.randomUUID(), staffId: s.id, date, present, status });
-       }
-    });
-    safeMergeDB(newDb);
+  const markAllStaff = async (status: 'present'|'absent') => {
+    try { await Promise.all(staff.map(person => toggleStaffAttendance(person.id, status))); } catch { /* surfaced */ }
   };
 
   const yearNum = parseInt(month.split('-')[0]);
@@ -131,7 +163,7 @@ const Attendance: React.FC = () => {
   let historyRecords: (AttendanceRecord | StaffAttendance)[] = [];
   if (historyPerson) {
     if (target === 'students') {
-      historyRecords = db.attendance.filter(a => a.studentId === historyPerson.id && (a.status !== 'present' || a.reason));
+      historyRecords = deduplicatedAttendance.filter(a => a.studentId === historyPerson.id && (a.status !== 'present' || a.reason));
     } else {
       historyRecords = (db.staffAttendance || []).filter(a => a.staffId === historyPerson.id && (a.status !== 'present' || a.reason));
     }
@@ -168,7 +200,7 @@ const Attendance: React.FC = () => {
           </button>
           <select value={target} onChange={e => {setTarget(e.target.value as 'students' | 'staff'); setClassFilter('all');}}>
             <option value="students">Élèves</option>
-            <option value="staff">Personnel</option>
+            {MANAGER_ROLES.has(currentUser.role) && <option value="staff">Personnel</option>}
           </select>
           <div style={{ display: 'flex', background: 'var(--bg-color)', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
              <button title="Vue Journalière" onClick={() => setViewMode('daily')} style={{ borderRadius: 0, padding: '0.5rem 1rem', background: viewMode === 'daily' ? 'var(--primary-color)' : 'transparent', color: viewMode === 'daily' ? '#fff' : 'inherit', border: 'none' }}>Quotidien</button>
@@ -176,6 +208,9 @@ const Attendance: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {saveError && <p role="alert" style={{ color: 'var(--danger)', marginTop: 0 }}>{saveError}</p>}
+      {saveMessage && !saveError && <p role="status" style={{ color: 'var(--success)', marginTop: 0 }}>{saveMessage}</p>}
 
       {viewMode === 'daily' && (
         <>
@@ -191,7 +226,7 @@ const Attendance: React.FC = () => {
                   </select>
                   <select value={classFilter} onChange={e => setClassFilter(e.target.value)}>
                     <option value="all">Toutes les classes</option>
-                    {sortClasses(db.classes).filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
+                    {sortClasses(availableClasses).filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -199,10 +234,10 @@ const Attendance: React.FC = () => {
               )}
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="secondary" onClick={() => target === 'students' ? markAllStudents('present') : markAllStaff('present')} style={{ color: 'var(--success)', borderColor: 'var(--success)' }}>
+              <button disabled={savingIds.size > 0} className="secondary" onClick={() => target === 'students' ? markAllStudents('present') : markAllStaff('present')} style={{ color: 'var(--success)', borderColor: 'var(--success)' }}>
                 ✓ Tous présents
               </button>
-              <button className="secondary" onClick={() => target === 'students' ? markAllStudents('absent') : markAllStaff('absent')} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+              <button disabled={savingIds.size > 0} className="secondary" onClick={() => target === 'students' ? markAllStudents('absent') : markAllStaff('absent')} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>
                 ✕ Tous absents
               </button>
             </div>
@@ -239,10 +274,10 @@ const Attendance: React.FC = () => {
                           <td style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{record?.reason || '-'}</td>
                           <td style={{ padding: '1rem', textAlign: 'right' }}>
                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              <button title="Présent" className={currentStatus === 'present' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'present' ? 'var(--success)' : '' }} onClick={() => executeStatusChange(s.id, false, 'present')}><Check size={16} /></button>
-                              <button title="Absent" className={currentStatus === 'absent' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'absent' ? 'var(--danger)' : '' }} onClick={() => executeStatusChange(s.id, false, 'absent')}><X size={16} /></button>
-                              <button title="Retard" className={currentStatus === 'late' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'late' ? 'var(--warning)' : '', color: currentStatus === 'late' ? '#fff' : '' }} onClick={() => executeStatusChange(s.id, false, 'late')}><Clock size={16} /></button>
-                              <button title="Sortie" className={currentStatus === 'left_early' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'left_early' ? 'var(--primary-color)' : '', color: currentStatus === 'left_early' ? '#fff' : '' }} onClick={() => executeStatusChange(s.id, false, 'left_early')}><LogOut size={16} /></button>
+                              <button disabled={savingIds.has(s.id)} aria-label={`Marquer ${s.name} présent`} title="Présent" className={currentStatus === 'present' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'present' ? 'var(--success)' : '' }} onClick={() => executeStatusChange(s.id, false, 'present')}><Check size={16} /></button>
+                              <button disabled={savingIds.has(s.id)} aria-label={`Marquer ${s.name} absent`} title="Absent" className={currentStatus === 'absent' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'absent' ? 'var(--danger)' : '' }} onClick={() => executeStatusChange(s.id, false, 'absent')}><X size={16} /></button>
+                              <button disabled={savingIds.has(s.id)} aria-label={`Marquer ${s.name} en retard`} title="Retard" className={currentStatus === 'late' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'late' ? 'var(--warning)' : '', color: currentStatus === 'late' ? '#fff' : '' }} onClick={() => executeStatusChange(s.id, false, 'late')}><Clock size={16} /></button>
+                              <button disabled={savingIds.has(s.id)} aria-label={`Marquer ${s.name} sorti avant l'heure`} title="Sortie" className={currentStatus === 'left_early' ? '' : 'secondary'} style={{ padding: '0.25rem 0.5rem', background: currentStatus === 'left_early' ? 'var(--primary-color)' : '', color: currentStatus === 'left_early' ? '#fff' : '' }} onClick={() => executeStatusChange(s.id, false, 'left_early')}><LogOut size={16} /></button>
                             </div>
                           </td>
                         </tr>
@@ -297,7 +332,7 @@ const Attendance: React.FC = () => {
                 </select>
                 <select value={classFilter} onChange={e => setClassFilter(e.target.value)}>
                   <option value="all">Toutes classes</option>
-                  {sortClasses(db.classes).filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
+                  {sortClasses(availableClasses).filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -340,7 +375,7 @@ const Attendance: React.FC = () => {
                         let statusStr = null;
                         
                         if (target === 'students') {
-                          const r = db.attendance.find(a => a.studentId === person.id && a.date === dateStr);
+                          const r = deduplicatedAttendance.find(a => a.studentId === person.id && normalizeAttendanceDate(a.date) === dateStr);
                           if (r) { isPresent = r.present; statusStr = r.status; }
                         } else {
                           const r = db.staffAttendance?.find(a => a.staffId === person.id && a.date === dateStr);
@@ -393,7 +428,7 @@ const Attendance: React.FC = () => {
           </p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
             <button type="button" className="secondary" onClick={() => setReasonModalOpen(false)}>Annuler</button>
-            <button type="submit">Valider</button>
+            <button type="submit" disabled={savingIds.has(pendingReasonContext.isStaff ? `staff:${pendingReasonContext.id}` : pendingReasonContext.id)}>Valider</button>
           </div>
         </form>
       </Modal>
