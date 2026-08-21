@@ -20,6 +20,44 @@ before(async () => {
   });
 });
 
+describe('Canonical student attendance security', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      const database = context.firestore();
+      await Promise.all([
+        setDoc(doc(database, 'users', 'attendance-owner'), { role: 'owner', schoolId: 'attendance-school-a', active: true }),
+        setDoc(doc(database, 'users', 'attendance-teacher'), { role: 'teacher', schoolId: 'attendance-school-a', active: true }),
+        setDoc(doc(database, 'users', 'attendance-parent'), { role: 'parent', schoolId: 'attendance-school-a', active: true }),
+        setDoc(doc(database, 'users', 'attendance-board'), { role: 'boardViewer', schoolId: 'attendance-school-a', active: true }),
+        setDoc(doc(database, 'users', 'attendance-owner-b'), { role: 'owner', schoolId: 'attendance-school-b', active: true }),
+        setDoc(doc(database, 'attendance', 'att-existing'), {
+          id: 'att-existing', schoolId: 'attendance-school-a', academicYearId: 'year-a', classId: 'class-a',
+          studentId: 'student-a', date: '2026-08-21', status: 'present', present: true,
+        }),
+      ]);
+    });
+  });
+
+  it('allows a same-school operational user to read but denies cross-tenant and BoardViewer reads', async () => {
+    await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('attendance-owner').firestore(), 'attendance', 'att-existing')));
+    await assertFails(getDoc(doc(testEnv.authenticatedContext('attendance-owner-b').firestore(), 'attendance', 'att-existing')));
+    await assertFails(getDoc(doc(testEnv.authenticatedContext('attendance-board').firestore(), 'attendance', 'att-existing')));
+  });
+
+  it('denies direct create, correction and physical delete for every client role', async () => {
+    const payload = {
+      id: 'att-client', schoolId: 'attendance-school-a', academicYearId: 'year-a', classId: 'class-a',
+      studentId: 'student-a', date: '2026-08-21', status: 'absent', present: false,
+    };
+    for (const uid of ['attendance-owner', 'attendance-teacher', 'attendance-parent']) {
+      const database = testEnv.authenticatedContext(uid).firestore();
+      await assertFails(setDoc(doc(database, 'attendance', `att-client-${uid}`), payload));
+      await assertFails(updateDoc(doc(database, 'attendance', 'att-existing'), { status: 'absent', present: false }));
+      await assertFails(deleteDoc(doc(database, 'attendance', 'att-existing')));
+    }
+  });
+});
+
 beforeEach(async () => {
   await testEnv.clearFirestore();
 });
