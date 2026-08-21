@@ -194,8 +194,11 @@ const run = async () => {
   let otherOwnerUid = null;
   let testSchoolId = null;
   let academicYear = null;
+  let academicYearFixtureId = null;
+  let schoolActiveAcademicYearIdBefore = null;
   let primaryClassId = null;
   let schoolBefore = null;
+  let schoolConfigPatched = false;
   let deadlineFixture = null;
   let paymentSettingsFixture = null;
   let closureId = null;
@@ -254,8 +257,27 @@ const run = async () => {
     const schoolSnapshot = await schoolRef.get();
     assert.equal(schoolSnapshot.exists, true);
     schoolBefore = schoolSnapshot.data() || {};
-    const activeAcademicYearId = String(schoolBefore.activeAcademicYearId || '').trim();
-    assert.ok(activeAcademicYearId && !activeAcademicYearId.includes('/'));
+    schoolActiveAcademicYearIdBefore = typeof schoolBefore.activeAcademicYearId === 'string'
+      && schoolBefore.activeAcademicYearId && !schoolBefore.activeAcademicYearId.includes('/')
+      ? schoolBefore.activeAcademicYearId : null;
+    let activeAcademicYearId = schoolActiveAcademicYearIdBefore;
+    if (!activeAcademicYearId) {
+      assert.match(String(schoolBefore.academicYear || ''), /^\d{4}-\d{4}$/,
+        'The staging school has neither a canonical pointer nor a valid legacy year label.');
+      academicYearFixtureId = `e2e-complete-academic-year-${suffix}`;
+      const fixtureYearRef = db.collection('academicYears').doc(academicYearFixtureId);
+      assert.equal((await fixtureYearRef.get()).exists, false);
+      await fixtureYearRef.create({
+        id: academicYearFixtureId,
+        schoolId: testSchoolId,
+        name: schoolBefore.academicYear,
+        status: 'active',
+        testFixture: true,
+        testRunId: suffix,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      activeAcademicYearId = academicYearFixtureId;
+    }
     const academicYearSnapshot = await db.collection('academicYears').doc(activeAcademicYearId).get();
     assert.equal(academicYearSnapshot.exists, true);
     const academicYearData = academicYearSnapshot.data() || {};
@@ -292,11 +314,14 @@ const run = async () => {
     const preexistingClosureId = `${testSchoolId}__${today}`;
     assert.equal((await db.collection('cashClosures').doc(preexistingClosureId).get()).exists, false,
       'A same-school staging cash closure already exists for today.');
-    await schoolRef.update({
+    const schoolFixturePatch = {
       paymentDeadlines: deadlineFixture,
       paymentSettings: paymentSettingsFixture,
       e2ePaymentsLiveConfig: { testFixture: true, testRunId: suffix },
-    });
+    };
+    if (academicYearFixtureId) schoolFixturePatch.activeAcademicYearId = academicYearFixtureId;
+    await schoolRef.update(schoolFixturePatch);
+    schoolConfigPatched = true;
 
     const tempPassword = `Aa1!${crypto.randomBytes(24).toString('base64url')}`;
     const ownerEmail = `e2e-owner-${suffix}@tests.ecoscolaire.invalid`;
@@ -703,7 +728,7 @@ const run = async () => {
         }
       }
 
-      if (testSchoolId && schoolBefore && deadlineFixture && paymentSettingsFixture) {
+      if (testSchoolId && schoolBefore && schoolConfigPatched && deadlineFixture && paymentSettingsFixture) {
         const schoolRef = db.collection('schools').doc(testSchoolId);
         await db.runTransaction(async (transaction) => {
           const current = await transaction.get(schoolRef);
@@ -717,8 +742,23 @@ const run = async () => {
             paymentSettings: schoolBefore.paymentSettings ?? FieldValue.delete(),
             e2ePaymentsLiveConfig: FieldValue.delete(),
           };
+          if (academicYearFixtureId) {
+            assert.equal(currentData.activeAcademicYearId, academicYearFixtureId,
+              'Refusing to restore an academic year pointer changed by another operation.');
+            patch.activeAcademicYearId = schoolActiveAcademicYearIdBefore ?? FieldValue.delete();
+          }
           transaction.update(schoolRef, patch);
         });
+      }
+
+      if (academicYearFixtureId) {
+        const fixtureYearRef = db.collection('academicYears').doc(academicYearFixtureId);
+        const fixtureYear = await fixtureYearRef.get();
+        if (fixtureYear.exists) {
+          assert.equal(fixtureYear.data()?.testRunId, suffix);
+          assert.equal(fixtureYear.data()?.schoolId, testSchoolId);
+          await fixtureYearRef.delete();
+        }
       }
 
       for (const uid of createdAuthUids) {
@@ -739,6 +779,12 @@ const run = async () => {
         assert.equal(schoolAfter.e2ePaymentsLiveConfig, undefined);
         assert.equal(stableStringify(schoolAfter.paymentDeadlines), stableStringify(schoolBefore.paymentDeadlines));
         assert.equal(stableStringify(schoolAfter.paymentSettings), stableStringify(schoolBefore.paymentSettings));
+        if (academicYearFixtureId) {
+          assert.equal(schoolAfter.activeAcademicYearId ?? null, schoolActiveAcademicYearIdBefore);
+        }
+      }
+      if (academicYearFixtureId) {
+        assert.equal((await db.collection('academicYears').doc(academicYearFixtureId).get()).exists, false);
       }
       if (closureId) assert.equal((await db.collection('cashClosures').doc(closureId).get()).exists, false);
       for (const uid of createdAuthUids) {
