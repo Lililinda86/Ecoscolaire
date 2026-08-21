@@ -210,8 +210,12 @@ const run = async () => {
     const selectDetailedClass = async className => {
       const picker = page.locator('button[aria-haspopup="listbox"]').first();
       await picker.click();
-      await page.getByPlaceholder(/Rechercher une classe/i).fill(className);
-      await page.getByRole('option', { name: new RegExp(className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
+      const search = page.getByPlaceholder(/Rechercher une classe/i);
+      await search.fill(className);
+      await page
+        .getByRole('listbox', { name: 'Classes disponibles' })
+        .getByRole('option', { name: new RegExp(className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })
+        .click();
       await page.getByRole('heading', { name: className, exact: true }).waitFor({ timeout: 20_000 });
     };
     const assignThroughUi = async (fromName, targetClassId) => {
