@@ -1094,10 +1094,8 @@ service cloud.firestore {
           (
             canManagePedagogy(request.resource.data.schoolId)
             && request.resource.data.schoolId == resource.data.schoolId
-            && (
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
-              || hasValidStudentClass(request.resource.data)
-            )
+            // Les reclassements sont exclusivement transactionnels via assignStudentToClass (Admin SDK).
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['classId'])
           )
         )
         && hasAtomicCounterForStudentStatusUpdate(studentId, resource.data, request.resource.data)
@@ -1160,7 +1158,8 @@ service cloud.firestore {
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['educationType', 'specialtyId'])
           || isValidClassPayload(request.resource.data)
         );
-      allow delete: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId);
+      // Une classe se désactive; elle n'est jamais supprimée physiquement par un client.
+      allow delete: if false;
     }
     match /subjects/{subjectId} {
       allow read: if isAuthenticated() && isActive() && !isBoardViewer() && hasSchoolAccess(resource.data.schoolId);

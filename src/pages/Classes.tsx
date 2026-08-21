@@ -7,6 +7,7 @@ import { buildStandardClassDocumentId, buildTechnicalSpecialtyDocumentId, buildT
 import type { ClassSection, TechnicalSpecialty } from '../types';
 import Modal from '../components/Modal';
 import { ClassSearchPicker } from '../components/classes/ClassSearchPicker';
+import { assignStudentToClass } from '../services/studentClassAssignments';
 
 const getCycleLabel = (cls: { cycle?: string; level?: string; name: string }): string => {
   const c = cls.cycle || cls.level;
@@ -54,6 +55,7 @@ const Classes: React.FC = () => {
 
   // Message d'état visuel (toast notification)
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [assignmentSubmittingStudentId, setAssignmentSubmittingStudentId] = useState<string | null>(null);
 
   // Utilisation de useMemo pour optimiser la réactivité et la performance
   const schoolClasses = React.useMemo(() => {
@@ -123,6 +125,7 @@ const Classes: React.FC = () => {
   if (!currentUser || !['superAdmin', 'owner', 'director', 'secretary', 'boardViewer'].includes(currentUser.role)) return null;
 
   const canManage = ['superAdmin', 'owner', 'director'].includes(currentUser.role);
+  const canAssignStudents = ['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role);
   const isSecretary = currentUser.role === 'secretary';
 
   const showToast = (msg: string) => {
@@ -270,13 +273,24 @@ const Classes: React.FC = () => {
     }
   };
 
-  const handleChangeClass = (studentId: string, newClassId: string) => {
-    if (!canManage) return;
-    const newDb = { ...db };
-    const studentIndex = newDb.students.findIndex(s => s.id === studentId);
-    if (studentIndex >= 0) {
-      const updatedStudents = newDb.students.map((s, idx) => idx === studentIndex ? { ...s, classId: newClassId } : s);
-      updateLocalState({ students: updatedStudents });
+  const handleChangeClass = async (studentId: string, newClassId: string) => {
+    if (!canAssignStudents || !newClassId || assignmentSubmittingStudentId) return;
+
+    try {
+      setAssignmentSubmittingStudentId(studentId);
+      const result = await assignStudentToClass({ studentId, targetClassId: newClassId });
+      updateLocalState({
+        students: db.students.map(student => student.id === result.studentId
+          ? { ...student, classId: result.classId }
+          : student),
+      });
+      showToast(result.changed ? 'Élève reclassé avec succès' : 'Élève déjà inscrit dans cette classe');
+    } catch (error: unknown) {
+      console.error("Erreur lors du reclassement de l'élève :", error);
+      const message = error instanceof Error ? error.message : "Le reclassement n'a pas pu être enregistré.";
+      showToast(`Erreur : ${message}`);
+    } finally {
+      setAssignmentSubmittingStudentId(null);
     }
   };
 
@@ -834,13 +848,13 @@ const Classes: React.FC = () => {
                   <th style={{ padding: '0.75rem', textAlign: 'left', minWidth: '150px' }}>Parent</th>
                   <th style={{ padding: '0.75rem', textAlign: 'left', minWidth: '120px' }}>Contact</th>
                   <th style={{ padding: '0.75rem', textAlign: 'left', minWidth: '150px' }}>Adresse</th>
-                  {canManage && <th style={{ padding: '0.75rem', textAlign: 'left' }}>Action (Reclasser)</th>}
+                  {canAssignStudents && <th style={{ padding: '0.75rem', textAlign: 'left' }}>Action (Reclasser)</th>}
                 </tr>
               </thead>
               <tbody>
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan={canManage ? 6 : 5} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={canAssignStudents ? 6 : 5} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                       Aucun élève inscrit dans cette classe.
                     </td>
                   </tr>
@@ -852,17 +866,25 @@ const Classes: React.FC = () => {
                       <td style={{ padding: '0.75rem' }}>{s.parentName}</td>
                       <td style={{ padding: '0.75rem' }}>{s.parentPhone || '-'}</td>
                       <td style={{ padding: '0.75rem' }}>{s.address || '-'}</td>
-                      {canManage && (
+                      {canAssignStudents && (
                         <td style={{ padding: '0.75rem' }}>
                           <select 
                             value={s.classId || ''} 
                             onChange={e => handleChangeClass(s.id, e.target.value)}
+                            disabled={assignmentSubmittingStudentId !== null}
+                            aria-busy={assignmentSubmittingStudentId === s.id}
+                            aria-label={`Reclasser ${s.name}`}
                             style={{ padding: '0.25rem', fontSize: '0.85rem' }}
                           >
                             {sortClasses(schoolClasses.filter(c => c.isActive !== false)).filter(c => (c.type || c.section) === s.section).map(c => (
                               <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                           </select>
+                          {assignmentSubmittingStudentId === s.id && (
+                            <span role="status" style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              Enregistrement…
+                            </span>
+                          )}
                         </td>
                       )}
                     </tr>

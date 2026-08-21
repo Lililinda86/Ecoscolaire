@@ -123,6 +123,9 @@ jobs:
           node tests/functions/test-boardviewer-governance.cjs
           node tests/functions/test-authenticated-audit.cjs
           node tests/functions/test-expense-ledger.cjs
+          node tests/functions/test-student-class-assignment.cjs
+          node --test tests/security/app-no-class-write-on-load.spec.mjs
+          npx vitest run tests/unit/AppNoAutomaticClassMutation.spec.tsx
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student
