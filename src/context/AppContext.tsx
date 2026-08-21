@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { defaultDB } from '../db/storage';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { Database, DatabasePatch } from '../db/storage';
-import type { User, School, Student, Payment, Expense, Evaluation, Grade } from '../types';
+import type { User, School, Student, Payment, Expense, Evaluation, Grade, Attendance } from '../types';
 import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { AcademicCalendarMutationCancelledError } from '../services/academicCalendarConfiguration';
 import { createAcademicYear as createAY, activateAcademicYear as actAY, updateAcademicYearBounds as updateAYBounds, createPeriod as createP, openPeriod as openP, updatePeriodStatus as updatePStatus } from '../services/academicCalendarPersistence';
@@ -93,6 +93,7 @@ interface AppContextProps {
   db: Database | null;
   updateLocalState: (patch: Partial<Database> | ((prev: Database) => Partial<Database>)) => void;
   updateStudentLocal: (studentId: string, patch: StudentLocalStatusPatch) => void;
+  updateAttendanceLocal: (attendance: Attendance) => void;
   addStudentsLocal: (studentsToAdd: Student[]) => void;
   patchLocalEntities: (student: Student, payment: Payment, receipt?: { id: string; [key: string]: unknown }) => void;
   saveDB: (newDb: Database) => Promise<void>;
@@ -311,7 +312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'grades', 'attendance', 'validation_requests', 'notifications',
           'subjects', 'technicalSpecialties', 'busRoutes', 'fuelExpenses', 'maintenances',
           'breakdowns', 'inventoryTransactions', 'staffAttendance', 'audit_logs', 'transactions', 'receipts',
-          'academicYears', 'periods', 'classPrograms', 'classSubjects', 'evaluations', 'teacherAssignments',
+          'academicYears', 'periods', 'classPrograms', 'classSubjects', 'evaluations', 'teacherAssignments', 'teacherAssignmentSlots',
           'financialBenefits'
         ];
 
@@ -390,11 +391,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         loadedDb.users = usersData;
 
+        let linkedTeacherStaffId = '';
+        if (userData.role === 'teacher') {
+          try {
+            const linkSnapshot = await getDoc(doc(firestoreDb, 'staffUserLinkByUser', firebaseUser.uid));
+            const link = linkSnapshot.data();
+            if (linkSnapshot.exists() && link?.isActive === true && link.schoolId === targetSchoolId
+                && typeof link.staffId === 'string') {
+              linkedTeacherStaffId = link.staffId;
+            }
+          } catch (error) {
+            console.warn('Teacher staff link unavailable; assignments fail closed.', error);
+          }
+        }
+
         // Fetch collections ciblées
         const fetchPromises = collectionsToFetch.map(async (colName) => {
           try {
             let q;
-            if (userData.role === 'parent' && colName === 'payments') {
+            if (userData.role === 'teacher' && colName === 'teacherAssignmentSlots') {
+              if (!linkedTeacherStaffId) return { colName, data: [] };
+              q = query(
+                collection(firestoreDb, colName),
+                where('schoolId', '==', targetSchoolId),
+                where('teacherStaffId', '==', linkedTeacherStaffId),
+                where('isActive', '==', true)
+              );
+            } else if (userData.role === 'teacher' && colName === 'teacherAssignments') {
+              if (!linkedTeacherStaffId) return { colName, data: [] };
+              q = query(
+                collection(firestoreDb, colName),
+                where('schoolId', '==', targetSchoolId),
+                where('teacherStaffId', '==', linkedTeacherStaffId),
+                where('isActive', '==', true)
+              );
+            } else if (userData.role === 'parent' && colName === 'payments') {
               if (!userData.studentIds || userData.studentIds.length === 0) {
                 return { colName, data: [] };
               }
@@ -430,7 +461,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const allDocs = new Map();
               snaps.forEach((snap: QuerySnapshot<DocumentData>) => snap.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) => allDocs.set(d.id, { id: d.id, ...d.data() })));
               return { colName, data: Array.from(allDocs.values()) };
-            } else {
+            } else if (!q) {
               q = query(collection(firestoreDb, colName), where('schoolId', '==', targetSchoolId));
             }
             const snap = await getDocs(q);
@@ -1027,6 +1058,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const updateAttendanceLocal = (attendance: Attendance) => {
+    setDb(previousDb => {
+      if (!previousDb || !currentSchool?.id || attendance.schoolId !== currentSchool.id) {
+        return previousDb;
+      }
+      const index = previousDb.attendance.findIndex(item => item.id === attendance.id);
+      const records = [...previousDb.attendance];
+      if (index >= 0) records[index] = attendance;
+      else records.push(attendance);
+      return { ...previousDb, attendance: records };
+    });
+  };
+
   const addStudentsLocal = (studentsToAdd: Student[]) => {
     setDb(previousDb => {
       if (!previousDb || !currentSchool?.id) {
@@ -1212,7 +1256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      db, updateLocalState, updateStudentLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, saveStructuredGrades, currentUser, currentSchool,
+      db, updateLocalState, updateStudentLocal, updateAttendanceLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, saveStructuredGrades, currentUser, currentSchool,
       createAcademicYear, activateAcademicYear, updateAcademicYearBounds, createAcademicPeriod, openAcademicPeriod, closeAcademicPeriod, publishAcademicPeriod,
       isSupervising, enterSupervision, exitSupervision,
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
