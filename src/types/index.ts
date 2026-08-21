@@ -363,11 +363,23 @@ export type AttendanceStatus = 'present' | 'absent' | 'late' | 'left_early';
 export interface Attendance {
   id: string;
   schoolId?: string;
+  academicYearId?: string;
+  classId?: string;
   studentId: string;
   date: string;
   present: boolean;
   status?: AttendanceStatus;
   reason?: string;
+  note?: string;
+  canonicalAttendance?: boolean;
+  version?: number;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  correctedAt?: unknown;
+  createdBy?: string;
+  updatedBy?: string;
+  testFixture?: boolean;
+  testRunId?: string;
 }
 
 export interface StaffAttendance {
