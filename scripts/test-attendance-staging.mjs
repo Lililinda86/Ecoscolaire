@@ -98,6 +98,7 @@ const run = async () => {
     studentA: `e2e-att-student-a-${testRunId}`,
     studentB: `e2e-att-student-b-${testRunId}`,
     slot: `e2e-att-slot-${testRunId}`,
+    teacherStaff: `e2e-att-staff-${testRunId}`,
   };
   const names = { studentA: `Élève Présence A ${testRunId}`, studentB: `Élève Présence B ${testRunId}` };
   let serviceAccount;
@@ -145,13 +146,25 @@ const run = async () => {
     const school = await db.collection('schools').doc(schoolId).get();
     academicYearId = String(school.data()?.activeAcademicYearId || school.data()?.academicYear || '');
     assert.ok(schoolId && academicYearId, 'Canonical school/year pointers are required.');
-    const teacherLink = await db.collection('staffUserLinkByUser').doc(profiles.teacher.uid).get();
-    assert.equal(teacherLink.exists, true, 'Teacher staff link missing.');
-    assert.equal(teacherLink.data()?.isActive, true, 'Teacher staff link inactive.');
-    const teacherStaffId = String(teacherLink.data()?.staffId || '');
+    const fixture = { testFixture: true, testRunId, createdAt: FieldValue.serverTimestamp() };
+    const teacherLinkRef = db.collection('staffUserLinkByUser').doc(profiles.teacher.uid);
+    const teacherLink = await teacherLinkRef.get();
+    if (!teacherLink.exists) {
+      await teacherLinkRef.create({
+        schoolId,
+        userId: profiles.teacher.uid,
+        staffId: ids.teacherStaff,
+        isActive: true,
+        ...fixture,
+      });
+    } else {
+      assert.equal(teacherLink.data()?.isActive, true, 'Teacher staff link inactive.');
+    }
+    const teacherStaffId = teacherLink.exists
+      ? String(teacherLink.data()?.staffId || '')
+      : ids.teacherStaff;
     assert.ok(teacherStaffId);
 
-    const fixture = { testFixture: true, testRunId, createdAt: FieldValue.serverTimestamp() };
     await Promise.all([
       db.collection('classes').doc(ids.classA).create({ id: ids.classA, schoolId, name: `ITALO Attendance A ${testRunId}`, section: 'francophone', type: 'francophone', isActive: true, ...fixture }),
       db.collection('classes').doc(ids.classB).create({ id: ids.classB, schoolId, name: `ITALO Attendance B ${testRunId}`, section: 'francophone', type: 'francophone', isActive: true, ...fixture }),
@@ -231,7 +244,7 @@ const run = async () => {
     for (const app of clientApps) {
       try { if (getAuth(app).currentUser) await signOut(getAuth(app)); await deleteApp(app); } catch { /* continue */ }
     }
-    const collections = ['attendance', 'audit_logs', 'teacherAssignmentSlots', 'students', 'classes'];
+    const collections = ['attendance', 'audit_logs', 'teacherAssignmentSlots', 'staffUserLinkByUser', 'students', 'classes'];
     for (const collectionName of collections) {
       const snapshot = await db.collection(collectionName).where('testRunId', '==', testRunId).get();
       if (!snapshot.empty) {
