@@ -4,6 +4,7 @@ export * from './academic/bulkAddSubjectsToClasses';
 export * from './boardViewerGovernance';
 export * from './authenticatedAudit';
 export * from './expenseLedger';
+export * from './studentClassAssignment';
 import * as admin from 'firebase-admin';
 import { CampayService } from './services/campayService';
 import * as crypto from 'crypto';
