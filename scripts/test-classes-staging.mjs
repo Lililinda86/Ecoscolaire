@@ -208,7 +208,7 @@ const run = async () => {
     await page.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 20_000 });
 
     const selectDetailedClass = async className => {
-      const picker = page.getByRole('button', { name: /classe.*élève|Choisir une classe/i }).first();
+      const picker = page.locator('button[aria-haspopup="listbox"]').first();
       await picker.click();
       await page.getByPlaceholder(/Rechercher une classe/i).fill(className);
       await page.getByRole('option', { name: new RegExp(className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
