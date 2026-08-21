@@ -114,6 +114,9 @@ export const attendanceDocumentId = (
   .update(`${schoolId}\u001f${academicYearId}\u001f${date}\u001f${studentId}`, 'utf8')
   .digest('hex')}`;
 
+export const resolveAcademicYearId = (school: Data): string =>
+  stringField(school.activeAcademicYearId) || stringField(school.academicYear);
+
 const isPresent = (status: CanonicalAttendanceStatus): boolean =>
   status === 'present' || status === 'late';
 
@@ -166,7 +169,7 @@ export const handleRecordStudentAttendance = async (
     const schoolSnapshot = await transaction.getSchool(schoolId);
     const school = schoolSnapshot.data;
     if (!schoolSnapshot.exists || !school) throw httpsError('failed-precondition', 'Student school was not found.');
-    const academicYearId = stringField(school.activeAcademicYearId);
+    const academicYearId = resolveAcademicYearId(school);
     if (!academicYearId) throw httpsError('failed-precondition', 'No canonical active academic year is configured.');
 
     const actorSchoolId = stringField(user.schoolId);

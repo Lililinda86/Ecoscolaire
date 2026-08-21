@@ -43,14 +43,14 @@ const Attendance: React.FC = () => {
   );
   const allowedClassIds = useMemo(() => {
     if (!currentUser || currentUser.role !== 'teacher') return null;
-    const activeYearId = currentSchool?.activeAcademicYearId;
+    const activeYearId = currentSchool?.activeAcademicYearId || currentSchool?.academicYear;
     return new Set((db.teacherAssignmentSlots || [])
       .filter(slot => slot.isActive === true
         && slot.schoolId === currentSchool?.id
         && slot.academicYearId === activeYearId
         )
       .map(slot => slot.classId));
-  }, [currentSchool?.activeAcademicYearId, currentSchool?.id, currentUser, db.teacherAssignmentSlots]);
+  }, [currentSchool?.academicYear, currentSchool?.activeAcademicYearId, currentSchool?.id, currentUser, db.teacherAssignmentSlots]);
   const availableClasses = useMemo(
     () => db.classes.filter(row => !allowedClassIds || allowedClassIds.has(row.id)),
     [allowedClassIds, db.classes],
