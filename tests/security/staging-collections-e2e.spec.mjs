@@ -30,6 +30,10 @@ test('completion runner covers live financial schedules, reversals and exact cle
   assert.match(source, /mode: 'PERCENTAGE'/);
   assert.match(source, /tuitionDiscounts/);
   assert.match(source, /paymentMoratoriums/);
+  assert.match(source, /e2e-complete-academic-year-/);
+  assert.match(source, /schoolActiveAcademicYearIdBefore/);
+  assert.match(source, /Refusing to restore an academic year pointer changed by another operation/);
+  assert.match(source, /academicYears.*academicYearFixtureId.*exists, false/s);
   assert.match(source, /ownerReverseCall/);
   assert.match(source, /secretaryReverseCall/);
   assert.match(source, /otherOwnerReverseCall/);
