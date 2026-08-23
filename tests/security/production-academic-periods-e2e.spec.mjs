@@ -22,6 +22,7 @@ test('Production Academic Periods smoke uses bounded fixtures and exact cleanup'
   assert.match(script, /assert\.deepEqual\(await snapshotRealData\(db\), realBefore\)/);
   assert.match(script, /residuals=0 orphans=0/);
   assert.doesNotMatch(script, /2026-2027/);
+  assert.match(script, /typeof operation === 'function' \? operation\(\) : operation/);
 });
 
 test('Production Academic Periods smoke covers lifecycle, validation, RBAC and direct-write denial', () => {

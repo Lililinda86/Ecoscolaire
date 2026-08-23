@@ -49,7 +49,7 @@ const config = () => ({
 
 const expectFailure = async (operation, codes) => {
   try {
-    await operation();
+    await (typeof operation === 'function' ? operation() : operation);
     assert.fail(`Expected failure: ${codes.join(' or ')}`);
   } catch (error) {
     if (error?.code === 'ERR_ASSERTION') throw error;
