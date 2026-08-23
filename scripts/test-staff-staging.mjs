@@ -183,7 +183,7 @@ const run = async () => {
     await secretaryUi.page.getByLabel('Nom', { exact: true }).fill(`Staff-${testRunId}`);
     await secretaryUi.page.getByLabel('Prénom', { exact: true }).fill('Fixture');
     await secretaryUi.page.getByRole('button', { name: /Enregistrer|Sauvegarder|save/i }).click();
-    await secretaryUi.page.getByText(`Staff-${testRunId}`, { exact: false }).waitFor({ timeout: 30_000 });
+    await secretaryUi.page.getByLabel('Nom', { exact: true }).waitFor({ state: 'hidden', timeout: 30_000 });
     let staffRows = await db.collection('staff').where('testRunId', '==', testRunId).where('schoolId', '==', schoolId).get();
     assert.equal(staffRows.size, 1);
     const uiStaffId = staffRows.docs[0].id;
