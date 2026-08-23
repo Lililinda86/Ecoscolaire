@@ -5,7 +5,7 @@ import type { Database, DatabasePatch } from '../db/storage';
 import type { User, School, Student, Payment, Expense, Evaluation, Grade, Attendance } from '../types';
 import type { QuerySnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { AcademicCalendarMutationCancelledError } from '../services/academicCalendarConfiguration';
-import { createAcademicYear as createAY, activateAcademicYear as actAY, updateAcademicYearBounds as updateAYBounds, createPeriod as createP, openPeriod as openP, updatePeriodStatus as updatePStatus } from '../services/academicCalendarPersistence';
+import { createAcademicYear as createAY, activateAcademicYear as actAY, updateAcademicYearBounds as updateAYBounds, createPeriod as createP, updatePeriod as updateP, openPeriod as openP, updatePeriodStatus as updatePStatus } from '../services/academicCalendarPersistence';
 import { db as firestoreDb } from '../db/firebase';
 import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
@@ -118,9 +118,9 @@ interface AppContextProps {
   activateAcademicYear: (yearId: string) => Promise<void>;
   updateAcademicYearBounds: (yearId: string, startDate: string, endDate: string) => Promise<void>;
   createAcademicPeriod: (period: Omit<Period, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateAcademicPeriod: (period: Period) => Promise<void>;
   openAcademicPeriod: (periodId: string) => Promise<void>;
   closeAcademicPeriod: (periodId: string) => Promise<void>;
-  publishAcademicPeriod: (periodId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -1209,6 +1209,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const updateAcademicPeriod = async (period: Period) => {
+    if (!db) throw new Error('Database not initialized');
+    if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
+    if (isSupervising && !window.confirm('Action critique en mode supervision. Continuer ?')) throw new AcademicCalendarMutationCancelledError();
+    const result = await updateP(firestoreDb, currentSchool.id, period);
+    setDb(prev => prev ? { ...prev, periods: upsertCanonicalPeriods(prev.periods || [], [result.updatedPeriod]) } : prev);
+  };
+
   const openAcademicPeriod = async (periodId: string) => {
     if (!db) throw new Error('Database not initialized');
     if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
@@ -1221,7 +1229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {
         ...prev,
         academicYears: upsertCanonicalAcademicYears(prev.academicYears || [], [result.updatedAcademicYear as AcademicYear]),
-        periods: upsertCanonicalPeriods(prev.periods || [], [result.openedPeriod, result.closedPeriod].filter(Boolean) as Period[])
+        periods: upsertCanonicalPeriods(prev.periods || [], [result.openedPeriod])
       };
     });
   };
@@ -1230,25 +1238,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!db) throw new Error('Database not initialized');
     if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
     if (isSupervising && !window.confirm('Action critique en mode supervision. Continuer ?')) throw new AcademicCalendarMutationCancelledError();
-    const result = await updatePStatus(firestoreDb, currentSchool.id, periodId, 'closed', currentUser.id);
+    const period = (db.periods || []).find(item => item.id === periodId);
+    if (!period) throw new Error('Période introuvable.');
+    const result = await updatePStatus(firestoreDb, currentSchool.id, periodId, 'closed', currentUser.id, period.academicYearId);
     setDb(prev => {
       if (!prev) throw new Error('État local indisponible.');
       return {
         ...prev,
-        periods: upsertCanonicalPeriods(prev.periods || [], [result.updatedPeriod])
-      };
-    });
-  };
-
-  const publishAcademicPeriod = async (periodId: string) => {
-    if (!db) throw new Error('Database not initialized');
-    if (!currentUser || !currentSchool) throw new Error('Not authenticated or no active school');
-    if (isSupervising && !window.confirm('Action critique en mode supervision. Continuer ?')) throw new AcademicCalendarMutationCancelledError();
-    const result = await updatePStatus(firestoreDb, currentSchool.id, periodId, 'published', currentUser.id);
-    setDb(prev => {
-      if (!prev) throw new Error('État local indisponible.');
-      return {
-        ...prev,
+        academicYears: upsertCanonicalAcademicYears(prev.academicYears || [], [result.updatedAcademicYear as AcademicYear]),
         periods: upsertCanonicalPeriods(prev.periods || [], [result.updatedPeriod])
       };
     });
@@ -1257,7 +1254,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       db, updateLocalState, updateStudentLocal, updateAttendanceLocal, addStudentsLocal, patchLocalEntities, saveDB, safeMergeDB, safePatchDB, saveStructuredGrades, currentUser, currentSchool,
-      createAcademicYear, activateAcademicYear, updateAcademicYearBounds, createAcademicPeriod, openAcademicPeriod, closeAcademicPeriod, publishAcademicPeriod,
+      createAcademicYear, activateAcademicYear, updateAcademicYearBounds, createAcademicPeriod, updateAcademicPeriod, openAcademicPeriod, closeAcademicPeriod,
       isSupervising, enterSupervision, exitSupervision,
       login, logout, isFirestoreConnected, firestoreError, lastSyncDate, supervisionSchoolId,
       authLoading: loading, logAuditAction, isSchoolSuspended

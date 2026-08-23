@@ -22,19 +22,43 @@ export type UpdateAcademicYearStatusResult = {
 
 export type CreatePeriodResult = {
   createdPeriod: Period;
-  updatedAcademicYear: Pick<AcademicYear, 'id' | 'version'>;
+  updatedAcademicYear: Pick<AcademicYear, 'id' | 'openPeriodId'>;
 };
 
 export type OpenPeriodResult = {
   openedPeriod: Period;
-  closedPeriod: Period | null;
   openPeriodId: string;
-  updatedAcademicYear: Pick<AcademicYear, 'id' | 'openPeriodId' | 'updatedAt' | 'updatedBy' | 'version'>;
+  updatedAcademicYear: Pick<AcademicYear, 'id' | 'openPeriodId'>;
 };
 
 export type UpdatePeriodStatusResult = {
   updatedPeriod: Period;
+  updatedAcademicYear: Pick<AcademicYear, 'id' | 'openPeriodId'>;
 };
+
+export type UpdatePeriodResult = { updatedPeriod: Period };
+
+type ManagePeriodInput = {
+  action: 'CREATE' | 'UPDATE' | 'OPEN' | 'CLOSE';
+  schoolId: string;
+  academicYearId: string;
+  periodId?: string;
+  profile?: Pick<Period, 'name' | 'type' | 'order' | 'startDate' | 'endDate'> & {
+    testFixture?: true;
+    testRunId?: string;
+  };
+};
+
+type ManagePeriodOutput = {
+  success: true;
+  period: Period;
+  academicYear: Pick<AcademicYear, 'id' | 'openPeriodId'>;
+};
+
+async function callManagePeriod(payload: ManagePeriodInput): Promise<ManagePeriodOutput> {
+  const callable = httpsCallable<ManagePeriodInput, ManagePeriodOutput>(getFunctions(), 'manageAcademicPeriod');
+  return (await callable(payload)).data;
+}
 
 export async function createAcademicYear(
   firestore: Firestore,
@@ -228,146 +252,60 @@ export async function updateAcademicYearStatus(
 }
 
 export async function createPeriod(
-  firestore: Firestore,
+  _firestore: Firestore,
   currentSchoolId: string,
   payload: Period
 ): Promise<CreatePeriodResult> {
-  if (payload.schoolId !== currentSchoolId) {
-    throw new Error("L'identifiant de l'Ǹcole ne correspond pas  l'Ǹcole active.");
-  }
-
-  const periodRef = doc(collection(firestore, 'periods'), payload.id);
-  const yearRef = doc(firestore, 'academicYears', payload.academicYearId);
-  
-  return runTransaction(firestore, async (transaction) => {
-    const yearSnap = await transaction.get(yearRef);
-    if (!yearSnap.exists()) {
-      throw new Error("AnnǸe acadǸmique introuvable.");
-    }
-    const yearData = yearSnap.data() as AcademicYear;
-    if (yearData.schoolId !== currentSchoolId) {
-      throw new Error("OpǸration non autorisǸe sur une autre Ǹcole.");
-    }
-
-    const createdPeriod = { ...payload, version: 1 };
-    transaction.set(periodRef, createdPeriod);
-
-    const updatedAcademicYear = {
-      id: yearData.id,
-      version: (yearData.version || 0) + 1
-    };
-    transaction.update(yearRef, { ...updatedAcademicYear });
-
-    return { createdPeriod, updatedAcademicYear };
+  const result = await callManagePeriod({
+    action: 'CREATE', schoolId: currentSchoolId, academicYearId: payload.academicYearId,
+    profile: {
+      name: payload.name, type: payload.type, order: payload.order,
+      startDate: payload.startDate, endDate: payload.endDate,
+      ...('testFixture' in payload && payload.testFixture === true
+        ? { testFixture: true as const, testRunId: String(payload.testRunId || '') }
+        : {}),
+    },
   });
+  return { createdPeriod: result.period, updatedAcademicYear: result.academicYear };
+}
+
+export async function updatePeriod(
+  _firestore: Firestore,
+  currentSchoolId: string,
+  payload: Period,
+): Promise<UpdatePeriodResult> {
+  const result = await callManagePeriod({
+    action: 'UPDATE', schoolId: currentSchoolId, academicYearId: payload.academicYearId,
+    periodId: payload.id,
+    profile: { name: payload.name, type: payload.type, order: payload.order, startDate: payload.startDate, endDate: payload.endDate },
+  });
+  return { updatedPeriod: result.period };
 }
 
 export async function openPeriod(
-  firestore: Firestore,
+  _firestore: Firestore,
   currentSchoolId: string,
   academicYearId: string,
   periodId: string,
-  userId: string
+  _userId: string
 ): Promise<OpenPeriodResult> {
-  const yearRef = doc(firestore, 'academicYears', academicYearId);
-  const targetPeriodRef = doc(firestore, 'periods', periodId);
-  const now = new Date().toISOString();
-
-  return runTransaction(firestore, async (transaction) => {
-    const yearSnap = await transaction.get(yearRef);
-    if (!yearSnap.exists()) {
-      throw new Error("AnnǸe acadǸmique introuvable.");
-    }
-    const yearData = yearSnap.data() as AcademicYear;
-
-    if (yearData.schoolId !== currentSchoolId) {
-      throw new Error("OpǸration non autorisǸe sur une autre Ǹcole.");
-    }
-
-    const targetSnap = await transaction.get(targetPeriodRef);
-    if (!targetSnap.exists()) {
-      throw new Error("PǸriode cible introuvable.");
-    }
-    const targetData = targetSnap.data() as Period;
-    
-    if (targetData.schoolId !== currentSchoolId) {
-      throw new Error("Accs refusǸ.");
-    }
-    if (targetData.academicYearId !== academicYearId) {
-      throw new Error("IncohǸrence de l'annǸe acadǸmique.");
-    }
-
-    const currentOpenPeriodId = yearData.openPeriodId;
-    let closedPeriod: Period | null = null;
-
-    if (currentOpenPeriodId && currentOpenPeriodId !== periodId) {
-      const oldPeriodRef = doc(firestore, 'periods', currentOpenPeriodId);
-      const oldPeriodSnap = await transaction.get(oldPeriodRef);
-      if (oldPeriodSnap.exists() && (oldPeriodSnap.data() as Period).status === 'open') {
-        const oldData = oldPeriodSnap.data() as Period;
-        closedPeriod = {
-          ...oldData,
-          status: 'closed',
-          updatedAt: now,
-          updatedBy: userId,
-          version: (oldData.version || 0) + 1
-        };
-        transaction.update(oldPeriodRef, { ...closedPeriod });
-      }
-    }
-
-    const openedPeriod = {
-      ...targetData,
-      status: 'open',
-      updatedAt: now,
-      updatedBy: userId,
-      version: (targetData.version || 0) + 1
-    } as Period;
-    
-    transaction.update(targetPeriodRef, { ...openedPeriod });
-
-    const updatedAcademicYear = {
-      id: yearData.id,
-      openPeriodId: periodId,
-      updatedAt: now,
-      updatedBy: userId,
-      version: (yearData.version || 0) + 1
-    };
-
-    transaction.update(yearRef, { ...updatedAcademicYear });
-
-    return { openedPeriod, closedPeriod, openPeriodId: periodId, updatedAcademicYear };
-  });
+  void _userId;
+  const result = await callManagePeriod({ action: 'OPEN', schoolId: currentSchoolId, academicYearId, periodId });
+  return { openedPeriod: result.period, openPeriodId: periodId, updatedAcademicYear: result.academicYear };
 }
 
 export async function updatePeriodStatus(
-  firestore: Firestore,
+  _firestore: Firestore,
   currentSchoolId: string,
   periodId: string,
   newStatus: Period['status'],
-  userId: string
+  _userId: string,
+  academicYearId?: string,
 ): Promise<UpdatePeriodStatusResult> {
-  const periodRef = doc(firestore, 'periods', periodId);
-  const now = new Date().toISOString();
-
-  return runTransaction(firestore, async (transaction) => {
-    const snap = await transaction.get(periodRef);
-    if (!snap.exists()) throw new Error("Document introuvable.");
-    
-    const data = snap.data() as Period;
-    if (data.schoolId !== currentSchoolId) throw new Error("Accs refusǸ.");
-    
-    const updatedPeriod = {
-      ...data,
-      status: newStatus,
-      updatedAt: now,
-      updatedBy: userId,
-      version: (data.version || 0) + 1
-    };
-    
-    transaction.update(periodRef, { ...updatedPeriod });
-    return { updatedPeriod };
-  });
+  void _userId;
+  if (newStatus !== 'closed' || !academicYearId) throw new Error('Transition de période non autorisée.');
+  const result = await callManagePeriod({ action: 'CLOSE', schoolId: currentSchoolId, academicYearId, periodId });
+  return { updatedPeriod: result.period, updatedAcademicYear: result.academicYear };
 }
 
 export type UpdateAcademicYearBoundsInput = {

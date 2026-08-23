@@ -107,8 +107,8 @@ export function validatePeriodInput(
   if (!endISO) {
     errors.push("La date de fin est invalide.");
   }
-  if (startISO && endISO && endISO <= startISO) {
-    errors.push("La date de fin doit être postérieure à la date de début.");
+  if (startISO && endISO && endISO < startISO) {
+    errors.push("La date de fin doit être postérieure ou égale à la date de début.");
   }
   
   if (startISO && yearStartISO && startISO < yearStartISO) {
@@ -180,7 +180,7 @@ export function getPermittedPeriodTransitions(currentStatus: Period['status']): 
     case 'open':
       return ['closed'];
     case 'closed':
-      return ['open', 'published', 'archived'];
+      return [];
     case 'published':
       return ['archived'];
     case 'archived':

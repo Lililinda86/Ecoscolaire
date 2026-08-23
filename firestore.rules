@@ -128,26 +128,6 @@ service cloud.firestore {
       return isAllowedRole && onlyAllowedKeysChanged && validActiveYearId && validUpdatedBy && validVersion;
     }
 
-    function isPeriodPointerUpdate() {
-      let isAllowedRole = isSuperAdmin() || (hasSchoolAccess(resource.data.schoolId) && (isAdminOrOwner() || isDirector()));
-      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
-      let onlyAllowedKeysChanged = affectedKeys.hasOnly(['openPeriodId', 'status', 'updatedAt', 'updatedBy', 'version']);
-
-      let validOpenPeriodId = !affectedKeys.hasAny(['openPeriodId']) ||
-                              request.resource.data.openPeriodId == null ||
-                              (request.resource.data.openPeriodId is string && request.resource.data.openPeriodId.size() > 0);
-
-      let validUpdatedBy = !affectedKeys.hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid;
-
-      let validVersion = affectedKeys.hasAll(['version']) &&
-                         request.resource.data.version is number &&
-                         request.resource.data.version == (('version' in resource.data ? resource.data.version : 0) + 1);
-
-      let schoolIdImmutable = request.resource.data.schoolId == resource.data.schoolId;
-
-      return isAllowedRole && onlyAllowedKeysChanged && validOpenPeriodId && validUpdatedBy && validVersion && schoolIdImmutable;
-    }
-
     function isUpdatingSensitiveUserFields() {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny([
         'role',
@@ -1384,18 +1364,21 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && !isBoardViewer() && (resource == null || hasSchoolAccess(resource.data.schoolId));
       allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId);
       allow update: if isAuthenticated() && isActive() && (
-        ((isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['openPeriodId'])) ||
-        isPeriodPointerUpdate()
+        (isAdminOrOwner() || isDirector()) &&
+        hasSchoolAccess(request.resource.data.schoolId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['openPeriodId'])
       );
       allow delete: if false;
     }
 
     match /periods/{periodId} {
-      allow read: if isAuthenticated() && isActive() && !isBoardViewer() && (resource == null || hasSchoolAccess(resource.data.schoolId));
-      allow create, update: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) &&
-        hasSchoolAccess(request.resource.data.schoolId) &&
-        request.resource.data.keys().hasAll(['schoolId', 'academicYearId', 'name', 'type', 'order', 'startDate', 'endDate', 'status', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']);
-      allow delete: if false;
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary() || isTeacher()) &&
+          (resource == null || hasSchoolAccess(resource.data.schoolId)))
+      );
+      // Every lifecycle mutation is performed by manageAcademicPeriod (Admin SDK).
+      allow create, update, delete: if false;
     }
 
     match /evaluations/{evalId} {

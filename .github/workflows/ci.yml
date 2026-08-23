@@ -133,7 +133,7 @@ jobs:
           npx vitest run tests/unit/AppNoAutomaticClassMutation.spec.tsx tests/unit/Staff.spec.tsx tests/unit/staffEligibility.spec.ts
 
       - name: Validate Staff staging E2E safety contract
-        run: node --check scripts/test-staff-staging.mjs
+        run: node --check scripts/test-staff-staging.mjs && node --check scripts/test-academic-periods-staging.mjs
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student

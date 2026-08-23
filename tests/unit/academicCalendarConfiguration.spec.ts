@@ -171,16 +171,15 @@ describe('academicCalendarConfiguration', () => {
       };
       const result = validatePeriodInput(input, academicYear, currentSchoolId);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("La date de fin doit être postérieure à la date de début.");
+      expect(result.errors).toContain("La date de fin doit être postérieure ou égale à la date de début.");
     });
 
-    it('rejects a period whose start and end dates are identical', () => {
+    it('accepts a one-day period whose start and end dates are identical', () => {
       const input = {
         name: 'Trimestre court', type: 'term' as Period['type'], order: 1, startDate: '2026-10-10', endDate: '2026-10-10'
       };
       const result = validatePeriodInput(input, academicYear, currentSchoolId);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("La date de fin doit être postérieure à la date de début.");
+      expect(result.errors).not.toContain("La date de fin doit être postérieure ou égale à la date de début.");
     });
 
     it('7. rejects strict invalid format dates (returns null)', () => {

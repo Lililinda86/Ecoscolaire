@@ -12,6 +12,12 @@ const mockRunTransaction = vi.fn();
 const mockWriteBatch = vi.fn();
 const mockBatchCommit = vi.fn();
 const mockBatchSet = vi.fn();
+const mockCallable = vi.fn();
+
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(() => ({})),
+  httpsCallable: vi.fn(() => mockCallable)
+}));
 
 vi.mock('firebase/firestore', () => {
   return {
@@ -44,8 +50,12 @@ describe('academicCalendarPersistence', () => {
 
     it('returns canonical result for simple creation', async () => {
       const payload = { id: 'ay1', schoolId: currentSchoolId, version: 0 } as AcademicYear;
+      mockRunTransaction.mockImplementation(async (_db, callback) => callback({
+        get: vi.fn().mockResolvedValue({ exists: () => false }),
+        set: vi.fn()
+      }));
       const result = await createAcademicYear(firestore, currentSchoolId, payload, false);
-      expect(mockWriteBatch).toHaveBeenCalled();
+      expect(mockRunTransaction).toHaveBeenCalled();
       expect(result.createdYear).toBeDefined();
       expect(result.createdYear.version).toBe(1);
       expect(result.activatedYear).toBeNull();
@@ -67,6 +77,9 @@ describe('academicCalendarPersistence', () => {
         transaction.get.mockResolvedValueOnce({
           exists: () => true,
           data: () => ({ id: 'school-1', activeAcademicYearId: 'ay1', version: 1 })
+        }).mockResolvedValueOnce({
+          exists: () => false,
+          data: () => undefined
         }).mockResolvedValueOnce({
           exists: () => true,
           data: () => ({ id: 'ay1', status: 'active', version: 1 })
@@ -133,50 +146,25 @@ describe('academicCalendarPersistence', () => {
 
   describe('createPeriod', () => {
     it('returns canonical result including updated academic year', async () => {
-      mockRunTransaction.mockImplementation(async (db, callback) => {
-        const transaction = {
-          get: vi.fn().mockResolvedValue({
-            exists: () => true,
-            data: () => ({ id: 'ay1', schoolId: currentSchoolId, version: 1 })
-          }),
-          set: vi.fn(),
-          update: vi.fn()
-        };
-        return callback(transaction);
-      });
-
-      const payload = { id: 'p1', schoolId: currentSchoolId, academicYearId: 'ay1' } as Period;
+      const period = { id: 'server-p1', schoolId: currentSchoolId, academicYearId: 'ay1', status: 'draft', version: 1 } as Period;
+      mockCallable.mockResolvedValue({ data: { success: true, period, academicYear: { id: 'ay1' } } });
+      const payload = { ...period, id: 'client-id', name: 'P1', type: 'term', order: 1, startDate: '2026-09-01', endDate: '2026-12-01' } as Period;
       const result = await createPeriod(firestore, currentSchoolId, payload);
       expect(result.createdPeriod.version).toBe(1);
-      expect(result.updatedAcademicYear.version).toBe(2);
+      expect(result.createdPeriod.id).toBe('server-p1');
+      expect(mockCallable).toHaveBeenCalledWith(expect.objectContaining({ action: 'CREATE', academicYearId: 'ay1' }));
     });
   });
 
   describe('openPeriod', () => {
-    it('returns canonical result closing old period', async () => {
-      mockRunTransaction.mockImplementation(async (db, callback) => {
-        const transaction = {
-          get: vi.fn().mockResolvedValueOnce({
-            exists: () => true,
-            data: () => ({ id: 'ay1', schoolId: currentSchoolId, openPeriodId: 'p1', version: 1 })
-          }).mockResolvedValueOnce({
-            exists: () => true,
-            data: () => ({ id: 'p2', schoolId: currentSchoolId, academicYearId: 'ay1', status: 'draft', version: 1 })
-          }).mockResolvedValueOnce({
-            exists: () => true,
-            data: () => ({ id: 'p1', status: 'open', version: 1 })
-          }),
-          update: vi.fn()
-        };
-        return callback(transaction);
-      });
-
+    it('returns the single opened period without closing another one implicitly', async () => {
+      const period = { id: 'p2', schoolId: currentSchoolId, academicYearId: 'ay1', status: 'open', version: 2 } as Period;
+      mockCallable.mockResolvedValue({ data: { success: true, period, academicYear: { id: 'ay1', openPeriodId: 'p2' } } });
       const result = await openPeriod(firestore, currentSchoolId, 'ay1', 'p2', 'user-1');
       expect(result.openPeriodId).toBe('p2');
       expect(result.openedPeriod.status).toBe('open');
-      expect(result.closedPeriod?.id).toBe('p1');
-      expect(result.closedPeriod?.status).toBe('closed');
       expect(result.updatedAcademicYear.openPeriodId).toBe('p2');
+      expect(mockCallable).toHaveBeenCalledWith(expect.objectContaining({ action: 'OPEN', periodId: 'p2' }));
     });
   });
 });

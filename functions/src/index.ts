@@ -3036,6 +3036,7 @@ export { setPrimaryTeacherAssignment } from './academic/setPrimaryTeacherAssignm
 export { deactivateTeacherAssignment } from './academic/deactivateTeacherAssignment';
 export { getTeacherAssignmentCandidates } from './academic/getTeacherAssignmentCandidates';
 export { updateAcademicYearBounds } from './academic/updateAcademicYearBounds';
+export { manageAcademicPeriod } from './academic/manageAcademicPeriod';
 export { createStudentSecure } from './studentCreationSecure';
 // Kept temporarily for source-compatible migration tests while Production exports
 // the generalized implementation below. This reference prevents dead-code errors
