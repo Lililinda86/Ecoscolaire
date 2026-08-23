@@ -110,12 +110,16 @@ const dbMock = {
   })
 };
 
+const firestoreMock = () => dbMock;
+firestoreMock.FieldValue = { serverTimestamp: () => 'SERVER_TIMESTAMP' };
+
 const adminMock = {
   initializeApp: () => {},
-  firestore: () => dbMock
+  firestore: firestoreMock
 };
 
 const functionsMock = {
+  logger: { error: () => undefined },
   https: {
     onCall: (handler) => handler,
     HttpsError: class HttpsError extends Error {
@@ -187,6 +191,7 @@ async function runTests() {
   setDocState('users', 'target_teacher', true, { role: 'teacher', isActive: true, schoolId: 'S1' });
   setDocState('users', 'target_teacher_inactive', true, { role: 'teacher', isActive: false, schoolId: 'S1' });
   setDocState('users', 'target_non_teacher', true, { role: 'accountant', isActive: true, schoolId: 'S1' });
+  setDocState('users', 'target_parent', true, { role: 'parent', isActive: true, schoolId: 'S1' });
   setDocState('users', 'target_teacher_other_school', true, { role: 'teacher', isActive: true, schoolId: 'S2' });
 
   setDocState('staff', 'staff_teacher', true, { role: 'teacher', schoolId: 'S1' }); // no isActive field = active (legacy compatibility)
@@ -242,11 +247,11 @@ async function runTests() {
     'USER_INACTIVE'
   );
 
-  // 12. utilisateur non teacher
+  // 12. un compte non-Staff ne peut pas être lié
   await assertThrowsBusinessError(
-    () => linkStaffToUser({ schoolId: 'S1', staffId: 'staff_teacher', userId: 'target_non_teacher' }, { auth: { uid: 'operator_director' } }),
+    () => linkStaffToUser({ schoolId: 'S1', staffId: 'staff_teacher', userId: 'target_parent' }, { auth: { uid: 'operator_director' } }),
     'failed-precondition',
-    'USER_NOT_TEACHER'
+    'USER_NOT_STAFF_ROLE'
   );
 
   // 13. utilisateur autre école
@@ -263,12 +268,13 @@ async function runTests() {
     'STAFF_NOT_FOUND'
   );
 
-  // 15. staff non teacher
-  await assertThrowsBusinessError(
-    () => linkStaffToUser({ schoolId: 'S1', staffId: 'staff_non_teacher', userId: 'target_teacher' }, { auth: { uid: 'operator_director' } }),
-    'failed-precondition',
-    'STAFF_NOT_TEACHER'
+  // 15. Staff et rôle applicatif restent distincts : un chauffeur peut être lié à un compte comptable.
+  const nonTeacherLink = await linkStaffToUser(
+    { staffId: 'staff_non_teacher', userId: 'target_non_teacher' },
+    { auth: { uid: 'operator_director' } }
   );
+  assert.ok(nonTeacherLink.linked);
+  assert.strictEqual(nonTeacherLink.schoolId, 'S1');
 
   // 16. staff autre école
   await assertThrowsBusinessError(
@@ -322,6 +328,9 @@ async function runTests() {
   assert.strictEqual(staffPointerDoc._data.isActive, true);
   assert.strictEqual(userPointerDoc._data.linkId, linkId);
   assert.strictEqual(staffPointerDoc._data.linkId, linkId);
+  const linkAudits = Object.values(docs).filter(doc => doc.path.startsWith('audit_logs/') && doc._data?.action === 'STAFF_USER_LINKED');
+  assert.strictEqual(linkAudits.length, 1, 'A single canonical link audit must be written');
+  assert.strictEqual(linkAudits[0]._data.targetName, 'staff/staff_teacher');
 
   // 26. Retry actif idempotent
   const retryResult = await linkStaffToUser(
@@ -380,6 +389,8 @@ async function runTests() {
   assert.strictEqual(staffPointerDoc._data.isActive, false);
   assert.strictEqual(linkDoc._data.deactivationReason, 'Dissociation test');
   assert.strictEqual(linkDoc._data.deactivatedBy, 'operator_director');
+  const unlinkAudits = Object.values(docs).filter(doc => doc.path.startsWith('audit_logs/') && doc._data?.action === 'STAFF_USER_UNLINKED');
+  assert.strictEqual(unlinkAudits.length, 1, 'A single canonical unlink audit must be written');
 
   // Retry unlink idempotent
   const unlinkRetry = await unlinkStaffFromUser(

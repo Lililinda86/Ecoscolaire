@@ -14,7 +14,7 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
   const { schoolId, staffId, userId, reason } = data || {};
 
   // 1. Argument validation
-  if (typeof schoolId !== 'string' || schoolId.trim() === '' || schoolId.includes('/') || schoolId.length > 100) {
+  if (schoolId !== undefined && (typeof schoolId !== 'string' || schoolId.trim() === '' || schoolId.includes('/') || schoolId.length > 100)) {
     throw new functions.https.HttpsError(
       'invalid-argument',
       'schoolId doit être une chaîne non vide valide.',
@@ -38,7 +38,7 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
     );
   }
 
-  const cleanSchoolId = schoolId.trim();
+  const requestedSchoolId = typeof schoolId === 'string' ? schoolId.trim() : '';
   const cleanStaffId = staffId.trim();
   const cleanUserId = userId.trim();
   
@@ -57,7 +57,7 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
 
   const db = admin.firestore();
   const nowIso = new Date().toISOString();
-  const staffPointerId = `${cleanSchoolId}__${cleanStaffId}`;
+  const auditRef = db.collection('audit_logs').doc();
 
   try {
     return await db.runTransaction(async (transaction) => {
@@ -72,7 +72,7 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
         );
       }
       const operator = operatorSnap.data()!;
-      if (operator.isActive !== true) {
+      if (!(operator.isActive === true || operator.active === true || operator.status === 'active')) {
         throw new functions.https.HttpsError(
           'permission-denied',
           'Compte opérateur inactif.',
@@ -87,7 +87,10 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
           { businessCode: 'PERMISSION_DENIED' }
         );
       }
-      if (operator.role !== 'superAdmin' && operator.schoolId !== cleanSchoolId) {
+      const cleanSchoolId = operator.role === 'superAdmin'
+        ? requestedSchoolId
+        : typeof operator.schoolId === 'string' ? operator.schoolId.trim() : '';
+      if (!cleanSchoolId || (operator.role !== 'superAdmin' && requestedSchoolId && requestedSchoolId !== cleanSchoolId)) {
         throw new functions.https.HttpsError(
           'permission-denied',
           'L\'opérateur n\'appartient pas à l\'école demandée.',
@@ -135,6 +138,7 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
 
       // 4. Read current pointers
       const userPointerRef = db.collection('staffUserLinkByUser').doc(cleanUserId);
+      const staffPointerId = `${cleanSchoolId}__${cleanStaffId}`;
       const staffPointerRef = db.collection('staffUserLinkByStaff').doc(staffPointerId);
 
       const userPointerSnap = await transaction.get(userPointerRef);
@@ -264,6 +268,23 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
       transaction.update(userPointerRef, pointerUpdate);
       transaction.update(staffPointerRef, pointerUpdate);
 
+      transaction.create(auditRef, {
+        actorUid: uid,
+        actorRole: operator.role,
+        schoolId: cleanSchoolId,
+        action: 'STAFF_USER_UNLINKED',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: nowIso,
+        targetType: 'STAFF',
+        targetId: cleanStaffId,
+        targetName: `staff/${cleanStaffId}`,
+        details: { userId: cleanUserId, linkId: userPointer.linkId },
+        canonicalBackendAudit: true,
+        ...(staff.testFixture === true && typeof staff.testRunId === 'string'
+          ? { testFixture: true, testRunId: staff.testRunId }
+          : {})
+      });
+
       return {
         linkId: userPointer.linkId,
         schoolId: cleanSchoolId,
@@ -274,12 +295,19 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
       };
     });
   } catch (err: unknown) {
+    const technical = err as { name?: string; message?: string; code?: string | number };
+    functions.logger.error('unlinkStaffFromUser transaction failed', {
+      errorName: technical?.name ?? 'UnknownError',
+      errorCode: technical?.code ?? 'unknown',
+      errorMessage: technical?.message ?? String(err),
+    });
     if (err instanceof functions.https.HttpsError) {
       throw err;
     }
     throw new functions.https.HttpsError(
       'internal',
-      err instanceof Error ? err.message : String(err)
+      'La dissociation Staff/compte a échoué.',
+      { businessCode: 'INTERNAL_ERROR' }
     );
   }
 });

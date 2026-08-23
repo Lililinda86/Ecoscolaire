@@ -34,6 +34,9 @@ jobs:
       - name: Validate Production financial E2E safety contract
         run: node --check scripts/test-production-financial-e2e.mjs && node --test tests/security/production-financial-e2e.spec.mjs
 
+      - name: Validate Production Staff E2E safety contract
+        run: node --check scripts/test-staff-production.mjs && node --test tests/security/production-staff-e2e.spec.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
@@ -124,8 +127,13 @@ jobs:
           node tests/functions/test-authenticated-audit.cjs
           node tests/functions/test-expense-ledger.cjs
           node tests/functions/test-student-class-assignment.cjs
+          node tests/functions/test-manage-staff.cjs
+          node tests/functions/test-staff-user-links.cjs
           node --test tests/security/app-no-class-write-on-load.spec.mjs
-          npx vitest run tests/unit/AppNoAutomaticClassMutation.spec.tsx
+          npx vitest run tests/unit/AppNoAutomaticClassMutation.spec.tsx tests/unit/Staff.spec.tsx tests/unit/staffEligibility.spec.ts
+
+      - name: Validate Staff staging E2E safety contract
+        run: node --check scripts/test-staff-staging.mjs
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student

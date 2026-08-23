@@ -6,10 +6,9 @@ export type StaffUserLinkErrorType =
   | 'INVALID_ARGUMENT'
   | 'USER_NOT_FOUND'
   | 'USER_INACTIVE'
-  | 'USER_NOT_TEACHER'
+  | 'USER_NOT_STAFF_ROLE'
   | 'STAFF_NOT_FOUND'
   | 'STAFF_INACTIVE'
-  | 'STAFF_NOT_TEACHER'
   | 'USER_ALREADY_LINKED'
   | 'STAFF_ALREADY_LINKED'
   | 'STAFF_USER_LINK_NOT_FOUND'
@@ -28,7 +27,7 @@ export class StaffUserLinkError extends Error {
 }
 
 export interface LinkStaffToUserInput {
-  schoolId: string;
+  schoolId?: string;
   staffId: string;
   userId: string;
 }
@@ -43,7 +42,7 @@ export interface LinkStaffToUserOutput {
 }
 
 export interface UnlinkStaffFromUserInput {
-  schoolId: string;
+  schoolId?: string;
   staffId: string;
   userId: string;
   reason?: string;
@@ -58,6 +57,10 @@ export interface UnlinkStaffFromUserOutput {
   alreadyUnlinked: boolean;
 }
 
+const withoutUndefined = <T extends object>(input: T): T => Object.fromEntries(
+  Object.entries(input).filter(([, value]) => value !== undefined),
+) as T;
+
 export async function linkStaffToUser(
   input: LinkStaffToUserInput
 ): Promise<LinkStaffToUserOutput> {
@@ -68,7 +71,7 @@ export async function linkStaffToUser(
   );
 
   try {
-    const response = await callable(input);
+    const response = await callable(withoutUndefined(input));
     return response.data;
   } catch (error: unknown) {
     throw parseStaffUserLinkError(error, 'Erreur lors de la liaison de l\'enseignant.');
@@ -85,7 +88,7 @@ export async function unlinkStaffFromUser(
   );
 
   try {
-    const response = await callable(input);
+    const response = await callable(withoutUndefined(input));
     return response.data;
   } catch (error: unknown) {
     throw parseStaffUserLinkError(error, 'Erreur lors de la dissociation de l\'enseignant.');

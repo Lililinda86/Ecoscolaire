@@ -4643,7 +4643,7 @@ describe('Staff Creation Rules (buildStaffWritePayload exact format)', () => {
       await setDoc(doc(ctx.firestore(), 'users', 'director1'), { role: 'director', schoolId: 'school-1', active: true });
     });
   });
-  it('1. Directeur autoris� dans sa propre �cole', async () => {
+  it('1. Directeur refusé en écriture client dans sa propre école (callable obligatoire)', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users', 'director1'), { role: 'director', schoolId: 'school-1', active: true });
     });
@@ -4660,7 +4660,7 @@ describe('Staff Creation Rules (buildStaffWritePayload exact format)', () => {
       createdBy: 'director1',
       updatedBy: 'director1'
     };
-    await assertSucceeds(setDoc(doc(ctx.firestore(), 'staff', 's1'), payload));
+    await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's1'), payload));
   });
 
   it('2. Autre �cole refus�e', async () => {
@@ -4718,7 +4718,7 @@ describe('Staff Creation Rules (buildStaffWritePayload exact format)', () => {
     await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's6'), payload));
   });
 
-  it('7. payload canonique enseignant actif accept�', async () => {
+  it('7. payload canonique enseignant actif refusé en écriture client', async () => {
     const ctx = testEnv.authenticatedContext('director1');
     const payload = {
       schoolId: 'school-1',
@@ -4727,10 +4727,10 @@ describe('Staff Creation Rules (buildStaffWritePayload exact format)', () => {
       staffType: 'teacher',
       employmentStatus: 'active'
     };
-    await assertSucceeds(setDoc(doc(ctx.firestore(), 'staff', 's7'), payload));
+    await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's7'), payload));
   });
 
-  it('8. userId absent accept�', async () => {
+  it('8. userId absent ne contourne pas le callable obligatoire', async () => {
     const ctx = testEnv.authenticatedContext('director1');
     const payload = {
       schoolId: 'school-1',
@@ -4739,7 +4739,7 @@ describe('Staff Creation Rules (buildStaffWritePayload exact format)', () => {
       staffType: 'teacher',
       employmentStatus: 'active'
     };
-    await assertSucceeds(setDoc(doc(ctx.firestore(), 'staff', 's8'), payload));
+    await assertFails(setDoc(doc(ctx.firestore(), 'staff', 's8'), payload));
   });
 
   it('9. suppression refus�e', async () => {
