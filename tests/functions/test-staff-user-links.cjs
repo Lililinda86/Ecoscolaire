@@ -119,6 +119,7 @@ const adminMock = {
 };
 
 const functionsMock = {
+  logger: { error: () => undefined },
   https: {
     onCall: (handler) => handler,
     HttpsError: class HttpsError extends Error {

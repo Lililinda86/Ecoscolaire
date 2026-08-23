@@ -295,15 +295,15 @@ export const unlinkStaffFromUser = functions.https.onCall(async (data, context) 
       };
     });
   } catch (err: unknown) {
-    if (err instanceof functions.https.HttpsError) {
-      throw err;
-    }
     const technical = err as { name?: string; message?: string; code?: string | number };
-    console.error('unlinkStaffFromUser transaction failed', {
+    functions.logger.error('unlinkStaffFromUser transaction failed', {
       errorName: technical?.name ?? 'UnknownError',
       errorCode: technical?.code ?? 'unknown',
       errorMessage: technical?.message ?? String(err),
     });
+    if (err instanceof functions.https.HttpsError) {
+      throw err;
+    }
     throw new functions.https.HttpsError(
       'internal',
       'La dissociation Staff/compte a échoué.',

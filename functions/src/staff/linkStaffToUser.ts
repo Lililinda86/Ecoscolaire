@@ -280,15 +280,15 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
       };
     });
   } catch (err: unknown) {
-    if (err instanceof functions.https.HttpsError) {
-      throw err;
-    }
     const technical = err as { name?: string; message?: string; code?: string | number };
-    console.error('linkStaffToUser transaction failed', {
+    functions.logger.error('linkStaffToUser transaction failed', {
       errorName: technical?.name ?? 'UnknownError',
       errorCode: technical?.code ?? 'unknown',
       errorMessage: technical?.message ?? String(err),
     });
+    if (err instanceof functions.https.HttpsError) {
+      throw err;
+    }
     throw new functions.https.HttpsError(
       'internal',
       'La liaison Staff/compte a échoué.',
