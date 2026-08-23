@@ -180,8 +180,8 @@ const run = async () => {
     pages.push(secretaryUi);
     await loginStaff(secretaryUi.page, appUrl, ACTORS.secretary);
     await secretaryUi.page.getByRole('button', { name: /Ajouter|add/i }).click();
-    await secretaryUi.page.getByLabel('Nom').fill(`Staff-${testRunId}`);
-    await secretaryUi.page.getByLabel('Prénom').fill('Fixture');
+    await secretaryUi.page.getByLabel('Nom', { exact: true }).fill(`Staff-${testRunId}`);
+    await secretaryUi.page.getByLabel('Prénom', { exact: true }).fill('Fixture');
     await secretaryUi.page.getByRole('button', { name: /Enregistrer|Sauvegarder|save/i }).click();
     await secretaryUi.page.getByText(`Staff-${testRunId}`, { exact: false }).waitFor({ timeout: 30_000 });
     let staffRows = await db.collection('staff').where('testRunId', '==', testRunId).where('schoolId', '==', schoolId).get();
@@ -191,7 +191,7 @@ const run = async () => {
     let row = secretaryUi.page.locator('tr', { hasText: `Staff-${testRunId}` });
     await row.waitFor({ timeout: 30_000 });
     await row.getByTestId(`edit-btn-${uiStaffId}`).click();
-    await secretaryUi.page.getByLabel('Prénom').fill('Fixture-Modifiée');
+    await secretaryUi.page.getByLabel('Prénom', { exact: true }).fill('Fixture-Modifiée');
     await secretaryUi.page.getByRole('button', { name: /Enregistrer|Sauvegarder|save/i }).click();
     await secretaryUi.page.reload({ waitUntil: 'domcontentloaded' });
     row = secretaryUi.page.locator('tr', { hasText: `Staff-${testRunId}` });
