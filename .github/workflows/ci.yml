@@ -123,9 +123,7 @@ jobs:
           node tests/functions/test-student-finance-projection.cjs
           node tests/functions/test-secretary-collection-calculations.cjs
           node tests/functions/test-academic-resolvers.cjs
-          node tests/functions/test-ensure-class-program-draft.cjs
-          node tests/functions/test-publish-class-program-draft.cjs
-          node tests/functions/test-bulk-add-subjects.cjs
+          npx firebase-tools@15.25.0 emulators:exec --project demo-school --only firestore "node tests/functions/test-class-program-lifecycle.cjs"
           node tests/functions/test-boardviewer-governance.cjs
           node tests/functions/test-authenticated-audit.cjs
           node tests/functions/test-expense-ledger.cjs

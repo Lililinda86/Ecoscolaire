@@ -11,6 +11,7 @@ import { ClassProgramEmptyState } from './ClassProgramEmptyState';
 import { ClassProgramEditor } from './editor/ClassProgramEditor';
 import { ensureClassProgramDraft } from '../../../services/classProgramDraftFunctions';
 import { determineProgramAction } from '../../../services/classProgramActions';
+import { archiveClassProgram } from '../../../services/classProgramArchiveFunctions';
 import type { TechnicalSpecialty } from '../../../types';
 
 export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) => void }> = ({ onDirtyChange }) => {
@@ -28,6 +29,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [isArchiving, setIsArchiving] = useState<boolean>(false);
 
   const schoolId = db?.school?.id;
   const normalizedYear = React.useMemo(() => {
@@ -108,6 +110,29 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
     }
   };
 
+  const handleArchive = async () => {
+    if (!schoolId || !normalizedYear || !selectedClassId || !program?.publishedRevisionId || isArchiving) return;
+    const confirmed = window.confirm(
+      `Archiver le programme publié ?\n\nClasse : ${selectedClass?.name || selectedClassId}\nAnnée scolaire : ${activeYearName || normalizedYear}\nStatut : PUBLISHED → ARCHIVED\n\nLes matières et l’historique seront conservés.`,
+    );
+    if (!confirmed) return;
+    setIsArchiving(true);
+    setDraftError(null);
+    try {
+      await archiveClassProgram({
+        schoolId,
+        academicYearId: normalizedYear,
+        classId: selectedClassId,
+        expectedPublishedRevisionId: program.publishedRevisionId,
+      });
+      retry();
+    } catch (error: unknown) {
+      setDraftError(error instanceof Error ? error.message : 'Le programme n’a pas pu être archivé.');
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
   const handleSectionFilterChange = (value: 'all' | 'francophone' | 'anglophone') => {
     setSectionFilter(value);
     setIsEditing(false);
@@ -162,7 +187,7 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
   if (!currentUser || !db) return null;
 
   const isManager = canManageAcademicPrograms(currentUser.role);
-  const isReadOnlyRole = currentUser.role === 'teacher';
+  const isReadOnlyRole = currentUser.role === 'teacher' || currentUser.role === 'secretary';
 
   // If academic year is not configured correctly
   if (!normalizedYear) {
@@ -295,6 +320,16 @@ export const ClassProgramPanel: React.FC<{ onDirtyChange?: (isDirty: boolean) =>
           }}>
             {/* Left: Program status title & badges */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {isManager && program?.status === 'published' && program.hasUnpublishedChanges === false && program.publishedRevisionId && (
+                <button
+                  type="button"
+                  onClick={handleArchive}
+                  disabled={isArchiving}
+                  style={{ border: '1px solid #dc2626', background: 'transparent', color: '#dc2626', padding: '0.5rem 0.8rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: isArchiving ? 'not-allowed' : 'pointer', opacity: isArchiving ? 0.7 : 1 }}
+                >
+                  {isArchiving ? 'Archivage...' : 'Archiver'}
+                </button>
+              )}
               <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1.05rem' }}>
                 Statut du programme :
               </span>

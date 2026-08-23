@@ -83,7 +83,7 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
           { businessCode: 'PERMISSION_DENIED' }
         );
       }
-      const allowedRoles = ['superAdmin', 'owner', 'director', 'secretary'];
+      const allowedRoles = ['superAdmin', 'owner', 'director'];
       if (!allowedRoles.includes(user.role)) {
         throw new functions.https.HttpsError(
           'permission-denied',
@@ -117,9 +117,15 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
           { businessCode: 'INVALID_ARGUMENT' }
         );
       }
+      if (classData.active === false || classData.isActive === false || classData.status === 'inactive' || classData.status === 'archived') {
+        throw new functions.https.HttpsError('failed-precondition', 'La classe doit être active.', { businessCode: 'CLASS_NOT_ACTIVE' });
+      }
 
       // 3. Resolve Academic Year and Class Program
       const resolvedYear = await resolveAcademicYear(transaction, db, cleanSchoolId, cleanAcademicYearId);
+      if (resolvedYear.data.active === false || resolvedYear.data.isActive === false || resolvedYear.data.status === 'inactive' || resolvedYear.data.status === 'archived') {
+        throw new functions.https.HttpsError('failed-precondition', 'L’année scolaire doit être active.', { businessCode: 'YEAR_NOT_ACTIVE' });
+      }
       const resolvedProgram = await resolveClassProgram(transaction, db, cleanSchoolId, cleanClassId, resolvedYear);
 
       if (!resolvedProgram) {
@@ -168,7 +174,7 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
           d.programId !== programId ||
           d.schoolId !== cleanSchoolId ||
           d.classId !== cleanClassId ||
-          d.academicYearId !== cleanAcademicYearId ||
+          d.academicYearId !== resolvedYear.id ||
           d.revisionId !== expectedDraftRevisionId ||
           typeof d.revisionNumber !== 'number' ||
           d.revisionNumber < 1 ||
@@ -193,7 +199,7 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
               { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
             );
           }
-          if (typeof d.coefficient !== 'number' || d.coefficient <= 0 || isNaN(d.coefficient)) {
+          if (typeof d.coefficient !== 'number' || !Number.isFinite(d.coefficient) || d.coefficient <= 0 || d.coefficient > 100) {
             throw new functions.https.HttpsError(
               'failed-precondition',
               'Coefficient invalide détecté.',
@@ -208,7 +214,7 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
               { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
             );
           }
-          if (typeof d.weeklyHours !== 'number' || d.weeklyHours <= 0 || isNaN(d.weeklyHours)) {
+          if (typeof d.weeklyHours !== 'number' || !Number.isFinite(d.weeklyHours) || d.weeklyHours <= 0 || d.weeklyHours > 80) {
             throw new functions.https.HttpsError(
               'failed-precondition',
               'Heures hebdomadaires invalides détectées.',
@@ -218,7 +224,7 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
         } else {
           // Si inactive, on s'assure juste que s'il y a une valeur, elle est valide
           if (d.coefficient !== undefined && d.coefficient !== null) {
-            if (typeof d.coefficient !== 'number' || d.coefficient <= 0 || isNaN(d.coefficient)) {
+            if (typeof d.coefficient !== 'number' || !Number.isFinite(d.coefficient) || d.coefficient <= 0 || d.coefficient > 100) {
               throw new functions.https.HttpsError(
                 'failed-precondition',
                 'Coefficient invalide détecté.',
@@ -227,7 +233,7 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
             }
           }
           if (d.weeklyHours !== undefined && d.weeklyHours !== null) {
-            if (typeof d.weeklyHours !== 'number' || d.weeklyHours <= 0 || isNaN(d.weeklyHours)) {
+            if (typeof d.weeklyHours !== 'number' || !Number.isFinite(d.weeklyHours) || d.weeklyHours <= 0 || d.weeklyHours > 80) {
               throw new functions.https.HttpsError(
                 'failed-precondition',
                 'Heures hebdomadaires invalides détectées.',
@@ -270,6 +276,20 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
         seenSubjectIds.add(s.subjectId);
       }
 
+      const activeOrders = activeSubjects.map(subject => subject.displayOrder).sort((a, b) => a - b);
+      if (activeOrders.some((order, index) => order !== index)) {
+        throw new functions.https.HttpsError('failed-precondition', 'L’ordre des matières actives doit être continu.', { businessCode: 'INVALID_ORDER' });
+      }
+      const catalogSnaps = await Promise.all(activeSubjects.map(subject => transaction.get(db.collection('subjects').doc(subject.subjectId))));
+      catalogSnaps.forEach(snapshot => {
+        const catalog = snapshot.data();
+        if (!snapshot.exists || !catalog) throw new functions.https.HttpsError('not-found', 'Matière introuvable.', { businessCode: 'SUBJECT_NOT_FOUND' });
+        if (catalog.schoolId !== cleanSchoolId) throw new functions.https.HttpsError('permission-denied', 'Accès inter-école refusé.', { businessCode: 'SCHOOL_MISMATCH' });
+        if (catalog.active === false || catalog.isActive === false || catalog.status === 'inactive' || catalog.status === 'archived') {
+          throw new functions.https.HttpsError('failed-precondition', 'Une matière du programme est inactive.', { businessCode: 'SUBJECT_NOT_ACTIVE' });
+        }
+      });
+
       // Compute actual token
       const actualDraftStateToken = computeDraftStateToken(subjects as unknown as DraftSubjectInput[]);
 
@@ -291,16 +311,11 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
             { businessCode: 'PROGRAM_INTEGRITY_ERROR' }
           );
         }
-        return {
-          programId,
-          publishedRevisionId: expectedDraftRevisionId,
-          publishedRevisionNumber: program.publishedRevisionNumber,
-          published: false,
-          alreadyPublished: true,
-          activeSubjectCount: activeSubjects.length,
-          inactiveSubjectCount: subjects.length - activeSubjects.length,
-          publishedDraftStateToken: actualDraftStateToken
-        };
+        throw new functions.https.HttpsError(
+          'already-exists',
+          'Cette révision est déjà publiée.',
+          { businessCode: 'PROGRAM_ALREADY_PUBLISHED' }
+        );
       }
 
       // If program claims to have no unpublished changes but doesn't match above, it's an integrity error
@@ -355,7 +370,15 @@ export const publishClassProgramDraft = functions.https.onCall(async (data, cont
         publishedAt: nowIso,
         publishedBy: uid,
         updatedAt: nowIso,
-        updatedBy: uid
+        updatedBy: uid,
+        version: Number(program.version || 0) + 1
+      });
+      transaction.create(db.collection('audit_logs').doc(), {
+        schoolId: cleanSchoolId, action: 'CLASS_PROGRAM_PUBLISHED', actorUid: uid, actorRole: user.role,
+        targetType: 'classProgram', targetId: programId,
+        details: { academicYearId: resolvedYear.id, classId: cleanClassId, revisionId: expectedDraftRevisionId, subjectCount: activeSubjects.length, version: Number(program.version || 0) + 1 },
+        timestamp: nowIso, createdAt: nowIso, canonicalBackendAudit: true,
+        ...(program.testFixture === true ? { testFixture: true, testRunId: program.testRunId } : {})
       });
 
       return {

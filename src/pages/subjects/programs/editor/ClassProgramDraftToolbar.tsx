@@ -38,7 +38,7 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        {isManager && <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={onAddSubject}
@@ -70,8 +70,7 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
             {isSaving ? 'Enregistrement...' : 'Enregistrer'}
           </button>
 
-          {isManager && (
-            <button
+          <button
               type="button"
               onClick={onPublish}
               disabled={isDirty || isSaving}
@@ -80,9 +79,8 @@ export const ClassProgramDraftToolbar: React.FC<ClassProgramDraftToolbarProps> =
               style={{ backgroundColor: 'var(--success)' }}
             >
               Publier
-            </button>
-          )}
-        </div>
+          </button>
+        </div>}
       </div>
     </div>
   );

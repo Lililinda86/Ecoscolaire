@@ -3,7 +3,7 @@ import { useClassProgramDraft } from '../../../../hooks/useClassProgramDraft';
 import type { ClassProgram, ClassSubject, Subject, ClassSection } from '../../../../types';
 import { ClassProgramDraftToolbar } from './ClassProgramDraftToolbar';
 import { ClassProgramDraftSummary } from './ClassProgramDraftSummary';
-import { bulkAddSubjectsToClasses, type BulkAddSubjectsResult } from '../../../../services/bulkClassSubjects';
+import type { BulkAddSubjectsResult } from '../../../../services/bulkClassSubjects';
 import { ClassProgramSubjectRow } from './ClassProgramSubjectRow';
 import { ClassProgramSubjectPicker } from './ClassProgramSubjectPicker';
 import { ClassProgramEditorState } from './ClassProgramEditorState';
@@ -51,6 +51,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
     draftStateToken,
     isTokenCalculating,
     tokenError,
+    addSubject,
     updateSubjectFields,
     removeSubject,
     reorderSubjects,
@@ -71,9 +72,9 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
-  const [isBulkAdding, setIsBulkAdding] = useState(false);
-  const [bulkResult, setBulkResult] = useState<BulkAddSubjectsResult | null>(null);
-  const [bulkPendingInfo, setBulkPendingInfo] = useState<{ classes: number, subjects: number } | null>(null);
+  const [isBulkAdding] = useState(false);
+  const [bulkResult] = useState<BulkAddSubjectsResult | null>(null);
+  const [bulkPendingInfo] = useState<{ classes: number, subjects: number } | null>(null);
   const [isReloading, setIsReloading] = useState(false);
   const [loadTimeout, setLoadTimeout] = useState(false);
 
@@ -119,28 +120,11 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
 
   const handleBulkSelect = async (selectedClassIds: string[], selectedSubjectIds: string[]) => {
     setIsPickerOpen(false);
-    setBulkPendingInfo({ classes: selectedClassIds.length, subjects: selectedSubjectIds.length });
-    setIsBulkAdding(true);
-    setBulkResult(null);
-
-    try {
-      const result = await bulkAddSubjectsToClasses({
-        schoolId,
-        academicYearId,
-        classIds: selectedClassIds,
-        subjectIds: selectedSubjectIds
-      });
-      setBulkResult(result);
-    } catch (err: unknown) {
-      setBulkResult({
-        classesProcessed: 0,
-        totalSubjectsAdded: 0,
-        totalDuplicatesIgnored: 0,
-        details: [{ classId: 'erreur', status: 'error', added: 0, ignored: 0, error: err instanceof Error ? err.message : String(err) }]
-      });
-    } finally {
-      setIsBulkAdding(false);
-    }
+    if (selectedClassIds.length !== 1 || selectedClassIds[0] !== classId) return;
+    selectedSubjectIds.forEach(subjectId => {
+      const subject = catalogSubjects.find(candidate => candidate.id === subjectId);
+      if (subject) addSubject(subject);
+    });
   };
 
   const closeBulkResult = () => {
@@ -239,7 +223,7 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
       <ClassProgramDraftToolbar
         isDirty={isDirty}
         isSaving={isSaving || isTokenCalculating}
-        isManager={userRole === 'superAdmin' || userRole === 'owner' || userRole === 'director' || userRole === 'secretary'}
+        isManager={userRole === 'superAdmin' || userRole === 'owner' || userRole === 'director'}
         onSave={saveDraft}
         onCancel={cancelChanges}
         onAddSubject={() => setIsPickerOpen(true)}
@@ -435,11 +419,14 @@ export const ClassProgramEditor: React.FC<ClassProgramEditorProps> = ({
       >
         <div className="p-2">
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-            Voulez-vous publier la révision <strong>v{program?.draftRevisionNumber}</strong> de ce programme de classe pour l'année scolaire <strong>{academicYearId}</strong> ?
+            Confirmez la publication de la révision <strong>v{program?.draftRevisionNumber}</strong>.
           </p>
           <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg text-xs text-gray-600 dark:text-gray-400 mb-4 space-y-1.5 border border-gray-150 dark:border-gray-800">
+            <div>• Classe : <strong>{selectedClass?.name || classId}</strong></div>
+            <div>• Année scolaire : <strong>{academicYearId}</strong></div>
             <div>• Matières actives : <strong>{subjects.length}</strong></div>
             <div>• Matières inactives : <strong>{initialSubjects.length - subjects.length}</strong></div>
+            <div>• Changement de statut : <strong>DRAFT → PUBLISHED</strong></div>
             <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 font-medium">
               Note : ces chiffres et l'intégrité du programme seront revérifiés côté serveur avant publication.
             </div>
