@@ -57,6 +57,10 @@ export interface UnlinkStaffFromUserOutput {
   alreadyUnlinked: boolean;
 }
 
+const withoutUndefined = <T extends object>(input: T): T => Object.fromEntries(
+  Object.entries(input).filter(([, value]) => value !== undefined),
+) as T;
+
 export async function linkStaffToUser(
   input: LinkStaffToUserInput
 ): Promise<LinkStaffToUserOutput> {
@@ -67,7 +71,7 @@ export async function linkStaffToUser(
   );
 
   try {
-    const response = await callable(input);
+    const response = await callable(withoutUndefined(input));
     return response.data;
   } catch (error: unknown) {
     throw parseStaffUserLinkError(error, 'Erreur lors de la liaison de l\'enseignant.');
@@ -84,7 +88,7 @@ export async function unlinkStaffFromUser(
   );
 
   try {
-    const response = await callable(input);
+    const response = await callable(withoutUndefined(input));
     return response.data;
   } catch (error: unknown) {
     throw parseStaffUserLinkError(error, 'Erreur lors de la dissociation de l\'enseignant.');
