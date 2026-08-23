@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ClassProgram, ClassSubject, Subject } from '../types';
 import {
-  saveClassProgramDraft,
   buildClassSubjectId,
   ClassProgramDraftError
 } from '../services/classProgramDrafts';
+import { updateClassProgramDraft } from '../services/classProgramUpdateFunctions';
 import { getClassProgramAccessMode } from './useClassProgram';
 import { computeDraftStateToken } from '../utils/draftStateToken';
 
@@ -268,12 +268,7 @@ export function useClassProgramDraft({
         }
       });
 
-      await saveClassProgramDraft({
-        program,
-        originalSubjects,
-        editedSubjects: finalSubjects,
-        userId
-      });
+      await updateClassProgramDraft(program, finalSubjects);
 
       setIsDirty(false);
       if (onDirtyChange) onDirtyChange(false);

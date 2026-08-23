@@ -841,7 +841,7 @@ export interface ClassProgram {
   classId: string;
   academicYearId: string;
 
-  status: 'draft' | 'published';
+  status: 'draft' | 'published' | 'archived';
 
   draftRevisionId: string;
   draftRevisionNumber: number;
@@ -850,6 +850,7 @@ export interface ClassProgram {
   publishedRevisionNumber?: number;
 
   hasUnpublishedChanges: boolean;
+  version?: number;
 
   createdAt: string;
   createdBy: string;
@@ -858,6 +859,10 @@ export interface ClassProgram {
 
   publishedAt?: string;
   publishedBy?: string;
+  archivedAt?: string;
+  archivedBy?: string;
+  testFixture?: boolean;
+  testRunId?: string;
 }
 
 export interface ClassSubject {

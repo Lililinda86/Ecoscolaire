@@ -23,7 +23,7 @@
     "test:vercel-build": "node --test tests/security/vercel-build-target.spec.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs tests/security/staff-rules.spec.mjs tests/security/boardviewer-readonly.spec.mjs tests/security/expense-immutability.spec.mjs --config=playwright.rules.config.ts\"",
+    "test:rules": "npx firebase-tools emulators:exec --only firestore \"playwright test tests/security/rules.spec.mjs tests/security/staff-rules.spec.mjs tests/security/program-rules.spec.mjs tests/security/boardviewer-readonly.spec.mjs tests/security/expense-immutability.spec.mjs --config=playwright.rules.config.ts\"",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "seed:staging": "node scripts/setup-test-data.mjs"
