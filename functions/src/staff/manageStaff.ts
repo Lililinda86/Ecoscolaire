@@ -101,9 +101,6 @@ const parseProfile = (raw: unknown, action: StaffAction): Data => {
     }
     output.testFixture = true;
     output.testRunId = requiredId(profile.testRunId, 'testRunId');
-    if (process.env.GCLOUD_PROJECT === 'ecoscolaire-c5861') {
-      throw error('permission-denied', 'Fixtures interdites en Production.', 'FIXTURE_FORBIDDEN');
-    }
   }
 
   if (action === 'CREATE') {
@@ -161,6 +158,18 @@ export const manageStaff = functions.https.onCall(async (raw, context) => {
   const profile = action === 'CREATE' || action === 'UPDATE'
     ? parseProfile(payload.profile, action)
     : {};
+  if (process.env.GCLOUD_PROJECT === 'ecoscolaire-c5861' && profile.testFixture === true) {
+    const fixtureActorMatches = actor.testFixture === true
+      && typeof actor.testRunId === 'string'
+      && actor.testRunId === profile.testRunId;
+    if (!fixtureActorMatches) {
+      throw error(
+        'permission-denied',
+        'Fixtures Production réservées à un acteur fixture du même testRunId.',
+        'FIXTURE_FORBIDDEN',
+      );
+    }
+  }
   const auditRef = db.collection('audit_logs').doc();
   const nowIso = new Date().toISOString();
 
