@@ -54,15 +54,9 @@ export function isStaffEligibleForTeaching(staff: Staff | Partial<Staff>, school
 }
 
 export function buildStaffWritePayload(
-  form: Partial<Staff>,
-  currentSchool: { id: string },
-  currentUser: { id: string } | null,
-  isEdit: boolean
-): Omit<Staff, 'id'> {
-  const now = new Date().toISOString();
-  
+  form: Partial<Staff>
+): Partial<Staff> {
   const payload: Partial<Staff> = {
-    schoolId: currentSchool.id,
     firstName: form.firstName?.trim() || '',
     lastName: form.lastName?.trim() || '',
     staffType: form.staffType || 'other',
@@ -78,18 +72,9 @@ export function buildStaffWritePayload(
     if (form.departureDate) payload.departureDate = form.departureDate;
     if (form.departureReason) payload.departureReason = form.departureReason;
   }
-
-  if (isEdit) {
-    payload.updatedAt = now;
-    if (currentUser) payload.updatedBy = currentUser.id;
-  } else {
-    payload.createdAt = now;
-    payload.updatedAt = now;
-    if (currentUser) {
-      payload.createdBy = currentUser.id;
-      payload.updatedBy = currentUser.id;
-    }
+  if (form.testFixture === true && form.testRunId) {
+    payload.testFixture = true;
+    payload.testRunId = form.testRunId;
   }
-
-  return payload as Omit<Staff, 'id'>;
+  return payload;
 }

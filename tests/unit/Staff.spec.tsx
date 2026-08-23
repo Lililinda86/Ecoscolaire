@@ -11,14 +11,24 @@ vi.mock('../../src/db/firebase', () => ({
   db: {}
 }));
 
-const { mockSetDoc } = vi.hoisted(() => ({
-  mockSetDoc: vi.fn()
+const { mockMutateStaff, mockLinkStaff, mockUnlinkStaff } = vi.hoisted(() => ({
+  mockMutateStaff: vi.fn(),
+  mockLinkStaff: vi.fn(),
+  mockUnlinkStaff: vi.fn()
+}));
+
+vi.mock('../../src/services/staffFunctions', () => ({ mutateStaff: mockMutateStaff }));
+vi.mock('../../src/services/staffUserLinkFunctions', () => ({
+  linkStaffToUser: mockLinkStaff,
+  unlinkStaffFromUser: mockUnlinkStaff
 }));
 
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn((db, collection, id) => `${collection}/${id}`),
-  setDoc: mockSetDoc,
   collection: vi.fn(),
+  getDocs: vi.fn().mockResolvedValue({ docs: [] }),
+  query: vi.fn((...args) => args),
+  where: vi.fn((...args) => args),
   runTransaction: vi.fn()
 }));
 
@@ -42,6 +52,10 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMutateStaff.mockResolvedValue({
+      staffId: 'generated-staff', schoolId: 'school-1', action: 'CREATE',
+      employmentStatus: 'active', isActive: true
+    });
     vi.spyOn(AppContextModule, 'useAppContext').mockReturnValue(mockContextValue as unknown as ReturnType<typeof AppContextModule.useAppContext>);
     vi.spyOn(I18nContextModule, 'useI18n').mockReturnValue({ t: (k: string) => k, locale: 'fr', setLocale: () => {} } as unknown as ReturnType<typeof I18nContextModule.useI18n>);
     window.confirm = vi.fn().mockReturnValue(true);
@@ -49,7 +63,6 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
   });
 
   it('A. Création réussie', async () => {
-    mockSetDoc.mockResolvedValueOnce(undefined);
     render(<StaffPage />);
 
     const addBtn = screen.getAllByText('add')[0];
@@ -62,7 +75,7 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
     fireEvent.submit(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
-      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockMutateStaff).toHaveBeenCalledTimes(1);
     });
 
     expect(mockUpdateLocalState).toHaveBeenCalledTimes(1);
@@ -74,7 +87,7 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
   it('B. Écriture refusée', async () => {
     const error = new Error('Permission denied') as Error & { code?: string };
     error.code = 'permission-denied';
-    mockSetDoc.mockRejectedValueOnce(error);
+    mockMutateStaff.mockRejectedValueOnce(error);
     render(<StaffPage />);
 
     const addBtn = screen.getAllByText('add')[0];
@@ -83,7 +96,7 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
     fireEvent.submit(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
-      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockMutateStaff).toHaveBeenCalledTimes(1);
     });
 
     expect(mockUpdateLocalState).not.toHaveBeenCalled();
@@ -91,7 +104,7 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
   });
 
   it('C. Mauvaise configuration', async () => {
-    mockSetDoc.mockRejectedValueOnce(new Error('Network error'));
+    mockMutateStaff.mockRejectedValueOnce(new Error('Network error'));
     render(<StaffPage />);
 
     const addBtn = screen.getAllByText('add')[0];
@@ -100,7 +113,7 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
     fireEvent.submit(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
-      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockMutateStaff).toHaveBeenCalledTimes(1);
     });
 
     expect(mockUpdateLocalState).not.toHaveBeenCalled();
@@ -110,7 +123,7 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
   it('D. Double clic bloqué (isSubmitting)', async () => {
     let resolvePromise: (value?: unknown) => void;
     const promise = new Promise((resolve) => { resolvePromise = resolve; });
-    mockSetDoc.mockReturnValueOnce(promise);
+    mockMutateStaff.mockReturnValueOnce(promise);
     render(<StaffPage />);
 
     const addBtn = screen.getAllByText('add')[0];
@@ -125,17 +138,23 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
     fireEvent.submit(submitBtn); // deuxième clic rapide
 
     await waitFor(() => {
-      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockMutateStaff).toHaveBeenCalledTimes(1);
     });
 
-    resolvePromise!();
+    resolvePromise!({
+      staffId: 'generated-staff', schoolId: 'school-1', action: 'CREATE',
+      employmentStatus: 'active', isActive: true
+    });
     await waitFor(() => {
       expect(mockUpdateLocalState).toHaveBeenCalledTimes(1);
     });
   });
 
   it('E. Édition avec merge: true et préservation des champs', async () => {
-    mockSetDoc.mockResolvedValueOnce(undefined);
+    mockMutateStaff.mockResolvedValueOnce({
+      staffId: 's1', schoolId: 'school-1', action: 'UPDATE',
+      employmentStatus: 'active', isActive: true
+    });
     render(<StaffPage />);
 
     // Click edit on the first staff 's1'
@@ -148,11 +167,14 @@ describe('B. Personnel (Staff.tsx) - Flux de persistance', () => {
     fireEvent.submit(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
-      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockMutateStaff).toHaveBeenCalledTimes(1);
     });
 
-    const setDocArgs = mockSetDoc.mock.calls[0];
-    expect(setDocArgs[2]).toEqual({ merge: true });
+    expect(mockMutateStaff).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'UPDATE',
+      staffId: 's1',
+      profile: expect.objectContaining({ firstName: 'ModifiedName', lastName: 'Teacher' })
+    }));
 
     await waitFor(() => {
       expect(mockUpdateLocalState).toHaveBeenCalledTimes(1);
@@ -177,20 +199,17 @@ describe('buildStaffWritePayload', () => {
       staffType: 'teacher' as const,
       legacyProp: 'should-be-ignored-too'
     };
-    const currentSchool = { id: 'school-override' };
-    const currentUser = { id: 'user-1' };
+    const payload = buildStaffWritePayload(form);
 
-    const payload = buildStaffWritePayload(form, currentSchool, currentUser, false);
-
-    expect(payload.schoolId).toBe('school-override');
+    expect(payload.schoolId).toBeUndefined();
     expect(payload.firstName).toBe('John'); // trimmed
     expect(payload.lastName).toBe('Doe'); // trimmed
     expect((payload as Record<string, unknown>).legacyProp).toBeUndefined(); // no legacy
-    expect(payload.createdBy).toBe('user-1');
-    expect(payload.createdAt).toBeDefined();
+    expect(payload.createdBy).toBeUndefined();
+    expect(payload.createdAt).toBeUndefined();
     
     // update test
-    const updatePayload = buildStaffWritePayload({ employmentStatus: 'departed', departureDate: '2025-01-01' }, currentSchool, null, true);
+    const updatePayload = buildStaffWritePayload({ employmentStatus: 'departed', departureDate: '2025-01-01' });
     expect(updatePayload.updatedBy).toBeUndefined();
     expect(updatePayload.createdAt).toBeUndefined(); // no overwrite
     expect(updatePayload.employmentStatus).toBe('departed');

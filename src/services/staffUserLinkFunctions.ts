@@ -6,10 +6,9 @@ export type StaffUserLinkErrorType =
   | 'INVALID_ARGUMENT'
   | 'USER_NOT_FOUND'
   | 'USER_INACTIVE'
-  | 'USER_NOT_TEACHER'
+  | 'USER_NOT_STAFF_ROLE'
   | 'STAFF_NOT_FOUND'
   | 'STAFF_INACTIVE'
-  | 'STAFF_NOT_TEACHER'
   | 'USER_ALREADY_LINKED'
   | 'STAFF_ALREADY_LINKED'
   | 'STAFF_USER_LINK_NOT_FOUND'
@@ -28,7 +27,7 @@ export class StaffUserLinkError extends Error {
 }
 
 export interface LinkStaffToUserInput {
-  schoolId: string;
+  schoolId?: string;
   staffId: string;
   userId: string;
 }
@@ -43,7 +42,7 @@ export interface LinkStaffToUserOutput {
 }
 
 export interface UnlinkStaffFromUserInput {
-  schoolId: string;
+  schoolId?: string;
   staffId: string;
   userId: string;
   reason?: string;
