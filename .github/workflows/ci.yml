@@ -37,6 +37,9 @@ jobs:
       - name: Validate Production Staff E2E safety contract
         run: node --check scripts/test-staff-production.mjs && node --test tests/security/production-staff-e2e.spec.mjs
 
+      - name: Validate Production Academic Periods E2E safety contract
+        run: node --check scripts/test-academic-periods-production.mjs && node --test tests/security/production-academic-periods-e2e.spec.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
