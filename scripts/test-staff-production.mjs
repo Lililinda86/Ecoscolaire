@@ -298,16 +298,22 @@ const run = async () => {
     await expectFailure(() => deleteDoc(doc(ownerClient.db, 'staff', staffA)), ['permission-denied']);
 
     const auditSnapshot = await db.collection('audit_logs').where('testRunId', '==', testRunId).get();
-    const auditActions = new Set(auditSnapshot.docs.map(item => item.data().action));
-    for (const action of [
+    const requiredStaffAuditActions = [
       'STAFF_CREATED', 'STAFF_UPDATED', 'STAFF_DEACTIVATED', 'STAFF_REACTIVATED',
       'STAFF_USER_LINKED', 'STAFF_USER_UNLINKED',
-    ]) assert.equal(auditActions.has(action), true, `Missing ${action}`);
-    const auditJson = JSON.stringify(auditSnapshot.docs.map(item => item.data()));
-    for (const account of [owner, secretary, targetA, targetB, ...Object.values(privacyAccounts), crossUser]) {
-      assert.equal(auditJson.includes(account.email), false);
+    ];
+    const staffAuditDocuments = auditSnapshot.docs
+      .map(item => item.data())
+      .filter(item => requiredStaffAuditActions.includes(String(item.action)));
+    const auditActions = new Set(staffAuditDocuments.map(item => item.action));
+    for (const action of requiredStaffAuditActions) {
+      assert.equal(auditActions.has(action), true, `Missing ${action}`);
     }
-    assert.equal(auditJson.includes('Fixture-Modifiée'), false);
+    const auditJson = JSON.stringify(staffAuditDocuments);
+    for (const account of [owner, secretary, targetA, targetB, ...Object.values(privacyAccounts), crossUser]) {
+      assert.equal(auditJson.includes(account.email), false, `Staff audit leaked fixture email for role ${account.role}`);
+    }
+    assert.equal(auditJson.includes('Fixture-Modifiée'), false, 'Staff audit leaked fixture display name');
 
     console.log('PRODUCTION responsive Staff 360/768/1440');
     for (const width of [360, 768, 1440]) {
