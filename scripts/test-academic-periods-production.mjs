@@ -4,7 +4,7 @@ import { applicationDefault, deleteApp as deleteAdminApp, initializeApp as initi
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { chromium } from '@playwright/test';
-import { deleteApp, initializeApp } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import {
   collection, deleteDoc, doc, getDocs, getFirestore as getClientFirestore,
   query, setDoc, updateDoc, where,
@@ -83,10 +83,11 @@ async function run() {
   const adminAuth = getAdminAuth(adminApp);
   const browser = await chromium.launch({ headless: true });
   const authUids = [];
-  const clientApps = [];
   const contexts = [];
   const createdPeriodIds = [];
   const realBefore = await snapshotRealData(db);
+  let phase = 'fixture-setup';
+  let primaryError;
 
   const newPage = async (role, viewport) => {
     const context = await browser.newContext({ viewport });
@@ -125,10 +126,10 @@ async function run() {
       });
     }
 
+    phase = 'client-authentication';
     const clients = {};
     for (const role of roles) {
       const app = initializeApp(config(), `prod-period-${role}-${testRunId}`);
-      clientApps.push(app);
       const auth = getAuth(app);
       await signInWithEmailAndPassword(auth, `${role}.${testRunId}@example.test`, password);
       clients[role] = {
@@ -137,6 +138,7 @@ async function run() {
       };
     }
 
+    phase = 'owner-ui-lifecycle';
     const ownerPage = await newPage('owner', { width: 1440, height: 900 });
     const createViaUi = async ({ name, order, startDate, endDate }) => {
       await ownerPage.getByTestId('add-academic-period').click();
@@ -166,6 +168,7 @@ async function run() {
     await ownerPage.getByText(`A-edit-${testRunId}`).waitFor({ timeout: 30_000 });
     const periodB = await createViaUi({ name: `B-${testRunId}`, order: 2, startDate: '2031-01-05', endDate: '2031-03-31' });
 
+    phase = 'date-order-validation';
     await expectFailure(clients.owner.manage(payload('invalid-range', 10, '2030-10-02', '2030-10-01')), ['invalid-argument']);
     await expectFailure(clients.owner.manage(payload('outside-year', 10, '2030-08-31', '2030-08-31')), ['failed-precondition']);
     await expectFailure(clients.owner.manage(payload('overlap', 10, '2030-12-01', '2030-12-31')), ['failed-precondition']);
@@ -179,6 +182,7 @@ async function run() {
       profile: { name: `Adjacent-edit-${testRunId}`, type: 'term', order: 3, startDate: '2030-12-21', endDate: '2031-01-04', ...fixture },
     });
 
+    phase = 'open-close-lifecycle';
     await ownerPage.getByTestId(`open-period-${periodA}`).click();
     await ownerPage.getByTestId(`close-period-${periodA}`).waitFor({ timeout: 30_000 });
     await ownerPage.getByTestId(`open-period-${periodB}`).click();
@@ -188,6 +192,7 @@ async function run() {
     await ownerPage.getByTestId(`open-period-${periodB}`).click();
     await ownerPage.getByTestId(`close-period-${periodB}`).waitFor({ timeout: 30_000 });
 
+    phase = 'rbac-callables';
     const closeB = { action: 'CLOSE', schoolId, academicYearId: yearId, periodId: periodB };
     await expectFailure(clients.secretary.manage(closeB), ['permission-denied']);
     await expectFailure(clients.teacher.manage(closeB), ['permission-denied']);
@@ -197,6 +202,7 @@ async function run() {
     await expectFailure(clients.owner.manage({ ...closeB, schoolId: 'cross-school-fixture' }), ['permission-denied']);
     await expectFailure(clients.owner.manage({ ...closeB, action: 'OPEN', periodId: periodA }), ['failed-precondition']);
 
+    phase = 'rbac-reads';
     for (const role of ['owner', 'director', 'secretary', 'teacher']) {
       const snapshot = await getDocs(query(collection(clients[role].db, 'periods'), where('schoolId', '==', schoolId)));
       assert.equal(snapshot.size, 3);
@@ -205,12 +211,14 @@ async function run() {
       await expectFailure(getDocs(query(collection(clients[role].db, 'periods'), where('schoolId', '==', schoolId))), ['permission-denied']);
     }
 
+    phase = 'direct-write-denials';
     const directId = `direct-${testRunId}`;
     const directRef = doc(clients.owner.db, 'periods', directId);
     await expectFailure(setDoc(directRef, { schoolId, academicYearId: yearId, ...fixture }), ['permission-denied']);
     await expectFailure(updateDoc(doc(clients.owner.db, 'periods', periodC), { name: 'forbidden' }), ['permission-denied']);
     await expectFailure(deleteDoc(doc(clients.owner.db, 'periods', periodA)), ['permission-denied']);
 
+    phase = 'responsive-readonly-ui';
     const secretaryPage = await newPage('secretary', { width: 360, height: 800 });
     await secretaryPage.getByText(`A-edit-${testRunId}`).waitFor({ timeout: 30_000 });
     assert.equal(await secretaryPage.getByTestId(`open-period-${periodC}`).count(), 0);
@@ -218,6 +226,7 @@ async function run() {
     await teacherPage.getByText(`Adjacent-edit-${testRunId}`).waitFor({ timeout: 30_000 });
     assert.equal(await teacherPage.getByTestId(`open-period-${periodC}`).count(), 0);
 
+    phase = 'audit-and-side-effects';
     const audits = await db.collection('audit_logs').where('testRunId', '==', testRunId).get();
     const periodAudits = audits.docs.filter(item => String(item.data().action || '').startsWith('ACADEMIC_PERIOD_'));
     assert.equal(periodAudits.length, 8);
@@ -232,10 +241,12 @@ async function run() {
     assert.equal((await db.collection('grades').where('testRunId', '==', testRunId).get()).size, 0);
     assert.equal((await db.collection('reportCards').where('testRunId', '==', testRunId).get()).size, 0);
     console.log(`ITALO-W2-01 PRODUCTION E2E PASS ${testRunId}`);
+  } catch (error) {
+    primaryError = error;
+    console.error(`ITALO-W2-01 PRIMARY E2E ERROR phase=${phase}`, error);
   } finally {
     for (const context of contexts) await context.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
-    for (const app of clientApps) await deleteApp(app).catch(() => undefined);
     for (const collectionName of FIXTURE_COLLECTIONS) {
       const snapshot = await db.collection(collectionName).where('testRunId', '==', testRunId).get();
       for (const document of snapshot.docs) await document.ref.delete();
@@ -248,6 +259,9 @@ async function run() {
     console.log(`ITALO-W2-01 PRODUCTION CLEANUP PASS ${testRunId} residuals=0 orphans=0`);
     await deleteAdminApp(adminApp);
   }
+  if (primaryError) throw primaryError;
 }
 
-run().catch(error => { console.error(error); process.exit(1); });
+run()
+  .then(() => process.exit(0))
+  .catch(error => { console.error(error); process.exit(1); });
