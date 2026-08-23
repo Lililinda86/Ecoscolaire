@@ -356,6 +356,8 @@ export interface Staff {
   licenseNumber?: string;
   assignedBusId?: string;
   position?: string;
+  testFixture?: boolean;
+  testRunId?: string;
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'left_early';

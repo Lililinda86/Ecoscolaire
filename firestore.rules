@@ -1469,22 +1469,26 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
     match /staff/{staffId} {
-      allow read: if isAuthenticated() && isActive() && !isBoardViewer() && hasSchoolAccess(resource.data.schoolId);
-      allow create: if isAuthenticated() && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.schoolId is string
-                    && (!('staffType' in request.resource.data) || request.resource.data.staffType in ['teacher', 'director', 'secretary', 'accountant', 'supervisor', 'driver', 'maintenance', 'other'])
-                    && (!('employmentStatus' in request.resource.data) || request.resource.data.employmentStatus in ['active', 'inactive', 'suspended', 'departed']);
-      allow update: if isAuthenticated() && isActive()
-                    && canManagePedagogy(resource.data.schoolId)
-                    && request.resource.data.schoolId == resource.data.schoolId
-                    && (!('staffType' in request.resource.data) || request.resource.data.staffType in ['teacher', 'director', 'secretary', 'accountant', 'supervisor', 'driver', 'maintenance', 'other'])
-                    && (!('employmentStatus' in request.resource.data) || request.resource.data.employmentStatus in ['active', 'inactive', 'suspended', 'departed']);
-      allow delete: if false;
+      // Staff documents can contain contact or legacy private fields. Keep the
+      // complete document restricted to the operational management roles.
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+                  && (isSuperAdmin() || isOwner() || isDirector() || isSecretary());
+      // Lifecycle writes are backend-only so schoolId, actor and timestamps are
+      // derived by manageStaff and identity-link fields cannot be forged.
+      allow create, update, delete: if false;
     }
     match /staffAttendance/{attendanceId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
-      allow write: if isAuthenticated() && isActive() && canManagePedagogy(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive()
+                    && canManagePedagogy(request.resource.data.schoolId)
+                    && attendanceId == 'staff_' + request.resource.data.schoolId + '_' + request.resource.data.date + '_' + request.resource.data.staffId;
+      allow update: if isAuthenticated() && isActive()
+                    && canManagePedagogy(resource.data.schoolId)
+                    && request.resource.data.schoolId == resource.data.schoolId
+                    && request.resource.data.staffId == resource.data.staffId
+                    && request.resource.data.date == resource.data.date
+                    && attendanceId == 'staff_' + resource.data.schoolId + '_' + resource.data.date + '_' + resource.data.staffId;
+      allow delete: if false;
     }
     match /staffUserLinks/{linkId} {
       allow read: if isAuthenticated() && isActive() && (
