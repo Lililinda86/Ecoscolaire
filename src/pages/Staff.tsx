@@ -405,38 +405,38 @@ const StaffPage: React.FC = () => {
         <form onSubmit={handleSave}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label>Nom</label>
-              <input required value={currentStaff.lastName || ''} onChange={e => setCurrentStaff({...currentStaff, lastName: e.target.value})} />
+              <label htmlFor="staff-last-name">Nom</label>
+              <input id="staff-last-name" required value={currentStaff.lastName || ''} onChange={e => setCurrentStaff({...currentStaff, lastName: e.target.value})} />
             </div>
             <div className="form-group">
-              <label>Prénom</label>
-              <input required value={currentStaff.firstName || ''} onChange={e => setCurrentStaff({...currentStaff, firstName: e.target.value})} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label>Téléphone (facultatif)</label>
-              <input type="tel" value={currentStaff.phone || ''} onChange={e => setCurrentStaff({...currentStaff, phone: e.target.value})} />
-            </div>
-            <div className="form-group">
-              <label>Email (facultatif)</label>
-              <input type="email" value={currentStaff.email || ''} onChange={e => setCurrentStaff({...currentStaff, email: e.target.value})} />
+              <label htmlFor="staff-first-name">Prénom</label>
+              <input id="staff-first-name" required value={currentStaff.firstName || ''} onChange={e => setCurrentStaff({...currentStaff, firstName: e.target.value})} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label>Fonction</label>
-              <select required value={currentStaff.staffType || currentStaff.role || 'teacher'} onChange={e => setCurrentStaff({...currentStaff, staffType: e.target.value as Staff['staffType']})}>
+              <label htmlFor="staff-phone">Téléphone (facultatif)</label>
+              <input id="staff-phone" type="tel" value={currentStaff.phone || ''} onChange={e => setCurrentStaff({...currentStaff, phone: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="staff-email">Email (facultatif)</label>
+              <input id="staff-email" type="email" value={currentStaff.email || ''} onChange={e => setCurrentStaff({...currentStaff, email: e.target.value})} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label htmlFor="staff-type">Fonction</label>
+              <select id="staff-type" required value={currentStaff.staffType || currentStaff.role || 'teacher'} onChange={e => setCurrentStaff({...currentStaff, staffType: e.target.value as Staff['staffType']})}>
                 {staffTypeOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>Statut</label>
-              <select required value={currentStaff.employmentStatus || (currentStaff.active !== false ? 'active' : 'inactive')} onChange={e => setCurrentStaff({...currentStaff, employmentStatus: e.target.value as Staff['employmentStatus']})}>
+              <label htmlFor="staff-employment-status">Statut</label>
+              <select id="staff-employment-status" required value={currentStaff.employmentStatus || (currentStaff.active !== false ? 'active' : 'inactive')} onChange={e => setCurrentStaff({...currentStaff, employmentStatus: e.target.value as Staff['employmentStatus']})}>
                 {employmentStatusOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
@@ -447,12 +447,12 @@ const StaffPage: React.FC = () => {
           {currentStaff.employmentStatus === 'departed' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
               <div className="form-group">
-                <label>Date de départ *</label>
-                <input required type="date" value={currentStaff.departureDate || ''} onChange={e => setCurrentStaff({...currentStaff, departureDate: e.target.value})} />
+                <label htmlFor="staff-departure-date">Date de départ *</label>
+                <input id="staff-departure-date" required type="date" value={currentStaff.departureDate || ''} onChange={e => setCurrentStaff({...currentStaff, departureDate: e.target.value})} />
               </div>
               <div className="form-group">
-                <label>Raison du départ (facultatif)</label>
-                <input type="text" value={currentStaff.departureReason || ''} onChange={e => setCurrentStaff({...currentStaff, departureReason: e.target.value})} />
+                <label htmlFor="staff-departure-reason">Raison du départ (facultatif)</label>
+                <input id="staff-departure-reason" type="text" value={currentStaff.departureReason || ''} onChange={e => setCurrentStaff({...currentStaff, departureReason: e.target.value})} />
               </div>
             </div>
           )}
