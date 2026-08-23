@@ -164,7 +164,8 @@ export const manageStaff = functions.https.onCall(async (raw, context) => {
   const auditRef = db.collection('audit_logs').doc();
   const nowIso = new Date().toISOString();
 
-  return db.runTransaction(async transaction => {
+  try {
+    return await db.runTransaction(async transaction => {
     const existingSnap = await transaction.get(staffRef);
     const existing = existingSnap.data();
     if (action === 'CREATE' && existingSnap.exists) {
@@ -263,5 +264,16 @@ export const manageStaff = functions.https.onCall(async (raw, context) => {
             ? profile.employmentStatus === 'active'
             : existing?.isActive !== false,
     };
-  });
+    });
+  } catch (err: unknown) {
+    if (err instanceof functions.https.HttpsError) throw err;
+    const technical = err as { name?: string; message?: string; code?: string | number };
+    console.error('manageStaff transaction failed', {
+      action,
+      errorName: technical?.name ?? 'UnknownError',
+      errorCode: technical?.code ?? 'unknown',
+      errorMessage: technical?.message ?? String(err),
+    });
+    throw error('internal', 'La mutation Staff a échoué.', 'INTERNAL_ERROR');
+  }
 });
