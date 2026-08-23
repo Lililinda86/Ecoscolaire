@@ -167,6 +167,38 @@ async function run() {
     audits.map(doc => doc.value.action),
     ['STAFF_CREATED', 'STAFF_UPDATED', 'STAFF_DEACTIVATED', 'STAFF_REACTIVATED'],
   );
+
+  const originalProject = process.env.GCLOUD_PROJECT;
+  process.env.GCLOUD_PROJECT = 'ecoscolaire-c5861';
+  try {
+    await expectBusinessError(
+      () => manageStaff({
+        action: 'CREATE',
+        profile: {
+          firstName: 'Release', lastName: 'Denied',
+          testFixture: true, testRunId: 'production-smoke-1',
+        },
+      }, { auth: { uid: 'owner' } }),
+      'permission-denied',
+      'FIXTURE_FORBIDDEN',
+    );
+
+    put('users/release-fixture-owner', {
+      role: 'owner', schoolId: 'S1', isActive: true,
+      testFixture: true, testRunId: 'production-smoke-1',
+    });
+    const productionFixture = await manageStaff({
+      action: 'CREATE',
+      profile: {
+        firstName: 'Release', lastName: 'Allowed',
+        testFixture: true, testRunId: 'production-smoke-1',
+      },
+    }, { auth: { uid: 'release-fixture-owner' } });
+    assert.strictEqual(docs[`staff/${productionFixture.staffId}`].value.testRunId, 'production-smoke-1');
+  } finally {
+    if (originalProject === undefined) delete process.env.GCLOUD_PROJECT;
+    else process.env.GCLOUD_PROJECT = originalProject;
+  }
   console.log('✅ manageStaff lifecycle, tenant isolation and audit tests passed');
 }
 
