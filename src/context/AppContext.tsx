@@ -409,7 +409,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const fetchPromises = collectionsToFetch.map(async (colName) => {
           try {
             let q;
-            if (userData.role === 'teacher' && colName === 'teacherAssignmentSlots') {
+            if (userData.role === 'teacher' && colName === 'classPrograms') {
+              q = query(
+                collection(firestoreDb, colName),
+                where('schoolId', '==', targetSchoolId),
+                where('status', '==', 'published')
+              );
+            } else if (userData.role === 'teacher' && colName === 'teacherAssignmentSlots') {
               if (!linkedTeacherStaffId) return { colName, data: [] };
               q = query(
                 collection(firestoreDb, colName),
