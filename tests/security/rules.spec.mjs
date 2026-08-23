@@ -4209,25 +4209,36 @@ describe('Lot 1B Notes & Bulletins Security Rules', () => {
   });
 
   describe('Period', () => {
-    it('owner même école autorisé', async () => {
+    const canonicalPeriod = { schoolId: 'school-p', academicYearId: 'ay1', name: 'T1', type: 'term', order: 1, startDate: '2023-01-01', endDate: '2023-03-31', status: 'draft', createdAt: '2023-01-01', createdBy: 'backend', updatedAt: '2023-01-01', updatedBy: 'backend' };
+
+    it('écriture directe owner refusée (backend uniquement)', async () => {
       await setupAdmin('owner-p', { role: 'owner', schoolId: 'school-p', isActive: true });
       const dbOwner = testEnv.authenticatedContext('owner-p').firestore();
       const ref = doc(collection(dbOwner, 'periods'), 'p1');
-      await assertSucceeds(setDoc(ref, { schoolId: 'school-p', academicYearId: 'ay1', name: 'T1', type: 'TERM', order: 1, startDate: '2023-01-01', endDate: '2023-03-31', status: 'DRAFT', createdAt: '2023-01-01', createdBy: 'owner-p', updatedAt: '2023-01-01', updatedBy: 'owner-p' }));
+      await assertFails(setDoc(ref, canonicalPeriod));
     });
 
-    it('autre école refusée', async () => {
-      await setupAdmin('owner-p2', { role: 'owner', schoolId: 'school-p', isActive: true });
-      const dbOwner = testEnv.authenticatedContext('owner-p2').firestore();
-      const ref = doc(collection(dbOwner, 'periods'), 'p2');
-      await assertFails(setDoc(ref, { schoolId: 'school-b', academicYearId: 'ay1', name: 'T1', type: 'TERM', order: 1, startDate: '2023-01-01', endDate: '2023-03-31', status: 'DRAFT', createdAt: '2023-01-01', createdBy: 'owner-p2', updatedAt: '2023-01-01', updatedBy: 'owner-p2' }));
+    it('owner, director, secretary et teacher lisent; parent et boardViewer non', async () => {
+      await testEnv.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), 'periods', 'p-read'), canonicalPeriod));
+      for (const role of ['owner', 'director', 'secretary', 'teacher', 'parent', 'boardViewer']) {
+        await setupAdmin(`period-${role}`, { role, schoolId: 'school-p', isActive: true });
+      }
+      for (const role of ['owner', 'director', 'secretary', 'teacher']) {
+        await assertSucceeds(getDoc(doc(testEnv.authenticatedContext(`period-${role}`).firestore(), 'periods', 'p-read')));
+      }
+      for (const role of ['parent', 'boardViewer']) {
+        await assertFails(getDoc(doc(testEnv.authenticatedContext(`period-${role}`).firestore(), 'periods', 'p-read')));
+      }
     });
 
-    it('champs requis absents refusés', async () => {
-      await setupAdmin('owner-p3', { role: 'owner', schoolId: 'school-p', isActive: true });
-      const dbOwner = testEnv.authenticatedContext('owner-p3').firestore();
-      const ref = doc(collection(dbOwner, 'periods'), 'p3');
-      await assertFails(setDoc(ref, { schoolId: 'school-p', name: 'T1' })); 
+    it('lecture inter-école, update et suppression physique refusés', async () => {
+      await testEnv.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), 'periods', 'p-locked'), canonicalPeriod));
+      await setupAdmin('period-other', { role: 'owner', schoolId: 'school-other', isActive: true });
+      await setupAdmin('period-owner', { role: 'owner', schoolId: 'school-p', isActive: true });
+      await assertFails(getDoc(doc(testEnv.authenticatedContext('period-other').firestore(), 'periods', 'p-locked')));
+      const ref = doc(testEnv.authenticatedContext('period-owner').firestore(), 'periods', 'p-locked');
+      await assertFails(updateDoc(ref, { status: 'open' }));
+      await assertFails(deleteDoc(ref));
     });
   });
 
@@ -4569,16 +4580,16 @@ test.describe('Academic Calendar Pointers Security Rules', () => {
   });
 
   // AcademicYear.openPeriodId
-  test('director même école autorisé (openPeriodId)', async () => {
+  test('director même école refusé en écriture client (openPeriodId backend uniquement)', async () => {
     const db = testEnv.authenticatedContext('dir_1', { email: 'dir@test.com' }).firestore();
     const docRef = doc(db, 'academicYears', yearId);
-    await assertSucceeds(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 2 }));
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 2 }));
   });
 
-  test('AcademicYear historique sans version (ajout openPeriodId, version 1 autorisé)', async () => {
+  test('AcademicYear historique sans version : ajout client openPeriodId refusé', async () => {
     const db = testEnv.authenticatedContext('dir_1').firestore();
     const docRef = doc(db, 'academicYears', 'ay_hist');
-    await assertSucceeds(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 1 }));
+    await assertFails(updateDoc(docRef, { openPeriodId: periodId, status: 'active', updatedAt: 'now', updatedBy: 'dir_1', version: 1 }));
   });
 
   test('AcademicYear historique sans version : nouvelle écriture sans version refusée', async () => {

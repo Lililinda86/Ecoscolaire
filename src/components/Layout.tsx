@@ -167,6 +167,16 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                   )}
                 </>
               )}
+
+              {currentUser && ['superAdmin', 'owner', 'director', 'secretary', 'teacher'].includes(currentUser.role) && (
+                <>
+                  <div className="sidebar-category">PÉDAGOGIE</div>
+                  <NavLink to="/academic-periods" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-academic-periods">
+                    <Calendar size={20} />
+                    Périodes académiques
+                  </NavLink>
+                </>
+              )}
               
               {currentUser && ['superAdmin', 'owner', 'director', 'accountant', 'secretary'].includes(currentUser.role) && (
                 <>

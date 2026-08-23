@@ -22,7 +22,7 @@ interface Props {
 export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, currentUser, academicYears, periods }) => {
   const { 
     createAcademicYear, updateAcademicYearBounds,
-    createAcademicPeriod, openAcademicPeriod, closeAcademicPeriod, publishAcademicPeriod
+    createAcademicPeriod, updateAcademicPeriod, openAcademicPeriod, closeAcademicPeriod
   } = useAppContext();
 
   const [loading, setLoading] = useState(false);
@@ -39,6 +39,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
   const [showYearModal, setShowYearModal] = useState(false);
   const [showYearEditModal, setShowYearEditModal] = useState(false);
   const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [editingPeriod, setEditingPeriod] = useState<Period | null>(null);
 
   // Forms State
   const [yearForm, setYearForm] = useState<Partial<AcademicYear>>({});
@@ -129,7 +130,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
     }
   };
 
-  const handleCreatePeriod = async () => {
+  const handleSavePeriod = async () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     
@@ -140,18 +141,25 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
       return;
     }
     
-    const submission = preparePeriodSubmission({
+    const preparedSubmission = preparePeriodSubmission({
       input: periodForm,
       academicYear: activeYear,
       currentSchoolId: currentSchool.id,
       currentUser
     });
+    const fixtureRunId = window.sessionStorage.getItem('ECOSCOLAIRE_PERIOD_TEST_RUN_ID');
+    const submission = fixtureRunId && preparedSubmission.normalizedInput
+      ? {
+          ...preparedSubmission,
+          normalizedInput: { ...preparedSubmission.normalizedInput, testFixture: true as const, testRunId: fixtureRunId },
+        }
+      : preparedSubmission;
 
     try {
       setLoading(true);
       const success = await submitValidatedPeriod({
         submission,
-        persist: createAcademicPeriod
+        persist: editingPeriod ? updateAcademicPeriod : createAcademicPeriod
       });
 
       if (!success) {
@@ -163,6 +171,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
       }
 
       setShowPeriodModal(false);
+      setEditingPeriod(null);
       setPeriodForm({ type: 'term', order: (periodForm.order || 1) + 1 });
       setFieldErrors({});
     } catch (err: unknown) {
@@ -172,6 +181,36 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
       setLoading(false);
       submittingRef.current = false;
     }
+  };
+
+  const requestOpenPeriod = async (period: Period) => {
+    if (!window.confirm(`Confirmer l’ouverture de « ${period.name} » ? Une seule période peut être ouverte.`)) return;
+    setError(null);
+    try { setLoading(true); await openAcademicPeriod(period.id); }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : "L’ouverture a échoué."); }
+    finally { setLoading(false); }
+  };
+
+  const requestClosePeriod = async (period: Period) => {
+    if (!window.confirm(`Confirmer la fermeture définitive de « ${period.name} » ? Cette période ne pourra pas être rouverte.`)) return;
+    setError(null);
+    try { setLoading(true); await closeAcademicPeriod(period.id); }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : "La fermeture a échoué."); }
+    finally { setLoading(false); }
+  };
+
+  const startPeriodEdit = (period: Period) => {
+    setEditingPeriod(period);
+    setPeriodForm(period);
+    setFieldErrors({});
+    setShowPeriodModal(true);
+  };
+
+  const startPeriodCreate = () => {
+    setEditingPeriod(null);
+    setPeriodForm({ type: 'term', order: activeYearPeriods.length + 1 });
+    setFieldErrors({});
+    setShowPeriodModal(true);
   };
 
   const renderState = () => {
@@ -210,7 +249,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
             </div>
             {isManager && (
               <div className="mt-4">
-                <button disabled={loading} onClick={() => setShowPeriodModal(true)} className="px-3 py-1 bg-orange-600 text-white rounded text-sm hover:bg-orange-700">Ajouter une période</button>
+                <button disabled={loading} onClick={startPeriodCreate} data-testid="add-academic-period" className="px-3 py-1 bg-orange-600 text-white rounded text-sm hover:bg-orange-700">Ajouter une période</button>
               </div>
             )}
           </div>
@@ -230,7 +269,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
             </div>
             {isManager && (
               <div className="mt-4 flex gap-2">
-                <button disabled={loading} onClick={() => setShowPeriodModal(true)} className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Ajouter une période</button>
+                <button disabled={loading} onClick={startPeriodCreate} data-testid="add-academic-period" className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Ajouter une période</button>
               </div>
             )}
           </div>
@@ -254,7 +293,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
                 <p className="text-xs text-green-700 mt-1">{activeYearPeriods.length} période(s) configurée(s).</p>
               </div>
               {isManager && (
-                <button disabled={loading} onClick={() => setShowPeriodModal(true)} className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">Ajouter une période</button>
+                <button disabled={loading} onClick={startPeriodCreate} data-testid="add-academic-period" className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">Ajouter une période</button>
               )}
             </div>
           </div>
@@ -282,7 +321,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
           <h3 className="text-md font-medium text-gray-800 mb-3">Périodes de l'année active</h3>
           <div className="space-y-3">
             {activeYearPeriods.sort((a, b) => a.order - b.order).map(period => (
-              <div key={period.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-200">
+              <div key={period.id} data-testid={`academic-period-${period.id}`} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-3 bg-gray-50 rounded border border-gray-200">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{period.name} <span className="text-xs font-normal text-gray-500">({period.startDate} - {period.endDate})</span></p>
                   <p className="text-xs text-gray-600">Statut : <span className="font-medium">{period.status}</span></p>
@@ -290,16 +329,13 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
                 {isManager && (
                   <div className="flex gap-2">
                     {period.status === 'draft' && (
-                      <button disabled={loading} onClick={() => openAcademicPeriod(period.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200">Ouvrir</button>
+                      <>
+                        <button disabled={loading} onClick={() => startPeriodEdit(period)} data-testid={`edit-period-${period.id}`} className="px-2 py-1 bg-white text-gray-700 border rounded text-xs hover:bg-gray-100">Modifier</button>
+                        <button disabled={loading} onClick={() => requestOpenPeriod(period)} data-testid={`open-period-${period.id}`} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200">Ouvrir</button>
+                      </>
                     )}
                     {period.status === 'open' && (
-                      <button disabled={loading} onClick={() => closeAcademicPeriod(period.id)} className="px-2 py-1 bg-gray-200 text-gray-800 rounded text-xs hover:bg-gray-300">Fermer</button>
-                    )}
-                    {period.status === 'closed' && (
-                      <>
-                        <button disabled={loading} onClick={() => openAcademicPeriod(period.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200">Ré-ouvrir</button>
-                        <button disabled={loading} onClick={() => publishAcademicPeriod(period.id)} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200">Publier</button>
-                      </>
+                      <button disabled={loading} onClick={() => requestClosePeriod(period)} data-testid={`close-period-${period.id}`} className="px-2 py-1 bg-gray-200 text-gray-800 rounded text-xs hover:bg-gray-300">Fermer</button>
                     )}
                   </div>
                 )}
@@ -376,7 +412,7 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
       {showPeriodModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Créer une période</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">{editingPeriod ? 'Modifier la période' : 'Créer une période'}</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Nom de la période</label>
@@ -413,8 +449,8 @@ export const AcademicCalendarSettings: React.FC<Props> = ({ currentSchool, curre
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button disabled={loading} onClick={() => { setShowPeriodModal(false); setFieldErrors({}); }} className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Annuler</button>
-              <button disabled={loading} onClick={handleCreatePeriod} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">{loading ? 'Création...' : 'Créer'}</button>
+              <button disabled={loading} onClick={() => { setShowPeriodModal(false); setEditingPeriod(null); setFieldErrors({}); }} className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Annuler</button>
+              <button disabled={loading} onClick={handleSavePeriod} data-testid="save-academic-period" className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">{loading ? 'Enregistrement...' : editingPeriod ? 'Enregistrer' : 'Créer'}</button>
             </div>
             {fieldErrors.general && <p className="text-sm text-red-600 mt-2 text-center">{fieldErrors.general}</p>}
           </div>

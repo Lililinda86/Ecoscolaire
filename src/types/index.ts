@@ -424,6 +424,8 @@ export interface Period {
   createdBy: string;
   updatedAt: string;
   updatedBy: string;
+  testFixture?: true;
+  testRunId?: string;
 }
 
 export interface Evaluation {
