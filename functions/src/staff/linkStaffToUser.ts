@@ -14,7 +14,7 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
   const { schoolId, staffId, userId } = data || {};
 
   // 1. Argument validation
-  if (typeof schoolId !== 'string' || schoolId.trim() === '' || schoolId.includes('/') || schoolId.length > 100) {
+  if (schoolId !== undefined && (typeof schoolId !== 'string' || schoolId.trim() === '' || schoolId.includes('/') || schoolId.length > 100)) {
     throw new functions.https.HttpsError(
       'invalid-argument',
       'schoolId doit être une chaîne non vide valide.',
@@ -38,7 +38,7 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const cleanSchoolId = schoolId.trim();
+  const requestedSchoolId = typeof schoolId === 'string' ? schoolId.trim() : '';
   const cleanStaffId = staffId.trim();
   const cleanUserId = userId.trim();
 
@@ -46,8 +46,7 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
   const nowIso = new Date().toISOString();
   const linkRef = db.collection('staffUserLinks').doc();
   const linkId = linkRef.id;
-
-  const staffPointerId = `${cleanSchoolId}__${cleanStaffId}`;
+  const auditRef = db.collection('audit_logs').doc();
 
   try {
     return await db.runTransaction(async (transaction) => {
@@ -62,7 +61,7 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
         );
       }
       const operator = operatorSnap.data()!;
-      if (operator.isActive !== true) {
+      if (!(operator.isActive === true || operator.active === true || operator.status === 'active')) {
         throw new functions.https.HttpsError(
           'permission-denied',
           'Compte opérateur inactif.',
@@ -77,7 +76,10 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
           { businessCode: 'PERMISSION_DENIED' }
         );
       }
-      if (operator.role !== 'superAdmin' && operator.schoolId !== cleanSchoolId) {
+      const cleanSchoolId = operator.role === 'superAdmin'
+        ? requestedSchoolId
+        : typeof operator.schoolId === 'string' ? operator.schoolId.trim() : '';
+      if (!cleanSchoolId || (operator.role !== 'superAdmin' && requestedSchoolId && requestedSchoolId !== cleanSchoolId)) {
         throw new functions.https.HttpsError(
           'permission-denied',
           'L\'opérateur n\'appartient pas à l\'école demandée.',
@@ -96,18 +98,19 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
         );
       }
       const targetUser = targetUserSnap.data()!;
-      if (targetUser.isActive !== true) {
+      if (!(targetUser.isActive === true || targetUser.active === true || targetUser.status === 'active')) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'Le compte utilisateur cible est inactif.',
           { businessCode: 'USER_INACTIVE' }
         );
       }
-      if (targetUser.role !== 'teacher') {
+      const staffAccountRoles = ['owner', 'director', 'secretary', 'accountant', 'teacher', 'driver'];
+      if (!staffAccountRoles.includes(targetUser.role)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
-          'L\'utilisateur cible doit avoir le rôle d\'enseignant.',
-          { businessCode: 'USER_NOT_TEACHER' }
+          'Le compte cible ne correspond pas à un rôle personnel autorisé.',
+          { businessCode: 'USER_NOT_STAFF_ROLE' }
         );
       }
       if (targetUser.schoolId !== cleanSchoolId) {
@@ -136,13 +139,6 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
           { businessCode: 'STAFF_INACTIVE' }
         );
       }
-      if (staff.role !== 'teacher') {
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          'Le membre du personnel doit avoir le rôle d\'enseignant.',
-          { businessCode: 'STAFF_NOT_TEACHER' }
-        );
-      }
       if (staff.schoolId !== cleanSchoolId) {
         throw new functions.https.HttpsError(
           'permission-denied',
@@ -153,6 +149,7 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
 
       // 4. Read current pointers for uniqueness checks
       const userPointerRef = db.collection('staffUserLinkByUser').doc(cleanUserId);
+      const staffPointerId = `${cleanSchoolId}__${cleanStaffId}`;
       const staffPointerRef = db.collection('staffUserLinkByStaff').doc(staffPointerId);
 
       const userPointerSnap = await transaction.get(userPointerRef);
@@ -216,6 +213,9 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
 
       // Execution of link creation / re-linking
       // Write 1: Create a NEW historic document
+      const fixtureMetadata = staff.testFixture === true && typeof staff.testRunId === 'string'
+        ? { testFixture: true, testRunId: staff.testRunId }
+        : {};
       const linkDoc = {
         id: linkId,
         schoolId: cleanSchoolId,
@@ -225,7 +225,8 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
         createdAt: nowIso,
         createdBy: uid,
         updatedAt: nowIso,
-        updatedBy: uid
+        updatedBy: uid,
+        ...fixtureMetadata
       };
       transaction.create(linkRef, linkDoc);
 
@@ -236,7 +237,8 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
         linkId: linkId,
         isActive: true,
         updatedAt: nowIso,
-        updatedBy: uid
+        updatedBy: uid,
+        ...fixtureMetadata
       };
 
       // Write 2: User pointer doc
@@ -252,6 +254,21 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
       } else {
         transaction.create(staffPointerRef, pointerDoc);
       }
+
+      transaction.create(auditRef, {
+        actorUid: uid,
+        actorRole: operator.role,
+        schoolId: cleanSchoolId,
+        action: 'STAFF_USER_LINKED',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: nowIso,
+        targetType: 'STAFF',
+        targetId: cleanStaffId,
+        targetName: `staff/${cleanStaffId}`,
+        details: { userId: cleanUserId, linkId },
+        canonicalBackendAudit: true,
+        ...fixtureMetadata
+      });
 
       return {
         linkId,
