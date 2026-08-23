@@ -23,6 +23,9 @@ export async function mutateStaff(input: StaffMutationInput): Promise<StaffMutat
     getFunctions(),
     'manageStaff',
   );
-  const response = await callable(input);
+  const payload = Object.fromEntries(
+    Object.entries(input).filter(([, value]) => value !== undefined),
+  ) as unknown as StaffMutationInput;
+  const response = await callable(payload);
   return response.data;
 }

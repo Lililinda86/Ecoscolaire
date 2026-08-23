@@ -283,9 +283,16 @@ export const linkStaffToUser = functions.https.onCall(async (data, context) => {
     if (err instanceof functions.https.HttpsError) {
       throw err;
     }
+    const technical = err as { name?: string; message?: string; code?: string | number };
+    console.error('linkStaffToUser transaction failed', {
+      errorName: technical?.name ?? 'UnknownError',
+      errorCode: technical?.code ?? 'unknown',
+      errorMessage: technical?.message ?? String(err),
+    });
     throw new functions.https.HttpsError(
       'internal',
-      err instanceof Error ? err.message : String(err)
+      'La liaison Staff/compte a échoué.',
+      { businessCode: 'INTERNAL_ERROR' }
     );
   }
 });

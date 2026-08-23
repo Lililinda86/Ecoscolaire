@@ -57,7 +57,13 @@ const configurePage = async (browser, appUrl, requestUrls, testRunId) => {
     window.sessionStorage.setItem('ECOSCOLAIRE_STAFF_TEST_RUN_ID', runId);
   }, testRunId);
   const page = await context.newPage();
-  page.on('dialog', dialog => dialog.accept());
+  page.on('dialog', async dialog => {
+    console.log(`BROWSER_DIALOG ${dialog.type()}: ${dialog.message()}`);
+    await dialog.accept();
+  });
+  page.on('console', message => {
+    if (message.type() === 'error') console.log(`BROWSER_ERROR ${message.text()}`);
+  });
   await page.route(`${appUrl}/**`, route => route.continue({
     headers: {
       ...route.request().headers(),
