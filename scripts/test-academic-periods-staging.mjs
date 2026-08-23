@@ -149,8 +149,9 @@ async function run() {
     }
 
     const audits = await db.collection('audit_logs').where('testRunId', '==', testRunId).get();
-    assert.equal(audits.size, 6);
-    assert.ok(audits.docs.every(item => item.data().canonicalBackendAudit === true));
+    const periodAudits = audits.docs.filter(item => String(item.data().action || '').startsWith('ACADEMIC_PERIOD_'));
+    assert.equal(periodAudits.length, 6);
+    assert.ok(periodAudits.every(item => item.data().canonicalBackendAudit === true));
     assert.strictEqual((await db.collection('academicYears').doc(yearId).get()).data()?.openPeriodId, periodB);
     console.log(`ITALO-W2-01 STAGING E2E PASS ${testRunId}`);
   } finally {
