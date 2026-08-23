@@ -89,7 +89,7 @@ async function run() {
     await page.getByTestId('login-email').fill(`${role}.${testRunId}@example.test`);
     await page.getByTestId('login-password').fill(password);
     await page.getByTestId('login-submit').click();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(url => !url.hash.includes('/login'), { timeout: 30_000 });
     return page;
   };
 
