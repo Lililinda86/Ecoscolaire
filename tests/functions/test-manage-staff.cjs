@@ -42,6 +42,7 @@ const db = {
 const firestore = () => db;
 const adminMock = { firestore };
 const functionsMock = {
+  logger: { error: () => undefined },
   https: {
     onCall: handler => handler,
     HttpsError: class HttpsError extends Error {

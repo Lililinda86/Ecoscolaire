@@ -266,14 +266,14 @@ export const manageStaff = functions.https.onCall(async (raw, context) => {
     };
     });
   } catch (err: unknown) {
-    if (err instanceof functions.https.HttpsError) throw err;
     const technical = err as { name?: string; message?: string; code?: string | number };
-    console.error('manageStaff transaction failed', {
+    functions.logger.error('manageStaff transaction failed', {
       action,
       errorName: technical?.name ?? 'UnknownError',
       errorCode: technical?.code ?? 'unknown',
       errorMessage: technical?.message ?? String(err),
     });
+    if (err instanceof functions.https.HttpsError) throw err;
     throw error('internal', 'La mutation Staff a échoué.', 'INTERNAL_ERROR');
   }
 });
