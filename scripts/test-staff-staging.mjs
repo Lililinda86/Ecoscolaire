@@ -51,6 +51,20 @@ const callableFailure = async (operation, code) => assert.rejects(operation, err
   return true;
 });
 
+const waitForServerState = async (description, predicate, timeoutMs = 30_000) => {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      if (await predicate()) return;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ''}`);
+};
+
 const configurePage = async (browser, appUrl, requestUrls, testRunId) => {
   const context = await browser.newContext();
   await context.addInitScript(runId => {
@@ -199,14 +213,23 @@ const run = async () => {
     await row.getByTestId(`edit-btn-${uiStaffId}`).click();
     await secretaryUi.page.getByLabel('Prénom', { exact: true }).fill('Fixture-Modifiée');
     await secretaryUi.page.getByRole('button', { name: /Enregistrer|Sauvegarder|save/i }).click();
+    await waitForServerState('Staff update confirmation', async () =>
+      (await db.collection('staff').doc(uiStaffId).get()).data()?.firstName === 'Fixture-Modifiée'
+    );
     await secretaryUi.page.reload({ waitUntil: 'domcontentloaded' });
     row = secretaryUi.page.locator('tr', { hasText: `Staff-${testRunId}` });
     await row.getByText('Fixture-Modifiée', { exact: false }).waitFor({ timeout: 30_000 });
     await row.getByTestId(`deact-btn-${uiStaffId}`).click();
+    await waitForServerState('Staff deactivation confirmation', async () =>
+      (await db.collection('staff').doc(uiStaffId).get()).data()?.isActive === false
+    );
     await secretaryUi.page.reload({ waitUntil: 'domcontentloaded' });
     row = secretaryUi.page.locator('tr', { hasText: `Staff-${testRunId}` });
     await row.getByTestId(`reactivate-btn-${uiStaffId}`).waitFor({ timeout: 30_000 });
     await row.getByTestId(`reactivate-btn-${uiStaffId}`).click();
+    await waitForServerState('Staff reactivation confirmation', async () =>
+      (await db.collection('staff').doc(uiStaffId).get()).data()?.isActive === true
+    );
     await secretaryUi.page.reload({ waitUntil: 'domcontentloaded' });
     await secretaryUi.page.locator('tr', { hasText: `Staff-${testRunId}` }).getByTestId(`deact-btn-${uiStaffId}`).waitFor({ timeout: 30_000 });
 
@@ -218,10 +241,16 @@ const run = async () => {
     await row.getByRole('button', { name: 'Lier un compte' }).click();
     await ownerUi.page.getByLabel('Compte actif de la même école').selectOption(targetUsers['teacher-a'].uid);
     await ownerUi.page.getByRole('button', { name: 'Confirmer la liaison' }).click();
+    await waitForServerState('Staff account link confirmation', async () =>
+      (await db.collection('staffUserLinkByStaff').doc(`${schoolId}__${uiStaffId}`).get()).data()?.isActive === true
+    );
     await ownerUi.page.reload({ waitUntil: 'domcontentloaded' });
     row = ownerUi.page.locator('tr', { hasText: `Staff-${testRunId}` });
     await row.getByText('Lié', { exact: true }).waitFor({ timeout: 30_000 });
     await row.getByRole('button', { name: 'Dissocier' }).click();
+    await waitForServerState('Staff account unlink confirmation', async () =>
+      (await db.collection('staffUserLinkByStaff').doc(`${schoolId}__${uiStaffId}`).get()).data()?.isActive === false
+    );
     await ownerUi.page.reload({ waitUntil: 'domcontentloaded' });
     row = ownerUi.page.locator('tr', { hasText: `Staff-${testRunId}` });
     await row.getByText('Non lié', { exact: true }).waitFor({ timeout: 30_000 });
