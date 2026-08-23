@@ -206,7 +206,7 @@ async function run() {
     for (const viewport of [{ width: 360, height: 800 }, { width: 768, height: 900 }, { width: 1440, height: 900 }]) {
       const page = await newPage('owner', viewport);
       await page.goto(`${appUrl}/#/subjects-program`, { waitUntil: 'domcontentloaded' });
-      await page.getByText('Matières & Programmes').waitFor({ timeout: 30_000 });
+      await page.getByRole('heading', { name: 'Matières & Programmes' }).waitFor({ timeout: 30_000 });
       await page.getByRole('button', { name: 'Programmes par classe' }).click();
       await page.locator('#class-select').selectOption(classId);
       await page.getByText('Publié', { exact: true }).waitFor({ timeout: 30_000 });
