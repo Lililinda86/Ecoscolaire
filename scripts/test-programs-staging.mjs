@@ -93,6 +93,19 @@ async function run() {
     return page;
   };
 
+  const openProgramPanel = async page => {
+    await page.getByRole('heading', { name: 'Matières & Programmes' }).waitFor({ timeout: 30_000 });
+    const classSelect = page.locator('#class-select');
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      if (await classSelect.isVisible().catch(() => false)) return classSelect;
+      const tab = page.getByRole('button', { name: 'Programmes par classe' });
+      if (await tab.isVisible().catch(() => false)) await tab.click();
+      await page.waitForTimeout(500);
+    }
+    throw new Error('Programs panel did not stabilize before the timeout.');
+  };
+
   const revisionSubjects = async (programId, revisionId) => {
     const snapshot = await db.collection('classSubjects').where('programId', '==', programId).where('revisionId', '==', revisionId).get();
     return snapshot.docs.map(document => ({ id: document.id, ...document.data() }));
@@ -206,9 +219,8 @@ async function run() {
     for (const viewport of [{ width: 360, height: 800 }, { width: 768, height: 900 }, { width: 1440, height: 900 }]) {
       const page = await newPage('owner', viewport);
       await page.goto(`${appUrl}/#/subjects-program`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: 'Matières & Programmes' }).waitFor({ timeout: 30_000 });
-      await page.getByRole('button', { name: 'Programmes par classe' }).click();
-      await page.locator('#class-select').selectOption(classId);
+      const classSelect = await openProgramPanel(page);
+      await classSelect.selectOption(classId);
       await page.getByText('Publié', { exact: true }).waitFor({ timeout: 30_000 });
       await page.getByText(`Mathématiques ${testRunId}`).waitFor({ timeout: 30_000 });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -218,8 +230,8 @@ async function run() {
     for (const role of ['secretary', 'teacher']) {
       const page = await newPage(role, { width: 390, height: 844 });
       await page.goto(`${appUrl}/#/subjects-program`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('button', { name: 'Programmes par classe' }).click();
-      await page.locator('#class-select').selectOption(classId);
+      const classSelect = await openProgramPanel(page);
+      await classSelect.selectOption(classId);
       await page.getByText(`Mathématiques ${testRunId}`).waitFor({ timeout: 30_000 });
       assert.equal(await page.getByRole('button', { name: /Modifier|Archiver|Créer le programme/ }).count(), 0);
     }
