@@ -3832,6 +3832,9 @@ describe('Class Programs and Subjects Security Rules', () => {
         await setDoc(doc(db, 'users', 'teacher-b'), { role: 'teacher', schoolId: SCHOOL_B, active: true });
         await setDoc(doc(db, 'users', 'director-b'), { role: 'director', schoolId: SCHOOL_B, active: true });
         await setDoc(doc(db, 'users', 'parent-a'), { role: 'parent', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'student-a'), { role: 'student', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'driver-a'), { role: 'driver', schoolId: SCHOOL_A, active: true });
+        await setDoc(doc(db, 'users', 'board-a'), { role: 'boardViewer', schoolId: SCHOOL_A, active: true });
         await setDoc(doc(db, 'users', 'manager-inactive'), { role: 'secretary', schoolId: SCHOOL_A, active: false });
 
         // Links
@@ -4015,6 +4018,13 @@ describe('Class Programs and Subjects Security Rules', () => {
       const relinkedCtx = testEnv.authenticatedContext('teacher-relinked');
       await assertSucceeds(getDoc(doc(relinkedCtx.firestore(), 'teacherAssignments', 'assign-1')));
     });
+    for (const [uid, label] of [['parent-a', 'parent'], ['student-a', 'student'], ['driver-a', 'driver'], ['board-a', 'boardViewer']]) {
+      it(`${label} ne peut lire aucune affectation`, async () => {
+        const deniedCtx = testEnv.authenticatedContext(uid);
+        await assertFails(getDoc(doc(deniedCtx.firestore(), 'teacherAssignments', 'assign-1')));
+        await assertFails(getDoc(doc(deniedCtx.firestore(), 'teacherAssignmentSlots', 'slot-1')));
+      });
+    }
 
     // REQUÊTES
     it('25. query manager contrainte autorisée', async () => {
