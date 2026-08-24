@@ -354,6 +354,8 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           subjectCodeSnapshot?: string;
           coefficient?: number;
           weeklyHours?: number;
+          testFixture?: true;
+          testRunId?: string;
         } = {
           id: newClassSubjectId,
           programId,
@@ -370,7 +372,8 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           createdAt: nowIso,
           createdBy: uid,
           updatedAt: nowIso,
-          updatedBy: uid
+          updatedBy: uid,
+          ...(program.testFixture === true ? { testFixture: true as const, testRunId: program.testRunId } : {})
         };
 
         if (subj.subjectCodeSnapshot !== undefined) {

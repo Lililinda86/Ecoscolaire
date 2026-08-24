@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const script = fs.readFileSync(new URL('../../scripts/test-programs-staging.mjs', import.meta.url), 'utf8');
 const workflow = fs.readFileSync(new URL('../../.github/workflows/production-programs-e2e.yml', import.meta.url), 'utf8');
+const ensureDraft = fs.readFileSync(new URL('../../functions/src/academic/ensureClassProgramDraft.ts', import.meta.url), 'utf8');
 
 test('Production Programs smoke is manual, main-only, exact-SHA and project guarded', () => {
   assert.match(workflow, /workflow_dispatch:/);
@@ -18,11 +19,16 @@ test('Production Programs smoke is manual, main-only, exact-SHA and project guar
   }
 });
 
-test('Production Programs smoke uses bounded fixtures, Auth cleanup and real-data fingerprints', () => {
+test('Production Programs smoke uses bounded fixtures, exact cleanup and live real-data fingerprints', () => {
   assert.match(script, /ITALO-PROD-PROGRAM-TEST-/);
   assert.match(script, /testFixture: true, testRunId/);
   assert.match(script, /where\('testRunId', '==', testRunId\)/);
-  assert.match(script, /assert\.deepEqual\(await snapshotRealData\(\), realBefore\)/);
+  assert.match(script, /describeRealDataChanges\(realBefore, await snapshotRealData\(\)\)/);
+  assert.match(script, /CONCURRENT REAL ACTIVITY/);
+  assert.match(script, /Release-generated real-data residuals/);
+  assert.match(script, /where\('programId', '==', expectedProgramId\)/);
+  assert.match(script, /Refusing cleanup of non-fixture classSubject/);
+  assert.match(ensureDraft, /program\.testFixture === true \? \{ testFixture: true as const, testRunId: program\.testRunId \}/);
   assert.match(script, /auth\/user-not-found/);
   assert.match(script, /residuals=0 orphans=0 authResiduals=0/);
   assert.doesNotMatch(script, /italo-gsb/);
