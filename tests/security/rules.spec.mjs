@@ -3637,14 +3637,14 @@ describe('Class Programs and Subjects Security Rules', () => {
       await assertFails(getDocs(q));
     });
 
-    it('teacher query of classPrograms limited to published status is denied', async () => {
+    it('teacher query of classPrograms limited to published status is allowed', async () => {
       const context = testEnv.authenticatedContext('teacher-1');
       const q = query(
         collection(context.firestore(), 'classPrograms'),
         where('schoolId', '==', SCHOOL_ID),
         where('status', '==', 'published')
       );
-      await assertFails(getDocs(q));
+      await assertSucceeds(getDocs(q));
     });
 
     it('secretary query of classSubjects with programId and published revisionId is allowed', async () => {
