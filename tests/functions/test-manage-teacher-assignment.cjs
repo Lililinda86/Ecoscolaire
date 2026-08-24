@@ -81,9 +81,25 @@ const expectBusiness = async (promise, code) => {
   documents.clear(); actor('owner-a'); seedCore();
   const draft = await call({ action: 'CREATE_DRAFT', academicYearId: 'year-a', classId: 'class-a', subjectId: 'math', teacherStaffId: 'staff-a', note: 'préparation' });
   assert.equal(draft.assignment.status, 'draft');
+  assert.equal(draft.assignment.id.length > 0, true);
   assert.equal([...documents.keys()].filter(key => key.startsWith('periods/')).length, 0);
   assert.equal([...documents.keys()].filter(key => key.startsWith('classPrograms/')).length, 0);
   await expectBusiness(call({ action: 'ACTIVATE', assignmentId: draft.assignment.id }), 'PROGRAM_NOT_PUBLISHED');
+
+  const longParts = {
+    academicYearId: `year-${'a'.repeat(90)}`,
+    classId: `class-${'b'.repeat(90)}`,
+    subjectId: `subject-${'c'.repeat(90)}`,
+    teacherStaffId: `staff-${'d'.repeat(90)}`,
+  };
+  put('academicYears', longParts.academicYearId, { schoolId: 'school-a', status: 'active' });
+  put('classes', longParts.classId, { schoolId: 'school-a', active: true });
+  put('subjects', longParts.subjectId, { schoolId: 'school-a', active: true });
+  put('staff', longParts.teacherStaffId, { schoolId: 'school-a', staffType: 'teacher', active: true });
+  const longIdDraft = await call({ action: 'CREATE_DRAFT', ...longParts });
+  assert.equal(longIdDraft.assignment.id.length > 128, true);
+  const longIdEdit = await call({ action: 'UPDATE_DRAFT', assignmentId: longIdDraft.assignment.id, note: 'identifiant composé valide' });
+  assert.equal(longIdEdit.assignment.note, 'identifiant composé valide');
 
   actor('secretary-a', 'secretary');
   const edit = await call({ action: 'UPDATE_DRAFT', assignmentId: draft.assignment.id, note: 'corrigé' }, 'secretary-a');

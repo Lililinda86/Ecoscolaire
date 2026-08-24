@@ -26,8 +26,8 @@ const object = (value: unknown): Data => {
   return result;
 };
 
-const id = (value: unknown, field: string): string => {
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 128
+const id = (value: unknown, field: string, maxBytes = 128): string => {
+  if (typeof value !== 'string' || value !== value.trim() || !value || Buffer.byteLength(value, 'utf8') > maxBytes
       || value.includes('/')
       // eslint-disable-next-line no-control-regex
       || /[\u0000-\u001f\u007f]/.test(value)) {
@@ -78,7 +78,7 @@ export const manageTeacherAssignment = functions.https.onCall(async (raw, contex
     throw failure('permission-denied', 'École cible non autorisée.', 'SCHOOL_MISMATCH');
   }
 
-  const assignmentId = action === 'CREATE_DRAFT' ? '' : id(payload.assignmentId, 'assignmentId');
+  const assignmentId = action === 'CREATE_DRAFT' ? '' : id(payload.assignmentId, 'assignmentId', 1500);
   const academicYearId = action === 'CREATE_DRAFT' ? id(payload.academicYearId, 'academicYearId') : '';
   const classId = action === 'CREATE_DRAFT' ? id(payload.classId, 'classId') : '';
   const subjectId = action === 'CREATE_DRAFT' ? id(payload.subjectId, 'subjectId') : '';
