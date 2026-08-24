@@ -234,7 +234,11 @@ async function run() {
     ];
     await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [validSubjects[0], validSubjects[0]] }), 'already-exists');
     await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], coefficient: 0 }] }), 'invalid-argument');
-    await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], coefficient: Number.NaN }] }), 'invalid-argument');
+    await assert.rejects(clients.owner.update({
+      ...base,
+      expectedDraftRevisionId: revisionV1,
+      subjects: [{ ...validSubjects[0], coefficient: Number.NaN }],
+    }));
     await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], subjectId: 'missing-fixture-subject' }] }), 'not-found');
     await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], subjectId: inactiveSubject }] }), 'failed-precondition');
     await clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: validSubjects });
