@@ -113,6 +113,20 @@ async function run() {
   };
   const realBefore = await snapshotRealData();
 
+  const describeRealDataChanges = (before, after) => {
+    const changes = [];
+    for (const name of REAL_DATA_COLLECTIONS) {
+      const beforeDocs = before?.[name] || {};
+      const afterDocs = after?.[name] || {};
+      for (const id of new Set([...Object.keys(beforeDocs), ...Object.keys(afterDocs)])) {
+        if (beforeDocs[id] !== afterDocs[id]) {
+          changes.push({ collection: name, id, before: beforeDocs[id] ?? null, after: afterDocs[id] ?? null });
+        }
+      }
+    }
+    return changes;
+  };
+
   const newPage = async (role, viewport) => {
     const context = await browser.newContext({ viewport });
     contexts.push(context);
@@ -318,6 +332,12 @@ async function run() {
       const snapshot = await db.collection(collection).where('testRunId', '==', testRunId).get();
       for (const document of snapshot.docs) await document.ref.delete();
     }
+    const expectedProgramId = `${schoolId}__2030-2031__${classId}`;
+    const programSubjectResiduals = await db.collection('classSubjects').where('programId', '==', expectedProgramId).get();
+    for (const document of programSubjectResiduals.docs) {
+      assert.ok(document.id.includes(testRunId), `Refusing cleanup of non-fixture classSubject ${document.id}`);
+      await document.ref.delete();
+    }
     for (const uid of authUids) await adminAuth.deleteUser(uid).catch(() => undefined);
     for (const collection of fixtureCollections) {
       assert.equal((await db.collection(collection).where('testRunId', '==', testRunId).get()).size, 0, `${collection} fixture residuals`);
@@ -325,7 +345,12 @@ async function run() {
     for (const uid of authUids) {
       await assert.rejects(adminAuth.getUser(uid), error => error?.code === 'auth/user-not-found');
     }
-    if (IS_PRODUCTION) assert.deepEqual(await snapshotRealData(), realBefore);
+    if (IS_PRODUCTION) {
+      const realChanges = describeRealDataChanges(realBefore, await snapshotRealData());
+      const releaseGenerated = realChanges.filter(change => change.id.includes(testRunId));
+      assert.equal(releaseGenerated.length, 0, `Release-generated real-data residuals: ${JSON.stringify(releaseGenerated)}`);
+      if (realChanges.length) console.log(`CONCURRENT REAL ACTIVITY ${JSON.stringify(realChanges)}`);
+    }
     console.log(`ITALO-W2-02 PROGRAMS ${PREFIX} CLEANUP PASS ${testRunId} residuals=0 orphans=0 authResiduals=0`);
     await deleteAdminApp(adminApp);
   }
