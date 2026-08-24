@@ -90,10 +90,8 @@ jobs:
           node tests/functions/test-student-import-recovery.cjs
           node tests/functions/test-student-import-bulk-writer.cjs
           node tests/functions/test-academic-resolvers.cjs
-          node tests/functions/test-ensure-class-program-draft.cjs
-          node tests/functions/test-publish-class-program-draft.cjs
+          firebase emulators:exec --project demo-school --only firestore "node tests/functions/test-class-program-lifecycle.cjs"
           firebase emulators:exec --project demo-school --only firestore "node tests/functions/test-manage-academic-period.cjs"
-          node tests/functions/test-bulk-add-subjects.cjs
           node tests/functions/test-secretary-collection-calculations.cjs
           node tests/functions/test-boardviewer-governance.cjs
           node tests/functions/test-authenticated-audit.cjs

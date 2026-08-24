@@ -143,6 +143,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
 
   // Handlers for classes
   const handleToggleClass = (id: string) => {
+    if (id !== classId) return;
     const next = new Set(selectedClassIds);
     if (next.has(id)) {
       next.delete(id);
@@ -151,8 +152,8 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
     }
     setSelectedClassIds(next);
   };
-  const handleSelectAllClasses = () => setSelectedClassIds(new Set(availableClasses.map(c => c.id)));
-  const handleClearClasses = () => setSelectedClassIds(new Set());
+  const handleSelectAllClasses = () => setSelectedClassIds(new Set([classId]));
+  const handleClearClasses = () => setSelectedClassIds(new Set([classId]));
 
   // Handlers for subjects
   const handleToggleSubject = (id: string) => {
@@ -192,7 +193,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
               Ajouter des matières au programme
             </h2>
             <p className="text-[10px] text-gray-500 mt-0.5">
-              Sélectionnez les classes cibles et les matières à ajouter.
+              Sélectionnez les matières à ajouter au brouillon de cette classe.
             </p>
           </div>
           <button
@@ -275,6 +276,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                         className={styles.checkbox}
                         checked={selectedClassIds.has(c.id)}
                         onChange={() => handleToggleClass(c.id)}
+                        disabled={c.id !== classId}
                       />
                       <div className={styles.optionText}>
                         <div className={styles.optionName}>

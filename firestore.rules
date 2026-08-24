@@ -304,7 +304,7 @@ service cloud.firestore {
     }
 
     function isAcademicProgramManager() {
-      return isSuperAdmin() || isOwner() || isDirector() || isSecretary();
+      return isSuperAdmin() || isOwner() || isDirector();
     }
 
     function isTeacherAssignedToClassSubject(schoolId, academicYearId, classId, classSubjectId) {
@@ -1208,47 +1208,13 @@ service cloud.firestore {
     match /classPrograms/{programId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
                   && (
-                    isAcademicProgramManager()
+                    isAcademicProgramManager() || isSecretary()
                     || (
                       isTeacher()
                       && resource.data.status == 'published'
-                      && 'publishedRevisionId' in resource.data
-                      && resource.data.publishedRevisionId is string
-                      && resource.data.publishedRevisionId != ""
-                      && 'publishedRevisionNumber' in resource.data
-                      && resource.data.publishedRevisionNumber is int
-                      && resource.data.publishedRevisionNumber >= 1
                     )
                   );
-      allow create: if isAuthenticated() && isActive()
-                    && request.resource.data.schoolId is string
-                    && request.resource.data.schoolId.size() > 0
-                    && hasSchoolAccess(request.resource.data.schoolId)
-                    && isAcademicProgramManager()
-                    && request.resource.data.classId is string
-                    && request.resource.data.classId.size() > 0
-                    && request.resource.data.academicYearId is string
-                    && request.resource.data.academicYearId.matches('^\\d{4}-\\d{4}$')
-                    && programId == request.resource.data.schoolId + '__' + request.resource.data.academicYearId + '__' + request.resource.data.classId
-                    && exists(/databases/$(database)/documents/classes/$(request.resource.data.classId))
-                    && get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.schoolId == request.resource.data.schoolId
-                    && request.resource.data.status == 'draft'
-                    && request.resource.data.draftRevisionNumber == 1
-                    && request.resource.data.draftRevisionId == programId + '__v1'
-                    && !('publishedRevisionId' in request.resource.data)
-                    && !('publishedRevisionNumber' in request.resource.data)
-                    && !('publishedAt' in request.resource.data)
-                    && !('publishedBy' in request.resource.data)
-                    && request.resource.data.hasUnpublishedChanges == true
-                    && request.resource.data.createdBy == request.auth.uid
-                    && request.resource.data.updatedBy == request.auth.uid
-                    && request.resource.data.createdAt is string
-                    && request.resource.data.updatedAt is string
-                    && request.resource.data.keys().hasOnly([
-                      'id', 'schoolId', 'classId', 'academicYearId', 'status',
-                      'draftRevisionId', 'draftRevisionNumber', 'hasUnpublishedChanges',
-                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
-                    ]);
+      allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
@@ -1256,7 +1222,7 @@ service cloud.firestore {
     match /classSubjects/{classSubjectId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
                   && (
-                    isAcademicProgramManager()
+                    isAcademicProgramManager() || isSecretary()
                     || (
                       isTeacher()
                       && exists(/databases/$(database)/documents/classPrograms/$(resource.data.programId))
@@ -1265,84 +1231,7 @@ service cloud.firestore {
                       && resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.publishedRevisionId
                     )
                   );
-      allow create: if isAuthenticated() && isActive()
-                    && request.resource.data.schoolId is string
-                    && hasSchoolAccess(request.resource.data.schoolId)
-                    && isAcademicProgramManager()
-                    && exists(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId))
-                    && request.resource.data.schoolId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.schoolId
-                    && request.resource.data.classId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.classId
-                    && request.resource.data.academicYearId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.academicYearId
-                    && request.resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.draftRevisionId
-                    && request.resource.data.revisionNumber == get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.draftRevisionNumber
-                    && get(/databases/$(database)/documents/classPrograms/$(request.resource.data.programId)).data.hasUnpublishedChanges == true
-                    && request.resource.data.subjectId is string
-                    && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
-                    && get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.schoolId == request.resource.data.schoolId
-                    && get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.isActive != false
-                    && classSubjectId == request.resource.data.revisionId + '__' + request.resource.data.subjectId
-                    && request.resource.data.subjectNameSnapshot == get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.name
-                    && request.resource.data.subjectNameSnapshot.size() > 0
-                    && (
-                      (
-                        (
-                          !('code' in get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data) ||
-                          get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.code == ""
-                        )
-                        && !('subjectCodeSnapshot' in request.resource.data)
-                      )
-                      ||
-                      (
-                        'code' in get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data &&
-                        get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.code != "" &&
-                        'subjectCodeSnapshot' in request.resource.data &&
-                        request.resource.data.subjectCodeSnapshot == get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.code
-                      )
-                    )
-                    && request.resource.data.isRequired is bool
-                    && request.resource.data.isActive is bool
-                    && request.resource.data.displayOrder is int
-                    && request.resource.data.displayOrder >= 0
-                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient > 0))
-                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours > 0))
-                    && request.resource.data.createdBy == request.auth.uid
-                    && request.resource.data.updatedBy == request.auth.uid
-                    && request.resource.data.createdAt is string
-                    && request.resource.data.updatedAt is string
-                    && request.resource.data.keys().hasOnly([
-                      'id', 'programId', 'schoolId', 'classId', 'academicYearId', 'subjectId',
-                      'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',
-                      'coefficient', 'weeklyHours', 'isRequired', 'displayOrder', 'isActive',
-                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
-                    ]);
-      allow update: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
-                    && isAcademicProgramManager()
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-                      'id', 'programId', 'schoolId', 'classId', 'academicYearId', 'subjectId',
-                      'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',
-                      'createdAt', 'createdBy'
-                    ])
-                    && resource.data.revisionId == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.draftRevisionId
-                    && resource.data.revisionNumber == get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.draftRevisionNumber
-                    && get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.hasUnpublishedChanges == true
-                    && (
-                      !('publishedRevisionId' in get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data)
-                      || resource.data.revisionId != get(/databases/$(database)/documents/classPrograms/$(resource.data.programId)).data.publishedRevisionId
-                    )
-                    && request.resource.data.isRequired is bool
-                    && request.resource.data.isActive is bool
-                    && request.resource.data.displayOrder is int
-                    && request.resource.data.displayOrder >= 0
-                    && (!('coefficient' in request.resource.data) || (request.resource.data.coefficient is number && request.resource.data.coefficient > 0))
-                    && (!('weeklyHours' in request.resource.data) || (request.resource.data.weeklyHours is number && request.resource.data.weeklyHours > 0))
-                    && request.resource.data.updatedBy == request.auth.uid
-                    && request.resource.data.updatedAt is string
-                    && request.resource.data.keys().hasOnly([
-                      'id', 'programId', 'schoolId', 'classId', 'academicYearId', 'subjectId',
-                      'revisionId', 'revisionNumber', 'subjectNameSnapshot', 'subjectCodeSnapshot',
-                      'coefficient', 'weeklyHours', 'isRequired', 'displayOrder', 'isActive',
-                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
-                    ]);
+      allow create, update: if false;
       allow delete: if false;
     }
 

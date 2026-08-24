@@ -1681,9 +1681,9 @@ describe('Subjects Security Rules', () => {
     );
   });
 
-  it('secretary can create a subject', async () => {
+  it('secretary cannot create a subject', async () => {
     const context = testEnv.authenticatedContext('secretary-1');
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(context.firestore(), 'subjects', 'subj-sec-create-1'), {
         id: 'subj-sec-create-1',
         schoolId: SCHOOL_ID,
@@ -2055,10 +2055,10 @@ describe('Class Programs and Subjects Security Rules', () => {
   });
 
   describe('ClassProgram rules', () => {
-    it('manager can create ClassProgram in their school', async () => {
+    it('manager cannot create ClassProgram directly from the client', async () => {
       const context = testEnv.authenticatedContext('owner-1');
       const docId = `${SCHOOL_ID}__2026-2027__class-create`;
-      await assertSucceeds(
+      await assertFails(
         setDoc(doc(context.firestore(), 'classPrograms', docId), {
           id: docId,
           schoolId: SCHOOL_ID,
@@ -2076,7 +2076,7 @@ describe('Class Programs and Subjects Security Rules', () => {
       );
     });
 
-    it('director can create ClassProgram in their school', async () => {
+    it('director cannot create ClassProgram directly from the client', async () => {
       const context = testEnv.authenticatedContext('director-1');
       const docId = `${SCHOOL_ID}__2026-2027__class-create-dir`;
 
@@ -2089,7 +2089,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         });
       });
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(doc(context.firestore(), 'classPrograms', docId), {
           id: docId,
           schoolId: SCHOOL_ID,
@@ -2444,10 +2444,10 @@ describe('Class Programs and Subjects Security Rules', () => {
       });
     });
 
-    it('manager can create ClassSubject in draft revision', async () => {
+    it('manager cannot create ClassSubject directly from the client', async () => {
       const context = testEnv.authenticatedContext('owner-1');
       const docId = `rev-2__subj-1`;
-      await assertSucceeds(
+      await assertFails(
         setDoc(doc(context.firestore(), 'classSubjects', docId), {
           id: docId,
           programId: parentProgramId,
@@ -2544,10 +2544,10 @@ describe('Class Programs and Subjects Security Rules', () => {
       );
     });
 
-    it('creation with valid snapshots matching code is allowed', async () => {
+    it('creation with valid snapshots matching code still requires the backend', async () => {
       const context = testEnv.authenticatedContext('owner-1');
       const docId = `rev-2__subj-with-code`;
-      await assertSucceeds(
+      await assertFails(
         setDoc(doc(context.firestore(), 'classSubjects', docId), {
           id: docId,
           programId: parentProgramId,
@@ -2693,7 +2693,7 @@ describe('Class Programs and Subjects Security Rules', () => {
       await assertFails(deleteDoc(doc(context.firestore(), 'classSubjects', 'rev-1__subj-1')));
     });
 
-    it('update to active draft is allowed for managers', async () => {
+    it('update to active draft requires the backend even for managers', async () => {
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           id: 'rev-2__subj-1',
@@ -2715,7 +2715,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         });
       });
       const context = testEnv.authenticatedContext('owner-1');
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           displayOrder: 10,
           updatedBy: 'owner-1',
@@ -2954,7 +2954,7 @@ describe('Class Programs and Subjects Security Rules', () => {
       );
     });
 
-    it('logical deactivation is allowed for managers', async () => {
+    it('logical deactivation requires the backend even for managers', async () => {
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           id: 'rev-2__subj-1',
@@ -2976,7 +2976,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         });
       });
       const context = testEnv.authenticatedContext('owner-1');
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           isActive: false,
           updatedBy: 'owner-1',
@@ -3047,7 +3047,7 @@ describe('Class Programs and Subjects Security Rules', () => {
       );
     });
 
-    it('owner can delete coefficient from a draft ClassSubject', async () => {
+    it('owner cannot delete coefficient directly from a draft ClassSubject', async () => {
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           id: 'rev-2__subj-1',
@@ -3070,7 +3070,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         });
       });
       const context = testEnv.authenticatedContext('owner-1');
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           coefficient: deleteField(),
           updatedBy: 'owner-1',
@@ -3079,7 +3079,7 @@ describe('Class Programs and Subjects Security Rules', () => {
       );
     });
 
-    it('owner can delete weeklyHours from a draft ClassSubject', async () => {
+    it('owner cannot delete weeklyHours directly from a draft ClassSubject', async () => {
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           id: 'rev-2__subj-1',
@@ -3102,7 +3102,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         });
       });
       const context = testEnv.authenticatedContext('owner-1');
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
           weeklyHours: deleteField(),
           updatedBy: 'owner-1',
@@ -3150,9 +3150,9 @@ describe('Class Programs and Subjects Security Rules', () => {
       });
 
       // SUBJECTS (1-5)
-      it('1. secretary crée une matière de son école', async () => {
+      it('1. secretary ne peut pas créer une matière de son école', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           setDoc(doc(context.firestore(), 'subjects', 'subj-sec-create'), {
             id: 'subj-sec-create',
             schoolId: SCHOOL_ID,
@@ -3166,9 +3166,9 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('2. secretary modifie une matière de son école', async () => {
+      it('2. secretary ne peut pas modifier une matière de son école', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
             name: 'Maths Updated By Sec',
             updatedAt: '2026-07-24T20:00:00Z',
@@ -3177,9 +3177,9 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('3. secretary désactive une matière', async () => {
+      it('3. secretary ne peut pas désactiver une matière', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'subjects', 'subj-1'), {
             isActive: false,
             updatedAt: '2026-07-24T20:00:00Z',
@@ -3207,10 +3207,10 @@ describe('Class Programs and Subjects Security Rules', () => {
       });
 
       // CLASSPROGRAM (6-9)
-      it('6. secretary crée le premier ClassProgram', async () => {
+      it('6. secretary ne peut pas créer le premier ClassProgram', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
         const docId = `${SCHOOL_ID}__2026-2027__class-create`;
-        await assertSucceeds(
+        await assertFails(
           setDoc(doc(context.firestore(), 'classPrograms', docId), {
             id: docId,
             schoolId: SCHOOL_ID,
@@ -3268,10 +3268,10 @@ describe('Class Programs and Subjects Security Rules', () => {
       });
 
       // CLASSSUBJECT (10-22)
-      it('10. secretary crée un ClassSubject dans le brouillon actif', async () => {
+      it('10. secretary ne peut pas créer un ClassSubject dans le brouillon actif', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
         const docId = `rev-2__subj-with-code`;
-        await assertSucceeds(
+        await assertFails(
           setDoc(doc(context.firestore(), 'classSubjects', docId), {
             id: docId,
             programId: parentProgramId,
@@ -3294,9 +3294,9 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('11. secretary modifie coefficient', async () => {
+      it('11. secretary ne peut pas modifier coefficient', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
             coefficient: 5.5,
             updatedBy: 'secretary-1',
@@ -3305,9 +3305,9 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('12. secretary modifie weeklyHours', async () => {
+      it('12. secretary ne peut pas modifier weeklyHours', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
             weeklyHours: 6,
             updatedBy: 'secretary-1',
@@ -3316,7 +3316,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('13. secretary supprime coefficient avec deleteField', async () => {
+      it('13. secretary ne peut pas supprimer coefficient avec deleteField', async () => {
         // Seed first
         await testEnv.withSecurityRulesDisabled(async (ctx) => {
           await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-del-coeff'), {
@@ -3340,7 +3340,7 @@ describe('Class Programs and Subjects Security Rules', () => {
           });
         });
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-del-coeff'), {
             coefficient: deleteField(),
             updatedBy: 'secretary-1',
@@ -3349,7 +3349,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('14. secretary supprime weeklyHours avec deleteField', async () => {
+      it('14. secretary ne peut pas supprimer weeklyHours avec deleteField', async () => {
         // Seed first
         await testEnv.withSecurityRulesDisabled(async (ctx) => {
           await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-del-hours'), {
@@ -3373,7 +3373,7 @@ describe('Class Programs and Subjects Security Rules', () => {
           });
         });
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-del-hours'), {
             weeklyHours: deleteField(),
             updatedBy: 'secretary-1',
@@ -3382,9 +3382,9 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('15. secretary désactive une matière', async () => {
+      it('15. secretary ne peut pas désactiver une matière du programme', async () => {
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-1'), {
             isActive: false,
             updatedBy: 'secretary-1',
@@ -3393,7 +3393,7 @@ describe('Class Programs and Subjects Security Rules', () => {
         );
       });
 
-      it('16. secretary réactive une matière', async () => {
+      it('16. secretary ne peut pas réactiver une matière du programme', async () => {
         await testEnv.withSecurityRulesDisabled(async (ctx) => {
           await setDoc(doc(ctx.firestore(), 'classSubjects', 'rev-2__subj-inactive'), {
             id: 'rev-2__subj-inactive',
@@ -3415,7 +3415,7 @@ describe('Class Programs and Subjects Security Rules', () => {
           });
         });
         const context = testEnv.authenticatedContext('secretary-1');
-        await assertSucceeds(
+        await assertFails(
           updateDoc(doc(context.firestore(), 'classSubjects', 'rev-2__subj-inactive'), {
             isActive: true,
             updatedBy: 'secretary-1',
@@ -3637,14 +3637,14 @@ describe('Class Programs and Subjects Security Rules', () => {
       await assertFails(getDocs(q));
     });
 
-    it('teacher query of classPrograms limited to published status is denied', async () => {
+    it('teacher query of classPrograms limited to published status is allowed', async () => {
       const context = testEnv.authenticatedContext('teacher-1');
       const q = query(
         collection(context.firestore(), 'classPrograms'),
         where('schoolId', '==', SCHOOL_ID),
         where('status', '==', 'published')
       );
-      await assertFails(getDocs(q));
+      await assertSucceeds(getDocs(q));
     });
 
     it('secretary query of classSubjects with programId and published revisionId is allowed', async () => {

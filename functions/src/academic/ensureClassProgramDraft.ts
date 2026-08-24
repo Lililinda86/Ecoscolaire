@@ -65,7 +65,7 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           { businessCode: 'PERMISSION_DENIED' }
         );
       }
-      const allowedRoles = ['superAdmin', 'owner', 'director', 'secretary'];
+      const allowedRoles = ['superAdmin', 'owner', 'director'];
       if (!allowedRoles.includes(user.role)) {
         throw new functions.https.HttpsError(
           'permission-denied',
@@ -99,9 +99,15 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           { businessCode: 'INVALID_ARGUMENT' }
         );
       }
+      if (classData.active === false || classData.isActive === false || classData.status === 'inactive' || classData.status === 'archived') {
+        throw new functions.https.HttpsError('failed-precondition', 'La classe doit être active.', { businessCode: 'CLASS_NOT_ACTIVE' });
+      }
 
       // 3. Resolve Academic Year and Class Program
       const resolvedYear = await resolveAcademicYear(transaction, db, cleanSchoolId, cleanAcademicYearId);
+      if (resolvedYear.data.active === false || resolvedYear.data.isActive === false || resolvedYear.data.status === 'inactive' || resolvedYear.data.status === 'archived') {
+        throw new functions.https.HttpsError('failed-precondition', 'L’année scolaire doit être active.', { businessCode: 'YEAR_NOT_ACTIVE' });
+      }
       const resolvedProgram = await resolveClassProgram(transaction, db, cleanSchoolId, cleanClassId, resolvedYear);
 
       let programId: string;
@@ -149,6 +155,10 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           );
         }
 
+        const fixtureFields = classData.testFixture === true && resolvedYear.data.testFixture === true &&
+          typeof classData.testRunId === 'string' && classData.testRunId === resolvedYear.data.testRunId
+          ? { testFixture: true, testRunId: classData.testRunId }
+          : {};
         const newProgramPayload = {
           id: programId,
           schoolId: cleanSchoolId,
@@ -161,10 +171,17 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
           createdBy: uid,
           createdAt: nowIso,
           updatedBy: uid,
-          updatedAt: nowIso
+          updatedAt: nowIso,
+          ...fixtureFields
         };
 
-        transaction.create(programRef, newProgramPayload);
+        transaction.create(programRef, { ...newProgramPayload, version: 1 });
+        transaction.create(db.collection('audit_logs').doc(), {
+          schoolId: cleanSchoolId, action: 'CLASS_PROGRAM_CREATED', actorUid: uid, actorRole: user.role,
+          targetType: 'classProgram', targetId: programId,
+          details: { academicYearId: resolvedYear.id, classId: cleanClassId, revisionId: initialDraftRevisionId, subjectCount: 0, version: 1 },
+          timestamp: nowIso, createdAt: nowIso, canonicalBackendAudit: true, ...fixtureFields
+        });
 
         return {
           programId,
@@ -375,7 +392,15 @@ export const ensureClassProgramDraft = functions.https.onCall(async (data, conte
         draftRevisionNumber: newDraftRevisionNumber,
         hasUnpublishedChanges: true,
         updatedAt: nowIso,
-        updatedBy: uid
+        updatedBy: uid,
+        version: Number(program.version || 0) + 1
+      });
+      transaction.create(db.collection('audit_logs').doc(), {
+        schoolId: cleanSchoolId, action: 'CLASS_PROGRAM_UPDATED', actorUid: uid, actorRole: user.role,
+        targetType: 'classProgram', targetId: programId,
+        details: { academicYearId: resolvedYear.id, classId: cleanClassId, revisionId: newDraftRevisionId, subjectCount: publishedSubjects.length, version: Number(program.version || 0) + 1 },
+        timestamp: nowIso, createdAt: nowIso, canonicalBackendAudit: true,
+        ...(program.testFixture === true ? { testFixture: true, testRunId: program.testRunId } : {})
       });
 
       return {

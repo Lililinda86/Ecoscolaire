@@ -50,6 +50,16 @@ export function resolveClassProgramHookState({
 
   if (isReadOnlyRole) {
     if (!hasPub) {
+      if (program.draftRevisionId) {
+        return {
+          status: 'success',
+          source: 'draft',
+          program,
+          subjects: [],
+          visibleRevisionId: program.draftRevisionId,
+          errorCode: null
+        };
+      }
       if (legacySubjectsCount === 0) {
         return {
           status: 'success',

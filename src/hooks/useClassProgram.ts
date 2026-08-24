@@ -38,7 +38,7 @@ import { canManageAcademicPrograms } from '../utils/academicPermissions';
 export function getClassProgramAccessMode(role: string | undefined): ClassProgramAccessMode {
   if (!role) return 'forbidden';
   if (canManageAcademicPrograms(role)) return 'manager';
-  if (role === 'teacher') return 'read-only';
+  if (role === 'teacher' || role === 'secretary') return 'read-only';
   return 'forbidden';
 }
 
@@ -104,7 +104,7 @@ export function useClassProgram({
           schoolId: schoolId!,
           classId: classId!,
           academicYearIds: [academicYearId!, ...equivalentAcademicYearIds.filter(id => id !== academicYearId)],
-          mode: requestedView === 'published' ? 'published' : 'any'
+          mode: requestedView === 'published' && currentRole !== 'secretary' ? 'published' : 'any'
         });
 
         if (resolved.status === 'success' && resolved.program) {

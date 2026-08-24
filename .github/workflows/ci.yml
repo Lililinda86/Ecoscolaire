@@ -40,6 +40,9 @@ jobs:
       - name: Validate Production Academic Periods E2E safety contract
         run: node --check scripts/test-academic-periods-production.mjs && node --test tests/security/production-academic-periods-e2e.spec.mjs
 
+      - name: Validate Production Programs E2E safety contract
+        run: node --check scripts/test-programs-staging.mjs && node --test tests/security/production-programs-e2e.spec.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
@@ -123,9 +126,7 @@ jobs:
           node tests/functions/test-student-finance-projection.cjs
           node tests/functions/test-secretary-collection-calculations.cjs
           node tests/functions/test-academic-resolvers.cjs
-          node tests/functions/test-ensure-class-program-draft.cjs
-          node tests/functions/test-publish-class-program-draft.cjs
-          node tests/functions/test-bulk-add-subjects.cjs
+          npx firebase-tools@15.25.0 emulators:exec --project demo-school --only firestore "node tests/functions/test-class-program-lifecycle.cjs"
           node tests/functions/test-boardviewer-governance.cjs
           node tests/functions/test-authenticated-audit.cjs
           node tests/functions/test-expense-ledger.cjs
@@ -135,8 +136,8 @@ jobs:
           node --test tests/security/app-no-class-write-on-load.spec.mjs
           npx vitest run tests/unit/AppNoAutomaticClassMutation.spec.tsx tests/unit/Staff.spec.tsx tests/unit/staffEligibility.spec.ts
 
-      - name: Validate Staff staging E2E safety contract
-        run: node --check scripts/test-staff-staging.mjs && node --check scripts/test-academic-periods-staging.mjs
+      - name: Validate staging E2E safety contracts
+        run: node --check scripts/test-staff-staging.mjs && node --check scripts/test-academic-periods-staging.mjs && node --check scripts/test-programs-staging.mjs
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student
