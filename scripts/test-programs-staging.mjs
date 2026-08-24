@@ -238,7 +238,8 @@ async function run() {
     for (const role of ['parent', 'student', 'boardViewer']) {
       const page = await newPage(role, { width: 390, height: 844 });
       await page.goto(`${appUrl}/#/subjects-program`, { waitUntil: 'domcontentloaded' });
-      await page.waitForURL(url => !url.hash.includes('/subjects-program'), { timeout: 30_000 });
+      await page.getByRole('heading', { name: 'Accès refusé' }).waitFor({ timeout: 30_000 });
+      assert.equal(await page.getByRole('heading', { name: 'Matières & Programmes' }).count(), 0);
     }
 
     await clients.owner.archive({ ...base, expectedPublishedRevisionId: revisionV2 });
