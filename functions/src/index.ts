@@ -3037,6 +3037,7 @@ export { seedDefaultSubjectCatalog } from './academic/seedDefaultSubjectCatalog'
 export { setPrimaryTeacherAssignment } from './academic/setPrimaryTeacherAssignment';
 export { deactivateTeacherAssignment } from './academic/deactivateTeacherAssignment';
 export { getTeacherAssignmentCandidates } from './academic/getTeacherAssignmentCandidates';
+export { manageTeacherAssignment } from './academic/manageTeacherAssignment';
 export { updateAcademicYearBounds } from './academic/updateAcademicYearBounds';
 export { manageAcademicPeriod } from './academic/manageAcademicPeriod';
 export { createStudentSecure } from './studentCreationSecure';

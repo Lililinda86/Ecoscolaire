@@ -309,13 +309,24 @@ service cloud.firestore {
 
     function isTeacherAssignedToClassSubject(schoolId, academicYearId, classId, classSubjectId) {
       let staffLink = get(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid));
-      let assignmentPath = /databases/$(database)/documents/teacherAssignments/$(schoolId + '__' + academicYearId + '__' + classId + '__' + classSubjectId + '__' + staffLink.data.staffId);
+      let classSubjectPath = /databases/$(database)/documents/classSubjects/$(classSubjectId);
+      let hasClassSubject = exists(classSubjectPath);
+      let catalogSubjectId = hasClassSubject
+        ? get(classSubjectPath).data.get('catalogSubjectId', get(classSubjectPath).data.subjectId)
+        : classSubjectId;
+      let assignmentPath = /databases/$(database)/documents/teacherAssignments/$(schoolId + '__' + academicYearId + '__' + classId + '__' + catalogSubjectId + '__' + staffLink.data.staffId);
       return isAuthenticated()
         && isTeacher()
-        && staffLink != null
+        && exists(/databases/$(database)/documents/staffUserLinkByUser/$(request.auth.uid))
         && staffLink.data.isActive == true
         && staffLink.data.schoolId == schoolId
+        && (!hasClassSubject || (
+          get(classSubjectPath).data.schoolId == schoolId
+          && get(classSubjectPath).data.academicYearId == academicYearId
+          && get(classSubjectPath).data.classId == classId
+        ))
         && exists(assignmentPath)
+        && get(assignmentPath).data.get('status', 'active') == 'active'
         && get(assignmentPath).data.isActive == true;
     }
 
