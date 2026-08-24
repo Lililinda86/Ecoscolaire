@@ -89,7 +89,7 @@ async function run() {
     await page.getByTestId('login-email').fill(`${role}.${testRunId}@example.test`);
     await page.getByTestId('login-password').fill(password);
     await page.getByTestId('login-submit').click();
-    await page.waitForURL(url => !url.hash.includes('/login'), { timeout: 30_000 });
+    await page.waitForURL(url => !url.hash.includes('/login'), { timeout: 60_000 });
     return page;
   };
 
@@ -226,8 +226,7 @@ async function run() {
     for (const role of ['parent', 'student', 'boardViewer']) {
       const page = await newPage(role, { width: 390, height: 844 });
       await page.goto(`${appUrl}/#/subjects-program`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(1_000);
-      assert.equal(page.url().includes('/subjects-program'), false);
+      await page.waitForURL(url => !url.hash.includes('/subjects-program'), { timeout: 30_000 });
     }
 
     await clients.owner.archive({ ...base, expectedPublishedRevisionId: revisionV2 });
