@@ -8,12 +8,14 @@ export interface TeacherAssignment {
   classId: string;
   subjectId: string;
   teacherStaffId: string;
-  assignmentRole: 'primary';
-  sourceProgramId: string;
-  sourcePublishedRevisionId: string;
-  sourceClassSubjectId: string;
+  status: 'draft' | 'active' | 'inactive';
+  version: number;
+  note?: string;
+  sourceProgramId?: string;
+  sourcePublishedRevisionId?: string;
+  sourceClassSubjectId?: string;
   isActive: boolean;
-  startedAt: string;
+  startedAt?: string;
   endedAt?: string;
   createdAt: string;
   createdBy: string;
@@ -33,7 +35,7 @@ export interface TeacherAssignmentSlot {
   classId: string;
   subjectId: string;
   teacherStaffId: string;
-  assignmentRole: 'primary';
+  status?: 'active' | 'inactive';
   sourceProgramId: string;
   sourcePublishedRevisionId: string;
   sourceClassSubjectId: string;
@@ -41,6 +43,20 @@ export interface TeacherAssignmentSlot {
   updatedAt: string;
   updatedBy: string;
   teacherUserId?: string;
+}
+
+export async function getSchoolTeacherAssignments(schoolId: string): Promise<TeacherAssignment[]> {
+  const q = query(collection(db, 'teacherAssignments'), where('schoolId', '==', schoolId));
+  const snap = await getDocs(q);
+  return snap.docs.map(document => {
+    const data = document.data();
+    return {
+      id: document.id,
+      ...data,
+      status: data.status || (data.isActive === true ? 'active' : 'inactive'),
+      version: Number(data.version || 1),
+    } as TeacherAssignment;
+  });
 }
 
 export interface StaffUserLinkPointer {
