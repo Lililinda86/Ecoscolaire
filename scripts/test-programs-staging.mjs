@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
-import { cert, deleteApp as deleteAdminApp, initializeApp as initializeAdminApp } from 'firebase-admin/app';
+import { applicationDefault, cert, deleteApp as deleteAdminApp, initializeApp as initializeAdminApp } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { chromium } from '@playwright/test';
@@ -10,19 +10,29 @@ import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { assertAutomationBypassSecret, assertProtectedPreviewLoaded } from './staging-firebase-precheck.mjs';
 
-const PROJECT = 'ecoscolaire-staging';
-const REQUIRED = [
-  'STAGING_APP_URL', 'STAGING_FIREBASE_SERVICE_ACCOUNT', 'STAGING_FIREBASE_API_KEY',
-  'STAGING_FIREBASE_AUTH_DOMAIN', 'STAGING_FIREBASE_PROJECT_ID', 'STAGING_FIREBASE_STORAGE_BUCKET',
-  'STAGING_FIREBASE_MESSAGING_SENDER_ID', 'STAGING_FIREBASE_APP_ID', 'VERCEL_AUTOMATION_BYPASS_SECRET',
+const IS_PRODUCTION = process.env.PROGRAMS_E2E_TARGET === 'production';
+const PREFIX = IS_PRODUCTION ? 'PRODUCTION' : 'STAGING';
+const PROJECT = IS_PRODUCTION ? 'ecoscolaire-c5861' : 'ecoscolaire-staging';
+const APP_URL_KEY = `${PREFIX}_APP_URL`;
+const REQUIRED = IS_PRODUCTION
+  ? [APP_URL_KEY, 'PRODUCTION_FIREBASE_API_KEY', 'PRODUCTION_FIREBASE_AUTH_DOMAIN',
+    'PRODUCTION_FIREBASE_PROJECT_ID', 'PRODUCTION_FIREBASE_STORAGE_BUCKET',
+    'PRODUCTION_FIREBASE_MESSAGING_SENDER_ID', 'PRODUCTION_FIREBASE_APP_ID',
+    'PRODUCTION_EXPECTED_SHA', 'TEST_MARKER_PREFIX']
+  : [APP_URL_KEY, 'STAGING_FIREBASE_SERVICE_ACCOUNT', 'STAGING_FIREBASE_API_KEY',
+    'STAGING_FIREBASE_AUTH_DOMAIN', 'STAGING_FIREBASE_PROJECT_ID', 'STAGING_FIREBASE_STORAGE_BUCKET',
+    'STAGING_FIREBASE_MESSAGING_SENDER_ID', 'STAGING_FIREBASE_APP_ID', 'VERCEL_AUTOMATION_BYPASS_SECRET'];
+const REAL_DATA_COLLECTIONS = [
+  'classPrograms', 'classSubjects', 'classes', 'subjects', 'academicYears', 'periods', 'staff',
+  'teacherAssignments', 'evaluations', 'grades', 'reportCards',
 ];
 const config = () => ({
-  apiKey: process.env.STAGING_FIREBASE_API_KEY,
-  authDomain: process.env.STAGING_FIREBASE_AUTH_DOMAIN,
+  apiKey: process.env[`${PREFIX}_FIREBASE_API_KEY`],
+  authDomain: process.env[`${PREFIX}_FIREBASE_AUTH_DOMAIN`],
   projectId: PROJECT,
-  storageBucket: process.env.STAGING_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.STAGING_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.STAGING_FIREBASE_APP_ID,
+  storageBucket: process.env[`${PREFIX}_FIREBASE_STORAGE_BUCKET`],
+  messagingSenderId: process.env[`${PREFIX}_FIREBASE_MESSAGING_SENDER_ID`],
+  appId: process.env[`${PREFIX}_FIREBASE_APP_ID`],
 });
 const callableFailure = (promise, code) => assert.rejects(promise, error => error?.code === `functions/${code}`);
 const canonicalToken = subjects => {
@@ -47,12 +57,21 @@ const canonicalToken = subjects => {
 
 async function run() {
   const missing = REQUIRED.filter(key => !process.env[key]?.trim());
-  if (missing.length) throw new Error(`Missing staging secrets: ${missing.join(', ')}`);
-  assert.equal(process.env.STAGING_FIREBASE_PROJECT_ID, PROJECT);
-  assertAutomationBypassSecret(process.env.VERCEL_AUTOMATION_BYPASS_SECRET);
-  const appUrl = new URL(process.env.STAGING_APP_URL).origin;
+  if (missing.length) throw new Error(`Missing ${PREFIX.toLowerCase()} configuration: ${missing.join(', ')}`);
+  assert.equal(process.env[`${PREFIX}_FIREBASE_PROJECT_ID`], PROJECT);
+  if (IS_PRODUCTION) {
+    assert.equal(process.env.GITHUB_REF, 'refs/heads/main');
+    assert.equal(process.env[APP_URL_KEY], 'https://ecoscolaire.vercel.app');
+    assert.equal(process.env.TEST_MARKER_PREFIX, 'ITALO-PROD-PROGRAM-TEST-');
+    assert.match(process.env.PRODUCTION_EXPECTED_SHA, /^[a-f0-9]{40}$/);
+  } else {
+    assertAutomationBypassSecret(process.env.VERCEL_AUTOMATION_BYPASS_SECRET);
+  }
+  const appUrl = new URL(process.env[APP_URL_KEY]).origin;
   const token = String(process.env.GITHUB_RUN_ID || Date.now()).replace(/[^A-Za-z0-9_-]/g, '-');
-  const testRunId = `italo-w2-02-${token}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`;
+  const testRunId = IS_PRODUCTION
+    ? `${process.env.TEST_MARKER_PREFIX}${token}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`
+    : `italo-w2-02-${token}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`;
   const fixture = { testFixture: true, testRunId };
   const password = `T!${randomBytes(18).toString('base64url')}9a`;
   const schoolId = `program-school-${testRunId}`;
@@ -63,11 +82,17 @@ async function run() {
   const subjectA = `program-subject-a-${testRunId}`;
   const subjectB = `program-subject-b-${testRunId}`;
   const inactiveSubject = `program-subject-off-${testRunId}`;
-  const roles = ['owner', 'director', 'secretary', 'teacher', 'parent', 'student', 'boardViewer'];
-  let credentials;
-  try { credentials = JSON.parse(process.env.STAGING_FIREBASE_SERVICE_ACCOUNT); } catch { throw new Error('Invalid staging service account JSON.'); }
-  assert.equal(credentials.project_id, PROJECT);
-  const adminApp = initializeAdminApp({ credential: cert(credentials) }, `program-admin-${testRunId}`);
+  const roles = ['superAdmin', 'owner', 'director', 'secretary', 'teacher', 'parent', 'student', 'boardViewer'];
+  let credential;
+  if (IS_PRODUCTION) {
+    credential = applicationDefault();
+  } else {
+    let credentials;
+    try { credentials = JSON.parse(process.env.STAGING_FIREBASE_SERVICE_ACCOUNT); } catch { throw new Error('Invalid staging service account JSON.'); }
+    assert.equal(credentials.project_id, PROJECT);
+    credential = cert(credentials);
+  }
+  const adminApp = initializeAdminApp({ credential, projectId: PROJECT }, `program-admin-${testRunId}`);
   const db = getFirestore(adminApp);
   const adminAuth = getAdminAuth(adminApp);
   const browser = await chromium.launch({ headless: true });
@@ -75,17 +100,32 @@ async function run() {
   const clientApps = [];
   const contexts = [];
 
+  const snapshotRealData = async () => {
+    if (!IS_PRODUCTION) return null;
+    const result = {};
+    for (const name of REAL_DATA_COLLECTIONS) {
+      const snapshot = await db.collection(name).get();
+      result[name] = Object.fromEntries(snapshot.docs
+        .filter(item => item.data().testFixture !== true)
+        .map(item => [item.id, `${item.updateTime?.toMillis() || 0}:${item.data().version ?? ''}`]));
+    }
+    return result;
+  };
+  const realBefore = await snapshotRealData();
+
   const newPage = async (role, viewport) => {
     const context = await browser.newContext({ viewport });
     contexts.push(context);
     const page = await context.newPage();
-    await page.route(`${appUrl}/**`, route => route.continue({ headers: {
-      ...route.request().headers(),
-      'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-      'x-vercel-set-bypass-cookie': 'true',
-    } }));
+    if (!IS_PRODUCTION) {
+      await page.route(`${appUrl}/**`, route => route.continue({ headers: {
+        ...route.request().headers(),
+        'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+        'x-vercel-set-bypass-cookie': 'true',
+      } }));
+    }
     await page.goto(`${appUrl}/#/login`, { waitUntil: 'domcontentloaded' });
-    assertProtectedPreviewLoaded({ expectedOrigin: appUrl, actualUrl: page.url() });
+    if (!IS_PRODUCTION) assertProtectedPreviewLoaded({ expectedOrigin: appUrl, actualUrl: page.url() });
     await page.getByTestId('login-email').fill(`${role}.${testRunId}@example.test`);
     await page.getByTestId('login-password').fill(password);
     await page.getByTestId('login-submit').click();
@@ -175,14 +215,17 @@ async function run() {
     }
 
     const base = { schoolId, academicYearId: yearId, classId };
-    await callableFailure(clients.secretary.ensure(base), 'permission-denied');
-    await callableFailure(clients.teacher.ensure(base), 'permission-denied');
+    for (const role of ['secretary', 'teacher', 'parent', 'student', 'boardViewer']) {
+      await callableFailure(clients[role].ensure(base), 'permission-denied');
+    }
     await callableFailure(clients.owner.ensure({ ...base, schoolId: otherSchoolId }), 'permission-denied');
     await callableFailure(clients.owner.ensure({ ...base, classId: 'missing-fixture-class' }), 'not-found');
 
-    const created = (await clients.owner.ensure(base)).data;
+    const created = (await clients.superAdmin.ensure(base)).data;
     const programId = created.programId;
     const revisionV1 = created.draftRevisionId;
+    assert.equal((await db.collection('classPrograms').doc(programId).get()).data()?.status, 'draft');
+    assert.equal((await clients.owner.ensure(base)).data.programId, programId);
     await clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [] });
     await callableFailure(clients.owner.publish({ ...base, expectedDraftRevisionId: revisionV1, expectedDraftStateToken: canonicalToken([]) }), 'failed-precondition');
     const validSubjects = [
@@ -191,6 +234,8 @@ async function run() {
     ];
     await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [validSubjects[0], validSubjects[0]] }), 'already-exists');
     await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], coefficient: 0 }] }), 'invalid-argument');
+    await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], coefficient: Number.NaN }] }), 'invalid-argument');
+    await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], subjectId: 'missing-fixture-subject' }] }), 'not-found');
     await callableFailure(clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: [{ ...validSubjects[0], subjectId: inactiveSubject }] }), 'failed-precondition');
     await clients.owner.update({ ...base, expectedDraftRevisionId: revisionV1, subjects: validSubjects });
     const v1Documents = await revisionSubjects(programId, revisionV1);
@@ -199,7 +244,12 @@ async function run() {
     const concurrent = await Promise.allSettled([clients.owner.publish(publication), clients.owner.publish(publication)]);
     assert.equal(concurrent.filter(result => result.status === 'fulfilled').length, 1);
     assert.equal(concurrent.filter(result => result.status === 'rejected' && result.reason?.code === 'functions/already-exists').length, 1);
+    const directProgramId = `direct-program-${testRunId}`;
+    await assert.rejects(setDoc(doc(clients.owner.firestore, 'classPrograms', directProgramId), {
+      id: directProgramId, ...base, status: 'draft', ...fixture,
+    }));
     await assert.rejects(updateDoc(doc(clients.owner.firestore, 'classPrograms', programId), { status: 'draft' }));
+    await assert.rejects(deleteDoc(doc(clients.owner.firestore, 'classPrograms', programId)));
     await assert.rejects(deleteDoc(doc(clients.owner.firestore, 'classSubjects', v1Documents[0].id)));
     assert.equal((await getDoc(doc(clients.teacher.firestore, 'classPrograms', programId))).data()?.status, 'published');
 
@@ -251,7 +301,10 @@ async function run() {
     assert.ok(programAudits.length >= 7);
     assert.ok(programAudits.every(item => item.data().canonicalBackendAudit === true));
     assert.ok(programAudits.every(item => !/email|password|student|payment|receipt/i.test(JSON.stringify(item.data().details || {}))));
-    console.log(`ITALO-W2-02 PROGRAMS STAGING E2E PASS ${testRunId}`);
+    for (const collection of ['teacherAssignments', 'evaluations', 'grades', 'reportCards', 'periods']) {
+      assert.equal((await db.collection(collection).where('testRunId', '==', testRunId).get()).size, 0, `${collection} side effects`);
+    }
+    console.log(`ITALO-W2-02 PROGRAMS ${PREFIX} E2E PASS ${testRunId}`);
   } finally {
     for (const context of contexts) await context.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
@@ -265,6 +318,11 @@ async function run() {
     for (const collection of fixtureCollections) {
       assert.equal((await db.collection(collection).where('testRunId', '==', testRunId).get()).size, 0, `${collection} fixture residuals`);
     }
+    for (const uid of authUids) {
+      await assert.rejects(adminAuth.getUser(uid), error => error?.code === 'auth/user-not-found');
+    }
+    if (IS_PRODUCTION) assert.deepEqual(await snapshotRealData(), realBefore);
+    console.log(`ITALO-W2-02 PROGRAMS ${PREFIX} CLEANUP PASS ${testRunId} residuals=0 orphans=0 authResiduals=0`);
     await deleteAdminApp(adminApp);
   }
 }
