@@ -1,533 +1,130 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAppContext } from '../../../context/AppContext';
-import { useClassProgram } from '../../../hooks/useClassProgram';
-import { getActiveAcademicYearId } from '../../../utils/academicYearDeduplication';
-import { ClassProgramSelectors } from '../programs/ClassProgramSelectors';
-import { getClassTeacherAssignmentSlots, type TeacherAssignmentSlot } from '../../../services/teacherAssignments';
-import {
-  setPrimaryTeacherAssignment,
-  deactivateTeacherAssignment,
-  getTeacherAssignmentCandidates,
-  type TeacherAssignmentCandidate
-} from '../../../services/teacherAssignmentFunctions';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Plus, ShieldAlert } from 'lucide-react';
 import Modal from '../../../components/Modal';
-import { ShieldAlert, AlertTriangle, Check, UserMinus, Info } from 'lucide-react';
-import type { Staff } from '../../../types';
-import { TeacherSelectDropdown } from '../../../components/TeacherSelectDropdown';
+import { useAppContext } from '../../../context/AppContext';
+import { getSchoolTeacherAssignments, type TeacherAssignment } from '../../../services/teacherAssignments';
+import { getTeacherAssignmentCandidates, manageTeacherAssignment, type TeacherAssignmentCandidate, type TeacherAssignmentError } from '../../../services/teacherAssignmentFunctions';
+import { getActiveAcademicYearId } from '../../../utils/academicYearDeduplication';
+
+type ModalMode = 'create' | 'edit' | null;
+const fieldStyle: React.CSSProperties = { width: '100%', minHeight: 42, padding: '0.55rem 0.7rem', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--card-bg, white)' };
 
 export const TeacherAssignmentsPanel: React.FC = () => {
   const { db, currentUser } = useAppContext();
-
-  // Filters state
-  const [sectionFilter, setSectionFilter] = useState<'all' | 'francophone' | 'anglophone'>('all');
-  const [cycleFilter, setCycleFilter] = useState<'all' | 'maternelle' | 'primaire' | 'secondaire'>('all');
-  const [selectedClassId, setSelectedClassId] = useState<string>('');
-
-  // Selected Class info
-  const classes = React.useMemo(() => db?.classes || [], [db?.classes]);
-  const selectedClass = classes.find((c) => c.id === selectedClassId) || null;
-
-  // School information
-  const schoolId = db?.school?.id;
-  const normalizedYear = React.useMemo(() => {
-    return getActiveAcademicYearId(db?.academicYears, db?.school);
-  }, [db?.academicYears, db?.school]);
-
-  const rawAcademicYear = db?.school?.academicYear || '';
-  const activeYearName = React.useMemo(() => {
-    if (!normalizedYear || !db?.academicYears) return rawAcademicYear;
-    const y = db.academicYears.find(y => y.id === normalizedYear);
-    return y ? y.name : rawAcademicYear;
-  }, [normalizedYear, db?.academicYears, rawAcademicYear]);
-
-  // Hook for class program
-  const {
-    status: programStatus,
-    subjects: publishedSubjects,
-    program,
-    errorCode: programErrorCode
-  } = useClassProgram({
-    schoolId,
-    academicYearId: normalizedYear,
-    selectedClass,
-    currentRole: currentUser?.role,
-    requestedView: 'published'
-  });
-
-  // State for assignments, candidates, loading and modals
-  const [slots, setSlots] = useState<TeacherAssignmentSlot[]>([]);
+  const schoolId = db?.school?.id || '';
+  const defaultYearId = useMemo(() => getActiveAcademicYearId(db?.academicYears, db?.school) || '', [db?.academicYears, db?.school]);
+  const canActivate = ['superAdmin', 'owner', 'director'].includes(currentUser?.role || '');
+  const canDraft = canActivate || currentUser?.role === 'secretary';
+  const [assignments, setAssignments] = useState<TeacherAssignment[]>([]);
   const [candidates, setCandidates] = useState<TeacherAssignmentCandidate[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [modalErrorMsg, setModalErrorMsg] = useState<string | null>(null);
+  const [yearFilter, setYearFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  const [teacherFilter, setTeacherFilter] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [selected, setSelected] = useState<TeacherAssignment | null>(null);
+  const [form, setForm] = useState({ academicYearId: '', classId: '', subjectId: '', teacherStaffId: '', note: '' });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  // Modals state
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
-  const [selectedSubjectName, setSelectedSubjectName] = useState<string>('');
-  const [chosenTeacherStaffId, setChosenTeacherStaffId] = useState<string>('');
-  const [deactivationReason, setDeactivationReason] = useState<string>('');
-  const [actionInProgress, setActionInProgress] = useState<boolean>(false);
-
-  // Load slots and candidates
-  const loadAssignmentsData = useCallback(async () => {
-    if (!schoolId || !normalizedYear || !selectedClassId) return;
-
-    // Check program load status
-    if (programStatus === 'loading' || programStatus === 'idle') return;
-    if (programStatus === 'error' || programStatus === 'forbidden') return;
-    if (!program || !program.publishedRevisionId || program.publishedRevisionId === '') {
-      setSlots([]);
-      setCandidates([]);
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMsg(null);
+  useEffect(() => { if (!yearFilter && defaultYearId) setYearFilter(defaultYearId); }, [defaultYearId, yearFilter]);
+  const reload = useCallback(async () => {
+    if (!schoolId) return;
+    setLoading(true); setError('');
     try {
-      const [fetchedSlots, candidatesRes] = await Promise.all([
-        getClassTeacherAssignmentSlots(schoolId, normalizedYear, selectedClassId),
-        getTeacherAssignmentCandidates({ schoolId })
-      ]);
-      setSlots(fetchedSlots);
-      setCandidates(candidatesRes.candidates || []);
-    } catch (err: unknown) {
-      console.error(err);
-      setErrorMsg('La liste des enseignants n’a pas pu être chargée.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [schoolId, normalizedYear, selectedClassId, program, programStatus]);
-
-  useEffect(() => {
-    loadAssignmentsData();
-  }, [loadAssignmentsData, program, programStatus]);
-
-  // Handle Tab filter reset
-
-  // Handle Tab filter reset
-  const handleClassSelect = (classId: string) => {
-    setSelectedClassId(classId);
-    setErrorMsg(null);
-  };
-
-  // Open assignment / replacement modal
-  const openAssignModal = (subjectId: string, subjectName: string, currentTeacherStaffId?: string) => {
-    setSelectedSubjectId(subjectId);
-    setSelectedSubjectName(subjectName);
-    setChosenTeacherStaffId(currentTeacherStaffId || '');
-    if (!normalizedYear) {
-      setModalErrorMsg('Impossible d’identifier l’année scolaire sélectionnée.');
-    } else {
-      setModalErrorMsg(null);
-    }
-    setIsAssignModalOpen(true);
-  };
-
-  // Open deactivation modal
-  const openDeactivateModal = (subjectId: string, subjectName: string) => {
-    setSelectedSubjectId(subjectId);
-    setSelectedSubjectName(subjectName);
-    setDeactivationReason('');
-    setIsDeactivateModalOpen(true);
-  };
-
-  // Submit setPrimaryTeacherAssignment
-  const handleAssignSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!normalizedYear) {
-      setModalErrorMsg('Impossible d’identifier l’année scolaire sélectionnée.');
-      return;
-    }
-    if (!schoolId || !selectedClassId || !selectedSubjectId || !chosenTeacherStaffId) return;
-
-    setModalErrorMsg(null);
-    setActionInProgress(true);
-    try {
-      await setPrimaryTeacherAssignment({
-        schoolId,
-        academicYearId: normalizedYear,
-        classId: selectedClassId,
-        subjectId: selectedSubjectId,
-        teacherStaffId: chosenTeacherStaffId
-      });
-      setIsAssignModalOpen(false);
-      alert('Enseignant affecté avec succès.');
-      await loadAssignmentsData();
-    } catch (err: unknown) {
-      console.error(err);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const error = err as any;
-      const code = error?.businessCode || error?.details?.businessCode;
-
-      if (code === 'PERMISSION_DENIED' || code === 'SCHOOL_MISMATCH' || code === 'UNAUTHENTICATED') {
-        setModalErrorMsg('Vous n’êtes pas autorisé à effectuer cette affectation.');
-      } else if (code === 'TEACHER_NOT_ELIGIBLE' || code === 'TEACHER_INACTIVE' || code === 'TEACHER_NOT_FOUND') {
-        setModalErrorMsg('Cet enseignant n’est plus disponible pour une nouvelle affectation.');
-      } else if (code === 'SUBJECT_NOT_IN_PUBLISHED_PROGRAM' || code === 'PROGRAM_NOT_FOUND' || code === 'PROGRAM_NOT_PUBLISHED' || code === 'PUBLISHED_SUBJECT_INACTIVE') {
-        setModalErrorMsg('Cette matière ne fait pas partie du programme publié de la classe.');
-      } else if (error?.code === 'functions/internal' || error?.code === 'functions/unavailable' || error?.message?.includes('network')) {
-        setModalErrorMsg('Impossible de joindre le service d’affectation. Réessayez.');
-      } else {
-        setModalErrorMsg('Impossible d’enregistrer l’affectation. Réessayez.');
+      if (currentUser?.role === 'teacher') {
+        setAssignments((db?.teacherAssignments || []).map(row => ({
+          ...row,
+          status: row.status || (row.isActive === true ? 'active' : 'inactive'),
+          version: Number(row.version || 1),
+        })));
+        setCandidates([]);
+        return;
       }
-    } finally {
-      setActionInProgress(false);
-    }
+      const [rows, people] = await Promise.all([getSchoolTeacherAssignments(schoolId), canDraft ? getTeacherAssignmentCandidates({ schoolId }) : Promise.resolve({ candidates: [] })]);
+      setAssignments(rows); setCandidates(people.candidates);
+    } catch { setError('Les affectations n’ont pas pu être chargées.'); } finally { setLoading(false); }
+  }, [canDraft, currentUser?.role, db?.teacherAssignments, schoolId]);
+  useEffect(() => { void reload(); }, [reload]);
+
+  const teacherName = (id: string) => candidates.find(row => row.teacherStaffId === id)?.name || db?.staff?.find(row => row.id === id)?.name || 'Enseignant inconnu';
+  const className = (id: string) => db?.classes?.find(row => row.id === id)?.name || id;
+  const subjectName = (id: string) => db?.subjects?.find(row => row.id === id)?.name || id;
+  const yearName = (id: string) => db?.academicYears?.find(row => row.id === id)?.name || id;
+  const compatibility = (assignment: TeacherAssignment) => {
+    const published = (db?.classPrograms || []).filter(program => program.schoolId === schoolId && program.academicYearId === assignment.academicYearId && program.classId === assignment.classId && program.status === 'published' && Boolean(program.publishedRevisionId));
+    if (published.length === 0) return 'PROGRAMME NON PUBLIÉ';
+    if (published.length !== 1) return 'PROGRAMME INCOHÉRENT';
+    const program = published[0];
+    const included = (db?.classSubjects || []).some(row => row.programId === program.id && row.revisionId === program.publishedRevisionId && row.isActive !== false && (row.subjectId === assignment.subjectId || row.catalogSubjectId === assignment.subjectId));
+    return included ? 'COMPATIBLE' : 'HORS PROGRAMME';
   };
+  const filtered = assignments.filter(row => (!yearFilter || row.academicYearId === yearFilter) && (!classFilter || row.classId === classFilter) && (!teacherFilter || row.teacherStaffId === teacherFilter) && (!subjectFilter || row.subjectId === subjectFilter) && (statusFilter === 'all' || row.status === statusFilter));
 
-  // Submit deactivateTeacherAssignment
-  const handleDeactivateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!schoolId || !normalizedYear || !selectedClassId || !selectedSubjectId) return;
-
-    setActionInProgress(true);
+  const explain = (caught: unknown) => {
+    const code = (caught as TeacherAssignmentError)?.businessCode;
+    if (code === 'PROGRAM_NOT_PUBLISHED') return 'PROGRAMME NON PUBLIÉ : le brouillon est conservé, mais son activation est bloquée.';
+    if (code === 'SUBJECT_NOT_IN_PUBLISHED_PROGRAM') return 'Cette matière ne figure pas dans le programme publié de la classe.';
+    if (code === 'TEACHER_LINK_REQUIRED' || code === 'TEACHER_LINK_INTEGRITY_ERROR') return 'Une liaison Staff ↔ User active et cohérente est requise pour activer.';
+    if (code === 'PERMISSION_DENIED' || code === 'SCHOOL_MISMATCH') return 'Vous n’êtes pas autorisé à effectuer cette action.';
+    return caught instanceof Error ? caught.message : 'L’opération a échoué.';
+  };
+  const openCreate = () => { setSelected(null); setForm({ academicYearId: yearFilter || defaultYearId, classId: classFilter, subjectId: subjectFilter, teacherStaffId: teacherFilter, note: '' }); setError(''); setModalMode('create'); };
+  const openEdit = (row: TeacherAssignment) => { setSelected(row); setForm({ academicYearId: row.academicYearId, classId: row.classId, subjectId: row.subjectId, teacherStaffId: row.teacherStaffId, note: row.note || '' }); setError(''); setModalMode('edit'); };
+  const submitDraft = async (event: React.FormEvent) => {
+    event.preventDefault(); if (saving) return; setSaving(true); setError('');
     try {
-      await deactivateTeacherAssignment({
-        schoolId,
-        academicYearId: normalizedYear,
-        classId: selectedClassId,
-        subjectId: selectedSubjectId,
-        reason: deactivationReason || undefined
-      });
-      setIsDeactivateModalOpen(false);
-      await loadAssignmentsData();
-    } catch (err: unknown) {
-      const errMessage = err instanceof Error ? err.message : 'Erreur lors de la désaffectation.';
-      alert(errMessage);
-    } finally {
-      setActionInProgress(false);
-    }
+      if (modalMode === 'create') await manageTeacherAssignment({ action: 'CREATE_DRAFT', ...form });
+      else if (selected) await manageTeacherAssignment({ action: 'UPDATE_DRAFT', assignmentId: selected.id, note: form.note });
+      setModalMode(null); await reload();
+    } catch (caught) { setError(explain(caught)); } finally { setSaving(false); }
+  };
+  const activate = async (row: TeacherAssignment) => {
+    if (!window.confirm(`Activer l’affectation de ${teacherName(row.teacherStaffId)} ? Elle accordera les droits pédagogiques pour cette classe.`)) return;
+    setSaving(true); setError(''); try { await manageTeacherAssignment({ action: 'ACTIVATE', assignmentId: row.id }); await reload(); } catch (caught) { setError(explain(caught)); } finally { setSaving(false); }
+  };
+  const deactivate = async (row: TeacherAssignment) => {
+    if (!window.confirm('Désactiver cette affectation ? Son historique sera conservé et ses nouveaux droits pédagogiques seront retirés.')) return;
+    setSaving(true); setError(''); try { await manageTeacherAssignment({ action: 'DEACTIVATE', assignmentId: row.id }); await reload(); } catch (caught) { setError(explain(caught)); } finally { setSaving(false); }
   };
 
-  // Check link status for a staff
-  const getTeacherLinkStatus = (staffId: string) => {
-    const candidate = candidates.find((c) => c.teacherStaffId === staffId);
-    return candidate ? candidate.accountStatus : 'unlinked';
-  };
-
-  const getTeacherName = (staffId: string) => {
-    const candidate = candidates.find((c) => c.teacherStaffId === staffId);
-    if (candidate) return candidate.name;
-    const teacher = db?.staff?.find((s: Staff) => s.id === staffId);
-    return teacher ? teacher.name : 'Enseignant inconnu';
-  };
-
-  // Filtered lists
-  const publishedActiveSubjects = publishedSubjects.filter((s) => s.isActive !== false);
-
-  const activeSlots = slots.filter((s) => s.isActive === true);
-
-  // Off-program slots: slots that are active but their subjectId doesn't exist in the published active subjects
-  const offProgramSlots = activeSlots.filter(
-    (slot) => !publishedActiveSubjects.some((subj) => subj.subjectId === slot.subjectId)
-  );
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-      {/* Selector Controls */}
-      <ClassProgramSelectors
-        academicYearLabel={activeYearName}
-        sectionFilter={sectionFilter}
-        setSectionFilter={setSectionFilter}
-        cycleFilter={cycleFilter}
-        setCycleFilter={setCycleFilter}
-        selectedClassId={selectedClassId}
-        setSelectedClassId={handleClassSelect}
-        classes={classes}
-        technicalSpecialties={db?.technicalSpecialties || []}
-        activeSchoolId={schoolId || ''}
-      />
-
-      {errorMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fee2e2', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', color: '#991b1b', fontSize: '0.9rem' }}>
-          <AlertTriangle size={18} />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {!selectedClassId ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', color: 'var(--text-muted)' }}>
-          <ShieldAlert size={48} style={{ margin: '0 auto 1rem', opacity: 0.3 }} />
-          <h3>Aucune classe sélectionnée</h3>
-          <p style={{ fontSize: '0.9rem' }}>Veuillez sélectionner une classe ci-dessus pour gérer les affectations.</p>
-        </div>
-      ) : programStatus === 'forbidden' ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', color: '#991b1b', border: '1px solid #fecaca', backgroundColor: '#fef2f2' }}>
-          <ShieldAlert size={48} style={{ margin: '0 auto 1rem', color: '#ef4444' }} />
-          <h3>Accès refusé</h3>
-          <p style={{ fontSize: '0.9rem' }}>Vous n’êtes pas autorisé à consulter le programme de cette classe.</p>
-        </div>
-      ) : programStatus === 'error' ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', color: '#991b1b', border: '1px solid #fecaca', backgroundColor: '#fef2f2' }}>
-          <AlertTriangle size={48} style={{ margin: '0 auto 1rem', color: '#ef4444' }} />
-          <h3>Erreur</h3>
-          <p style={{ fontSize: '0.9rem' }}>
-            {programErrorCode === 'PROGRAM_PERMISSION_DENIED'
-              ? 'Vous n’êtes pas autorisé à consulter le programme de cette classe.'
-              : programErrorCode === 'PROGRAM_INTEGRITY_ERROR'
-              ? 'Les données du programme de cette classe sont incohérentes.'
-              : 'Une erreur est survenue lors de la récupération des données.'}
-          </p>
-        </div>
-      ) : programStatus === 'loading' || isLoading ? (
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-          <div className="spinner" style={{ margin: '0 auto 1rem' }} />
-          <p>Chargement des données...</p>
-        </div>
-      ) : (!program || !program.publishedRevisionId || program.publishedRevisionId === '') ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', border: '1px dashed var(--border-color)' }}>
-          <AlertTriangle size={48} style={{ margin: '0 auto 1rem', color: '#eab308' }} />
-          <h3>Programme officiel non publié</h3>
-          <p style={{ fontSize: '0.9rem', maxWidth: '500px', margin: '0 auto 1rem', color: 'var(--text-muted)' }}>
-            Aucun programme officiel n’a encore été publié pour cette classe.
-          </p>
-        </div>
-      ) : publishedActiveSubjects.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem 2rem', color: 'var(--text-muted)' }}>
-          <AlertTriangle size={48} style={{ margin: '0 auto 1rem', opacity: 0.3 }} />
-          <h3>Le programme officiel ne contient aucune matière active</h3>
-          <p style={{ fontSize: '0.9rem' }}>Activez ou ajoutez des matières dans l'onglet "Programmes par classe" puis republiez.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-          {/* Main assignments table */}
-          <div className="card" style={{ padding: 0, overflowX: 'auto', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left', background: 'rgba(0,0,0,0.015)' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matière officielle</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Code</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Heures</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coeff</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enseignant principal</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Compte</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {publishedActiveSubjects.map((subj) => {
-                  const slot = activeSlots.find((s) => s.subjectId === subj.subjectId);
-                  const isAssigned = !!slot;
-
-                  let linkStatus = 'unlinked';
-                  if (slot) {
-                    linkStatus = getTeacherLinkStatus(slot.teacherStaffId);
-                  }
-
-                  return (
-                    <tr key={subj.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '0.65rem 1rem', fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>
-                        {subj.subjectNameSnapshot}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem' }}>
-                        {subj.subjectCodeSnapshot ? (
-                          <span style={{ background: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary-color)', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
-                            {subj.subjectCodeSnapshot}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', color: '#475569', fontSize: '0.85rem' }}>
-                        {subj.weeklyHours !== undefined ? `${subj.weeklyHours}h` : '—'}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', color: '#475569', fontSize: '0.85rem' }}>
-                        {subj.coefficient !== undefined ? subj.coefficient : '—'}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem' }}>
-                        {slot ? (
-                          <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>
-                            {getTeacherName(slot.teacherStaffId)}
-                          </div>
-                        ) : (
-                          <span style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 500 }}>Non affecté</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem' }}>
-                        {slot ? (
-                          linkStatus === 'linked' ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#ecfdf5', color: '#047857', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
-                              <Check size={12} /> Compte lié
-                            </span>
-                          ) : linkStatus === 'inactive' ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#fffbeb', color: '#b45309', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
-                              <AlertTriangle size={12} /> Liaison inactive
-                            </span>
-                          ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#ffedd5', color: '#9a3412', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 600 }}>
-                              Sans compte
-                            </span>
-                          )
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
-                          <button
-                            className="secondary"
-                            style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}
-                            onClick={() => openAssignModal(subj.subjectId, subj.subjectNameSnapshot, slot?.teacherStaffId)}
-                          >
-                            {isAssigned ? 'Changer' : 'Affecter'}
-                          </button>
-                          {isAssigned && (
-                            <button
-                              className="secondary"
-                              style={{ padding: '0.35rem 0.5rem', borderRadius: '6px', display: 'flex', alignItems: 'center', color: '#ef4444', borderColor: '#fecaca', backgroundColor: '#fef2f2' }}
-                              onClick={() => openDeactivateModal(subj.subjectId, subj.subjectNameSnapshot)}
-                              title="Désaffecter"
-                            >
-                              <UserMinus size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Off-program assignments section */}
-          {offProgramSlots.length > 0 && (
-            <div style={{ marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <AlertTriangle size={18} style={{ color: '#eab308' }} />
-                <h4 style={{ margin: 0, color: '#854d0e' }}>Affectations hors programme officiel</h4>
-              </div>
-              <div className="card" style={{ padding: 0, overflowX: 'auto', borderRadius: '12px', border: '1px solid #fef08a' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #fef08a', textAlign: 'left', background: '#fefcbf' }}>
-                      <th style={{ padding: '0.65rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#854d0e' }}>Subject ID</th>
-                      <th style={{ padding: '0.65rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#854d0e' }}>Enseignant</th>
-                      <th style={{ padding: '0.65rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#854d0e' }}>Provenance</th>
-                      <th style={{ padding: '0.65rem 1rem', fontSize: '0.8rem', fontWeight: 700, color: '#854d0e', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {offProgramSlots.map((slot) => (
-                      <tr key={slot.id} style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: '#fffbeb' }}>
-                        <td style={{ padding: '0.65rem 1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{slot.subjectId}</td>
-                        <td style={{ padding: '0.65rem 1rem', fontWeight: 600 }}>{getTeacherName(slot.teacherStaffId)}</td>
-                        <td style={{ padding: '0.65rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          Rev: {slot.sourcePublishedRevisionId}
-                        </td>
-                        <td style={{ padding: '0.65rem 1rem', textAlign: 'right' }}>
-                          <button
-                            className="secondary"
-                            style={{ padding: '0.35rem 0.5rem', borderRadius: '6px', display: 'flex', alignItems: 'center', color: '#ef4444', borderColor: '#fecaca', backgroundColor: '#fef2f2', marginLeft: 'auto' }}
-                            onClick={() => openDeactivateModal(slot.subjectId, slot.subjectId)}
-                          >
-                            <UserMinus size={14} /> &nbsp; Désaffecter
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* Assignment & Replacement Modal */}
-      <Modal isOpen={isAssignModalOpen} onClose={() => !actionInProgress && setIsAssignModalOpen(false)} title="Affecter un enseignant">
-        <form onSubmit={handleAssignSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '360px' }}>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0 }}>
-            {selectedSubjectName} · {selectedClass?.name} · {activeYearName}
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Enseignant disponible</label>
-            <TeacherSelectDropdown
-              candidates={candidates}
-              value={chosenTeacherStaffId}
-              onChange={setChosenTeacherStaffId}
-              disabled={actionInProgress}
-              errorMsg={errorMsg}
-            />
-          </div>
-
-          {modalErrorMsg && (
-            <div style={{ display: 'flex', gap: '0.5rem', background: '#fee2e2', border: '1px solid #fecaca', padding: '0.75rem', borderRadius: '8px', color: '#991b1b', fontSize: '0.85rem' }}>
-              <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-              <span>{modalErrorMsg}</span>
-            </div>
-          )}
-
-          {chosenTeacherStaffId && getTeacherLinkStatus(chosenTeacherStaffId) === 'unlinked' && (
-            <div style={{ display: 'flex', gap: '0.5rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem', borderRadius: '8px', color: '#166534', fontSize: '0.85rem' }}>
-              <Info size={16} style={{ flexShrink: 0, color: '#16a34a' }} />
-              <span>
-                Cet enseignant peut être affecté immédiatement. Son accès à l’espace enseignant sera disponible après la création ou la liaison de son compte.
-              </span>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setIsAssignModalOpen(false)}
-              disabled={actionInProgress}
-            >
-              Annuler
-            </button>
-            <button type="submit" disabled={actionInProgress || !chosenTeacherStaffId}>
-              {actionInProgress ? 'Enregistrement...' : 'Affecter'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Deactivation Modal */}
-      <Modal isOpen={isDeactivateModalOpen} onClose={() => !actionInProgress && setIsDeactivateModalOpen(false)} title="Retirer l'enseignant">
-        <form onSubmit={handleDeactivateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '320px' }}>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0 }}>
-            Voulez-vous désaffecter l'enseignant de la matière <strong>{selectedSubjectName}</strong> ? L'historique complet de cette affectation sera conservé.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Motif du retrait (facultatif)</label>
-            <input
-              type="text"
-              maxLength={500}
-              placeholder="Ex: Remplacement temporaire, congé, etc."
-              value={deactivationReason}
-              onChange={(e) => setDeactivationReason(e.target.value)}
-              style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setIsDeactivateModalOpen(false)}
-              disabled={actionInProgress}
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              style={{ backgroundColor: '#dc2626', borderColor: '#dc2626', color: 'white' }}
-              disabled={actionInProgress}
-            >
-              {actionInProgress ? 'En cours...' : 'Désaffecter'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
+  return <div style={{ display: 'grid', gap: '1rem' }}>
+    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div><h2 style={{ margin: 0 }}>Affectations enseignants</h2><p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)' }}>Un rôle enseignant ne crée jamais une affectation.</p></div>
+      {canDraft && <button onClick={openCreate}><Plus size={16} /> Créer un brouillon</button>}
     </div>
-  );
+    <div className="card" aria-label="Filtres des affectations" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.65rem' }}>
+      <select aria-label="Année scolaire" style={fieldStyle} value={yearFilter} onChange={event => setYearFilter(event.target.value)}><option value="">Toutes les années</option>{(db?.academicYears || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+      <select aria-label="Classe" style={fieldStyle} value={classFilter} onChange={event => setClassFilter(event.target.value)}><option value="">Toutes les classes</option>{(db?.classes || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+      <select aria-label="Enseignant" style={fieldStyle} value={teacherFilter} onChange={event => setTeacherFilter(event.target.value)}><option value="">Tous les enseignants</option>{candidates.map(row => <option key={row.teacherStaffId} value={row.teacherStaffId}>{row.name}</option>)}</select>
+      <select aria-label="Matière" style={fieldStyle} value={subjectFilter} onChange={event => setSubjectFilter(event.target.value)}><option value="">Toutes les matières</option>{(db?.subjects || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+      <select aria-label="Statut" style={fieldStyle} value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option><option value="draft">DRAFT</option><option value="active">ACTIVE</option><option value="inactive">INACTIVE</option></select>
+    </div>
+    {error && <div role="alert" style={{ padding: '0.8rem', borderRadius: 8, color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca' }}><AlertTriangle size={16} /> {error}</div>}
+    {loading ? <div className="card">Chargement…</div> : filtered.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: '2.5rem' }}><ShieldAlert size={40} style={{ opacity: 0.35 }} /><p>Aucune affectation pour ces filtres.</p></div> :
+      <div className="card" style={{ padding: 0, overflowX: 'auto' }}><table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse' }}>
+        <thead><tr>{['Enseignant', 'Classe', 'Matière', 'Année', 'Statut', 'Programme', 'Actions'].map(label => <th key={label} style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>{label}</th>)}</tr></thead>
+        <tbody>{filtered.map(row => <tr key={row.id}>
+          <td style={{ padding: '0.75rem' }}>{teacherName(row.teacherStaffId)}</td><td style={{ padding: '0.75rem' }}>{className(row.classId)}</td><td style={{ padding: '0.75rem' }}>{subjectName(row.subjectId)}</td><td style={{ padding: '0.75rem' }}>{yearName(row.academicYearId)}</td>
+          <td style={{ padding: '0.75rem', fontWeight: 700 }}>{row.status.toUpperCase()}</td><td style={{ padding: '0.75rem', color: compatibility(row) === 'COMPATIBLE' ? '#047857' : '#b45309' }}>{compatibility(row)}</td>
+          <td style={{ padding: '0.75rem' }}><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>{canDraft && row.status === 'draft' && <button className="secondary" disabled={saving} onClick={() => openEdit(row)}>Modifier</button>}{canActivate && row.status === 'draft' && <button disabled={saving} onClick={() => void activate(row)}>Activer</button>}{canActivate && row.status === 'active' && <button className="secondary" disabled={saving} onClick={() => void deactivate(row)}>Désactiver</button>}</div></td>
+        </tr>)}</tbody>
+      </table></div>}
+    <Modal isOpen={modalMode !== null} onClose={() => !saving && setModalMode(null)} title={modalMode === 'create' ? 'Créer une affectation DRAFT' : 'Modifier le brouillon'}>
+      <form onSubmit={submitDraft} style={{ display: 'grid', gap: '0.8rem' }}>
+        {modalMode === 'create' && <>
+          <label>Année scolaire<select required style={fieldStyle} value={form.academicYearId} onChange={event => setForm({ ...form, academicYearId: event.target.value })}><option value="">Sélectionner</option>{(db?.academicYears || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+          <label>Classe<select required style={fieldStyle} value={form.classId} onChange={event => setForm({ ...form, classId: event.target.value })}><option value="">Sélectionner</option>{(db?.classes || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+          <label>Matière<select required style={fieldStyle} value={form.subjectId} onChange={event => setForm({ ...form, subjectId: event.target.value })}><option value="">Sélectionner</option>{(db?.subjects || []).filter(row => row.isActive !== false).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+          <label>Enseignant<select required style={fieldStyle} value={form.teacherStaffId} onChange={event => setForm({ ...form, teacherStaffId: event.target.value })}><option value="">Sélectionner</option>{candidates.filter(row => row.isEligible).map(row => <option key={row.teacherStaffId} value={row.teacherStaffId}>{row.name} · {row.accountStatus === 'linked' ? 'compte lié' : 'DRAFT uniquement'}</option>)}</select></label>
+        </>}
+        <label>Note administrative<textarea style={{ ...fieldStyle, minHeight: 85 }} maxLength={500} value={form.note} onChange={event => setForm({ ...form, note: event.target.value })} /></label>
+        <div style={{ padding: '0.65rem', background: '#fffbeb', borderRadius: 8, color: '#92400e' }}>Sans programme publié, le brouillon reste possible. L’activation demeure bloquée.</div>
+        {error && <div role="alert" style={{ color: '#991b1b' }}>{error}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}><button type="button" className="secondary" disabled={saving} onClick={() => setModalMode(null)}>Annuler</button><button type="submit" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer DRAFT'}</button></div>
+      </form>
+    </Modal>
+  </div>;
 };

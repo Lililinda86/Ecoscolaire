@@ -873,6 +873,7 @@ export interface ClassSubject {
   classId: string;
   academicYearId: string;
   subjectId: string;
+  catalogSubjectId?: string;
 
   revisionId: string;
   revisionNumber: number;
@@ -934,12 +935,14 @@ export interface TeacherAssignment {
   classId: string;
   subjectId: string;
   teacherStaffId: string;
-  assignmentRole: 'primary';
-  sourceProgramId: string;
-  sourcePublishedRevisionId: string;
-  sourceClassSubjectId: string;
+  status: 'draft' | 'active' | 'inactive';
+  version: number;
+  note?: string;
+  sourceProgramId?: string;
+  sourcePublishedRevisionId?: string;
+  sourceClassSubjectId?: string;
   isActive: boolean;
-  startedAt: string;
+  startedAt?: string;
   endedAt?: string;
   createdAt: string;
   createdBy: string;
@@ -959,7 +962,7 @@ export interface TeacherAssignmentSlot {
   classId: string;
   subjectId: string;
   teacherStaffId: string;
-  assignmentRole: 'primary';
+  status?: 'active' | 'inactive';
   sourceProgramId: string;
   sourcePublishedRevisionId: string;
   sourceClassSubjectId: string;

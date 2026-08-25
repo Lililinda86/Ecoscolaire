@@ -7,10 +7,15 @@ export type TeacherAssignmentErrorType =
   | 'SCHOOL_MISMATCH'
   | 'CLASS_NOT_FOUND'
   | 'CLASS_INACTIVE'
+  | 'ACADEMIC_YEAR_NOT_FOUND'
+  | 'ACADEMIC_YEAR_INACTIVE'
+  | 'SUBJECT_NOT_FOUND'
+  | 'SUBJECT_INACTIVE'
   | 'TEACHER_NOT_FOUND'
   | 'TEACHER_INACTIVE'
   | 'TEACHER_NOT_ELIGIBLE'
   | 'TEACHER_LINK_INTEGRITY_ERROR'
+  | 'TEACHER_LINK_REQUIRED'
   | 'PROGRAM_NOT_FOUND'
   | 'PROGRAM_NOT_PUBLISHED'
   | 'PROGRAM_INTEGRITY_ERROR'
@@ -19,6 +24,8 @@ export type TeacherAssignmentErrorType =
   | 'ASSIGNMENT_NOT_FOUND'
   | 'ASSIGNMENT_ALREADY_EXISTS'
   | 'ASSIGNMENT_INTEGRITY_ERROR'
+  | 'INVALID_ACTION'
+  | 'INVALID_STATUS'
   | 'INTERNAL_ERROR';
 
 export class TeacherAssignmentError extends Error {
@@ -27,6 +34,39 @@ export class TeacherAssignmentError extends Error {
     super(message);
     this.businessCode = businessCode;
     this.name = 'TeacherAssignmentError';
+  }
+}
+
+export type ManageTeacherAssignmentAction = 'CREATE_DRAFT' | 'UPDATE_DRAFT' | 'ACTIVATE' | 'DEACTIVATE';
+
+export interface ManageTeacherAssignmentInput {
+  action: ManageTeacherAssignmentAction;
+  assignmentId?: string;
+  academicYearId?: string;
+  classId?: string;
+  subjectId?: string;
+  teacherStaffId?: string;
+  note?: string;
+  reason?: string;
+  testFixture?: true;
+  testRunId?: string;
+}
+
+export interface ManageTeacherAssignmentOutput {
+  success: true;
+  changed: boolean;
+  assignment: Record<string, unknown>;
+}
+
+export async function manageTeacherAssignment(input: ManageTeacherAssignmentInput): Promise<ManageTeacherAssignmentOutput> {
+  const callable = httpsCallable<ManageTeacherAssignmentInput, ManageTeacherAssignmentOutput>(
+    getFunctions(),
+    'manageTeacherAssignment'
+  );
+  try {
+    return (await callable(input)).data;
+  } catch (error: unknown) {
+    throw parseTeacherAssignmentError(error, 'Erreur lors de la gestion de l’affectation.');
   }
 }
 
