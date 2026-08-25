@@ -141,7 +141,8 @@ async function run() {
       await page.goto(`${appUrl}/#/subjects-program`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Affectation des Enseignants' }).click();
       await page.getByRole('heading', { name: 'Affectations enseignants' }).waitFor({ timeout: 30_000 });
-      await page.getByLabel('Statut').selectOption('inactive'); await page.getByText(`Enseignant A ${testRunId}`).waitFor({ timeout: 30_000 });
+      await page.getByLabel('Statut').selectOption('inactive');
+      await page.getByRole('cell', { name: `Enseignant A ${testRunId}`, exact: true }).waitFor({ timeout: 30_000 });
       await page.reload({ waitUntil: 'domcontentloaded' }); await page.getByRole('button', { name: 'Affectation des Enseignants' }).click();
       await page.getByText('PROGRAMME NON PUBLIÉ').first().waitFor({ timeout: 30_000 });
       assert.ok(await page.getByRole('button', { name: 'Créer un brouillon' }).isVisible());
