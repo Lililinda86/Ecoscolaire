@@ -54,16 +54,17 @@ async function run() {
   const testRunId = IS_PRODUCTION
     ? `${MARKER_PREFIX}${token}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`
     : `italo-w2-03-${token}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`;
+  const fixtureIdToken = IS_PRODUCTION ? `${token}-${process.env.GITHUB_RUN_ATTEMPT || '1'}` : testRunId;
   const fixture = { testFixture: true, testRunId };
   const password = `T!${randomBytes(18).toString('base64url')}9a`;
   const ids = {
-    school: `assign-school-${testRunId}`, otherSchool: `assign-cross-school-${testRunId}`,
-    year: `assign-year-${testRunId}`, inactiveYear: `assign-year-off-${testRunId}`,
-    classA: `assign-class-a-${testRunId}`, classB: `assign-class-b-${testRunId}`, foreignClass: `assign-class-cross-${testRunId}`, inactiveClass: `assign-class-off-${testRunId}`,
-    math: `assign-math-${testRunId}`, outside: `assign-outside-${testRunId}`, foreignSubject: `assign-subject-cross-${testRunId}`, inactiveSubject: `assign-subject-off-${testRunId}`,
-    staffA: `assign-staff-a-${testRunId}`, staffB: `assign-staff-b-${testRunId}`, staffUnlinked: `assign-staff-unlinked-${testRunId}`, inactiveStaff: `assign-staff-off-${testRunId}`,
-    program: `assign-program-${testRunId}`, revision: `assign-revision-${testRunId}`,
-    studentA: `assign-student-a-${testRunId}`, studentB: `assign-student-b-${testRunId}`,
+    school: `assign-school-${fixtureIdToken}`, otherSchool: `assign-cross-school-${fixtureIdToken}`,
+    year: `assign-year-${fixtureIdToken}`, inactiveYear: `assign-year-off-${fixtureIdToken}`,
+    classA: `assign-class-a-${fixtureIdToken}`, classB: `assign-class-b-${fixtureIdToken}`, foreignClass: `assign-class-cross-${fixtureIdToken}`, inactiveClass: `assign-class-off-${fixtureIdToken}`,
+    math: `assign-math-${fixtureIdToken}`, outside: `assign-outside-${fixtureIdToken}`, foreignSubject: `assign-subject-cross-${fixtureIdToken}`, inactiveSubject: `assign-subject-off-${fixtureIdToken}`,
+    staffA: `assign-staff-a-${fixtureIdToken}`, staffB: `assign-staff-b-${fixtureIdToken}`, staffUnlinked: `assign-staff-unlinked-${fixtureIdToken}`, inactiveStaff: `assign-staff-off-${fixtureIdToken}`,
+    program: `assign-program-${fixtureIdToken}`, revision: `assign-revision-${fixtureIdToken}`,
+    studentA: `assign-student-a-${fixtureIdToken}`, studentB: `assign-student-b-${fixtureIdToken}`,
   };
   let credential;
   if (IS_PRODUCTION) {
