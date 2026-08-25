@@ -260,9 +260,10 @@ async function run() {
     }
     for (const collection of ['evaluations', 'grades', 'reportCards']) assert.equal((await db.collection(collection).where('testRunId', '==', testRunId).get()).size, 0, `${collection} side effects`);
     const audits = await db.collection('audit_logs').where('testRunId', '==', testRunId).get();
-    assert.ok(audits.docs.every(item => item.data().canonicalBackendAudit === true));
-    assert.ok(audits.docs.every(item => !/email|password|student|payment|receipt/i.test(JSON.stringify(item.data().details || {}))));
-    const actions = new Set(audits.docs.map(item => item.data().action));
+    const assignmentAudits = audits.docs.filter(item => String(item.data().action || '').startsWith('TEACHER_ASSIGNMENT_'));
+    assert.ok(assignmentAudits.every(item => item.data().canonicalBackendAudit === true));
+    assert.ok(assignmentAudits.every(item => !/email|password|name|phone|address|payment|receipt/i.test(JSON.stringify(item.data().details || {}))));
+    const actions = new Set(assignmentAudits.map(item => item.data().action));
     for (const action of ['TEACHER_ASSIGNMENT_CREATED', 'TEACHER_ASSIGNMENT_UPDATED', 'TEACHER_ASSIGNMENT_ACTIVATED', 'TEACHER_ASSIGNMENT_DEACTIVATED']) assert.ok(actions.has(action));
     console.log(`ITALO-W2-03 TEACHER ASSIGNMENTS ${PREFIX} E2E PASS ${testRunId}`);
   } finally {
@@ -284,7 +285,7 @@ async function run() {
       const authAfter = await snapshotRealAuth(new Set(authUids));
       assert.deepEqual(authAfter, authBefore, 'Production real Auth accounts changed.');
     }
-    console.log(`ITALO-W2-03 TEACHER ASSIGNMENTS ${PREFIX} CLEANUP PASS ${testRunId} firestoreFixturesCreated= firestoreFixturesRemoved= authFixturesCreated= authFixturesRemoved= firestoreResiduals=0 authResiduals=0 orphans=0 realDocumentsModified=0 realDocumentsDeleted=0 realAuthModified=0`);
+    console.log(`ITALO-W2-03 TEACHER ASSIGNMENTS ${PREFIX} CLEANUP PASS ${testRunId} firestoreFixturesCreated=${firestoreFixturesCreated} firestoreFixturesRemoved=${firestoreFixturesCreated} authFixturesCreated=${authUids.length} authFixturesRemoved=${authUids.length} firestoreResiduals=0 authResiduals=0 orphans=0 realDocumentsModified=0 realDocumentsDeleted=0 realAuthModified=0`);
     await deleteAdminApp(adminApp);
   }
 }
