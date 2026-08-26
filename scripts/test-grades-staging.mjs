@@ -23,6 +23,43 @@ const fail = (promise, code, businessCode) => assert.rejects(promise, error => {
   return true;
 });
 
+const captureGradeState = async (db, evaluationId) => {
+  const [evaluation, grades] = await Promise.all([
+    db.collection('evaluations').doc(evaluationId).get(),
+    db.collection('grades').where('evaluationId', '==', evaluationId).get(),
+  ]);
+  return {
+    evaluation: {
+      exists: evaluation.exists,
+      updateTime: evaluation.updateTime?.toMillis(),
+      data: JSON.stringify(evaluation.data()),
+    },
+    grades: grades.docs.map(item => ({
+      id: item.id,
+      updateTime: item.updateTime?.toMillis(),
+      data: JSON.stringify(item.data()),
+    })).sort((left, right) => left.id.localeCompare(right.id)),
+  };
+};
+
+const expectInvalidNumericInputRejected = async ({ db, evaluationId, valueName, request }) => {
+  const before = await captureGradeState(db, evaluationId);
+  const error = await request().then(() => undefined, reason => reason);
+  assert.ok(error, `${valueName} request unexpectedly succeeded`);
+
+  const backendRejection = error?.code === 'functions/invalid-argument'
+    && error?.details?.businessCode === 'INVALID_SCORE';
+  const clientRejection = error?.name === 'Error'
+    && error?.code === undefined
+    && error?.message === `Data cannot be encoded in JSON: ${valueName}`;
+  assert.ok(backendRejection || clientRejection,
+    `${valueName} rejection was neither Firebase serialization nor backend INVALID_SCORE: ${error?.message || error}`);
+
+  const after = await captureGradeState(db, evaluationId);
+  assert.deepEqual(after, before, `${valueName} rejection modified Evaluation/Grade state`);
+  return clientRejection ? 'client' : 'backend';
+};
+
 async function run() {
   const missing = REQUIRED.filter(key => !process.env[key]?.trim());
   if (missing.length) throw new Error(`Missing staging configuration: ${missing.join(', ')}`);
@@ -143,8 +180,10 @@ async function run() {
     ];
     await fail(clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `negative-${token}`, rows: [{ studentId: ids.student0, resultStatus: 'scored', score: -0.1 }] }), 'invalid-argument', 'INVALID_SCORE');
     await fail(clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `above-${token}`, rows: [{ studentId: ids.student0, resultStatus: 'scored', score: 20.1 }] }), 'invalid-argument', 'INVALID_SCORE');
-    await fail(clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `nan-${token}`, rows: [{ studentId: ids.student0, resultStatus: 'scored', score: Number.NaN }] }), 'invalid-argument', 'INVALID_SCORE');
-    await fail(clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `infinity-${token}`, rows: [{ studentId: ids.student0, resultStatus: 'scored', score: Number.POSITIVE_INFINITY }] }), 'invalid-argument', 'INVALID_SCORE');
+    const nanRejectionLayer = await expectInvalidNumericInputRejected({ db, evaluationId: ids.evaluation, valueName: 'NaN',
+      request: () => clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `nan-${token}`, rows: [{ studentId: ids.student0, resultStatus: 'scored', score: Number.NaN }] }) });
+    const infinityRejectionLayer = await expectInvalidNumericInputRejected({ db, evaluationId: ids.evaluation, valueName: 'Infinity',
+      request: () => clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `infinity-${token}`, rows: [{ studentId: ids.student0, resultStatus: 'scored', score: Number.POSITIVE_INFINITY }] }) });
     await fail(clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `absence-score-${token}`, rows: [{ studentId: ids.student0, resultStatus: 'absent', score: 0 }] }), 'invalid-argument', 'SCORE_STATUS_CONFLICT');
     await fail(clients.teacher.grades({ evaluationId: ids.evaluation, requestId: `duplicate-${token}`, rows: [validRows[0], validRows[0]] }), 'invalid-argument', 'DUPLICATE_STUDENT');
     const beforeAtomic = (await db.collection('grades').where('testRunId', '==', testRunId).get()).size;
@@ -217,7 +256,7 @@ async function run() {
       assert.equal(await page.getByRole('button', { name: 'Saisir des Notes' }).isDisabled(), true);
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 2);
     }
-    console.log(`ITALO-W2-04 GRADES STAGING E2E PASS ${testRunId}`);
+    console.log(`ITALO-W2-04 GRADES STAGING E2E PASS ${testRunId} NaNRejection=${nanRejectionLayer} InfinityRejection=${infinityRejectionLayer} nonFiniteGradeWrites=0`);
   } finally {
     for (const context of contexts) await context.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
