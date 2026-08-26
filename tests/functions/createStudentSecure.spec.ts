@@ -326,6 +326,28 @@ describe('createStudentSecure callable', () => {
     });
   }
 
+  it('persists a valid structured transport zone PK', async () => {
+    const fixture = await seed();
+    const basePayload = input(fixture.classId);
+    const payload = input(fixture.classId, {
+      studentData: { ...basePayload.studentData, usesTransport: true },
+      privateData: { ...basePayload.privateData, transportZonePk: 14 }
+    });
+    const result = await call(fixture.uid, payload);
+    expect((await db.collection('studentPrivate').doc(result.studentId).get()).data()?.transportZonePk).toBe(14);
+  });
+
+  for (const invalidTransportZonePk of [13, 42.5, 43]) {
+    it(`rejects invalid structured transport zone PK ${invalidTransportZonePk}`, async () => {
+      const fixture = await seed();
+      const basePayload = input(fixture.classId);
+      const payload = input(fixture.classId, {
+        privateData: { ...basePayload.privateData, transportZonePk: invalidTransportZonePk }
+      });
+      await expectBusinessError(call(fixture.uid, payload), 'INVALID_ARGUMENT');
+    });
+  }
+
   it('27 same matricule and same identity is denied for a distinct operation', async () => {
     const fixture = await seed();
     const first = input(fixture.classId);
