@@ -250,10 +250,12 @@ async function run() {
       await page.getByTestId('login-password').fill(password); await page.getByTestId('login-submit').click();
       await page.waitForURL(url => !url.hash.includes('/login'), { timeout: 60_000 });
       await page.goto(`${appUrl}/#/grades`, { waitUntil: 'domcontentloaded' });
-      await page.getByTestId('grades-configuration-required').waitFor({ timeout: 30_000 });
-      await page.getByText('CONFIGURATION PÉDAGOGIQUE REQUISE').waitFor();
-      await page.getByText('Aucune période ouverte').waitFor();
+      const configurationRequired = page.getByTestId('grades-configuration-required');
+      await configurationRequired.waitFor({ timeout: 30_000 });
+      await configurationRequired.getByText('CONFIGURATION PÉDAGOGIQUE REQUISE').waitFor();
+      await configurationRequired.getByText(/^Aucune période ouverte\.?$/i).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Saisir des Notes' }).isDisabled(), true);
+      assert.equal(await page.getByRole('dialog').count(), 0);
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 2);
     }
     console.log(`ITALO-W2-04 GRADES STAGING E2E PASS ${testRunId} NaNRejection=${nanRejectionLayer} InfinityRejection=${infinityRejectionLayer} nonFiniteGradeWrites=0`);
