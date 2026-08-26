@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useI18n } from '../context/I18nContext';
 import { useAppContext } from '../context/AppContext';
-import { Bot, Shield, Package, Bus as BusIcon, ClipboardList, BookOpen, Users, LayoutDashboard, Settings, CreditCard, Calendar, MessageSquare, ShieldAlert, Briefcase, AlertTriangle, Menu, X } from 'lucide-react';
+import { Bot, Shield, Package, Bus as BusIcon, ClipboardList, BookOpen, FileText, Users, LayoutDashboard, Settings, CreditCard, Calendar, MessageSquare, ShieldAlert, Briefcase, AlertTriangle, Menu, X } from 'lucide-react';
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { t, lang, setLang } = useI18n();
@@ -133,8 +133,14 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                       </NavLink>
                       <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-grades">
                         <ClipboardList size={20} />
-                        Notes & Bulletins
+                        Notes & Évaluations
                       </NavLink>
+                      {['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
+                        <NavLink to="/report-cards" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-report-cards">
+                          <FileText size={20} />
+                          Bulletins
+                        </NavLink>
+                      )}
                       <NavLink to="/attendance" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-attendance">
                         <Calendar size={20} />
                         Présences

@@ -419,6 +419,13 @@ const Grades: React.FC = () => {
         </div>
       )}
 
+      <div className="card no-print" style={{ marginBottom: '1.5rem', borderLeft: '4px solid #4f46e5' }}>
+        <strong>Bulletins canoniques</strong>
+        <p>La génération, la validation, la publication et le PDF utilisent désormais des snapshots backend reproductibles.</p>
+        <a className="button" href="#/report-cards">Ouvrir le module Bulletins</a>
+        <p style={{ marginBottom: 0, marginTop: '.75rem' }}><small>Classement, mention et décision de passage restent différés jusqu’à validation de la politique ITALO.</small></p>
+      </div>
+      {Boolean(false) && (<>
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', overflowX: 'auto' }} className="no-print">
         <button className={activeTab === 'individual' ? '' : 'secondary'} style={{ border: activeTab === 'individual' ? '' : 'none', whiteSpace: 'nowrap' }} onClick={() => setActiveTab('individual')}>Bulletin Individuel</button>
         <button className={activeTab === 'ranking' ? '' : 'secondary'} style={{ border: activeTab === 'ranking' ? '' : 'none', whiteSpace: 'nowrap' }} onClick={() => setActiveTab('ranking')}><Trophy size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/> Palmarès (Classement par Classe)</button>
@@ -699,7 +706,9 @@ const Grades: React.FC = () => {
         </>
       )}
 
+      </>)}
       <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Saisie des Notes">
+
         {firestoreError ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <p style={{ marginBottom: '1rem', color: 'var(--danger-color)', fontWeight: 'bold' }}>Le calendrier académique n'a pas pu être chargé. Vérifiez vos droits ou réessayez.</p>
