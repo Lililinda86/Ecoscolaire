@@ -506,6 +506,102 @@ export interface Grade {
   testRunId?: string;
 }
 
+export type ReportCardStatus = 'draft' | 'validated' | 'published';
+export type ReportCardSubjectStatus = 'VALID' | 'NOT_EVALUATED' | 'NO_CALCULABLE_GRADE' | 'MISSING_COEFFICIENT';
+
+export interface ReportCardEvaluationResult {
+  evaluationId: string;
+  evaluationVersion: number;
+  evaluationTitle: string;
+  evaluationDate: string;
+  gradeId: string | null;
+  gradeVersion: number | null;
+  originalScore?: number;
+  originalMaxScore: number;
+  normalizedScore: number | null;
+  weight: number;
+  status: GradeResultStatus | 'missing' | string;
+  calculable: boolean;
+  reason?: string;
+}
+
+export interface ReportCardSubjectResult {
+  classSubjectId: string;
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string;
+  coefficient: number | null;
+  status: ReportCardSubjectStatus;
+  evaluationCount: number;
+  scoredCount: number;
+  absenceCount: number;
+  excusedCount: number;
+  evaluationResults: ReportCardEvaluationResult[];
+  rawAverage: number | null;
+  displayedAverage: string | null;
+  weightedPoints: number | null;
+  calculable: boolean;
+}
+
+export interface ReportCardSnapshot {
+  school: { id: string; name: string; logoUrl?: string | null };
+  academicYear: { id: string; name: string; startDate: string; endDate: string };
+  period: { id: string; name: string; startDate: string; endDate: string };
+  class: { id: string; name: string; section: string; type: string };
+  student: { id: string; name: string; registrationNumber?: string | null; section: string };
+  program: { id: string; revisionId: string; revisionNumber: number };
+  subjectResults: ReportCardSubjectResult[];
+  overallResult: { generalAverage: number | null; totalPoints: number; totalCoefficients: number };
+  blockingIssues: Array<{ code: string; classSubjectId: string; subjectId: string }>;
+  sourceRefs: {
+    evaluationIds: Array<{ id: string; version: number; updateTime: string }>;
+    gradeIds: Array<{ id: string; version: number; updateTime: string }>;
+  };
+  policy: {
+    normalizedScale: 20;
+    eligibleEvaluationStatus: 'published';
+    absence: 'PRESERVED_NOT_ZERO';
+    missingGrade: 'BLOCK_VALIDATION';
+    ranking: 'DEFERRED';
+    mention: 'DEFERRED';
+    promotionDecision: 'OUT_OF_SCOPE';
+  };
+  teacherComment?: string | null;
+  directorComment?: string;
+}
+
+export interface ReportCard {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  periodId: string;
+  classId: string;
+  studentId: string;
+  programId: string;
+  programRevisionId: string;
+  programRevisionNumber: number;
+  status: ReportCardStatus;
+  version: number;
+  immutable: boolean;
+  snapshot: ReportCardSnapshot;
+  sourceHash: string;
+  snapshotHash: string;
+  officialSnapshot?: ReportCardSnapshot;
+  officialSnapshotHash?: string;
+  teacherComment?: string | null;
+  directorComment?: string;
+  createdAt: DateLike;
+  createdBy: string;
+  updatedAt: DateLike;
+  updatedBy: string;
+  validatedAt?: DateLike;
+  validatedBy?: string;
+  publishedAt?: DateLike;
+  publishedBy?: string;
+  testFixture?: true;
+  testRunId?: string;
+}
+
 export interface CreateGradeInput {
   schoolId: string;
   academicYearId: string;
