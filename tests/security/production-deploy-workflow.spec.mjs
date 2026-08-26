@@ -9,6 +9,8 @@ import {
 
 const workflowPath = new URL('../../.github/workflows/firebase-deploy.yml', import.meta.url);
 const workflow = fs.readFileSync(workflowPath, 'utf8');
+const functionsIndexPath = new URL('../../functions/src/index.ts', import.meta.url);
+const functionsIndex = fs.readFileSync(functionsIndexPath, 'utf8');
 const mainRef = 'refs/heads/main';
 
 const requiredFunctions = new Set([
@@ -44,6 +46,7 @@ const requiredFunctions = new Set([
   'manageTeacherAssignment',
   'manageEvaluation',
   'recordGradesBatch',
+  'manageReportCard',
 ]);
 
 const requiredBoardViewerFunctions = new Set([
@@ -99,9 +102,17 @@ test('Production deploy eligibility is fail-closed for every configured trigger'
   assert.equal(productionDeployJobEligible('workflow_dispatch', 'refs/heads/feature/example'), false);
 });
 
-test('Production deployment includes Firestore Rules and the exact thirty-two Functions', () => {
+test('Production deployment includes Firestore Rules and the exact thirty-three Functions', () => {
   assert.ok(deployTargets.includes('firestore:rules'));
   assert.deepEqual(deployedFunctions, requiredFunctions);
+});
+
+test('Production deployment exports and includes the Report Cards callable', () => {
+  assert.match(
+    functionsIndex,
+    /export\s*\{\s*manageReportCard\s*\}\s*from\s*['"]\.\/academic\/manageReportCard['"]/,
+  );
+  assert.equal(deployedFunctions.has('manageReportCard'), true);
 });
 
 test('Production deployment manifest includes every BoardViewer-required Function', () => {
