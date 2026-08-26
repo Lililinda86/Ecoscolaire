@@ -1,0 +1,90 @@
+name: Production Grades E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type RUN_ITALO_GRADES_PRODUCTION_SMOKE to authorize bounded fixtures
+        required: true
+        type: string
+      expected_sha:
+        description: Exact 40-character main SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  production-grades-e2e:
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RUN_ITALO_GRADES_PRODUCTION_SMOKE'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    concurrency:
+      group: italo-production-grades-e2e
+      cancel-in-progress: false
+    env:
+      GRADES_E2E_TARGET: production
+      PRODUCTION_APP_URL: https://ecoscolaire.vercel.app
+      PRODUCTION_FIREBASE_PROJECT_ID: ecoscolaire-c5861
+      TEST_MARKER_PREFIX: ITALO-PROD-GRADE-TEST-
+      PRODUCTION_EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Guard exact Production authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "${{ inputs.confirmation }}" = "RUN_ITALO_GRADES_PRODUCTION_SMOKE"
+          test "$PRODUCTION_FIREBASE_PROJECT_ID" = "ecoscolaire-c5861"
+          test "$PRODUCTION_FIREBASE_PROJECT_ID" != "ecoscolaire-staging"
+          test "$PRODUCTION_APP_URL" = "https://ecoscolaire.vercel.app"
+          test "$TEST_MARKER_PREFIX" = "ITALO-PROD-GRADE-TEST-"
+          test "$(git rev-parse HEAD)" = "$PRODUCTION_EXPECTED_SHA"
+
+      - name: Authenticate keylessly to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify exact Production target and canonical dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployed="$(gcloud functions list --project "$PRODUCTION_FIREBASE_PROJECT_ID" --regions us-central1 --format='value(name)')"
+          for function_name in manageEvaluation recordGradesBatch manageTeacherAssignment ensureClassProgramDraft updateClassProgramDraft publishClassProgramDraft archiveClassProgram manageAcademicPeriod manageStaff linkStaffToUser unlinkStaffFromUser recordStudentAttendance assignStudentToClass recordCashPayment reversePayment closeCashDrawer; do
+            printf '%s\n' "$deployed" | grep -Fx "$function_name" >/dev/null
+          done
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate canonical grade calculations
+        run: npx vitest run tests/unit/gradeCalculations.spec.ts tests/unit/gradePublishedCalculations.spec.ts tests/unit/gradingPolicy.spec.ts
+
+      - name: Capture PII-free Production baseline
+        run: node scripts/audit-grades-production-readonly.mjs
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run bounded ITALO Production Grades E2E
+        env:
+          PRODUCTION_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          PRODUCTION_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          PRODUCTION_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          PRODUCTION_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          PRODUCTION_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: node scripts/test-grades-staging.mjs

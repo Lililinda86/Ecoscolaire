@@ -437,17 +437,22 @@ export interface Evaluation {
   subjectId: string;
   classSubjectId: string;
   teacherId: string;
+  teacherAssignmentId: string;
+  teacherStaffId?: string;
+  teacherUserId?: string;
   title: string;
   type: string;
   date: string;
   maxScore: number;
   weight: number;
-  status: 'draft' | 'open' | 'submitted' | 'validated' | 'locked';
+  status: 'draft' | 'open' | 'locked' | 'published' | 'cancelled';
   createdAt: string;
   createdBy: string;
   updatedAt: string;
   updatedBy: string;
   version: number;
+  testFixture?: true;
+  testRunId?: string;
 }
 
 export type GradeResultStatus = 'scored' | 'absent' | 'excused' | 'exempt' | 'notSubmitted';
@@ -484,6 +489,9 @@ export interface Grade {
   subjectId: string;
   studentId: string;
   teacherId: string;
+  teacherAssignmentId?: string;
+  teacherStaffId?: string;
+  teacherUserId?: string;
   status: GradeStatus;
   resultStatus: GradeResultStatus;
   score?: number; // Obligatoire seulement si resultStatus === 'scored'
@@ -494,6 +502,8 @@ export interface Grade {
   updatedAt: string;
   updatedBy: string;
   version: number;
+  testFixture?: true;
+  testRunId?: string;
 }
 
 export interface CreateGradeInput {

@@ -46,6 +46,9 @@ jobs:
       - name: Validate Production Teacher Assignments E2E safety contract
         run: node --check scripts/test-teacher-assignments-staging.mjs && node --test tests/security/production-teacher-assignments-e2e.spec.mjs
 
+      - name: Validate Production Grades E2E safety contract
+        run: node --check scripts/test-grades-staging.mjs && node --check scripts/audit-grades-production-readonly.mjs && node --test tests/security/production-grades-e2e.spec.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
@@ -136,11 +139,12 @@ jobs:
           node tests/functions/test-student-class-assignment.cjs
           node tests/functions/test-manage-staff.cjs
           node tests/functions/test-staff-user-links.cjs
+          node tests/functions/test-manage-grades-contracts.cjs
           node --test tests/security/app-no-class-write-on-load.spec.mjs
           npx vitest run tests/unit/AppNoAutomaticClassMutation.spec.tsx tests/unit/Staff.spec.tsx tests/unit/staffEligibility.spec.ts
 
       - name: Validate staging E2E safety contracts
-        run: node --check scripts/test-staff-staging.mjs && node --check scripts/test-academic-periods-staging.mjs && node --check scripts/test-programs-staging.mjs && node --check scripts/test-teacher-assignments-staging.mjs
+        run: node --check scripts/test-staff-staging.mjs && node --check scripts/test-academic-periods-staging.mjs && node --check scripts/test-programs-staging.mjs && node --check scripts/test-teacher-assignments-staging.mjs && node --check scripts/test-grades-staging.mjs
 
       - name: Test Secure Student Creation
         run: npm run test:functions:secure-student
