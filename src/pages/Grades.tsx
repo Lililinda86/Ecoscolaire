@@ -7,6 +7,7 @@ import { getEffectiveClassSubjects } from '../services/effectiveClassSubjects';
 import { deduplicateAcademicYears, getEquivalentAcademicYearIds } from '../utils/academicYearDeduplication';
 import { groupGradesByClassSubject, calculateSubjectAverage, calculateWeightedGeneralAverage } from '../services/gradeCalculations';
 import { buildEvaluationId, buildGradeId } from '../utils/gradeIds';
+import { manageEvaluation } from '../services/gradeFunctions';
 import Modal from '../components/Modal';
 import { Plus, Printer, Trophy } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
@@ -54,7 +55,9 @@ const Grades: React.FC = () => {
   const [evaluationDate, setEvaluationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [evaluationMaxScore, setEvaluationMaxScore] = useState<string>('20');
   const [evaluationWeight, setEvaluationWeight] = useState<string>('1');
-  const [gradeEntryRows, setGradeEntryRows] = useState<Record<string, {score: string}>>({});
+  const [gradeEntryRows, setGradeEntryRows] = useState<Record<string, { score: string; resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted' }>>({});
+  const [gradeRequestId, setGradeRequestId] = useState<string>('');
+  const [isSavingGrades, setIsSavingGrades] = useState(false);
 
   const validAcademicYears = useMemo(() => {
     return deduplicateAcademicYears(db.academicYears || [], currentSchool?.id, currentSchool?.activeAcademicYearId);
@@ -101,6 +104,7 @@ const Grades: React.FC = () => {
     setEvaluationMaxScore('20');
     setEvaluationWeight('1');
     setGradeEntryRows({});
+    setGradeRequestId(crypto.randomUUID());
     setModalOpen(true);
   };
 
@@ -121,10 +125,37 @@ const Grades: React.FC = () => {
   };
 
   const handleUpdateGradeEntry = (studentId: string, value: string) => {
-    setGradeEntryRows({
-      ...gradeEntryRows,
-      [studentId]: { score: value }
-    });
+    setGradeEntryRows(rows => ({
+      ...rows,
+      [studentId]: { score: value, resultStatus: value === '' ? 'notSubmitted' : 'scored' }
+    }));
+  };
+
+  const handleUpdateGradeStatus = (studentId: string, resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted') => {
+    setGradeEntryRows(rows => ({
+      ...rows,
+      [studentId]: { score: resultStatus === 'scored' ? (rows[studentId]?.score || '') : '', resultStatus }
+    }));
+  };
+
+  const handleEvaluationTransition = async (action: 'LOCK' | 'PUBLISH' | 'CANCEL') => {
+    const evaluation = (db.evaluations || []).find(item => item.id === selectedEvaluationId);
+    if (!evaluation || !currentSchool) return;
+    const message = action === 'LOCK'
+      ? 'Après verrouillage, l’enseignant ne pourra plus modifier normalement les notes. Confirmer ?'
+      : action === 'PUBLISH'
+        ? 'Publier les résultats de cette évaluation sans générer de bulletin ?'
+        : 'Annuler cette évaluation tout en conservant son historique ?';
+    if (!window.confirm(message)) return;
+    setIsSavingGrades(true);
+    try {
+      await manageEvaluation({ action, evaluationId: evaluation.id, schoolId: currentSchool.id, expectedVersion: evaluation.version });
+      alert('Cycle de l’évaluation mis à jour.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSavingGrades(false);
+    }
   };
 
   const handleSaveBulk = async (e: React.FormEvent) => {
@@ -153,7 +184,8 @@ const Grades: React.FC = () => {
       equivalentAcademicYearIds.includes(a.academicYearId) &&
       a.classId === selectedClassId &&
       a.sourceClassSubjectId === selectedClassSubjectId &&
-      a.isActive === true
+      a.isActive === true &&
+      (currentUser.role !== 'teacher' || a.teacherUserId === currentUser.id)
     );
 
     if (!activeAssignment) {
@@ -202,6 +234,9 @@ const Grades: React.FC = () => {
         classSubjectId: selectedClassSubjectId,
         subjectId: effSub.subjectId,
         teacherId: activeAssignment.teacherStaffId,
+        teacherAssignmentId: activeAssignment.id,
+        teacherStaffId: activeAssignment.teacherStaffId,
+        teacherUserId: activeAssignment.teacherUserId,
         title: evaluationTitle,
         type: evaluationType as 'exam'|'homework'|'oral'|'participation',
         date: evaluationDate,
@@ -233,24 +268,21 @@ const Grades: React.FC = () => {
       const studentId = stu.id;
       const entry = gradeEntryRows[studentId];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const existingGrade = db.grades.find(g => (g as any).evaluationId === finalEvalId && g.studentId === studentId) as any;
+      const existingGrade = (db.gradesStrict || []).find(g => (g as any).evaluationId === finalEvalId && g.studentId === studentId) as any;
 
       let finalScoreVal: number | undefined;
-      let finalResultStatus: 'scored' | 'absent' | 'exempt' | 'missing' = 'missing';
+      const finalResultStatus = entry?.resultStatus || existingGrade?.resultStatus || 'notSubmitted';
 
-      if (entry && entry.score !== '') {
-        const scoreVal = parseFloat(entry.score);
+      if (finalResultStatus === 'scored') {
+        const scoreVal = Number(entry?.score ?? existingGrade?.score);
         if (!Number.isFinite(scoreVal) || scoreVal < 0 || scoreVal > theEval.maxScore) {
           alert(`La note doit être comprise entre 0 et ${theEval.maxScore}.`);
           return;
         }
         finalScoreVal = scoreVal;
-        finalResultStatus = 'scored';
-      } else if (existingGrade && (existingGrade.resultStatus === 'absent' || existingGrade.resultStatus === 'exempt')) {
-        finalResultStatus = existingGrade.resultStatus;
       }
 
-      if (finalResultStatus !== 'missing') {
+      if (entry || existingGrade) {
         const gId = buildGradeId(finalEvalId, studentId);
         const newGrade: Grade = {
           id: gId,
@@ -263,6 +295,9 @@ const Grades: React.FC = () => {
           subjectId: effSub.subjectId,
           studentId: studentId,
           teacherId: activeAssignment.teacherStaffId,
+          teacherAssignmentId: activeAssignment.id,
+          teacherStaffId: activeAssignment.teacherStaffId,
+          teacherUserId: activeAssignment.teacherUserId,
           status: 'draft',
           resultStatus: finalResultStatus,
           score: finalScoreVal,
@@ -277,8 +312,13 @@ const Grades: React.FC = () => {
       }
     }
 
+    if (gradesToSave.length === 0) {
+      alert("Saisissez au moins une note ou un statut explicite.");
+      return;
+    }
+    setIsSavingGrades(true);
     try {
-      await saveStructuredGrades({ evaluation: theEval, grades: gradesToSave });
+      await saveStructuredGrades({ evaluation: theEval, grades: gradesToSave, requestId: gradeRequestId });
 
       alert("Notes structurées enregistrées avec succès !");
       setModalOpen(false);
@@ -290,6 +330,8 @@ const Grades: React.FC = () => {
       console.error("Erreur saveStructuredGrades:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
       alert(`Erreur lors de l'enregistrement des notes: ${errorMessage}`);
+    } finally {
+      setIsSavingGrades(false);
     }
   };
 
@@ -340,6 +382,12 @@ const Grades: React.FC = () => {
   }).filter(d => d.evaluatedCount > 0).sort((a, b) => b.avg - a.avg);
 
   const isGlobalRankingDisabled = true;
+  const pedagogicalConfigurationGaps = [
+    ...(!activeYear ? ['Aucune année scolaire active.'] : []),
+    ...(activeYear && !(db.periods || []).some(period => period.schoolId === currentSchool?.id && period.academicYearId === activeYear.id && period.status === 'open') ? ['Aucune période ouverte.'] : []),
+    ...(activeYear && !(db.classPrograms || []).some(program => program.schoolId === currentSchool?.id && program.status === 'published' && getEquivalentAcademicYearIds(db.academicYears || [], currentSchool?.id, activeYear.id).includes(program.academicYearId)) ? ['Aucun programme publié.'] : []),
+    ...(activeYear && !(db.teacherAssignments || []).some(assignment => assignment.schoolId === currentSchool?.id && assignment.status === 'active' && assignment.isActive === true && getEquivalentAcademicYearIds(db.academicYears || [], currentSchool?.id, activeYear.id).includes(assignment.academicYearId)) ? ['Aucune affectation ACTIVE.'] : []),
+  ];
 
   return (
     <div className="page-container" id="grades-page">
@@ -357,11 +405,19 @@ const Grades: React.FC = () => {
       <div className="page-header no-print">
         <h1>{t('grades', 'Notes & Bulletins')}</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={handleOpenModal} disabled={isSchoolSuspended}>
+          <button onClick={handleOpenModal} disabled={isSchoolSuspended || pedagogicalConfigurationGaps.length > 0}>
             <Plus size={18} /> Saisir des Notes
           </button>
         </div>
       </div>
+
+      {pedagogicalConfigurationGaps.length > 0 && (
+        <div className="card no-print" role="status" data-testid="grades-configuration-required" style={{ marginBottom: '1rem', borderLeft: '4px solid #d97706' }}>
+          <strong>CONFIGURATION PÉDAGOGIQUE REQUISE</strong>
+          <ul style={{ marginBottom: 0 }}>{pedagogicalConfigurationGaps.map(message => <li key={message}>{message}</li>)}</ul>
+          <small>Aucune période, affectation, évaluation ou donnée pédagogique n’est créée automatiquement.</small>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', overflowX: 'auto' }} className="no-print">
         <button className={activeTab === 'individual' ? '' : 'secondary'} style={{ border: activeTab === 'individual' ? '' : 'none', whiteSpace: 'nowrap' }} onClick={() => setActiveTab('individual')}>Bulletin Individuel</button>
@@ -408,7 +464,7 @@ const Grades: React.FC = () => {
                       g.studentId === student.id && g.academicYearId === activeYear.id && g.periodId === activePer.id
                     );
 
-                    const summaries = groupGradesByClassSubject(stGrades, effSubjects); summaries.forEach(s => calculateSubjectAverage(s)); const genAvgObj = calculateWeightedGeneralAverage(summaries); const weightedSum = genAvgObj.generalAverage;
+                    const summaries = groupGradesByClassSubject(stGrades, effSubjects, db.evaluations || []); summaries.forEach(s => calculateSubjectAverage(s)); const genAvgObj = calculateWeightedGeneralAverage(summaries); const weightedSum = genAvgObj.generalAverage;
                     generalAvg = weightedSum || 0;
 
                     subjectsRender = (
@@ -776,6 +832,18 @@ const Grades: React.FC = () => {
                       <option key={e.id} value={e.id}>{e.title} (Max: {e.maxScore}, Coeff: {e.weight})</option>
                     ))}
                   </select>
+                  {selectedEvaluationId && (() => {
+                    const evaluation = (db.evaluations || []).find(item => item.id === selectedEvaluationId);
+                    if (!evaluation) return null;
+                    return (
+                      <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <strong>Statut : {evaluation.status.toUpperCase()}</strong>
+                        {evaluation.status === 'open' && <button type="button" disabled={isSavingGrades} onClick={() => handleEvaluationTransition('LOCK')}>Verrouiller</button>}
+                        {evaluation.status === 'locked' && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && <button type="button" disabled={isSavingGrades} onClick={() => handleEvaluationTransition('PUBLISH')}>Publier</button>}
+                        {['draft', 'open', 'locked'].includes(evaluation.status) && <button type="button" className="secondary" disabled={isSavingGrades} onClick={() => handleEvaluationTransition('CANCEL')}>Annuler l’évaluation</button>}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -829,15 +897,15 @@ const Grades: React.FC = () => {
                   <tbody>
                     {db.students.filter(s => s.schoolId === currentSchool?.id && s.classId === selectedClassId && s.schoolingStatus !== 'inactive').map(stu => {
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      const existingGrade = db.grades.find(g => (g as any).evaluationId === selectedEvaluationId && g.studentId === stu.id) as any;
+                      const existingGrade = (db.gradesStrict || []).find(g => (g as any).evaluationId === selectedEvaluationId && g.studentId === stu.id) as any;
 
                       let currentVal = '';
                       let statusText = 'Non noté';
 
                       if (gradeEntryRows[stu.id] !== undefined) {
                         currentVal = gradeEntryRows[stu.id].score;
-                        if (currentVal === '') statusText = 'Non noté';
-                        else statusText = 'Noté';
+                        const entryStatus = gradeEntryRows[stu.id].resultStatus;
+                        statusText = entryStatus === 'scored' ? 'Noté' : entryStatus === 'absent' ? 'Absent' : entryStatus === 'excused' ? 'Dispensé' : 'Non noté';
                       } else if (existingGrade) {
                         if (existingGrade.resultStatus === 'scored') {
                           currentVal = existingGrade.score?.toString() || '';
@@ -852,12 +920,21 @@ const Grades: React.FC = () => {
                       return (
                         <tr key={stu.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                           <td style={{ padding: '0.75rem 0' }}>{stu.name}</td>
-                          <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>{statusText}</td>
+                          <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>
+                            <select aria-label={`Statut ${stu.name}`} value={gradeEntryRows[stu.id]?.resultStatus || (existingGrade?.resultStatus === 'exempt' ? 'excused' : existingGrade?.resultStatus) || 'notSubmitted'} onChange={event => handleUpdateGradeStatus(stu.id, event.target.value as 'scored' | 'absent' | 'excused' | 'notSubmitted')}>
+                              <option value="notSubmitted">Non noté</option>
+                              <option value="scored">Noté</option>
+                              <option value="absent">Absent</option>
+                              <option value="excused">Dispensé</option>
+                            </select>
+                            <span className="sr-only">{statusText}</span>
+                          </td>
                           <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>
                             <input
                               type="number" step="any" min="0" max={evaluationMaxScore} placeholder="Note"
                               style={{ width: '80px', textAlign: 'center' }}
                               value={currentVal}
+                              disabled={(gradeEntryRows[stu.id]?.resultStatus || existingGrade?.resultStatus) !== 'scored' && gradeEntryRows[stu.id] !== undefined}
                               onChange={e => handleUpdateGradeEntry(stu.id, e.target.value)}
                             />
                           </td>
@@ -872,7 +949,7 @@ const Grades: React.FC = () => {
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
             <button type="button" className="secondary" onClick={() => setModalOpen(false)}>Annuler</button>
-            <button type="submit" disabled={(() => {
+            <button type="submit" disabled={isSavingGrades || (() => {
               if (dropdownPeriods.length === 0) return true;
               if (evaluationMode === 'new') {
                 if (!evaluationTitle.trim()) return true;
@@ -885,7 +962,7 @@ const Grades: React.FC = () => {
                 if (p && (evaluationDate < p.startDate || evaluationDate > p.endDate)) return true;
               }
               return false;
-            })()}>Enregistrer les notes</button>
+            })()}>{isSavingGrades ? "Enregistrement…" : "Enregistrer les notes"}</button>
           </div>
         </form>
         )}

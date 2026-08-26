@@ -1,6 +1,5 @@
-import type { LegacyGrade, Grade, GradeResultStatus } from '../types';
+import type { LegacyGrade, Grade, GradeResultStatus, Evaluation } from '../types';
 import { getLegacyGradeNormalizedValue } from '../utils/legacyGrades';
-import { getMention } from './gradingPolicy';
 import type { EffectiveClassSubject } from './effectiveClassSubjects';
 
 export interface EvaluationNormalizedScore {
@@ -42,7 +41,8 @@ export interface StudentReportSummary {
 
 export function groupGradesByClassSubject(
   grades: (LegacyGrade | Grade)[],
-  effectiveSubjects: EffectiveClassSubject[]
+  effectiveSubjects: EffectiveClassSubject[],
+  evaluations?: Evaluation[]
 ): SubjectGradeSummary[] {
   const summary: SubjectGradeSummary[] = effectiveSubjects.map(sub => ({
     classSubjectId: sub.classSubjectId,
@@ -63,7 +63,10 @@ export function groupGradesByClassSubject(
   const subjectMap = new Map<string, SubjectGradeSummary>();
   summary.forEach(s => subjectMap.set(s.classSubjectId, s));
   
+  const evaluationMap = new Map((evaluations || []).map(evaluation => [evaluation.id, evaluation]));
   grades.forEach(g => {
+    const evaluation = 'evaluationId' in g ? evaluationMap.get(g.evaluationId) : undefined;
+    if (evaluations && 'evaluationId' in g && evaluation?.status !== 'published') return;
     let targetSummary: SubjectGradeSummary | undefined;
     
     if ('classSubjectId' in g && g.classSubjectId) {
@@ -73,7 +76,7 @@ export function groupGradesByClassSubject(
     }
 
     if (targetSummary) {
-      const evalScore = calculateEvaluationNormalizedScore(g);
+      const evalScore = calculateEvaluationNormalizedScore(g, evaluation);
       targetSummary.evaluations.push(evalScore);
       targetSummary.evaluationCount += 1;
     }
@@ -82,7 +85,7 @@ export function groupGradesByClassSubject(
   return summary;
 }
 
-export function calculateEvaluationNormalizedScore(grade: LegacyGrade | Grade): EvaluationNormalizedScore {
+export function calculateEvaluationNormalizedScore(grade: LegacyGrade | Grade, evaluation?: Evaluation): EvaluationNormalizedScore {
   if ('resultStatus' in grade) {
     const calculable = grade.resultStatus === 'scored' 
       && typeof grade.score === 'number' 
@@ -101,7 +104,7 @@ export function calculateEvaluationNormalizedScore(grade: LegacyGrade | Grade): 
       originalScore: grade.score,
       originalMaxScore: grade.maxScore,
       normalizedScore,
-      weight: 1, 
+      weight: evaluation?.weight || 1,
       status: grade.resultStatus,
       calculable,
       reason: calculable ? undefined : (grade.resultStatus !== 'scored' ? grade.resultStatus : 'invalid_score')
@@ -160,7 +163,7 @@ export function calculateSubjectAverage(summary: SubjectGradeSummary): void {
       summary.calculable = true;
       summary.weightedPoints = summary.rawAverage * summary.coefficient;
       summary.status = 'valid';
-      summary.appreciation = getMention(summary.rawAverage);
+      summary.appreciation = '-';
     }
   } else {
     summary.rawAverage = null;
