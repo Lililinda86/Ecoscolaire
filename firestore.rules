@@ -1300,6 +1300,16 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /reportCards/{reportCardId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary()) && hasSchoolAccess(resource.data.schoolId))
+      );
+      // Canonical lifecycle, including immutable publication, is exclusively
+      // managed by manageReportCard. Physical deletion is never a business action.
+      allow create, update, delete: if false;
+    }
+
     match /gradeBatchRequests/{requestId} {
       allow read, create, update, delete: if false;
     }

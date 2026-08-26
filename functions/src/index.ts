@@ -3041,6 +3041,7 @@ export { manageTeacherAssignment } from './academic/manageTeacherAssignment';
 export { updateAcademicYearBounds } from './academic/updateAcademicYearBounds';
 export { manageAcademicPeriod } from './academic/manageAcademicPeriod';
 export { manageEvaluation, recordGradesBatch } from './academic/manageGrades';
+export { manageReportCard } from './academic/manageReportCard';
 export { createStudentSecure } from './studentCreationSecure';
 // Kept temporarily for source-compatible migration tests while Production exports
 // the generalized implementation below. This reference prevents dead-code errors

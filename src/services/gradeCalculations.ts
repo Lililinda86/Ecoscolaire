@@ -1,16 +1,16 @@
 import type { LegacyGrade, Grade, GradeResultStatus, Evaluation } from '../types';
 import { getLegacyGradeNormalizedValue } from '../utils/legacyGrades';
 import type { EffectiveClassSubject } from './effectiveClassSubjects';
+import {
+  calculateCanonicalGeneral,
+  calculateCanonicalSubject,
+  normalizeCanonicalGrade,
+  roundCanonicalGradeForDisplay,
+  type CanonicalEvaluationScore,
+} from '../../functions/src/academic/canonicalGradeCalculations';
 
-export interface EvaluationNormalizedScore {
-  evaluationId: string;
-  originalScore?: number;
-  originalMaxScore: number;
-  normalizedScore: number | null; // out of 20
-  weight: number;
+export interface EvaluationNormalizedScore extends CanonicalEvaluationScore {
   status: GradeResultStatus | string;
-  calculable: boolean;
-  reason?: string;
 }
 
 export interface SubjectGradeSummary {
@@ -87,28 +87,13 @@ export function groupGradesByClassSubject(
 
 export function calculateEvaluationNormalizedScore(grade: LegacyGrade | Grade, evaluation?: Evaluation): EvaluationNormalizedScore {
   if ('resultStatus' in grade) {
-    const calculable = grade.resultStatus === 'scored' 
-      && typeof grade.score === 'number' 
-      && typeof grade.maxScore === 'number' 
-      && grade.maxScore > 0
-      && grade.score <= grade.maxScore;
-
-    let normalizedScore = null;
-    
-    if (calculable && grade.score !== undefined) {
-      normalizedScore = (grade.score / grade.maxScore) * 20;
-    }
-
-    return {
+    return normalizeCanonicalGrade({
       evaluationId: grade.evaluationId,
-      originalScore: grade.score,
-      originalMaxScore: grade.maxScore,
-      normalizedScore,
+      resultStatus: grade.resultStatus,
+      score: grade.score,
+      maxScore: grade.maxScore,
       weight: evaluation?.weight || 1,
-      status: grade.resultStatus,
-      calculable,
-      reason: calculable ? undefined : (grade.resultStatus !== 'scored' ? grade.resultStatus : 'invalid_score')
-    };
+    });
   } else {
     const norm = getLegacyGradeNormalizedValue(grade);
     if (norm.calculable) {
@@ -138,41 +123,10 @@ export function calculateEvaluationNormalizedScore(grade: LegacyGrade | Grade, e
 }
 
 export function calculateSubjectAverage(summary: SubjectGradeSummary): void {
-  let totalWeightedScore = 0;
-  let totalWeight = 0;
-  let hasCalculable = false;
-
-  for (const ev of summary.evaluations) {
-    if (ev.calculable && ev.normalizedScore !== null) {
-      totalWeightedScore += ev.normalizedScore * ev.weight;
-      totalWeight += ev.weight;
-      hasCalculable = true;
-    }
-  }
-
-  if (hasCalculable && totalWeight > 0) {
-    summary.rawAverage = totalWeightedScore / totalWeight;
-    summary.displayedAverage = roundGradeForDisplay(summary.rawAverage);
-    
-    if (summary.coefficient === null || summary.coefficient <= 0) {
-      summary.calculable = false;
-      summary.weightedPoints = null;
-      summary.status = 'missing_coefficient';
-      summary.appreciation = 'Coefficient non configuré';
-    } else {
-      summary.calculable = true;
-      summary.weightedPoints = summary.rawAverage * summary.coefficient;
-      summary.status = 'valid';
-      summary.appreciation = '-';
-    }
-  } else {
-    summary.rawAverage = null;
-    summary.displayedAverage = null;
-    summary.calculable = false;
-    summary.weightedPoints = null;
-    summary.status = 'no_grades';
-    summary.appreciation = '-';
-  }
+  const calculated = calculateCanonicalSubject(summary.evaluations, summary.coefficient);
+  Object.assign(summary, calculated, {
+    appreciation: calculated.status === 'missing_coefficient' ? 'Coefficient non configuré' : '-',
+  });
 }
 
 export function calculateWeightedGeneralAverage(subjects: SubjectGradeSummary[]): {
@@ -180,24 +134,9 @@ export function calculateWeightedGeneralAverage(subjects: SubjectGradeSummary[])
   totalPoints: number;
   totalCoefficients: number;
 } {
-  let totalPoints = 0;
-  let totalCoefficients = 0;
-  let hasCalculable = false;
-
-  for (const sub of subjects) {
-    if (sub.calculable && sub.rawAverage !== null && sub.coefficient !== null) {
-      totalPoints += sub.rawAverage * sub.coefficient;
-      totalCoefficients += sub.coefficient;
-      hasCalculable = true;
-    }
-  }
-
-  const generalAverage = hasCalculable && totalCoefficients > 0 ? totalPoints / totalCoefficients : null;
-
-  return { generalAverage, totalPoints, totalCoefficients };
+  return calculateCanonicalGeneral(subjects);
 }
 
 export function roundGradeForDisplay(score: number | null): string {
-  if (score === null) return 'Non noté';
-  return score.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return roundCanonicalGradeForDisplay(score) || 'Non noté';
 }
