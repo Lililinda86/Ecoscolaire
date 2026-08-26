@@ -31,6 +31,7 @@ const isApplicable = (benefit: FinancialBenefit, props: Props): boolean => {
   if (props.paymentType === 'tuition') {
     return benefit.installment === props.installment || benefit.installment === 'ALL_TUITION';
   }
+  if (!props.period) return !!benefit.transportStartPeriod && !!benefit.transportEndPeriod;
   return !!props.period && !!benefit.transportStartPeriod && !!benefit.transportEndPeriod
     && props.period >= benefit.transportStartPeriod && props.period <= benefit.transportEndPeriod;
 };
@@ -48,19 +49,14 @@ const FinancialBenefitsPanel: React.FC<Props> = (props) => {
   const [reference, setReference] = useState('');
   const [singleUse, setSingleUse] = useState(true);
   const [maximumUses, setMaximumUses] = useState('1');
-  const [scope, setScope] = useState<'CURRENT' | 'ALL_TUITION' | 'TRANSPORT_RANGE' | 'TRANSPORT_YEAR'>('CURRENT');
+  const [scope, setScope] = useState<'CURRENT' | 'ALL_TUITION' | 'TRANSPORT_RANGE'>(props.paymentType === 'transport' && !props.period ? 'TRANSPORT_RANGE' : 'CURRENT');
   const [transportStartPeriod, setTransportStartPeriod] = useState(props.period || '');
   const [transportEndPeriod, setTransportEndPeriod] = useState(props.period || '');
   const [validFrom, setValidFrom] = useState('');
   const [validUntil, setValidUntil] = useState('');
 
-  const [academicStartYear, academicEndYear] = props.academicYear.split('-');
-  const resolvedTransportStart = scope === 'TRANSPORT_YEAR'
-    ? `${academicStartYear}-09`
-    : scope === 'TRANSPORT_RANGE' ? transportStartPeriod : props.period;
-  const resolvedTransportEnd = scope === 'TRANSPORT_YEAR'
-    ? `${academicEndYear}-06`
-    : scope === 'TRANSPORT_RANGE' ? transportEndPeriod : props.period;
+  const resolvedTransportStart = scope === 'TRANSPORT_RANGE' ? transportStartPeriod : props.period;
+  const resolvedTransportEnd = scope === 'TRANSPORT_RANGE' ? transportEndPeriod : props.period;
 
   const refresh = useCallback(async () => {
     if (!props.schoolId || !props.studentId) return;
@@ -235,13 +231,12 @@ const FinancialBenefitsPanel: React.FC<Props> = (props) => {
           </label>
           <label>Périmètre
             <select value={scope} onChange={event => setScope(event.target.value as typeof scope)}>
-              <option value="CURRENT">Échéance affichée</option>
+              {(props.paymentType !== 'transport' || props.period) && <option value="CURRENT">Échéance affichée</option>}
               {props.paymentType === 'tuition' ? (
                 <option value="ALL_TUITION">Toute la scolarité T1–T3</option>
               ) : (
                 <>
                   <option value="TRANSPORT_RANGE">Plage de mois</option>
-                  <option value="TRANSPORT_YEAR">Toute l’année scolaire</option>
                 </>
               )}
             </select>

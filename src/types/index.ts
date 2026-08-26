@@ -74,6 +74,8 @@ export interface School {
     transport?: Record<string, string>;
   };
   transportPolicy?: {
+    feePolicyId?: 'ITALO_PK_2026' | null;
+    billingPeriods?: string[];
     secretaryManageAll?: boolean;
   };
   apiKeys?: { // DEPRECATED
@@ -235,6 +237,7 @@ export interface Student {
   transportNeighborhood?: string;
   transportPickupPoint?: string;
   transportMonthlyFee?: number;
+  transportZonePk?: number;
   transportFleet?: string;
   transportStatus?: 'none' | 'active' | 'suspended';
   transportPaid?: number;
@@ -247,6 +250,8 @@ export interface Student {
   transportExpectedNet?: number;
   transportByPeriod?: Record<string, FinancialPeriodSummary>;
 
+  transportCredit?: number;
+  transportFeePolicyId?: string;
   schoolingStatus?: 'active' | 'inactive';
   departureReason?: 'school_change' | 'graduated' | 'withdrawn' | 'other';
   departureDate?: string;

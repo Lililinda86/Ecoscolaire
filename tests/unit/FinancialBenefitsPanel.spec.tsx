@@ -76,13 +76,15 @@ describe('FinancialBenefitsPanel permissions and scopes', () => {
     expect(callable.mock.calls[0][0].maximumUses).toBeUndefined();
   });
 
-  it('maps the school-year transport scope to September through June', async () => {
+  it('uses the explicit transport month range without inventing a school-year calendar', async () => {
     render(<FinancialBenefitsPanel
       schoolId="school-1" studentId="student-1" academicYear="2026-2027"
       paymentType="transport" period="2026-09" currentRole="director" onChanged={vi.fn()}
     />);
     fireEvent.click(screen.getByRole('button', { name: 'Nouvel avantage' }));
-    fireEvent.change(screen.getByLabelText('Périmètre'), { target: { value: 'TRANSPORT_YEAR' } });
+    fireEvent.change(screen.getByLabelText('Périmètre'), { target: { value: 'TRANSPORT_RANGE' } });
+    fireEvent.change(screen.getByLabelText('Premier mois'), { target: { value: '2026-09' } });
+    fireEvent.change(screen.getByLabelText('Dernier mois'), { target: { value: '2027-06' } });
     fireEvent.change(screen.getByLabelText('Montant par échéance FCFA'), { target: { value: '1000' } });
     fireEvent.change(screen.getByLabelText('Motif'), { target: { value: 'Aide transport annuelle fictive' } });
     fireEvent.click(screen.getByRole('button', { name: 'Créer le brouillon' }));

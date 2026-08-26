@@ -166,9 +166,13 @@ const run = async () => {
   let academicYearFixtureId = null;
   let secondaryClassFixtureId = null;
   let mobileMoneyExpected = false;
+  let schoolTransportPolicyBefore;
+  let schoolPaymentDeadlinesBefore;
+  let schoolTransportPolicyConfigured = false;
+  const transportFixtureStudentIds = new Set();
   const paymentIds = new Set();
   const receiptNumbers = new Set();
-  const targetIds = new Set([tuitionBenefitId, transportBenefitId, draftBenefitId]);
+  const targetIds = new Set([studentId, tuitionBenefitId, transportBenefitId, draftBenefitId]);
 
   try {
     console.log('PRECHECK: staging target and secretary authentication');
@@ -256,6 +260,7 @@ const run = async () => {
     assert.equal(endYear, startYear + 1);
     const september = `${startYear}-09`;
     const october = `${startYear}-10`;
+    const november = `${startYear}-11`;
     const classSnapshot = await db.collection('classes').where('schoolId', '==', testSchoolId).get();
     assert.equal(classSnapshot.empty, false, 'No same-school staging class is available for the fixture.');
     const structuredCycle = (data) => String(data.cycle || data.level || '').toLowerCase();
@@ -295,6 +300,25 @@ const run = async () => {
     const expectedClosureId = `${testSchoolId}__${today}`;
     assert.equal((await db.collection('cashClosures').doc(expectedClosureId).get()).exists, false,
       'A staging cash closure already exists for today; refusing to overwrite it.');
+    schoolTransportPolicyBefore = school.transportPolicy;
+    schoolPaymentDeadlinesBefore = school.paymentDeadlines;
+    await db.collection('schools').doc(testSchoolId).update({
+      transportPolicy: {
+        ...(school.transportPolicy || {}),
+        feePolicyId: 'ITALO_PK_2026',
+        billingPeriods: [september, october, november],
+      },
+      paymentDeadlines: {
+        ...(school.paymentDeadlines || {}),
+        transport: {
+          ...(school.paymentDeadlines?.transport || {}),
+          [september]: `${startYear}-09-10`,
+          [october]: `${startYear}-10-10`,
+          [november]: `${startYear}-11-10`,
+        },
+      },
+    });
+    schoolTransportPolicyConfigured = true;
 
     clientApp = initializeApp({
       apiKey: process.env.STAGING_FIREBASE_API_KEY,
@@ -326,11 +350,13 @@ const run = async () => {
       studentData: {
         name: studentName, studentLastName: `E2E-${suffix}`, studentFirstName: 'Collections',
         gender: 'F', section, classId: primaryClassId, studentStatus: 'nouveau',
+        usesTransport: true,
       },
-      privateData: { dob: '2017-01-02', parentName: `Parent E2E ${suffix}`, parentPhone: '600000001' },
+      privateData: {
+        dob: '2017-01-02', parentName: `Parent E2E ${suffix}`, parentPhone: '600000001', transportZonePk: 14,
+      },
       financeData: {
         registrationFeeExpected: 15_000, feeT1: 70_000, feeT2: 70_000, feeT3: 70_000,
-        transportMonthlyFee: 4_000,
       },
       parentPrivateData: { dob: '2017-01-02' },
       parentFinanceData: { feeT1: 70_000, feeT2: 70_000, feeT3: 70_000 },
@@ -439,21 +465,137 @@ const run = async () => {
     assert.equal(octoberQuote.discountAmount, 0);
     assert.equal(octoberQuote.remainingBalance, 4_000);
 
-    console.log('TRANSPORT: secondary class is denied by quote and payment backends');
-    const studentRef = db.collection('students').doc(studentId);
-    await studentRef.update({ classId: secondaryClassId });
-    try {
-      await expectCallableFailure(
-        () => quote('transport', { period: october }),
-        ['TRANSPORT_NOT_AVAILABLE_FOR_CLASS'],
-      );
-      await expectCallableFailure(
-        () => pay(requestIds.secondaryTransport, 1_000, 'transport', { period: october }),
-        ['TRANSPORT_NOT_AVAILABLE_FOR_CLASS'],
-      );
-    } finally {
-      await studentRef.update({ classId: primaryClassId });
-    }
+    const createTransportFixture = async (label, zonePk, options = {}) => {
+      const id = `e2e-transport-${label}-${suffix}`;
+      transportFixtureStudentIds.add(id);
+      targetIds.add(id);
+      const fixtureClassId = options.classId || primaryClassId;
+      await Promise.all([
+        db.collection('students').doc(id).create({
+          id, schoolId: testSchoolId, name: `Transport ${label} ${suffix}`,
+          matricule: `E2E-TR-${label}-${suffix}`.slice(0, 80), classId: fixtureClassId,
+          academicYearId: activeAcademicYearId, academicYear, gender: 'F', section,
+          usesTransport: options.usesTransport !== false, testFixture: true, testRunId: suffix,
+        }),
+        db.collection('studentPrivate').doc(id).create({
+          id, studentId: id, schoolId: testSchoolId, transportZonePk: zonePk,
+          testFixture: true, testRunId: suffix,
+        }),
+        db.collection('studentFinance').doc(id).create({
+          id, studentId: id, schoolId: testSchoolId,
+          feeT1: 70_000, feeT2: 70_000, feeT3: 70_000,
+          testFixture: true, testRunId: suffix,
+        }),
+      ]);
+      return id;
+    };
+    const quoteFor = (targetStudentId) => quote('transport', { studentId: targetStudentId });
+    const payFor = (targetStudentId, requestId, amount) => pay(
+      requestId, amount, 'transport', { studentId: targetStudentId },
+    );
+
+    console.log('TRANSPORT CANONICAL: PK boundaries and deterministic allocations');
+    const pk14 = await createTransportFixture('pk14-allocation', 14);
+    const pk33 = await createTransportFixture('pk33-credit', 33);
+    const pk34 = await createTransportFixture('pk34-allocation', 34);
+    const pk42 = await createTransportFixture('pk42-partial', 42);
+    assert.equal((await quoteFor(pk14)).monthlyGrossAmount, 4_000);
+    assert.equal((await quoteFor(pk33)).monthlyGrossAmount, 4_000);
+    assert.equal((await quoteFor(pk34)).monthlyGrossAmount, 5_000);
+    assert.equal((await quoteFor(pk42)).monthlyGrossAmount, 5_000);
+
+    const pk14Payment = await payFor(pk14, `e2e-transport-pk14-${suffix}`, 10_000);
+    assert.deepEqual(pk14Payment.allocations, [
+      { kind: 'INSTALLMENT', period: september, amount: 4_000 },
+      { kind: 'INSTALLMENT', period: october, amount: 4_000 },
+      { kind: 'INSTALLMENT', period: november, amount: 2_000 },
+    ]);
+    assert.equal(pk14Payment.remainingBalance, 2_000);
+    const pk14Replay = await payFor(pk14, `e2e-transport-pk14-${suffix}`, 10_000);
+    assert.equal(pk14Replay.idempotentReplay, true);
+    assert.deepEqual(pk14Replay.allocations, pk14Payment.allocations);
+    assert.equal((await db.collection('transportPaymentAllocations')
+      .where('paymentId', '==', pk14Payment.paymentId).get()).size, 3);
+
+    const pk34Payment = await payFor(pk34, `e2e-transport-pk34-${suffix}`, 10_000);
+    assert.deepEqual(pk34Payment.allocations, [
+      { kind: 'INSTALLMENT', period: september, amount: 5_000 },
+      { kind: 'INSTALLMENT', period: october, amount: 5_000 },
+    ]);
+    const partialPayment = await payFor(pk42, `e2e-transport-pk42-${suffix}`, 2_000);
+    assert.equal(partialPayment.allocations[0].amount, 2_000);
+    assert.equal((await quoteFor(pk42)).installments[0].remainingBalance, 3_000);
+    await payFor(pk33, `e2e-transport-credit-prior-${suffix}`, 4_000);
+    const creditPayment = await payFor(pk33, `e2e-transport-credit-${suffix}`, 10_000);
+    assert.deepEqual(creditPayment.allocations, [
+      { kind: 'INSTALLMENT', period: october, amount: 4_000 },
+      { kind: 'INSTALLMENT', period: november, amount: 4_000 },
+      { kind: 'CREDIT', period: null, amount: 2_000 },
+    ]);
+    assert.equal(creditPayment.transportCredit, 2_000);
+    assert.equal((await quote('tuition', { studentId: pk33, installment: 'T1' })).previousPaid, 0);
+
+    console.log('TRANSPORT CANONICAL: benefits, scope and moratorium');
+    const benefitStudent = await createTransportFixture('benefits', 34);
+    const fixedBenefitId = `e2e-transport-benefit-fixed-${suffix}`;
+    const percentBenefitId = `e2e-transport-benefit-percent-${suffix}`;
+    const wrongScopeId = `e2e-transport-benefit-wrong-scope-${suffix}`;
+    targetIds.add(fixedBenefitId); targetIds.add(percentBenefitId); targetIds.add(wrongScopeId);
+    await Promise.all([
+      db.collection('financialBenefits').doc(fixedBenefitId).create({
+        id: fixedBenefitId, schoolId: testSchoolId, studentId: benefitStudent, academicYear,
+        benefitType: 'SCHOLARSHIP', paymentType: 'TRANSPORT', mode: 'FIXED_AMOUNT', value: 1_000,
+        transportStartPeriod: september, transportEndPeriod: september, status: 'approved',
+        stackable: true, usageCount: 0, maximumUses: 1, appliedTargets: [],
+        createdBy: 'e2e-admin', approvedBy: 'e2e-admin', testFixture: true, testRunId: suffix,
+      }),
+      db.collection('financialBenefits').doc(percentBenefitId).create({
+        id: percentBenefitId, schoolId: testSchoolId, studentId: benefitStudent, academicYear,
+        benefitType: 'DISCOUNT_VOUCHER', paymentType: 'TRANSPORT', mode: 'PERCENTAGE', value: 50,
+        transportStartPeriod: october, transportEndPeriod: october, status: 'approved',
+        stackable: true, usageCount: 0, maximumUses: 1, appliedTargets: [], reference: `E2E-50-${suffix}`,
+        createdBy: 'e2e-admin', approvedBy: 'e2e-admin', testFixture: true, testRunId: suffix,
+      }),
+      db.collection('financialBenefits').doc(wrongScopeId).create({
+        id: wrongScopeId, schoolId: testSchoolId, studentId: benefitStudent, academicYear,
+        benefitType: 'SCHOLARSHIP', paymentType: 'TUITION', mode: 'FIXED_AMOUNT', value: 2_000,
+        installment: 'T1', status: 'approved', stackable: true, usageCount: 0, maximumUses: 1,
+        appliedTargets: [], createdBy: 'e2e-admin', approvedBy: 'e2e-admin',
+        testFixture: true, testRunId: suffix,
+      }),
+    ]);
+    const benefitQuote = await quoteFor(benefitStudent);
+    assert.deepEqual(benefitQuote.installments.slice(0, 2).map((item) => ({
+      gross: item.grossExpectedAmount, discount: item.discountAmount, net: item.netExpectedAmount,
+    })), [
+      { gross: 5_000, discount: 1_000, net: 4_000 },
+      { gross: 5_000, discount: 2_500, net: 2_500 },
+    ]);
+    const moratoriumId = `e2e-transport-moratorium-${suffix}`;
+    targetIds.add(moratoriumId);
+    await db.collection('paymentMoratoriums').doc(moratoriumId).create({
+      id: moratoriumId, schoolId: testSchoolId, studentId: pk42, academicYear,
+      paymentType: 'transport', period: october, status: 'approved',
+      effectiveDueDate: `${endYear}-12-31`, reason: 'Moratoire transport fixture',
+      testFixture: true, testRunId: suffix,
+    });
+    const moratoriumMonth = (await quoteFor(pk42)).installments.find((item) => item.period === october);
+    assert.equal(moratoriumMonth.grossExpectedAmount, 5_000);
+    assert.equal(moratoriumMonth.netExpectedAmount, 5_000);
+    assert.equal(moratoriumMonth.originalDueDate, `${startYear}-10-10`);
+    assert.equal(moratoriumMonth.effectiveDueDate, `${endYear}-12-31`);
+    assert.equal(moratoriumMonth.overdue, false);
+
+    console.log('TRANSPORT CANONICAL: free secondary and no false debt');
+    const secondaryStudent = await createTransportFixture('secondary-free', 14, { classId: secondaryClassId });
+    const secondaryQuote = await quoteFor(secondaryStudent);
+    assert.equal(secondaryQuote.transportState, 'FREE_SECONDARY');
+    assert.equal(secondaryQuote.monthlyGrossAmount, 0);
+    assert.equal(secondaryQuote.remainingBalance, 0);
+    await expectCallableFailure(
+      () => payFor(secondaryStudent, requestIds.secondaryTransport, 1_000),
+      ['TRANSPORT_FREE_SECONDARY'],
+    );
 
     console.log('CONCURRENCY: simultaneous payments cannot overpay');
     const concurrentResults = await Promise.allSettled([
@@ -463,14 +605,22 @@ const run = async () => {
     assert.equal(concurrentResults.filter((result) => result.status === 'fulfilled').length, 1);
     assert.equal(concurrentResults.filter((result) => result.status === 'rejected').length, 1);
     assert.equal((await quote('tuition', { installment: 'T2' })).previousPaid, 50_000);
+    const concurrentTransportStudent = await createTransportFixture('concurrent', 20);
+    const transportConcurrency = await Promise.all([
+      payFor(concurrentTransportStudent, `e2e-transport-concurrent-a-${suffix}`, 4_000),
+      payFor(concurrentTransportStudent, `e2e-transport-concurrent-b-${suffix}`, 4_000),
+    ]);
+    assert.equal(transportConcurrency.length, 2);
+    const concurrentTransportQuote = await quoteFor(concurrentTransportStudent);
+    assert.deepEqual(concurrentTransportQuote.installments.map((item) => item.previousPaid), [4_000, 4_000, 0]);
 
     console.log('RECEIPTS, PROJECTIONS, PRIVACY AND CASH CLOSURE');
     const payments = await db.collection('payments').where('studentId', '==', studentId).get();
     const receipts = await db.collection('receipts').where('studentId', '==', studentId).get();
     assert.equal(payments.size, 5);
     assert.equal(receipts.size, 5);
-    assert.equal(paymentIds.size, 5);
-    assert.equal(receiptNumbers.size, 5);
+    assert.ok(paymentIds.size >= 12);
+    assert.equal(receiptNumbers.size, paymentIds.size);
     assert.equal(new Set(receipts.docs.map((doc) => doc.data().receiptNumber)).size, 5);
     const tuitionReceipt = receipts.docs.find((doc) => doc.id === tuitionPartial.receiptId)?.data();
     assert.equal(tuitionReceipt?.grossExpectedAmount, 70_000);
@@ -535,12 +685,21 @@ const run = async () => {
     assert.ok(await page.getByRole('button', { name: /Imprimer/i }).count() > 0);
     await page.getByRole('button', { name: /Brouillard de Caisse/i }).click();
     await page.getByText(/Clôture & Brouillard de Caisse/i).waitFor({ timeout: 20_000 });
-    console.log('RESPONSIVE: secretary cash flow at 360, 768 and 1440 pixels');
+    console.log('RESPONSIVE TRANSPORT: secretary schedule at 360, 768 and 1440 pixels');
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${appUrl}/#/payments`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: /Encaissement/i }).first().click();
-      await page.getByTestId('cash-payment-student').selectOption(studentId);
+      await page.getByTestId('cash-payment-student').selectOption(benefitStudent);
+      await page.getByTestId('cash-payment-type').selectOption('transport');
+      await page.getByTestId('transport-auto-allocation').waitFor({ state: 'visible' });
+      await page.getByText(/Zone PK34/).waitFor({ state: 'visible' });
+      await page.getByText(/Mensualité brute/).waitFor({ state: 'visible' });
+      await page.getByText(/Bourse \/ réduction applicable/).waitFor({ state: 'visible' });
+      await page.getByText(/Moratoire/).waitFor({ state: 'visible' });
+      await page.getByTestId('cash-payment-student').selectOption(secondaryStudent);
+      await page.getByTestId('transport-free-secondary').waitFor({ state: 'visible' });
+      assert.equal(await page.getByTestId('cash-payment-submit').isDisabled(), true);
       await page.getByTestId('cash-payment-amount').waitFor({ state: 'visible' });
       await page.getByTestId('cash-payment-submit').waitFor({ state: 'visible' });
       if (!mobileMoneyExpected) {
@@ -562,16 +721,37 @@ const run = async () => {
     console.log('CLEANUP: deleting only exact E2E fixture records');
     try {
       if (clientAuth?.currentUser) await signOut(clientAuth);
-      const paymentSnapshots = await db.collection('payments').where('studentId', '==', studentId).get();
-      const receiptSnapshots = await db.collection('receipts').where('studentId', '==', studentId).get();
-      const benefitSnapshots = await db.collection('financialBenefits').where('studentId', '==', studentId).get();
+      const markedCollections = [
+        'payments', 'receipts', 'transportPaymentAllocations', 'financialBenefits',
+        'paymentMoratoriums', 'audit_logs',
+      ];
+      const markedSnapshots = await Promise.all(markedCollections.map(
+        (name) => db.collection(name).where('testRunId', '==', suffix).get(),
+      ));
+      const paymentSnapshots = markedSnapshots[0];
+      const receiptSnapshots = markedSnapshots[1];
+      const allocationSnapshots = markedSnapshots[2];
+      const benefitSnapshots = markedSnapshots[3];
       paymentSnapshots.docs.forEach((doc) => targetIds.add(doc.id));
       receiptSnapshots.docs.forEach((doc) => targetIds.add(doc.id));
+      allocationSnapshots.docs.forEach((doc) => targetIds.add(doc.id));
       const auditSnapshots = secretaryUid && testSchoolId
         ? await db.collection('audit_logs').where('schoolId', '==', testSchoolId).get()
         : { docs: [] };
-      const exactAudits = auditSnapshots.docs.filter((doc) => targetIds.has(String(doc.data().targetId || '')));
-      await deleteSnapshots(db, [paymentSnapshots, receiptSnapshots, benefitSnapshots]);
+      const exactAudits = auditSnapshots.docs.filter((doc) => (
+        doc.data().testRunId === suffix || targetIds.has(String(doc.data().targetId || ''))
+      ));
+      const boundedDrain = async () => {
+        for (let round = 0; round < 3; round += 1) {
+          const snapshots = await Promise.all(markedCollections.slice(0, 5).map(
+            (name) => db.collection(name).where('testRunId', '==', suffix).get(),
+          ));
+          if (snapshots.every((snapshot) => snapshot.empty)) return;
+          await deleteSnapshots(db, snapshots);
+        }
+      };
+      await boundedDrain();
+      await deleteSnapshots(db, [paymentSnapshots, receiptSnapshots, allocationSnapshots, benefitSnapshots]);
       await deleteSnapshots(db, exactAudits);
       if (referenceId) await db.collection('financialBenefitReferences').doc(referenceId).delete();
       if (testSchoolId) {
@@ -585,6 +765,10 @@ const run = async () => {
               : Promise.resolve(null),
           ]);
           const schoolPatch = {};
+          if (schoolTransportPolicyConfigured) {
+            schoolPatch.transportPolicy = schoolTransportPolicyBefore ?? FieldValue.delete();
+            schoolPatch.paymentDeadlines = schoolPaymentDeadlinesBefore ?? FieldValue.delete();
+          }
           if (currentStudent.exists) {
             assert.equal(currentStudent.data()?.schoolId, testSchoolId);
             assert.equal(currentStudent.data()?.name, studentName);
@@ -603,6 +787,11 @@ const run = async () => {
             schoolPatch.activeAcademicYearId = schoolActiveAcademicYearIdBefore ?? FieldValue.delete();
           }
           if (Object.keys(schoolPatch).length > 0) transaction.update(schoolRef, schoolPatch);
+          for (const fixtureStudentId of transportFixtureStudentIds) {
+            transaction.delete(db.collection('students').doc(fixtureStudentId));
+            transaction.delete(db.collection('studentPrivate').doc(fixtureStudentId));
+            transaction.delete(db.collection('studentFinance').doc(fixtureStudentId));
+          }
           for (const name of [
             'students', 'studentPrivate', 'studentFinance', 'studentParentPrivate', 'studentParentFinance',
           ]) transaction.delete(db.collection(name).doc(studentId));
@@ -644,6 +833,7 @@ const run = async () => {
           await closureRef.delete();
         }
       }
+      await boundedDrain();
 
       const remaining = {
         student: (await db.collection('students').doc(studentId).get()).exists ? 1 : 0,
@@ -666,10 +856,17 @@ const run = async () => {
           && (await db.collection('academicYears').doc(academicYearFixtureId).get()).exists ? 1 : 0,
         secondaryClassFixture: secondaryClassFixtureId
           && (await db.collection('classes').doc(secondaryClassFixtureId).get()).exists ? 1 : 0,
+        allocations: (await db.collection('transportPaymentAllocations').where('testRunId', '==', suffix).get()).size,
+        moratoriums: (await db.collection('paymentMoratoriums').where('testRunId', '==', suffix).get()).size,
+        audits: (await db.collection('audit_logs').where('testRunId', '==', suffix).get()).size,
+        transportStudents: (await Promise.all([...transportFixtureStudentIds].map(
+          (id) => db.collection('students').doc(id).get(),
+        ))).filter((item) => item.exists).length,
       };
       assert.deepEqual(remaining, {
         student: 0, privateDocs: 0, payments: 0, receipts: 0, benefits: 0,
         references: 0, closure: 0, reservations: 0, academicYearFixture: 0, secondaryClassFixture: 0,
+        allocations: 0, moratoriums: 0, audits: 0, transportStudents: 0,
       });
       if (testSchoolId) {
         const schoolAfter = (await db.collection('schools').doc(testSchoolId).get()).data() || {};
@@ -679,8 +876,12 @@ const run = async () => {
         if (academicYearFixtureId) {
           assert.equal(schoolAfter.activeAcademicYearId ?? null, schoolActiveAcademicYearIdBefore);
         }
+        if (schoolTransportPolicyConfigured) {
+          assert.deepEqual(schoolAfter.transportPolicy, schoolTransportPolicyBefore);
+          assert.deepEqual(schoolAfter.paymentDeadlines, schoolPaymentDeadlinesBefore);
+        }
       }
-      console.log('STAGING FIXTURE CLEANUP: PASS');
+      console.log(`STAGING FIXTURE CLEANUP: PASS testRunId=${suffix} residuals=0 orphans=0`);
     } finally {
       await context.close();
       await browser.close();

@@ -13,6 +13,7 @@ export type StudentPrivate = Pick<Student,
   | 'medicalConditions'
   | 'transportNeighborhood'
   | 'transportPickupPoint'
+  | 'transportZonePk'
   | 'fatherName'
   | 'fatherPhone'
   | 'fatherProfession'
@@ -66,6 +67,8 @@ export type StudentFinance = Pick<Student,
   | 'transportDiscountTotal'
   | 'transportExpectedNet'
   | 'transportByPeriod'
+  | 'transportCredit'
+  | 'transportFeePolicyId'
 > & {
   id: string;
   schoolId: string;
@@ -92,7 +95,7 @@ export type StudentParentFinance = Pick<Student,
 const PRIVATE_KEYS: ReadonlyArray<keyof StudentPrivate> = [
   'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails', 'address',
   'emergencyContact', 'allergies', 'medicalConditions',
-  'transportNeighborhood', 'transportPickupPoint',
+  'transportNeighborhood', 'transportPickupPoint', 'transportZonePk',
   'fatherName', 'fatherPhone', 'fatherProfession',
   'motherName', 'motherPhone', 'motherProfession',
   'guardianRelationship', 'guardianRelationshipDetails',
@@ -108,7 +111,8 @@ const FINANCE_KEYS: ReadonlyArray<keyof StudentFinance> = [
   'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
   'transportMonthlyFee', 'transportPaid',
   'tuitionExpectedGross', 'tuitionDiscountTotal', 'tuitionExpectedNet', 'tuitionByInstallment',
-  'transportExpectedGross', 'transportDiscountTotal', 'transportExpectedNet', 'transportByPeriod'
+  'transportExpectedGross', 'transportDiscountTotal', 'transportExpectedNet', 'transportByPeriod',
+  'transportCredit', 'transportFeePolicyId'
 ];
 
 const pickDefined = <T extends object>(

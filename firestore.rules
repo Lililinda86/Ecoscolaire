@@ -105,8 +105,12 @@ service cloud.firestore {
 
     function isValidTransportPolicy() {
       let policy = request.resource.data.get('transportPolicy', {});
-      let validKeys = policy.keys().hasOnly(['secretaryManageAll']);
-      let validTypes = !('secretaryManageAll' in policy) || policy.secretaryManageAll is bool;
+      let validKeys = policy.keys().hasOnly(['secretaryManageAll', 'feePolicyId', 'billingPeriods']);
+      let validTypes = (!('secretaryManageAll' in policy) || policy.secretaryManageAll is bool)
+        && (!('feePolicyId' in policy) || policy.feePolicyId == null
+          || policy.feePolicyId == 'ITALO_PK_2026')
+        && (!('billingPeriods' in policy)
+          || (policy.billingPeriods is list && policy.billingPeriods.size() <= 24));
       return validKeys && validTypes;
     }
 
@@ -642,7 +646,7 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                       'id', 'schoolId', 'studentId', 'dob', 'placeOfBirth',
                       'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
-                      'allergies', 'medicalConditions', 'transportNeighborhood', 'transportPickupPoint',
+                      'allergies', 'medicalConditions', 'transportNeighborhood', 'transportPickupPoint', 'transportZonePk',
                       'fatherName', 'fatherPhone', 'fatherProfession', 'motherName', 'motherPhone',
                       'motherProfession', 'guardianRelationship', 'guardianRelationshipDetails',
                       'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp',
@@ -657,6 +661,11 @@ service cloud.firestore {
                     && request.resource.data.updatedAt == request.time
                     && request.resource.data.createdBy == request.auth.uid
                     && request.resource.data.updatedBy == request.auth.uid
+                    && (!('transportZonePk' in request.resource.data) || (
+                      request.resource.data.transportZonePk is int
+                      && request.resource.data.transportZonePk >= 14
+                      && request.resource.data.transportZonePk <= 42
+                    ))
                     && exists(/databases/$(database)/documents/students/$(studentId))
                     && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
       /* Schéma conservé comme documentation de migration serveur.
@@ -668,7 +677,7 @@ service cloud.firestore {
                       'id', 'schoolId', 'studentId', 'dob', 'placeOfBirth',
                       'parentName', 'parentPhone', 'parentEmails', 'address', 'emergencyContact',
                       'allergies', 'medicalConditions',
-                      'transportNeighborhood', 'transportPickupPoint',
+                      'transportNeighborhood', 'transportPickupPoint', 'transportZonePk',
                       'fatherName', 'fatherPhone', 'fatherProfession',
                       'motherName', 'motherPhone', 'motherProfession',
                       'guardianRelationship', 'guardianRelationshipDetails',
@@ -702,7 +711,7 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                       'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails',
                       'address', 'emergencyContact', 'allergies', 'medicalConditions',
-                      'transportNeighborhood', 'transportPickupPoint',
+                      'transportNeighborhood', 'transportPickupPoint', 'transportZonePk',
                       'fatherName', 'fatherPhone', 'fatherProfession',
                       'motherName', 'motherPhone', 'motherProfession',
                       'guardianRelationship', 'guardianRelationshipDetails',
@@ -714,6 +723,11 @@ service cloud.firestore {
                     ])
                     && request.resource.data.updatedAt == request.time
                     && request.resource.data.updatedBy == request.auth.uid
+                    && (!('transportZonePk' in request.resource.data) || (
+                      request.resource.data.transportZonePk is int
+                      && request.resource.data.transportZonePk >= 14
+                      && request.resource.data.transportZonePk <= 42
+                    ))
                     && (
                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['dob'])
                       || (
@@ -784,10 +798,9 @@ service cloud.firestore {
                     && request.resource.data.studentId == resource.data.studentId
                     && request.resource.data.id == resource.data.id
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                      'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeTransport', 'feeUniforms',
+                      'feeAmount', 'feeT1', 'feeT2', 'feeT3', 'feeUniforms',
                       'financialBypass', 'registrationFeeExpected', 'registrationFeePaid',
                       'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid', 'tuitionStatus',
-                      'transportMonthlyFee', 'transportPaid',
                       'updatedAt', 'updatedBy'
                     ])
                     && request.resource.data.updatedAt == request.time
@@ -1410,6 +1423,16 @@ service cloud.firestore {
         (isParent() && hasSchoolAccess(resource.data.schoolId) && resource.data.studentId in getUserData().get('studentIds', []))
       );
       // Le grand livre des encaissements est alimenté uniquement par le backend canonique.
+      allow create, update, delete: if false;
+    }
+    match /transportPaymentAllocations/{allocationId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary() || isAccountant())
+          && hasSchoolAccess(resource.data.schoolId)) ||
+        (isParent() && hasSchoolAccess(resource.data.schoolId)
+          && resource.data.studentId in getUserData().get('studentIds', []))
+      );
       allow create, update, delete: if false;
     }
     match /receipts/{receiptId} {
