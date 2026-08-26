@@ -46,6 +46,9 @@ jobs:
       - name: Validate Production Teacher Assignments E2E safety contract
         run: node --check scripts/test-teacher-assignments-staging.mjs && node --test tests/security/production-teacher-assignments-e2e.spec.mjs
 
+      - name: Validate Production Grades E2E safety contract
+        run: node --check scripts/test-grades-staging.mjs && node --check scripts/audit-grades-production-readonly.mjs && node --test tests/security/production-grades-e2e.spec.mjs
+
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
