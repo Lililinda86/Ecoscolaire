@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { chromium } from '@playwright/test';
-import { cert, deleteApp as deleteAdminApp, initializeApp as initializeAdminApp } from 'firebase-admin/app';
+import { applicationDefault, cert, deleteApp as deleteAdminApp, initializeApp as initializeAdminApp } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { deleteApp, initializeApp } from 'firebase/app';
@@ -10,13 +10,24 @@ import { collection, deleteDoc, doc, getDoc, getDocs, getFirestore as getClientF
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { assertAutomationBypassSecret, assertProtectedPreviewLoaded } from './staging-firebase-precheck.mjs';
 
-const PROJECT = 'ecoscolaire-staging';
-const REQUIRED = ['STAGING_APP_URL', 'STAGING_FIREBASE_SERVICE_ACCOUNT', 'STAGING_FIREBASE_API_KEY',
-  'STAGING_FIREBASE_AUTH_DOMAIN', 'STAGING_FIREBASE_PROJECT_ID', 'STAGING_FIREBASE_STORAGE_BUCKET',
-  'STAGING_FIREBASE_MESSAGING_SENDER_ID', 'STAGING_FIREBASE_APP_ID', 'VERCEL_AUTOMATION_BYPASS_SECRET'];
-const config = () => ({ apiKey: process.env.STAGING_FIREBASE_API_KEY, authDomain: process.env.STAGING_FIREBASE_AUTH_DOMAIN,
-  projectId: PROJECT, storageBucket: process.env.STAGING_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.STAGING_FIREBASE_MESSAGING_SENDER_ID, appId: process.env.STAGING_FIREBASE_APP_ID });
+const IS_PRODUCTION = process.env.GRADES_E2E_TARGET === 'production';
+const PREFIX = IS_PRODUCTION ? 'PRODUCTION' : 'STAGING';
+const PROJECT = IS_PRODUCTION ? 'ecoscolaire-c5861' : 'ecoscolaire-staging';
+const APP_URL_KEY = `${PREFIX}_APP_URL`;
+const REQUIRED = IS_PRODUCTION
+  ? [APP_URL_KEY, 'PRODUCTION_FIREBASE_API_KEY', 'PRODUCTION_FIREBASE_AUTH_DOMAIN',
+    'PRODUCTION_FIREBASE_PROJECT_ID', 'PRODUCTION_FIREBASE_STORAGE_BUCKET',
+    'PRODUCTION_FIREBASE_MESSAGING_SENDER_ID', 'PRODUCTION_FIREBASE_APP_ID',
+    'PRODUCTION_EXPECTED_SHA', 'TEST_MARKER_PREFIX']
+  : [APP_URL_KEY, 'STAGING_FIREBASE_SERVICE_ACCOUNT', 'STAGING_FIREBASE_API_KEY',
+    'STAGING_FIREBASE_AUTH_DOMAIN', 'STAGING_FIREBASE_PROJECT_ID', 'STAGING_FIREBASE_STORAGE_BUCKET',
+    'STAGING_FIREBASE_MESSAGING_SENDER_ID', 'STAGING_FIREBASE_APP_ID', 'VERCEL_AUTOMATION_BYPASS_SECRET'];
+const REAL_DATA_COLLECTIONS = ['evaluations', 'grades', 'reportCards', 'periods', 'programs', 'classPrograms',
+  'teacherAssignments', 'teacherAssignmentSlots', 'staff', 'students', 'classes', 'subjects', 'attendance'];
+const isFixture = data => data.testFixture === true && typeof data.testRunId === 'string' && data.testRunId.trim().length > 0;
+const config = () => ({ apiKey: process.env[`${PREFIX}_FIREBASE_API_KEY`], authDomain: process.env[`${PREFIX}_FIREBASE_AUTH_DOMAIN`],
+  projectId: PROJECT, storageBucket: process.env[`${PREFIX}_FIREBASE_STORAGE_BUCKET`],
+  messagingSenderId: process.env[`${PREFIX}_FIREBASE_MESSAGING_SENDER_ID`], appId: process.env[`${PREFIX}_FIREBASE_APP_ID`] });
 const fail = (promise, code, businessCode) => assert.rejects(promise, error => {
   assert.equal(error?.code, `functions/${code}`);
   if (businessCode) assert.equal(error?.details?.businessCode, businessCode);
@@ -62,12 +73,19 @@ const expectInvalidNumericInputRejected = async ({ db, evaluationId, valueName, 
 
 async function run() {
   const missing = REQUIRED.filter(key => !process.env[key]?.trim());
-  if (missing.length) throw new Error(`Missing staging configuration: ${missing.join(', ')}`);
-  assert.equal(process.env.STAGING_FIREBASE_PROJECT_ID, PROJECT);
-  assertAutomationBypassSecret(process.env.VERCEL_AUTOMATION_BYPASS_SECRET);
-  const appUrl = new URL(process.env.STAGING_APP_URL).origin;
+  if (missing.length) throw new Error(`Missing ${PREFIX.toLowerCase()} configuration: ${missing.join(', ')}`);
+  assert.equal(process.env[`${PREFIX}_FIREBASE_PROJECT_ID`], PROJECT);
+  if (IS_PRODUCTION) {
+    assert.equal(process.env.GITHUB_REF, 'refs/heads/main');
+    assert.equal(process.env[APP_URL_KEY], 'https://ecoscolaire.vercel.app');
+    assert.equal(process.env.TEST_MARKER_PREFIX, 'ITALO-PROD-GRADE-TEST-');
+    assert.match(process.env.PRODUCTION_EXPECTED_SHA, /^[a-f0-9]{40}$/);
+  } else {
+    assertAutomationBypassSecret(process.env.VERCEL_AUTOMATION_BYPASS_SECRET);
+  }
+  const appUrl = new URL(process.env[APP_URL_KEY]).origin;
   const token = `${String(process.env.GITHUB_RUN_ID || Date.now()).replace(/[^A-Za-z0-9_-]/g, '-')}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`;
-  const testRunId = `italo-w2-04-${token}`;
+  const testRunId = IS_PRODUCTION ? `${process.env.TEST_MARKER_PREFIX}${token}` : `italo-w2-04-${token}`;
   const fixture = { testFixture: true, testRunId };
   const password = `T!${randomBytes(18).toString('base64url')}9a`;
   const ids = {
@@ -83,10 +101,16 @@ async function run() {
     studentAbsent: `grade-student-absent-${token}`, studentOtherClass: `grade-student-other-${token}`,
     evaluation: `grade-evaluation-${token}`, cancelledEvaluation: `grade-cancelled-${token}`,
   };
-  let credentials;
-  try { credentials = JSON.parse(process.env.STAGING_FIREBASE_SERVICE_ACCOUNT); } catch { throw new Error('Invalid staging service account JSON.'); }
-  assert.equal(credentials.project_id, PROJECT);
-  const adminApp = initializeAdminApp({ credential: cert(credentials), projectId: PROJECT }, `grades-admin-${testRunId}`);
+  let credential;
+  if (IS_PRODUCTION) {
+    credential = applicationDefault();
+  } else {
+    let credentials;
+    try { credentials = JSON.parse(process.env.STAGING_FIREBASE_SERVICE_ACCOUNT); } catch { throw new Error('Invalid staging service account JSON.'); }
+    assert.equal(credentials.project_id, PROJECT);
+    credential = cert(credentials);
+  }
+  const adminApp = initializeAdminApp({ credential, projectId: PROJECT }, `grades-admin-${testRunId}`);
   const db = getFirestore(adminApp);
   const adminAuth = getAdminAuth(adminApp);
   const browser = await chromium.launch({ headless: true });
@@ -94,6 +118,29 @@ async function run() {
   const contexts = [];
   const authUids = [];
   let fixturesCreated = 0;
+  const snapshotRealData = async () => {
+    if (!IS_PRODUCTION) return null;
+    const result = {};
+    for (const name of REAL_DATA_COLLECTIONS) {
+      const snapshot = await db.collection(name).get();
+      result[name] = Object.fromEntries(snapshot.docs
+        .filter(item => !isFixture(item.data()))
+        .map(item => [item.id, `${item.updateTime?.toMillis() || 0}:${item.data().version ?? ''}`]));
+    }
+    return result;
+  };
+  const describeRealDataChanges = (before, after) => {
+    const changes = [];
+    for (const name of REAL_DATA_COLLECTIONS) {
+      const beforeDocs = before?.[name] || {};
+      const afterDocs = after?.[name] || {};
+      for (const id of new Set([...Object.keys(beforeDocs), ...Object.keys(afterDocs)])) {
+        if (beforeDocs[id] !== afterDocs[id]) changes.push({ collection: name, id, before: beforeDocs[id] ?? null, after: afterDocs[id] ?? null });
+      }
+    }
+    return changes;
+  };
+  const realBefore = await snapshotRealData();
 
   try {
     await Promise.all([
@@ -240,14 +287,25 @@ async function run() {
     for (const action of ['EVALUATION_CREATED', 'EVALUATION_OPENED', 'GRADE_RECORDED', 'GRADE_CORRECTED', 'EVALUATION_LOCKED', 'EVALUATION_PUBLISHED', 'EVALUATION_CANCELLED']) assert.ok(actions.has(action), action);
     assert.ok(audits.every(item => item.canonicalBackendAudit === true));
     assert.ok(audits.every(item => !/email|password|name|phone|address|payment|receipt/i.test(JSON.stringify(item.details || {}))));
+    const expectedSetupIds = {
+      classPrograms: [ids.program],
+      periods: [ids.period, ids.draftPeriod, ids.closedPeriod],
+      teacherAssignments: [ids.assignment, ids.coAssignment, ids.inactiveAssignment, ids.outsideAssignment, ids.noProgramAssignment, ids.unlinkedAssignment],
+    };
+    for (const [collectionName, expectedIds] of Object.entries(expectedSetupIds)) {
+      const actualIds = (await db.collection(collectionName).where('testRunId', '==', testRunId).get()).docs.map(item => item.id).sort();
+      assert.deepEqual(actualIds, [...expectedIds].sort(), `${collectionName} unexpected automatic side effects`);
+    }
 
     for (const viewport of [{ width: 360, height: 800 }, { width: 768, height: 900 }, { width: 1440, height: 900 }]) {
       const context = await browser.newContext({ viewport }); contexts.push(context);
       const page = await context.newPage();
-      await page.route(`${appUrl}/**`, route => route.continue({ headers: { ...route.request().headers(),
-        'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
+      if (!IS_PRODUCTION) {
+        await page.route(`${appUrl}/**`, route => route.continue({ headers: { ...route.request().headers(),
+          'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
+      }
       await page.goto(`${appUrl}/#/login`, { waitUntil: 'domcontentloaded' });
-      assertProtectedPreviewLoaded({ expectedOrigin: appUrl, actualUrl: page.url() });
+      if (!IS_PRODUCTION) assertProtectedPreviewLoaded({ expectedOrigin: appUrl, actualUrl: page.url() });
       await page.getByTestId('login-email').fill(profiles.noOpenPeriodOwner.email);
       await page.getByTestId('login-password').fill(password); await page.getByTestId('login-submit').click();
       await page.waitForURL(url => !url.hash.includes('/login'), { timeout: 60_000 });
@@ -260,7 +318,7 @@ async function run() {
       assert.equal(await page.getByRole('dialog').count(), 0);
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 2);
     }
-    console.log(`ITALO-W2-04 GRADES STAGING E2E PASS ${testRunId} NaNRejection=${nanRejectionLayer} InfinityRejection=${infinityRejectionLayer} nonFiniteGradeWrites=0`);
+    console.log(`ITALO-W2-04 GRADES ${PREFIX} E2E PASS ${testRunId} NaNRejection=${nanRejectionLayer} InfinityRejection=${infinityRejectionLayer} nonFiniteGradeWrites=0 programsAutoCreated=0 periodsAutoCreated=0 teacherAssignmentsAutoCreated=0 reportCardsCreated=0`);
   } finally {
     for (const context of contexts) await context.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
@@ -270,12 +328,22 @@ async function run() {
       'staff', 'subjects', 'classes', 'periods', 'academicYears', 'users', 'schools'];
     for (const name of collections) {
       const snapshot = await db.collection(name).where('testRunId', '==', testRunId).get(); fixturesCreated += snapshot.size;
-      for (const document of snapshot.docs) await document.ref.delete();
+      for (const document of snapshot.docs) {
+        assert.equal(document.data().testFixture, true, `Refusing cleanup of non-fixture ${document.ref.path}`);
+        assert.equal(document.data().testRunId, testRunId, `Refusing cleanup outside ${testRunId}`);
+        await document.ref.delete();
+      }
     }
     for (const uid of authUids) await adminAuth.deleteUser(uid).catch(() => undefined);
     for (const name of collections) assert.equal((await db.collection(name).where('testRunId', '==', testRunId).get()).size, 0, `${name} residuals`);
     for (const uid of authUids) await assert.rejects(adminAuth.getUser(uid), error => error?.code === 'auth/user-not-found');
-    console.log(`ITALO-W2-04 GRADES STAGING CLEANUP PASS ${testRunId} fixturesCreated=${fixturesCreated} fixturesRemoved=${fixturesCreated} firestoreResiduals=0 authResiduals=0 productionWrites=0 productionDeletes=0 reportCardsCreated=0`);
+    if (IS_PRODUCTION) {
+      const realChanges = describeRealDataChanges(realBefore, await snapshotRealData());
+      const releaseGenerated = realChanges.filter(change => change.id.includes(testRunId));
+      assert.equal(releaseGenerated.length, 0, `Release-generated real-data residuals: ${JSON.stringify(releaseGenerated)}`);
+      if (realChanges.length) console.log(`CONCURRENT REAL USER ACTIVITY ${JSON.stringify(realChanges)}`);
+    }
+    console.log(`ITALO-W2-04 GRADES ${PREFIX} CLEANUP PASS ${testRunId} fixturesCreated=${fixturesCreated} fixturesRemoved=${fixturesCreated} authFixturesRemoved=${authUids.length} firestoreResiduals=0 authResiduals=0 orphans=0 productionWrites=0 productionDeletes=0 reportCardsCreated=0`);
     await deleteAdminApp(adminApp);
   }
 }
