@@ -75,7 +75,15 @@ test('runner fails closed against Production and always executes exact cleanup',
   assert.match(source, /schoolId: testSchoolId/);
   assert.match(source, /academicYears.*activeAcademicYearId/);
   assert.match(source, /httpsCallable\(functions, 'createStudentSecure'\)/);
-  assert.match(source, /TRANSPORT_NOT_AVAILABLE_FOR_CLASS/);
+  assert.match(source, /TRANSPORT_FREE_SECONDARY/);
+  assert.match(source, /feePolicyId: 'ITALO_PK_2026'/);
+  assert.match(source, /transportZonePk: zonePk/);
+  assert.match(source, /e2e-transport-pk14/);
+  assert.match(source, /e2e-transport-pk34/);
+  assert.match(source, /kind: 'CREDIT'/);
+  assert.match(source, /transportPaymentAllocations/);
+  assert.match(source, /const boundedDrain = async/);
+  assert.match(source, /testRunId.*suffix/);
   assert.match(source, /classId: secondaryClassId/);
   assert.match(source, /classId: primaryClassId/);
   assert.match(source, /studentMatriculeReservations/);

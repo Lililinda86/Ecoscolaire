@@ -6,6 +6,10 @@ const {
   resolveCanonicalClassCycle,
   resolvePaymentSchedule
 } = require('../../functions/lib/secretaryCollections');
+const {
+  planTransportAllocations,
+  resolveItaloTransportFee
+} = require('../../functions/lib/transportPaymentPolicy');
 
 assert.equal(calculateBenefitAmount(70000, 'FIXED_AMOUNT', 10000), 10000);
 assert.equal(calculateBenefitAmount(70000, 'PERCENTAGE', 25), 17500);
@@ -43,6 +47,61 @@ assert.equal(resolveCanonicalClassCycle({ name: '6e', cycle: 'primary' }), 'prim
   'structured cycle must take precedence over the display name');
 assert.equal(resolveCanonicalClassCycle({ name: 'CP', catalogLevelId: 'fr-secondary-6e' }), 'secondary',
   'catalogLevelId must be authoritative when cycle and level are absent');
+const transportFee = zonePk => resolveItaloTransportFee({
+  cycle: 'primary', usesTransport: true, zonePk
+}).monthlyGrossAmount;
+for (const zonePk of [14, 20, 33]) assert.equal(transportFee(zonePk), 4000, `PK${zonePk}`);
+for (const zonePk of [34, 40, 42]) assert.equal(transportFee(zonePk), 5000, `PK${zonePk}`);
+assert.deepEqual(resolveItaloTransportFee({ cycle: 'secondary', usesTransport: true, zonePk: 20 }), {
+  state: 'FREE_SECONDARY', zonePk: null, monthlyGrossAmount: 0
+});
+assert.deepEqual(resolveItaloTransportFee({ cycle: 'primary', usesTransport: false, zonePk: 20 }), {
+  state: 'NOT_SUBSCRIBED', zonePk: null, monthlyGrossAmount: 0
+});
+for (const zonePk of [13, 43, 14.5, 'PK20', null]) {
+  assert.throws(() => resolveItaloTransportFee({ cycle: 'primary', usesTransport: true, zonePk }),
+    /TRANSPORT_ZONE/);
+}
+
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-11', remainingBalance: 4000 },
+  { period: '2026-09', remainingBalance: 4000 },
+  { period: '2026-10', remainingBalance: 4000 }
+], 10000), {
+  allocations: [
+    { kind: 'INSTALLMENT', period: '2026-09', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-10', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-11', amount: 2000 }
+  ],
+  allocatedAmount: 10000,
+  creditAmount: 0
+});
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-09', remainingBalance: 5000 },
+  { period: '2026-10', remainingBalance: 5000 }
+], 10000).allocations, [
+  { kind: 'INSTALLMENT', period: '2026-09', amount: 5000 },
+  { kind: 'INSTALLMENT', period: '2026-10', amount: 5000 }
+]);
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-09', remainingBalance: 5000 }
+], 2000), {
+  allocations: [{ kind: 'INSTALLMENT', period: '2026-09', amount: 2000 }],
+  allocatedAmount: 2000,
+  creditAmount: 0
+});
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-09', remainingBalance: 4000 },
+  { period: '2026-10', remainingBalance: 4000 }
+], 10000), {
+  allocations: [
+    { kind: 'INSTALLMENT', period: '2026-09', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-10', amount: 4000 },
+    { kind: 'CREDIT', period: null, amount: 2000 }
+  ],
+  allocatedAmount: 8000,
+  creditAmount: 2000
+});
 
 const deadlineSchool = {
   paymentDeadlines: {

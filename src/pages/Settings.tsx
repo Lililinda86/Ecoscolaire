@@ -58,6 +58,8 @@ const Settings: React.FC = () => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [draftTransportPolicy, setDraftTransportPolicy] = useState(false);
+  const [draftItaloTransportEnabled, setDraftItaloTransportEnabled] = useState(false);
+  const [draftTransportBillingPeriods, setDraftTransportBillingPeriods] = useState('');
 
   const canEditFees = ['owner', 'superAdmin'].includes(currentUser?.role || '');
   const [draftClassFees, setDraftClassFees] = useState<Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }>>({});
@@ -96,6 +98,8 @@ const Settings: React.FC = () => {
         feeUniforms: String(school.globalFees?.feeUniforms ?? 0)
       });
       setDraftTransportPolicy(school.transportPolicy?.secretaryManageAll === true);
+      setDraftItaloTransportEnabled(school.transportPolicy?.feePolicyId === 'ITALO_PK_2026');
+      setDraftTransportBillingPeriods((school.transportPolicy?.billingPeriods || []).join(', '));
       
       const feesInit: Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }> = {};
       if (school.classFees) {
@@ -223,6 +227,23 @@ const Settings: React.FC = () => {
       alert(errorMsg);
       return;
     }
+    const normalizedTransportPeriods = [...new Set(draftTransportBillingPeriods
+      .split(/[\s,;]+/)
+      .map(value => value.trim())
+      .filter(Boolean))].sort();
+    if (draftItaloTransportEnabled) {
+      if (normalizedTransportPeriods.length === 0) {
+        alert('Configurez au moins un mois facturable pour le transport ITALO.');
+        return;
+      }
+      const allowedYears = new Set([String(yearStart), String(yearEnd)]);
+      if (normalizedTransportPeriods.some(period =>
+        !/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || !allowedYears.has(period.slice(0, 4)))) {
+        alert('Chaque mois transport doit utiliser YYYY-MM et appartenir à l’année scolaire affichée.');
+        return;
+      }
+    }
+
 
     // 6. PIN Conditional Inclusion
     const normPin = draftAdminPin.trim();
@@ -267,7 +288,9 @@ const Settings: React.FC = () => {
         },
         transportPolicy: {
           ...(db.school.transportPolicy || {}),
-          secretaryManageAll: draftTransportPolicy
+          secretaryManageAll: draftTransportPolicy,
+          feePolicyId: draftItaloTransportEnabled ? ('ITALO_PK_2026' as const) : null,
+          billingPeriods: draftItaloTransportEnabled ? normalizedTransportPeriods : []
         }
       };
 
@@ -870,6 +893,36 @@ const Settings: React.FC = () => {
           <label htmlFor="secretaryManageAllTransport" style={{ fontWeight: 500, cursor: 'pointer' }}>
             Autoriser la secrétaire à gérer l'intégralité du module Transport
           </label>
+        </div>
+        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '.75rem', fontWeight: 600 }}>
+            <input
+              data-testid="italo-transport-policy-enabled"
+              type="checkbox"
+              checked={draftItaloTransportEnabled}
+              onChange={event => setDraftItaloTransportEnabled(event.target.checked)}
+              disabled={!canEditFees}
+            />
+            Activer la politique ITALO PK14–PK42
+          </label>
+          <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>
+            Primaire PK14–33 : 4 000 FCFA/mois · PK34–42 : 5 000 FCFA/mois · Secondaire : gratuit.
+          </p>
+          <label style={{ display: 'block', maxWidth: 640 }}>
+            Mois facturables explicites
+            <textarea
+              data-testid="italo-transport-billing-periods"
+              rows={2}
+              value={draftTransportBillingPeriods}
+              onChange={event => setDraftTransportBillingPeriods(event.target.value)}
+              disabled={!canEditFees || !draftItaloTransportEnabled}
+              placeholder="Exemple de format : 2026-09, 2026-10 (saisir uniquement les mois décidés par ITALO)"
+              style={{ width: '100%', marginTop: '.35rem' }}
+            />
+          </label>
+          <p style={{ color: '#92400e', fontSize: '.82rem' }}>
+            Aucun mois n’est ajouté automatiquement. Enregistrez uniquement le calendrier officiellement validé.
+          </p>
         </div>
         {!['superAdmin', 'owner'].includes(currentUser.role) && (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>

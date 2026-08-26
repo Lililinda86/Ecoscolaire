@@ -90,6 +90,11 @@ describe('Canonical financial benefits security', () => {
           benefitType: 'SCHOLARSHIP', paymentType: 'TUITION', mode: 'FIXED_AMOUNT', value: 1000,
           installment: 'T1', stackable: true, reason: 'Test', status: 'approved'
         }),
+        setDoc(doc(db, 'transportPaymentAllocations', 'allocation-a'), {
+          id: 'allocation-a', schoolId: 'benefit-school-a', studentId: 'student-a',
+          academicYear: '2026-2027', paymentId: 'payment-a', kind: 'INSTALLMENT',
+          period: '2026-09', amount: 4000, status: 'POSTED', byTransportPaymentEngine: true
+        }),
         setDoc(doc(db, 'financialBenefitReferences', 'reference-a'), {
           id: 'reference-a', schoolId: 'benefit-school-a', benefitId: 'benefit-a', reference: 'BON-TEST'
         })
@@ -116,6 +121,32 @@ describe('Canonical financial benefits security', () => {
     await assertFails(deleteDoc(doc(ownerDb, 'financialBenefits', 'benefit-a')));
   });
 
+
+  it('allows tenant reads but denies cross-school reads and every direct financial ledger mutation', async () => {
+    const ownerDb = testEnv.authenticatedContext('benefit-owner-a').firestore();
+    const secretaryDb = testEnv.authenticatedContext('benefit-secretary-a').firestore();
+    const accountantDb = testEnv.authenticatedContext('benefit-accountant-a').firestore();
+    const crossDb = testEnv.authenticatedContext('benefit-secretary-b').firestore();
+    const teacherDb = testEnv.authenticatedContext('benefit-teacher-a').firestore();
+    await assertSucceeds(getDoc(doc(ownerDb, 'transportPaymentAllocations', 'allocation-a')));
+    await assertSucceeds(getDoc(doc(secretaryDb, 'transportPaymentAllocations', 'allocation-a')));
+    await assertSucceeds(getDoc(doc(accountantDb, 'transportPaymentAllocations', 'allocation-a')));
+    await assertFails(getDoc(doc(crossDb, 'transportPaymentAllocations', 'allocation-a')));
+    await assertFails(getDoc(doc(teacherDb, 'transportPaymentAllocations', 'allocation-a')));
+    for (const database of [ownerDb, secretaryDb, accountantDb]) {
+      await assertFails(setDoc(doc(database, 'payments', `direct-payment-${Math.random()}`), {
+        schoolId: 'benefit-school-a', studentId: 'student-a', amount: 4000
+      }));
+      await assertFails(setDoc(doc(database, 'receipts', `direct-receipt-${Math.random()}`), {
+        schoolId: 'benefit-school-a', studentId: 'student-a', amount: 4000
+      }));
+      await assertFails(setDoc(doc(database, 'transportPaymentAllocations', `direct-allocation-${Math.random()}`), {
+        schoolId: 'benefit-school-a', studentId: 'student-a', amount: 4000
+      }));
+      await assertFails(updateDoc(doc(database, 'transportPaymentAllocations', 'allocation-a'), { amount: 1 }));
+      await assertFails(deleteDoc(doc(database, 'transportPaymentAllocations', 'allocation-a')));
+    }
+  });
   it('keeps voucher reference reservations hidden from secretary but visible to approvers/accounting', async () => {
     await assertFails(getDoc(doc(testEnv.authenticatedContext('benefit-secretary-a').firestore(), 'financialBenefitReferences', 'reference-a')));
     await assertSucceeds(getDoc(doc(testEnv.authenticatedContext('benefit-owner-a').firestore(), 'financialBenefitReferences', 'reference-a')));

@@ -190,7 +190,9 @@ const Dashboard: React.FC = () => {
       const transPaid = Number(student.transportPaid) || 0;
       transportPaidTotal += transPaid;
       
-      const transportFeeConfigured = Number(student.transportMonthlyFee) > 0;
+      const transportFeeConfigured = Number(
+        student.transportExpectedGross ?? student.transportExpectedNet ?? student.transportMonthlyFee,
+      ) > 0;
       const hasNoTransportPayment = student.usesTransport === true && transportFeeConfigured && transPaid <= 0;
 
       // 4. Calculate consecutive absences
