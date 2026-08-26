@@ -71,8 +71,8 @@ async function run() {
   const fixture = { testFixture: true, testRunId };
   const password = `T!${randomBytes(18).toString('base64url')}9a`;
   const ids = {
-    school: `grade-school-${token}`, emptySchool: `grade-empty-school-${token}`, otherSchool: `grade-other-school-${token}`,
-    year: `grade-year-${token}`, period: `grade-period-${token}`, draftPeriod: `grade-draft-period-${token}`, closedPeriod: `grade-closed-period-${token}`,
+    school: `grade-school-${token}`, emptySchool: `grade-empty-school-${token}`, noOpenPeriodSchool: `grade-no-open-period-school-${token}`, otherSchool: `grade-other-school-${token}`,
+    year: `grade-year-${token}`, noOpenPeriodYear: `grade-no-open-period-year-${token}`, period: `grade-period-${token}`, draftPeriod: `grade-draft-period-${token}`, closedPeriod: `grade-closed-period-${token}`,
     classA: `grade-class-a-${token}`, classB: `grade-class-b-${token}`, subject: `grade-math-${token}`, outsideSubject: `grade-science-${token}`,
     program: `grade-program-${token}`, revision: `grade-revision-${token}`, classSubject: `grade-cs-${token}`,
     staff: `grade-staff-${token}`, coStaff: `grade-co-staff-${token}`, unlinkedStaff: `grade-unlinked-staff-${token}`,
@@ -99,8 +99,10 @@ async function run() {
     await Promise.all([
       db.collection('schools').doc(ids.school).create({ id: ids.school, schoolId: ids.school, name: `ITALO Grades ${testRunId}`, status: 'active', active: true, activeAcademicYearId: ids.year, academicYear: '2031-2032', version: 1, ...fixture }),
       db.collection('schools').doc(ids.emptySchool).create({ id: ids.emptySchool, schoolId: ids.emptySchool, name: `ITALO Empty ${testRunId}`, status: 'active', active: true, version: 1, ...fixture }),
+      db.collection('schools').doc(ids.noOpenPeriodSchool).create({ id: ids.noOpenPeriodSchool, schoolId: ids.noOpenPeriodSchool, name: `ITALO No Open Period ${testRunId}`, status: 'active', active: true, activeAcademicYearId: ids.noOpenPeriodYear, academicYear: '2031-2032', version: 1, ...fixture }),
       db.collection('schools').doc(ids.otherSchool).create({ id: ids.otherSchool, schoolId: ids.otherSchool, name: `ITALO Other ${testRunId}`, status: 'active', active: true, version: 1, ...fixture }),
       db.collection('academicYears').doc(ids.year).create({ id: ids.year, schoolId: ids.school, name: '2031-2032', status: 'active', active: true, startDate: '2031-09-01', endDate: '2032-06-30', version: 1, ...fixture }),
+      db.collection('academicYears').doc(ids.noOpenPeriodYear).create({ id: ids.noOpenPeriodYear, schoolId: ids.noOpenPeriodSchool, name: '2031-2032', status: 'active', active: true, startDate: '2031-09-01', endDate: '2032-06-30', version: 1, ...fixture }),
       db.collection('periods').doc(ids.period).create({ id: ids.period, schoolId: ids.school, academicYearId: ids.year, name: 'Trimestre 1', status: 'open', startDate: '2031-09-01', endDate: '2031-12-20', version: 1, ...fixture }),
       db.collection('periods').doc(ids.draftPeriod).create({ id: ids.draftPeriod, schoolId: ids.school, academicYearId: ids.year, name: 'Trimestre brouillon', status: 'draft', startDate: '2032-01-01', endDate: '2032-03-31', version: 1, ...fixture }),
       db.collection('periods').doc(ids.closedPeriod).create({ id: ids.closedPeriod, schoolId: ids.school, academicYearId: ids.year, name: 'Trimestre clos', status: 'closed', startDate: '2032-01-01', endDate: '2032-03-31', version: 1, ...fixture }),
@@ -119,7 +121,7 @@ async function run() {
 
     const roleSpecs = { owner: ['owner', ids.school], director: ['director', ids.school], secretary: ['secretary', ids.school],
       teacher: ['teacher', ids.school], coTeacher: ['teacher', ids.school], unlinkedTeacher: ['teacher', ids.school], parent: ['parent', ids.school], student: ['student', ids.school],
-      boardViewer: ['boardViewer', ids.school], emptyOwner: ['owner', ids.emptySchool] };
+      boardViewer: ['boardViewer', ids.school], emptyOwner: ['owner', ids.emptySchool], noOpenPeriodOwner: ['owner', ids.noOpenPeriodSchool] };
     const profiles = {};
     for (const [key, [role, schoolId]] of Object.entries(roleSpecs)) {
       const email = `${key}.${testRunId}@example.test`;
@@ -246,7 +248,7 @@ async function run() {
         'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
       await page.goto(`${appUrl}/#/login`, { waitUntil: 'domcontentloaded' });
       assertProtectedPreviewLoaded({ expectedOrigin: appUrl, actualUrl: page.url() });
-      await page.getByTestId('login-email').fill(profiles.emptyOwner.email);
+      await page.getByTestId('login-email').fill(profiles.noOpenPeriodOwner.email);
       await page.getByTestId('login-password').fill(password); await page.getByTestId('login-submit').click();
       await page.waitForURL(url => !url.hash.includes('/login'), { timeout: 60_000 });
       await page.goto(`${appUrl}/#/grades`, { waitUntil: 'domcontentloaded' });
