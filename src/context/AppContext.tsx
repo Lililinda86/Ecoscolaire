@@ -9,7 +9,8 @@ import { createAcademicYear as createAY, activateAcademicYear as actAY, updateAc
 import { db as firestoreDb } from '../db/firebase';
 import type { AcademicYear, Period } from '../types';
 import { partitionGradeDocuments } from '../services/gradeSchemaPartition';
-import { saveStructuredEvaluationGrades, StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
+import { StructuredGradeSaveCancelledError } from '../services/structuredGradesPersistence';
+import { saveCanonicalEvaluationGrades } from '../services/gradeFunctions';
 import { isUserActive, logAuthenticationFailure } from '../utils/authSecurity';
 import { recordAuthenticatedAudit } from '../services/authenticatedAudit';
 import {
@@ -99,7 +100,7 @@ interface AppContextProps {
   saveDB: (newDb: Database) => Promise<void>;
   safeMergeDB: (newDb: Database) => Promise<void>;
   safePatchDB: (patch: DatabasePatch) => Promise<void>;
-  saveStructuredGrades: (params: { evaluation: Evaluation, grades: Grade[] }) => Promise<void>;
+  saveStructuredGrades: (params: { evaluation: Evaluation, grades: Grade[], requestId: string }) => Promise<void>;
   currentUser: User | null;
   currentSchool: School | null;
   isSupervising: boolean;
@@ -409,7 +410,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const fetchPromises = collectionsToFetch.map(async (colName) => {
           try {
             let q;
-            if (userData.role === 'teacher' && colName === 'classPrograms') {
+            if (userData.role === 'teacher' && (colName === 'evaluations' || colName === 'grades')) {
+              q = query(
+                collection(firestoreDb, colName),
+                where('schoolId', '==', targetSchoolId),
+                where('teacherUserId', '==', firebaseUser.uid)
+              );
+            } else if (userData.role === 'teacher' && colName === 'classPrograms') {
               q = query(
                 collection(firestoreDb, colName),
                 where('schoolId', '==', targetSchoolId),
@@ -746,61 +753,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const saveStructuredGrades = async ({ evaluation, grades }: { evaluation: Evaluation, grades: Grade[] }) => {
-    if (!db) {
-      throw new Error("Les données de l'école ne sont pas disponibles.");
-    }
-    if (!currentUser) {
-      throw new Error("Vous devez être authentifié pour enregistrer les notes.");
-    }
-
+  const saveStructuredGrades = async ({ evaluation, grades, requestId }: { evaluation: Evaluation, grades: Grade[], requestId: string }) => {
+    if (!db) throw new Error("Les données de l'école ne sont pas disponibles.");
+    if (!currentUser) throw new Error("Vous devez être authentifié pour enregistrer les notes.");
     if (isSupervising) {
       const confirm = window.confirm("MODE SUPERVISION : Vous êtes sur le point de modifier les notes structurées de cette école. Êtes-vous sûr ?");
-      if (!confirm) {
-        throw new StructuredGradeSaveCancelledError();
-      }
+      if (!confirm) throw new StructuredGradeSaveCancelledError();
     }
-
     try {
-      const { db: firestoreDb } = await import('../db/firebase');
-      await saveStructuredEvaluationGrades({ firestore: firestoreDb, evaluation, grades });
-
-      // Update local state after successful persistence
-      setDb(prevDb => {
-        if (!prevDb) return prevDb;
-
-        // Update evaluations
-        const nextEvaluations = [...(prevDb.evaluations || [])];
-        const evalIndex = nextEvaluations.findIndex(e => e.id === evaluation.id);
-        if (evalIndex >= 0) {
-          nextEvaluations[evalIndex] = evaluation;
-        } else {
-          nextEvaluations.push(evaluation);
-        }
-
-        // Update gradesStrict
-        const nextStrictGrades = [...(prevDb.gradesStrict || [])];
-        grades.forEach(g => {
-          const gIndex = nextStrictGrades.findIndex(existing => existing.id === g.id);
-          if (gIndex >= 0) {
-            nextStrictGrades[gIndex] = g;
-          } else {
-            nextStrictGrades.push(g);
-          }
-        });
-
-        return {
-          ...prevDb,
-          evaluations: nextEvaluations,
-          gradesStrict: nextStrictGrades
-        };
-      });
-    } catch (e) {
-      console.error("Structured Grades Save Error:", e);
-      throw e;
+      await saveCanonicalEvaluationGrades({ evaluation, grades, requestId });
+      // Firestore listeners refresh the canonical server-derived documents.
+      // No client-side grade shape is written or forged optimistically.
+    } catch (error) {
+      console.error("Canonical Grades Save Error:", error);
+      throw error;
     }
   };
-
   const safePatchDB = async (patch: DatabasePatch) => {
     if (!db || !currentUser) return;
 

@@ -4253,11 +4253,11 @@ describe('Lot 1B Notes & Bulletins Security Rules', () => {
   });
 
   describe('Grade legacy transitoire', () => {
-    it('bon schoolId autorisé selon rôle historique', async () => {
+    it('bon schoolId refusé en écriture client malgré le rôle historique', async () => {
       await setupAdmin('owner-g', { role: 'owner', schoolId: 'school-g', isActive: true });
       const dbOwner = testEnv.authenticatedContext('owner-g').firestore();
       const ref = doc(collection(dbOwner, 'grades'), 'g1');
-      await assertSucceeds(setDoc(ref, { schoolId: 'school-g', studentId: 's1', score: 10 }));
+      await assertFails(setDoc(ref, { schoolId: 'school-g', studentId: 's1', score: 10 }));
     });
 
     it('sans schoolId refusé', async () => {
@@ -4279,14 +4279,14 @@ describe('Lot 1B Notes & Bulletins Security Rules', () => {
 
 describe('Evaluations & Grades Lot 2A', () => {
   // Evaluation: 1, 2, 3, 4, 5, 6, 7, 8
-  it('1. enseignant affecté crée draft valide', async () => {
+  it('1. enseignant affecté passe obligatoirement par le callable', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users', 't-uid'), { role: 'teacher', schoolId: 's1', active: true });
       await setDoc(doc(ctx.firestore(), 'staffUserLinkByUser', 't-uid'), { isActive: true, schoolId: 's1', staffId: 'st1' });
       await setDoc(doc(ctx.firestore(), 'teacherAssignments', 's1__ay__c1__cs1__st1'), { isActive: true });
     });
     const ctx = testEnv.authenticatedContext('t-uid');
-    await assertSucceeds(setDoc(doc(ctx.firestore(), 'evaluations', 'ev1'), {
+    await assertFails(setDoc(doc(ctx.firestore(), 'evaluations', 'ev1'), {
       schoolId: 's1', academicYearId: 'ay', periodId: 'p1', classId: 'c1', classSubjectId: 'cs1', status: 'draft', weight: 1, maxScore: 20
     }));
   });
@@ -4303,12 +4303,12 @@ describe('Evaluations & Grades Lot 2A', () => {
     }));
   });
 
-  it('3. director crée ou valide selon politique autorisée', async () => {
+  it('3. director passe obligatoirement par le callable', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users', 'd-uid'), { role: 'director', schoolId: 's1', active: true });
     });
     const ctx = testEnv.authenticatedContext('d-uid');
-    await assertSucceeds(setDoc(doc(ctx.firestore(), 'evaluations', 'ev3'), {
+    await assertFails(setDoc(doc(ctx.firestore(), 'evaluations', 'ev3'), {
       schoolId: 's1', academicYearId: 'ay', periodId: 'p1', classId: 'c1', classSubjectId: 'cs1', status: 'validated', weight: 1, maxScore: 20
     }));
   });
@@ -4333,7 +4333,7 @@ describe('Evaluations & Grades Lot 2A', () => {
     }));
   });
 
-  it('6. Evaluation existante valide utilisable', async () => {
+  it('6. Evaluation existante reste non modifiable directement', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users', 't-uid'), { role: 'teacher', schoolId: 's1', active: true });
       await setDoc(doc(ctx.firestore(), 'staffUserLinkByUser', 't-uid'), { isActive: true, schoolId: 's1', staffId: 'st1' });
@@ -4341,7 +4341,7 @@ describe('Evaluations & Grades Lot 2A', () => {
       await setDoc(doc(ctx.firestore(), 'evaluations', 'ev6'), { status: 'draft', weight: 1, schoolId: 's1', academicYearId: 'ay', classId: 'c1', classSubjectId: 'cs1' });
     });
     const ctx = testEnv.authenticatedContext('t-uid');
-    await assertSucceeds(updateDoc(doc(ctx.firestore(), 'evaluations', 'ev6'), {
+    await assertFails(updateDoc(doc(ctx.firestore(), 'evaluations', 'ev6'), {
       status: 'submitted'
     }));
   });
@@ -4370,14 +4370,14 @@ describe('Evaluations & Grades Lot 2A', () => {
     id: 'gr9', schoolId: 's1', academicYearId: 'ay', periodId: 'p1', evaluationId: 'e', classId: 'c1', classSubjectId: 'cs1', subjectId: 's', studentId: 'stu', teacherId: 'st1', status: 'draft', resultStatus: 'scored', maxScore: 20, version: 1, createdAt: '2023', createdBy: 't', updatedAt: '2023', updatedBy: 't', score: 10
   };
 
-  it('9. Grade draft scored valide autorisé', async () => {
+  it('9. Grade valide passe obligatoirement par le callable', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users', 't-uid'), { role: 'teacher', schoolId: 's1', active: true });
       await setDoc(doc(ctx.firestore(), 'staffUserLinkByUser', 't-uid'), { isActive: true, schoolId: 's1', staffId: 'st1' });
       await setDoc(doc(ctx.firestore(), 'teacherAssignments', 's1__ay__c1__cs1__st1'), { isActive: true });
     });
     const ctx = testEnv.authenticatedContext('t-uid');
-    await assertSucceeds(setDoc(doc(ctx.firestore(), 'grades', 'gr9'), validStrictGrade));
+    await assertFails(setDoc(doc(ctx.firestore(), 'grades', 'gr9'), validStrictGrade));
   });
 
   it('10. Grade scored sans score refusé', async () => {
@@ -4408,13 +4408,13 @@ describe('Evaluations & Grades Lot 2A', () => {
     await assertFails(updateDoc(doc(ctx.firestore(), 'grades', 'gr13'), { status: 'validated', version: 2 }));
   });
 
-  it('14. transition director draft -> validated autorisée', async () => {
+  it('14. transition director directe refusée', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users', 'd-uid'), { role: 'director', schoolId: 's1', active: true });
       await setDoc(doc(ctx.firestore(), 'grades', 'gr14'), { ...validStrictGrade, id: 'gr14', status: 'draft' });
     });
     const ctx = testEnv.authenticatedContext('d-uid');
-    await assertSucceeds(updateDoc(doc(ctx.firestore(), 'grades', 'gr14'), { status: 'validated', version: 2 }));
+    await assertFails(updateDoc(doc(ctx.firestore(), 'grades', 'gr14'), { status: 'validated', version: 2 }));
   });
 
   it('15. modification d’un Grade locked par teacher refusée', async () => {
