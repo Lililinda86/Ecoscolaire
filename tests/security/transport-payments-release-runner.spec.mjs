@@ -62,6 +62,8 @@ test('runner is isolated, run-scoped, manifests exact IDs and baselines real dat
   assert.match(runner, /releaseCaused=0/);
   assert.match(runner, /residuals=0 orphans=0/);
   assert.doesNotMatch(runner, /recursiveDelete|deleteCollection|where\('testFixture', '==', true\)/);
+  assert.match(runner, /collection\('transportReleasePreflight'\)/);
+  assert.doesNotMatch(runner, /collection\('__transport_release_preflight__'\)/);
 });
 
 test('runner covers the required Transport contract and real UI', () => {
