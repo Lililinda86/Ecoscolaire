@@ -116,7 +116,7 @@ const STUDENT_KEYS = [
 const PRIVATE_KEYS = [
   'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails', 'address',
   'emergencyContact', 'allergies', 'medicalConditions', 'transportNeighborhood',
-  'transportPickupPoint', 'fatherName', 'fatherPhone', 'fatherProfession', 'motherName',
+  'transportPickupPoint', 'transportZonePk', 'fatherName', 'fatherPhone', 'fatherProfession', 'motherName',
   'motherPhone', 'motherProfession', 'guardianRelationship', 'guardianRelationshipDetails',
   'motherLastName', 'motherFirstName', 'motherEmail', 'motherWhatsapp', 'fatherLastName',
   'fatherFirstName', 'fatherEmail', 'fatherWhatsapp', 'guardianLastName', 'guardianFirstName',
@@ -142,6 +142,12 @@ const validateStudentPayload = (
   }
   if (!['nouveau', 'ancien'].includes(String(studentData.studentStatus))) {
     throw businessError('invalid-argument', 'INVALID_ARGUMENT', 'Statut élève invalide.');
+  }
+  if (privateData.transportZonePk !== undefined
+      && (!Number.isSafeInteger(privateData.transportZonePk)
+        || Number(privateData.transportZonePk) < 14
+        || Number(privateData.transportZonePk) > 42)) {
+    throw businessError('invalid-argument', 'INVALID_ARGUMENT', 'PK transport invalide.');
   }
   for (const key of FINANCE_KEYS) {
     const value = financeData[key];
