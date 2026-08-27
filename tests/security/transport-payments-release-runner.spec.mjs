@@ -5,6 +5,7 @@ import { validateTransportRunnerConfig } from '../../scripts/transport-release-r
 
 const workflow = await readFile('.github/workflows/transport-payments-release-runner.yml', 'utf8');
 const runner = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
+const stagingWorkflow = await readFile('.github/workflows/run-seed.yml', 'utf8');
 
 const valid = (mode = 'staging') => {
   const project = mode === 'production' ? 'ecoscolaire-c5861' : 'ecoscolaire-staging';
@@ -72,4 +73,16 @@ test('runner covers the required Transport contract and real UI', () => {
     'closeCashDrawer', 'CROSS_SCHOOL_DENIED', 'permission-denied', '#/payments',
   ]) assert.ok(runner.includes(token), `missing contract token ${token}`);
   assert.match(runner, /\[360, 768, 1440\]/);
+});
+
+test('existing Staging dispatcher runs the isolated gate before the full collections E2E', () => {
+  const isolatedIndex = stagingWorkflow.indexOf('node scripts/test-transport-payments-production.mjs');
+  const fullIndex = stagingWorkflow.indexOf('node scripts/test-secretary-collections-staging.mjs');
+  assert.ok(isolatedIndex > 0 && fullIndex > isolatedIndex);
+  assert.match(stagingWorkflow, /inputs\.operation == 'secretary-collections-e2e'/);
+  assert.match(stagingWorkflow, /project_id: ecoscolaire-staging/);
+  assert.match(stagingWorkflow, /refs\/heads\/staging/);
+  assert.match(stagingWorkflow, /testIamPermissions/);
+  assert.match(stagingWorkflow, /TRANSPORT_FIXTURE_SCHOOL_ID: transport-release-staging-/);
+  assert.doesNotMatch(stagingWorkflow, /TRANSPORT_FIXTURE_SCHOOL_ID: italo-gsb/);
 });
