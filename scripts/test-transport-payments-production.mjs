@@ -320,6 +320,55 @@ const main = async () => {
       [5_000, 2_000, 3_000], [5_000, 1_500, 3_500], [5_000, 5_000, 0],
     ]);
     assert.equal((await quote(secretary, benefitStudent, 'tuition', { installment: 'T1' })).discountAmount, 2_000);
+
+    const approvalFixedStudent = await createStudent('benefit-approval-pk20', 20);
+    const approvalFixed = await call(owner, 'createFinancialBenefit', {
+      schoolId: cfg.fixtureSchoolId, studentId: approvalFixedStudent, academicYear,
+      requestId: `approval-fixed-${cfg.testRunId}`, benefitType: 'SCHOLARSHIP', paymentType: 'TRANSPORT',
+      mode: 'FIXED_AMOUNT', value: 1_000, transportStartPeriod: periods[0], transportEndPeriod: periods[0],
+      stackable: true, reason: 'Fixture canonical PK20 fixed benefit', maximumUses: 1,
+    });
+    mark('financialBenefits', approvalFixed.benefitId);
+    await call(owner, 'approveFinancialBenefit', { benefitId: approvalFixed.benefitId });
+    const approvalFixedQuote = await quote(secretary, approvalFixedStudent);
+    assert.deepEqual([
+      approvalFixedQuote.installments[0].grossExpectedAmount,
+      approvalFixedQuote.installments[0].discountAmount,
+      approvalFixedQuote.installments[0].netExpectedAmount,
+    ], [4_000, 1_000, 3_000]);
+
+    const approvalPercentStudent = await createStudent('benefit-approval-pk34', 34);
+    const approvalPercent = await call(owner, 'createFinancialBenefit', {
+      schoolId: cfg.fixtureSchoolId, studentId: approvalPercentStudent, academicYear,
+      requestId: `approval-percent-${cfg.testRunId}`, benefitType: 'SCHOLARSHIP', paymentType: 'TRANSPORT',
+      mode: 'PERCENTAGE', value: 50, transportStartPeriod: periods[0], transportEndPeriod: periods[0],
+      stackable: true, reason: 'Fixture canonical PK34 percentage benefit', maximumUses: 1,
+    });
+    mark('financialBenefits', approvalPercent.benefitId);
+    await call(owner, 'approveFinancialBenefit', { benefitId: approvalPercent.benefitId });
+    const approvalPercentQuote = await quote(secretary, approvalPercentStudent);
+    assert.deepEqual([
+      approvalPercentQuote.installments[0].grossExpectedAmount,
+      approvalPercentQuote.installments[0].discountAmount,
+      approvalPercentQuote.installments[0].netExpectedAmount,
+    ], [5_000, 2_500, 2_500]);
+
+    const expectTransportBenefitApprovalDenied = async (studentId, label, code) => {
+      const created = await call(owner, 'createFinancialBenefit', {
+        schoolId: cfg.fixtureSchoolId, studentId, academicYear,
+        requestId: `approval-deny-${label}-${cfg.testRunId}`, benefitType: 'SCHOLARSHIP', paymentType: 'TRANSPORT',
+        mode: 'FIXED_AMOUNT', value: 100, transportStartPeriod: periods[0], transportEndPeriod: periods[0],
+        stackable: true, reason: `Fixture approval deny ${label}`, maximumUses: 1,
+      });
+      mark('financialBenefits', created.benefitId);
+      await expectFailure(() => call(owner, 'approveFinancialBenefit', { benefitId: created.benefitId }), [code]);
+    };
+    await expectTransportBenefitApprovalDenied(secondary, 'secondary', 'TRANSPORT_FREE_SECONDARY');
+    assert.equal((await quote(secretary, secondary)).remainingBalance, 0);
+    const missingPkStudent = await createStudent('benefit-approval-missing-pk', undefined);
+    await expectTransportBenefitApprovalDenied(missingPkStudent, 'missing-pk', 'TRANSPORT_ZONE_REQUIRED');
+    await expectTransportBenefitApprovalDenied(invalid, 'outside-pk', 'TRANSPORT_ZONE_OUTSIDE_POLICY');
+
     const duplicateReference = `DUPLICATE-${cfg.testRunId}`;
     const firstDuplicate = await call(owner, 'createFinancialBenefit', {
       schoolId: cfg.fixtureSchoolId, studentId: benefitStudent, academicYear,

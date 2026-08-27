@@ -4,6 +4,7 @@ const {
   calculateBenefits,
   isTransportPeriod,
   resolveCanonicalClassCycle,
+  resolveTransportBenefitGross,
   resolvePaymentSchedule
 } = require('../../functions/lib/secretaryCollections');
 const {
@@ -62,6 +63,41 @@ for (const zonePk of [13, 43, 14.5, 'PK20', null]) {
   assert.throws(() => resolveItaloTransportFee({ cycle: 'primary', usesTransport: true, zonePk }),
     /TRANSPORT_ZONE/);
 }
+
+const canonicalBenefitGross = (zonePk, overrides = {}) => resolveTransportBenefitGross({
+  student: { usesTransport: true }, privateData: { transportZonePk: zonePk },
+  classData: { cycle: 'primary' }, finance: { transportMonthlyFee: 99000 },
+  school: { transportPolicy: { feePolicyId: 'ITALO_PK_2026' }, globalFees: { feeTransport: 88000 } },
+  bus: { monthlyFee: 77000 }, ...overrides
+});
+for (const zonePk of [14, 20, 33]) assert.equal(canonicalBenefitGross(zonePk), 4000, `benefit PK${zonePk}`);
+for (const zonePk of [34, 42]) assert.equal(canonicalBenefitGross(zonePk), 5000, `benefit PK${zonePk}`);
+assert.equal(calculateBenefitAmount(canonicalBenefitGross(20), 'FIXED_AMOUNT', 1000), 1000);
+assert.equal(canonicalBenefitGross(20) - calculateBenefitAmount(canonicalBenefitGross(20), 'FIXED_AMOUNT', 1000), 3000);
+assert.equal(calculateBenefitAmount(canonicalBenefitGross(34), 'PERCENTAGE', 50), 2500);
+assert.equal(canonicalBenefitGross(34) - calculateBenefitAmount(canonicalBenefitGross(34), 'PERCENTAGE', 50), 2500);
+for (const zonePk of [undefined, 13, 43]) {
+  assert.throws(() => canonicalBenefitGross(zonePk), /PK transport|périmètre tarifaire/);
+}
+assert.throws(() => canonicalBenefitGross(20, {
+  classData: { cycle: 'secondary' }
+}), /TRANSPORT GRATUIT/);
+assert.throws(() => canonicalBenefitGross(20, {
+  student: { usesTransport: false }
+}), /n’utilise pas le transport/);
+assert.equal(resolveTransportBenefitGross({
+  student: {}, privateData: {}, classData: {}, finance: { transportMonthlyFee: 3500 },
+  school: {}, bus: null
+}), 3500, 'legacy fallback remains available only without canonical ITALO policy');
+
+for (const [mode, value] of [
+  ['FIXED_AMOUNT', 0], ['FIXED_AMOUNT', -1], ['PERCENTAGE', 0], ['PERCENTAGE', 101],
+  ['FIXED_AMOUNT', Number.NaN], ['FIXED_AMOUNT', Number.POSITIVE_INFINITY]
+]) {
+  assert.throws(() => calculateBenefitAmount(4000, mode, value));
+}
+assert.equal(calculateBenefitAmount(4000, 'FIXED_AMOUNT', 5000), 4000,
+  'fixed benefit larger than gross follows the existing capped contract');
 
 assert.deepEqual(planTransportAllocations([
   { period: '2026-11', remainingBalance: 4000 },

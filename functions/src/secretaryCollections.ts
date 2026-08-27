@@ -544,6 +544,34 @@ const resolveTransportFee = (student: Data, privateData: Data, classData: Data):
   }
 };
 
+export const resolveTransportBenefitGross = ({
+  student, privateData, classData, finance, school, bus
+}: {
+  student: Data; privateData: Data; classData: Data; finance: Data; school: Data; bus: Data | null;
+}): number => {
+  const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
+    ? school.transportPolicy as Data : {};
+  if (policy.feePolicyId !== ITALO_TRANSPORT_FEE_POLICY_ID) {
+    return resolveGross('transport', null, finance, school, bus);
+  }
+  const fee = resolveTransportFee(student, privateData, classData);
+  if (fee.state === 'FREE_SECONDARY') {
+    throw httpsError(
+      'failed-precondition',
+      'TRANSPORT GRATUIT : une aide transport n’aurait aucun effet.',
+      'TRANSPORT_FREE_SECONDARY'
+    );
+  }
+  if (fee.state === 'NOT_SUBSCRIBED') {
+    throw httpsError(
+      'failed-precondition',
+      'Cet élève n’utilise pas le transport.',
+      'TRANSPORT_NOT_SUBSCRIBED'
+    );
+  }
+  return fee.monthlyGrossAmount;
+};
+
 const resolveTransportBillingPeriods = (school: Data, academicYear: string): string[] => {
   const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
     ? school.transportPolicy as Data : {};
@@ -953,10 +981,11 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
     const schoolRef = db.collection('schools').doc(String(benefit.schoolId));
     const studentRef = db.collection('students').doc(String(benefit.studentId));
     const financeRef = db.collection('studentFinance').doc(String(benefit.studentId));
+    const privateRef = db.collection('studentPrivate').doc(String(benefit.studentId));
     const paymentsQuery = db.collection('payments').where('studentId', '==', benefit.studentId);
     const benefitsQuery = db.collection('financialBenefits').where('studentId', '==', benefit.studentId);
-    const [schoolSnap, studentSnap, financeSnap, paymentsSnap, benefitsSnap] = await Promise.all([
-      transaction.get(schoolRef), transaction.get(studentRef), transaction.get(financeRef),
+    const [schoolSnap, studentSnap, financeSnap, privateSnap, paymentsSnap, benefitsSnap] = await Promise.all([
+      transaction.get(schoolRef), transaction.get(studentRef), transaction.get(financeRef), transaction.get(privateRef),
       transaction.get(paymentsQuery), transaction.get(benefitsQuery)
     ]);
     if (!schoolSnap.exists) throw httpsError('not-found', 'School not found.', 'SCHOOL_NOT_FOUND');
@@ -1013,6 +1042,20 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
         );
       }
     }
+    let classData: Data = {};
+    if (benefit.paymentType === 'TRANSPORT') {
+      const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
+        ? school.transportPolicy as Data : {};
+      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID) {
+        const classId = typeof student.classId === 'string' ? student.classId : '';
+        if (!classId) throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
+        const classSnap = await transaction.get(db.collection('classes').doc(classId));
+        if (!classSnap.exists || classSnap.data()?.schoolId !== benefit.schoolId) {
+          throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
+        }
+        classData = classSnap.data() || {};
+      }
+    }
     const finance = resolveStudentFinanceData(studentSnap.data() || {}, financeSnap);
     const targetType = benefit.paymentType === 'TUITION' ? 'tuition' : 'transport';
     const targetInstallment = benefit.paymentType === 'TUITION' && benefit.installment !== 'ALL_TUITION'
@@ -1021,7 +1064,9 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       ? (['T1', 'T2', 'T3'] as Installment[]).reduce((sum, item) => safeAdd(
           sum, resolveGross('tuition', item, finance, schoolSnap.data() || {}, null), 'grossExpectedAmount'
         ), 0)
-      : resolveGross(targetType, targetInstallment, finance, schoolSnap.data() || {}, bus);
+      : targetType === 'transport'
+        ? resolveTransportBenefitGross({ student, privateData: privateSnap.data() || {}, classData, finance, school, bus })
+        : resolveGross(targetType, targetInstallment, finance, school, bus);
     calculateBenefitAmount(gross, benefit.mode as BenefitMode, benefit.value as number);
     let referenceRef: admin.firestore.DocumentReference | null = null;
     if (typeof benefit.reference === 'string') {

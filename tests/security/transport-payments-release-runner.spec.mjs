@@ -77,6 +77,11 @@ test('runner covers the required Transport contract and real UI', () => {
     'expired', 'moratorium', 'idempotentReplay', 'Promise.allSettled', 'reversePayment',
     'closeCashDrawer', 'CROSS_SCHOOL_DENIED', 'permission-denied', '#/payments',
   ]) assert.ok(runner.includes(token), `missing contract token ${token}`);
+  for (const marker of ['benefit-approval-pk20', 'approval-fixed', 'benefit-approval-pk34',
+    'approval-percent', 'TRANSPORT_FREE_SECONDARY', 'TRANSPORT_ZONE_REQUIRED',
+    'TRANSPORT_ZONE_OUTSIDE_POLICY']) assert.ok(runner.includes(marker), `missing approval marker ${marker}`);
+  assert.match(runner, /\[4_000, 1_000, 3_000\]/);
+  assert.match(runner, /\[5_000, 2_500, 2_500\]/);
   assert.match(runner, /\[360, 768, 1440\]/);
 });
 
