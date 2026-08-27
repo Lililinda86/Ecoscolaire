@@ -4,6 +4,13 @@ import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
 import { resolveStudentFinanceData, writeStudentFinanceProjection } from './studentFinanceProjection';
 import { makeTuitionDiscountSlotId } from './utils/discountHelpers';
+import {
+  ITALO_TRANSPORT_FEE_POLICY_ID,
+  planTransportAllocations,
+  resolveItaloTransportFee,
+  TransportAllocationPlanItem,
+  TransportFeeResolution
+} from './transportPaymentPolicy';
 
 type Data = Record<string, unknown>;
 type PaymentType = 'registration_fee' | 'tuition' | 'transport';
@@ -123,16 +130,9 @@ export const resolveCanonicalClassCycle = (classData: Data): CanonicalClassCycle
   return 'unknown';
 };
 
-const assertTransportAvailableForClass = (type: PaymentType, classData: Data): void => {
+const assertTransportClassIsKnown = (type: PaymentType, classData: Data): void => {
   if (type !== 'transport') return;
   const cycle = resolveCanonicalClassCycle(classData);
-  if (cycle === 'secondary') {
-    throw httpsError(
-      'failed-precondition',
-      'Le transport scolaire n’est pas facturable pour cette classe.',
-      'TRANSPORT_NOT_AVAILABLE_FOR_CLASS'
-    );
-  }
   if (cycle === 'unknown') {
     throw httpsError('failed-precondition', 'Le cycle de la classe est invalide.', 'INVALID_CLASS_CYCLE');
   }
@@ -152,7 +152,7 @@ const requireTransportPeriod = (value: unknown, field = 'period'): string => {
 
 const transportPeriodIsInAcademicYear = (period: string, academicYear: string): boolean => {
   const [startYear, endYear] = academicYear.split('-');
-  return period >= `${startYear}-09` && period <= `${endYear}-06`;
+  return period.startsWith(`${startYear}-`) || period.startsWith(`${endYear}-`);
 };
 
 const isCalendarDate = (value: string): boolean => {
@@ -184,7 +184,9 @@ const requirePaymentTarget = (raw: Data): {
     if (raw.installment !== undefined && raw.installment !== null && raw.installment !== '') {
       throw httpsError('invalid-argument', 'installment is not valid for transport.', 'INVALID_INSTALLMENT');
     }
-    return { type, installment: null, period: requireTransportPeriod(raw.period) };
+    const period = raw.period === undefined || raw.period === null || raw.period === ''
+      ? null : requireTransportPeriod(raw.period);
+    return { type, installment: null, period };
   }
   if ((raw.installment !== undefined && raw.installment !== null && raw.installment !== '')
       || (raw.period !== undefined && raw.period !== null && raw.period !== '')) {
@@ -420,6 +422,21 @@ export interface CollectionQuote extends PaymentScheduleSnapshot {
   benefits: BenefitSnapshot[];
 }
 
+export interface TransportInstallmentSnapshot extends CollectionQuote {
+  period: string;
+  allocatedAmount: number;
+}
+
+export interface TransportCollectionQuote extends CollectionQuote {
+  transportState: 'FREE_SECONDARY' | 'NOT_SUBSCRIBED' | 'BILLABLE';
+  feePolicyId: string;
+  zonePk: number | null;
+  monthlyGrossAmount: number;
+  installments: TransportInstallmentSnapshot[];
+  transportCredit: number;
+}
+
+
 const selectApplicableBenefits = (
   benefits: Data[],
   type: PaymentType,
@@ -484,7 +501,8 @@ const resolveGross = (
   installment: Installment | null,
   finance: Data,
   school: Data,
-  bus: Data | null
+  bus: Data | null,
+  transportFee: TransportFeeResolution | null = null
 ): number => {
   const fees = school.globalFees && typeof school.globalFees === 'object' ? school.globalFees as Data : {};
   let gross: unknown;
@@ -493,7 +511,9 @@ const resolveGross = (
   } else if (type === 'tuition') {
     gross = finance[`fee${installment}`] ?? fees[`fee${installment}`];
   } else {
-    gross = finance.transportMonthlyFee
+    gross = transportFee?.state === 'BILLABLE'
+      ? transportFee.monthlyGrossAmount
+      : finance.transportMonthlyFee
       ?? finance.feeTransport
       ?? bus?.transportMonthlyFee
       ?? bus?.monthlyFee
@@ -504,6 +524,175 @@ const resolveGross = (
     throw httpsError('failed-precondition', 'Le tarif brut attendu n’est pas configuré.', 'GROSS_AMOUNT_NOT_CONFIGURED');
   }
   return gross;
+};
+
+const resolveTransportFee = (student: Data, privateData: Data, classData: Data): TransportFeeResolution => {
+  try {
+    return resolveItaloTransportFee({
+      cycle: resolveCanonicalClassCycle(classData),
+      usesTransport: student.usesTransport === true,
+      zonePk: privateData.transportZonePk
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'TRANSPORT_POLICY_INVALID';
+    const messages: Record<string, string> = {
+      TRANSPORT_CLASS_NOT_SUPPORTED: 'Le transport payant ITALO est réservé au primaire.',
+      TRANSPORT_ZONE_REQUIRED: 'Le PK transport structuré doit être configuré.',
+      TRANSPORT_ZONE_OUTSIDE_POLICY: 'Le PK transport est hors du périmètre tarifaire ITALO.'
+    };
+    throw httpsError('failed-precondition', messages[code] || 'La politique transport est invalide.', code);
+  }
+};
+
+export const resolveTransportBenefitGross = ({
+  student, privateData, classData, finance, school, bus
+}: {
+  student: Data; privateData: Data; classData: Data; finance: Data; school: Data; bus: Data | null;
+}): number => {
+  const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
+    ? school.transportPolicy as Data : {};
+  if (policy.feePolicyId !== ITALO_TRANSPORT_FEE_POLICY_ID) {
+    return resolveGross('transport', null, finance, school, bus);
+  }
+  const fee = resolveTransportFee(student, privateData, classData);
+  if (fee.state === 'FREE_SECONDARY') {
+    throw httpsError(
+      'failed-precondition',
+      'TRANSPORT GRATUIT : une aide transport n’aurait aucun effet.',
+      'TRANSPORT_FREE_SECONDARY'
+    );
+  }
+  if (fee.state === 'NOT_SUBSCRIBED') {
+    throw httpsError(
+      'failed-precondition',
+      'Cet élève n’utilise pas le transport.',
+      'TRANSPORT_NOT_SUBSCRIBED'
+    );
+  }
+  return fee.monthlyGrossAmount;
+};
+
+const resolveTransportBillingPeriods = (school: Data, academicYear: string): string[] => {
+  const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
+    ? school.transportPolicy as Data : {};
+  if (policy.feePolicyId !== ITALO_TRANSPORT_FEE_POLICY_ID) {
+    throw httpsError('failed-precondition', 'La politique tarifaire transport ITALO doit être activée.',
+      'TRANSPORT_FEE_POLICY_NOT_CONFIGURED');
+  }
+  if (!Array.isArray(policy.billingPeriods) || policy.billingPeriods.length === 0) {
+    throw httpsError('failed-precondition', 'Les mois facturables du transport doivent être configurés.',
+      'TRANSPORT_BILLING_PERIODS_NOT_CONFIGURED');
+  }
+  const periods = policy.billingPeriods.map(period =>
+    requireTransportPeriod(period, 'transportPolicy.billingPeriods'));
+  if (new Set(periods).size !== periods.length
+      || periods.some(period => !transportPeriodIsInAcademicYear(period, academicYear))) {
+    throw httpsError('failed-precondition', 'Le calendrier transport configuré est invalide.',
+      'TRANSPORT_BILLING_PERIODS_INVALID');
+  }
+  return [...periods].sort();
+};
+
+const zeroTransportQuote = (
+  state: 'FREE_SECONDARY' | 'NOT_SUBSCRIBED'
+): TransportCollectionQuote => ({
+  transportState: state, feePolicyId: ITALO_TRANSPORT_FEE_POLICY_ID, zonePk: null,
+  monthlyGrossAmount: 0, installments: [], transportCredit: 0,
+  grossExpectedAmount: 0, discountAmount: 0, netExpectedAmount: 0,
+  previousPaid: 0, remainingBalance: 0, status: 'PAID', benefits: [],
+  originalDueDate: null, effectiveDueDate: null, nextDueDate: null,
+  moratoriumStatus: 'NONE', moratoriumId: null, overdue: false, dueStatus: 'PAID'
+});
+
+const requireTransportAllocationAmount = (allocation: Data): number => {
+  const amount = allocation.amount;
+  if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount === 0
+      || allocation.status !== 'POSTED' || allocation.byTransportPaymentEngine !== true
+      || (allocation.kind !== 'INSTALLMENT' && allocation.kind !== 'CREDIT')) {
+    throw httpsError('failed-precondition', 'Une allocation transport historique est invalide.',
+      'TRANSPORT_ALLOCATION_HISTORY_INCONSISTENT');
+  }
+  return amount;
+};
+
+const buildTransportCollectionQuote = ({
+  fee, periods, benefits, payments, allocations, moratoriums, school, schoolId, academicYear, today
+}: {
+  fee: TransportFeeResolution; periods: string[]; benefits: Data[]; payments: Data[];
+  allocations: Data[]; moratoriums: Data[]; school: Data; schoolId: string;
+  academicYear: string; today: string;
+}): TransportCollectionQuote => {
+  if (fee.state !== 'BILLABLE') return zeroTransportQuote(fee.state);
+  const installmentAllocations = new Map<string, number>();
+  let transportCredit = 0;
+  for (const allocation of allocations) {
+    if (allocation.schoolId !== schoolId || allocation.academicYear !== academicYear) continue;
+    const amount = requireTransportAllocationAmount(allocation);
+    if (allocation.kind === 'CREDIT') {
+      transportCredit = safeAdd(transportCredit, amount, 'transportCredit');
+    } else {
+      const period = requireTransportPeriod(allocation.period, 'allocation.period');
+      installmentAllocations.set(period, safeAdd(
+        installmentAllocations.get(period) || 0, amount, `allocation:${period}`));
+    }
+  }
+  if (transportCredit < 0) {
+    throw httpsError('failed-precondition', 'Le crédit transport historique est négatif.',
+      'FINANCIAL_HISTORY_INCONSISTENT');
+  }
+  const benefitPlanning = benefits.map(benefit => ({ ...benefit }));
+  const installments: TransportInstallmentSnapshot[] = periods.map(period => {
+    const legacyQuote = buildQuote({
+      gross: fee.monthlyGrossAmount, benefits: benefitPlanning, payments, moratoriums, school, schoolId, academicYear,
+      type: 'transport', installment: null, period, today
+    });
+    for (const snapshot of legacyQuote.benefits) {
+      const benefit = benefitPlanning.find(item => item.id === snapshot.benefitId);
+      if (!benefit) continue;
+      const target = paymentTargetKey('transport', null, period);
+      const appliedTargets = Array.isArray(benefit.appliedTargets) ? benefit.appliedTargets as string[] : [];
+      if (!appliedTargets.includes(target)) {
+        benefit.appliedTargets = [...appliedTargets, target];
+        benefit.usageCount = safeAdd(typeof benefit.usageCount === 'number' ? benefit.usageCount : 0, 1, 'usageCount');
+      }
+    }
+    const allocatedAmount = installmentAllocations.get(period) || 0;
+    const paidAmount = safeAdd(legacyQuote.previousPaid, allocatedAmount, `paid:${period}`);
+    if (paidAmount < 0 || paidAmount > legacyQuote.netExpectedAmount) {
+      throw httpsError('failed-precondition', 'Une mensualité transport est surallouée.',
+        'TRANSPORT_ALLOCATION_HISTORY_INCONSISTENT');
+    }
+    const remainingBalance = legacyQuote.netExpectedAmount - paidAmount;
+    const schedule = resolvePaymentSchedule({
+      school, moratoriums, type: 'transport', installment: null, period, today, remainingBalance
+    });
+    return {
+      ...legacyQuote, ...schedule, period, allocatedAmount, previousPaid: paidAmount, remainingBalance,
+      status: remainingBalance === 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID'
+    };
+  });
+  const sum = (selector: (item: TransportInstallmentSnapshot) => number, field: string) =>
+    installments.reduce((total, item) => safeAdd(total, selector(item), field), 0);
+  const grossExpectedAmount = sum(item => item.grossExpectedAmount, 'transportExpectedGross');
+  const discountAmount = sum(item => item.discountAmount, 'transportDiscountTotal');
+  const netExpectedAmount = sum(item => item.netExpectedAmount, 'transportExpectedNet');
+  const allocatedAndLegacyPaid = sum(item => item.previousPaid, 'transportAllocatedTotal');
+  const previousPaid = safeAdd(allocatedAndLegacyPaid, transportCredit, 'transportReceivedTotal');
+  const remainingBalance = sum(item => item.remainingBalance, 'transportRemainingBalance');
+  const outstanding = installments.filter(item => item.remainingBalance > 0);
+  const next = outstanding[0] || null;
+  const overdue = outstanding.some(item => item.overdue);
+  return {
+    transportState: 'BILLABLE', feePolicyId: ITALO_TRANSPORT_FEE_POLICY_ID,
+    zonePk: fee.zonePk, monthlyGrossAmount: fee.monthlyGrossAmount, installments, transportCredit,
+    grossExpectedAmount, discountAmount, netExpectedAmount, previousPaid, remainingBalance,
+    status: remainingBalance === 0 ? 'PAID' : allocatedAndLegacyPaid > 0 ? 'PARTIAL' : 'UNPAID',
+    benefits: installments.flatMap(item => item.benefits.map(benefit => ({ ...benefit }))),
+    originalDueDate: next?.originalDueDate || null, effectiveDueDate: next?.effectiveDueDate || null,
+    nextDueDate: next?.effectiveDueDate || null, moratoriumStatus: next?.moratoriumStatus || 'NONE',
+    moratoriumId: next?.moratoriumId || null, overdue,
+    dueStatus: remainingBalance === 0 ? 'PAID' : overdue ? 'OVERDUE' : next?.dueStatus || 'UNCONFIGURED'
+  };
 };
 
 const paymentMatchesTarget = (
@@ -792,10 +981,11 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
     const schoolRef = db.collection('schools').doc(String(benefit.schoolId));
     const studentRef = db.collection('students').doc(String(benefit.studentId));
     const financeRef = db.collection('studentFinance').doc(String(benefit.studentId));
+    const privateRef = db.collection('studentPrivate').doc(String(benefit.studentId));
     const paymentsQuery = db.collection('payments').where('studentId', '==', benefit.studentId);
     const benefitsQuery = db.collection('financialBenefits').where('studentId', '==', benefit.studentId);
-    const [schoolSnap, studentSnap, financeSnap, paymentsSnap, benefitsSnap] = await Promise.all([
-      transaction.get(schoolRef), transaction.get(studentRef), transaction.get(financeRef),
+    const [schoolSnap, studentSnap, financeSnap, privateSnap, paymentsSnap, benefitsSnap] = await Promise.all([
+      transaction.get(schoolRef), transaction.get(studentRef), transaction.get(financeRef), transaction.get(privateRef),
       transaction.get(paymentsQuery), transaction.get(benefitsQuery)
     ]);
     if (!schoolSnap.exists) throw httpsError('not-found', 'School not found.', 'SCHOOL_NOT_FOUND');
@@ -852,6 +1042,20 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
         );
       }
     }
+    let classData: Data = {};
+    if (benefit.paymentType === 'TRANSPORT') {
+      const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
+        ? school.transportPolicy as Data : {};
+      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID) {
+        const classId = typeof student.classId === 'string' ? student.classId : '';
+        if (!classId) throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
+        const classSnap = await transaction.get(db.collection('classes').doc(classId));
+        if (!classSnap.exists || classSnap.data()?.schoolId !== benefit.schoolId) {
+          throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
+        }
+        classData = classSnap.data() || {};
+      }
+    }
     const finance = resolveStudentFinanceData(studentSnap.data() || {}, financeSnap);
     const targetType = benefit.paymentType === 'TUITION' ? 'tuition' : 'transport';
     const targetInstallment = benefit.paymentType === 'TUITION' && benefit.installment !== 'ALL_TUITION'
@@ -860,7 +1064,9 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       ? (['T1', 'T2', 'T3'] as Installment[]).reduce((sum, item) => safeAdd(
           sum, resolveGross('tuition', item, finance, schoolSnap.data() || {}, null), 'grossExpectedAmount'
         ), 0)
-      : resolveGross(targetType, targetInstallment, finance, schoolSnap.data() || {}, bus);
+      : targetType === 'transport'
+        ? resolveTransportBenefitGross({ student, privateData: privateSnap.data() || {}, classData, finance, school, bus })
+        : resolveGross(targetType, targetInstallment, finance, school, bus);
     calculateBenefitAmount(gross, benefit.mode as BenefitMode, benefit.value as number);
     let referenceRef: admin.firestore.DocumentReference | null = null;
     if (typeof benefit.reference === 'string') {
@@ -989,7 +1195,7 @@ const readQuoteContext = async (
   input: ReturnType<typeof parseQuoteInput>
 ): Promise<{
   user: Data; school: Data; student: Data; finance: Data; benefits: Data[]; payments: Data[];
-  moratoriums: Data[];
+  moratoriums: Data[]; allocations: Data[];
   quote: CollectionQuote; classData: Data; financeRef: admin.firestore.DocumentReference;
   financeSnap: admin.firestore.DocumentSnapshot;
 }> => {
@@ -997,12 +1203,16 @@ const readQuoteContext = async (
   const schoolRef = db.collection('schools').doc(input.schoolId);
   const studentRef = db.collection('students').doc(input.studentId);
   const financeRef = db.collection('studentFinance').doc(input.studentId);
+  const privateRef = db.collection('studentPrivate').doc(input.studentId);
   const benefitsQuery = db.collection('financialBenefits').where('studentId', '==', input.studentId);
   const paymentsQuery = db.collection('payments').where('studentId', '==', input.studentId);
   const moratoriumsQuery = db.collection('paymentMoratoriums').where('studentId', '==', input.studentId);
-  const [userSnap, schoolSnap, studentSnap, financeSnap, benefitsSnap, paymentsSnap, moratoriumsSnap] = await Promise.all([
-    transaction.get(userRef), transaction.get(schoolRef), transaction.get(studentRef), transaction.get(financeRef),
-    transaction.get(benefitsQuery), transaction.get(paymentsQuery), transaction.get(moratoriumsQuery)
+  const allocationsQuery = db.collection('transportPaymentAllocations').where('studentId', '==', input.studentId);
+  const [userSnap, schoolSnap, studentSnap, financeSnap, privateSnap, benefitsSnap, paymentsSnap,
+    moratoriumsSnap, allocationsSnap] = await Promise.all([
+    transaction.get(userRef), transaction.get(schoolRef), transaction.get(studentRef), transaction.get(financeRef), transaction.get(privateRef),
+    transaction.get(benefitsQuery), transaction.get(paymentsQuery), transaction.get(moratoriumsQuery),
+    transaction.get(allocationsQuery)
   ]);
   const user = validateActiveUser(userSnap, PAYMENT_ROLES);
   validateTenant(user, input.schoolId);
@@ -1032,7 +1242,7 @@ const readQuoteContext = async (
     }
     classData = classSnap.data() || {};
   }
-  assertTransportAvailableForClass(input.type, classData);
+  assertTransportClassIsKnown(input.type, classData);
   const canonicalBenefits = benefitsSnap.docs.map(normalizeBenefit)
     .filter(item => item.schoolId === input.schoolId && item.academicYear === input.academicYear);
   const legacyBenefits = input.type === 'tuition'
@@ -1044,14 +1254,39 @@ const readQuoteContext = async (
     .map(doc => ({ id: doc.id, ...doc.data() }) as Data)
     .filter(item => item.schoolId === input.schoolId && item.studentId === input.studentId
       && item.academicYear === input.academicYear);
-  const gross = resolveGross(input.type, input.installment, finance, school, bus);
-  const quote = buildQuote({
-    gross, benefits, payments, moratoriums, school,
-    schoolId: input.schoolId, academicYear: input.academicYear,
-    type: input.type, installment: input.installment, period: input.period, today: getDoualaDate()
-  });
+  const allocations = allocationsSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }) as Data)
+    .filter(item => item.schoolId === input.schoolId && item.studentId === input.studentId);
+  let quote: CollectionQuote;
+  if (input.type === 'transport') {
+    const fee = resolveTransportFee(student, privateSnap.exists ? privateSnap.data() || {} : {}, classData);
+    if (fee.state !== 'BILLABLE') {
+      quote = zeroTransportQuote(fee.state);
+    } else if (!input.period) {
+      quote = buildTransportCollectionQuote({
+        fee, periods: resolveTransportBillingPeriods(school, input.academicYear), benefits, payments,
+        allocations, moratoriums, school, schoolId: input.schoolId,
+        academicYear: input.academicYear, today: getDoualaDate()
+      });
+    } else {
+      const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
+        ? school.transportPolicy as Data : {};
+      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID
+          && !resolveTransportBillingPeriods(school, input.academicYear).includes(input.period)) {
+        throw httpsError('failed-precondition', 'Ce mois ne fait pas partie du calendrier transport.',
+          'TRANSPORT_PERIOD_NOT_BILLABLE');
+      }
+      quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, fee),
+        benefits, payments, moratoriums, school, schoolId: input.schoolId, academicYear: input.academicYear,
+        type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
+    }
+  } else {
+    quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus),
+      benefits, payments, moratoriums, school, schoolId: input.schoolId, academicYear: input.academicYear,
+      type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
+  }
   return {
-    user, school, student, finance, benefits, payments, moratoriums,
+    user, school, student, finance, benefits, payments, moratoriums, allocations,
     quote, classData, financeRef, financeSnap
   };
 };
@@ -1154,6 +1389,54 @@ const buildTransportProjection = (
     transportPaid: aggregate('paidAmount')
   };
 };
+const buildCanonicalTransportProjection = (
+  finance: Data,
+  quote: TransportCollectionQuote,
+  allocationItems: TransportAllocationPlanItem[],
+  newReceivedTotal: number
+): Data => {
+  const addedByPeriod = new Map<string, number>();
+  let addedCredit = 0;
+  for (const allocation of allocationItems) {
+    if (allocation.kind === 'CREDIT') addedCredit = safeAdd(addedCredit, allocation.amount, 'transportCredit');
+    else addedByPeriod.set(String(allocation.period), safeAdd(
+      addedByPeriod.get(String(allocation.period)) || 0, allocation.amount, `transport:${allocation.period}`));
+  }
+  const existingPeriods = finance.transportByPeriod && typeof finance.transportByPeriod === 'object'
+    ? finance.transportByPeriod as Data : {};
+  const transportByPeriod: Data = { ...existingPeriods };
+  for (const installment of quote.installments) {
+    const paidAmount = safeAdd(
+      installment.previousPaid, addedByPeriod.get(installment.period) || 0, `transportPaid:${installment.period}`);
+    const remainingBalance = installment.netExpectedAmount - paidAmount;
+    transportByPeriod[installment.period] = {
+      grossExpectedAmount: installment.grossExpectedAmount,
+      discountAmount: installment.discountAmount,
+      netExpectedAmount: installment.netExpectedAmount,
+      paidAmount,
+      remainingBalance,
+      status: remainingBalance === 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID',
+      originalDueDate: installment.originalDueDate,
+      effectiveDueDate: installment.effectiveDueDate,
+      nextDueDate: remainingBalance > 0 ? installment.effectiveDueDate : null,
+      moratoriumStatus: installment.moratoriumStatus,
+      moratoriumId: installment.moratoriumId,
+      overdue: remainingBalance > 0 && installment.overdue,
+      dueStatus: remainingBalance === 0 ? 'PAID' : installment.dueStatus
+    };
+  }
+  return {
+    transportByPeriod,
+    transportExpectedGross: quote.grossExpectedAmount,
+    transportDiscountTotal: quote.discountAmount,
+    transportExpectedNet: quote.netExpectedAmount,
+    transportPaid: newReceivedTotal,
+    transportCredit: safeAdd(quote.transportCredit, addedCredit, 'transportCredit'),
+    transportZonePk: quote.zonePk,
+    transportFeePolicyId: quote.feePolicyId
+  };
+};
+
 
 export const recordCashPayment = functions.https.onCall(async (raw, context) => {
   if (!context.auth?.uid) throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
@@ -1196,6 +1479,8 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
         discountAmount: receipt.discountAmount, netExpectedAmount: receipt.netExpectedAmount,
         previousPaid: receipt.previousPaid, newPaid: receipt.newPaid,
         remainingBalance: receipt.remainingBalance, benefits: receipt.benefits || [],
+        allocations: receipt.allocationSummary || payment.allocations || [],
+        transportCredit: receipt.transportCredit ?? payment.transportCredit ?? 0,
         idempotentReplay: true
       };
     }
@@ -1205,16 +1490,30 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       user, school, student, finance, benefits, payments, moratoriums,
       quote, classData, financeRef, financeSnap
     } = contextData;
-    if (quote.remainingBalance <= 0) {
+    const canonicalTransport = input.type === 'transport' && input.period === null;
+    const transportQuote = canonicalTransport ? quote as TransportCollectionQuote : null;
+    if (transportQuote && transportQuote.transportState !== 'BILLABLE') {
+      throw httpsError('failed-precondition',
+        transportQuote.transportState === 'FREE_SECONDARY'
+          ? 'TRANSPORT GRATUIT : aucun paiement ne peut être enregistré.'
+          : 'Cet élève n’utilise pas le transport.',
+        transportQuote.transportState === 'FREE_SECONDARY'
+          ? 'TRANSPORT_FREE_SECONDARY' : 'TRANSPORT_NOT_SUBSCRIBED');
+    }
+    if (!canonicalTransport && quote.remainingBalance <= 0) {
       throw httpsError('failed-precondition', 'Aucun reste à payer.', 'NO_REMAINING_BALANCE');
     }
-    if (amount > quote.remainingBalance) {
+    if (!canonicalTransport && amount > quote.remainingBalance) {
       throw httpsError(
         'failed-precondition', 'Le montant saisi dépasse le reste à payer.', 'OVERPAYMENT_DENIED'
       );
     }
+    const allocationPlan = transportQuote ? planTransportAllocations(
+      transportQuote.installments.map(item => ({ period: item.period, remainingBalance: item.remainingBalance })), amount
+    ) : null;
     const newPaid = safeAdd(quote.previousPaid, amount, 'newPaid');
-    const remainingBalance = quote.netExpectedAmount - newPaid;
+    const remainingBalance = allocationPlan
+      ? quote.remainingBalance - allocationPlan.allocatedAmount : quote.netExpectedAmount - newPaid;
     const counterRef = db.collection('counters').doc(`receipts_${input.schoolId}`);
     const counterSnap = await transaction.get(counterRef);
     const lastNumber = counterSnap.exists ? counterSnap.data()?.lastReceiptNumber : 0;
@@ -1237,6 +1536,10 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       previousPaid: quote.previousPaid,
       newPaid,
       remainingBalance,
+      ...(allocationPlan ? {
+        allocations: allocationPlan.allocations, transportCredit: safeAdd(
+          transportQuote!.transportCredit, allocationPlan.creditAmount, 'transportCredit')
+      } : {}),
       benefits: quote.benefits,
       originalDueDate: quote.originalDueDate,
       effectiveDueDate: quote.effectiveDueDate,
@@ -1267,8 +1570,26 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       ...(input.period ? { period: input.period, month: input.period } : {}),
       method: 'cash', paymentMethod: 'cash', date, paymentDate: date, amount,
       collectedByUserId: uid, collectedByName: user.name || user.displayName || user.email || uid,
+      ...(allocationPlan ? { allocationSummary: allocationPlan.allocations } : {}),
       createdAt: FieldValue.serverTimestamp(), ...commonSnapshot
     };
+    if (allocationPlan) {
+      allocationPlan.allocations.forEach((allocation, index) => {
+        const allocationId = hashId('transport_allocation', [paymentId, index, allocation.kind, allocation.period]);
+        transaction.create(db.collection('transportPaymentAllocations').doc(allocationId), {
+          id: allocationId, allocationId, schoolId: input.schoolId, studentId: input.studentId,
+          academicYear: input.academicYear, paymentId, receiptId: paymentId,
+          kind: allocation.kind, period: allocation.period, amount: allocation.amount,
+          status: 'POSTED', sequence: index, createdBy: uid, createdAt: FieldValue.serverTimestamp(),
+          byTransportPaymentEngine: true, ...fixtureSnapshot
+        });
+        transaction.create(db.collection('audit_logs').doc(), { ...auditData(
+          'TRANSPORT_PAYMENT_ALLOCATED', input.schoolId, uid, 'TRANSPORT_ALLOCATION', allocationId,
+          { paymentId, kind: allocation.kind, period: allocation.period, amount: allocation.amount }
+        ), ...fixtureSnapshot });
+      });
+    }
+
 
     transaction.set(counterRef, { lastReceiptNumber: nextNumber }, { merge: true });
     transaction.create(paymentRef, paymentData);
@@ -1285,6 +1606,9 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
         finance, school, benefits, payments, moratoriums,
         input.schoolId, input.academicYear, date, paymentData
       );
+    } else if (allocationPlan && transportQuote) {
+      financePatch = buildCanonicalTransportProjection(
+        finance, transportQuote, allocationPlan.allocations, newPaid);
     } else {
       financePatch = buildTransportProjection(finance, quote, String(input.period), newPaid);
     }
@@ -1293,6 +1617,42 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       schoolId: input.schoolId, patch: financePatch, actorId: uid
     });
 
+    if (allocationPlan && transportQuote) {
+      const applications = new Map<string, { benefit: Data; targets: Set<string> }>();
+      for (const allocation of allocationPlan.allocations.filter(item => item.kind === 'INSTALLMENT')) {
+        const installment = transportQuote.installments.find(item => item.period === allocation.period);
+        if (!installment) continue;
+        for (const snapshot of installment.benefits) {
+          const benefit = benefits.find(item => item.id === snapshot.benefitId);
+          if (!benefit || benefit.legacy === true) continue;
+          const entry = applications.get(snapshot.benefitId) || { benefit, targets: new Set<string>() };
+          entry.targets.add(paymentTargetKey('transport', null, installment.period));
+          applications.set(snapshot.benefitId, entry);
+        }
+      }
+      for (const [benefitId, application] of applications) {
+        const appliedTargets = Array.isArray(application.benefit.appliedTargets)
+          ? application.benefit.appliedTargets as string[] : [];
+        const newTargets = [...application.targets].filter(target => !appliedTargets.includes(target)).sort();
+        const usageCount = typeof application.benefit.usageCount === 'number'
+          ? application.benefit.usageCount : 0;
+        const maximumUses = typeof application.benefit.maximumUses === 'number'
+          ? application.benefit.maximumUses : 1;
+        if (usageCount + newTargets.length > maximumUses) {
+          throw httpsError('failed-precondition', 'Une aide transport dépasserait son nombre d’utilisations.',
+            'BENEFIT_USAGE_CONFLICT');
+        }
+        const patch: Data = { lastAppliedAt: FieldValue.serverTimestamp(), lastPaymentId: paymentId };
+        if (newTargets.length > 0) {
+          patch.appliedTargets = FieldValue.arrayUnion(...newTargets);
+          patch.usageCount = safeAdd(usageCount, newTargets.length, 'usageCount');
+          if (application.benefit.status === 'approved') patch.status = 'applied';
+          for (const target of newTargets) transaction.create(db.collection('audit_logs').doc(), auditData(
+            'BENEFIT_APPLIED', input.schoolId, uid, 'FINANCIAL_BENEFIT', benefitId, { paymentId, target }));
+        }
+        transaction.update(db.collection('financialBenefits').doc(benefitId), patch);
+      }
+    } else {
     const targetKey = paymentTargetKey(input.type, input.installment, input.period);
     for (const snapshot of quote.benefits) {
       const benefit = benefits.find(item => item.id === snapshot.benefitId)!;
@@ -1317,19 +1677,20 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       transaction.update(db.collection('financialBenefits').doc(snapshot.benefitId), patch);
     }
 
-    transaction.create(db.collection('audit_logs').doc(), auditData(
+    }
+    transaction.create(db.collection('audit_logs').doc(), { ...auditData(
       'PAYMENT_CREATED', input.schoolId, uid, 'PAYMENT', paymentId,
       { type: input.type, installment: input.installment, period: input.period, amount }
-    ));
+    ), ...fixtureSnapshot });
     if (input.type === 'transport') {
-      transaction.create(db.collection('audit_logs').doc(), auditData(
+      transaction.create(db.collection('audit_logs').doc(), { ...auditData(
         'TRANSPORT_PAYMENT_CREATED', input.schoolId, uid, 'PAYMENT', paymentId,
         { period: input.period, amount }
-      ));
+      ), ...fixtureSnapshot });
     }
-    transaction.create(db.collection('audit_logs').doc(), auditData(
+    transaction.create(db.collection('audit_logs').doc(), { ...auditData(
       'RECEIPT_CREATED', input.schoolId, uid, 'RECEIPT', paymentId, { receiptNumber }
-    ));
+    ), ...fixtureSnapshot });
 
     return {
       paymentId, receiptId: paymentId, receiptNumber, amount,
@@ -1362,9 +1723,11 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
     const receiptRef = db.collection('receipts').doc(paymentId);
     const reversalRef = db.collection('payments').doc(reversalId);
     const correctionReceiptRef = db.collection('receipts').doc(reversalId);
-    const [userSnap, paymentSnap, receiptSnap, reversalSnap, correctionReceiptSnap] = await Promise.all([
+    const originalAllocationsQuery = db.collection('transportPaymentAllocations').where('paymentId', '==', paymentId);
+    const [userSnap, paymentSnap, receiptSnap, reversalSnap, correctionReceiptSnap,
+      originalAllocationsSnap] = await Promise.all([
       transaction.get(userRef), transaction.get(paymentRef), transaction.get(receiptRef),
-      transaction.get(reversalRef), transaction.get(correctionReceiptRef)
+      transaction.get(reversalRef), transaction.get(correctionReceiptRef), transaction.get(originalAllocationsQuery)
     ]);
 
     const user = validateActiveUser(userSnap, new Set(['owner', 'superAdmin']));
@@ -1424,6 +1787,27 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
     const academicYear = requireAcademicYear(original.academicYear);
     const target = requirePaymentTarget(original);
     const originalAmount = requireMoney(original.amount, 'payment.amount');
+    const canonicalTransport = target.type === 'transport' && target.period === null;
+    const originalAllocationItems: TransportAllocationPlanItem[] = originalAllocationsSnap.docs.map(document => {
+      const allocation = document.data() as Data;
+      if (allocation.schoolId !== schoolId || allocation.studentId !== studentId
+          || allocation.academicYear !== academicYear || allocation.paymentId !== paymentId) {
+        throw httpsError('failed-precondition', 'Une allocation originale est incohérente.',
+          'TRANSPORT_ALLOCATION_HISTORY_INCONSISTENT');
+      }
+      const allocationAmount = requireTransportAllocationAmount(allocation);
+      if (allocationAmount <= 0) throw httpsError('failed-precondition', 'Une allocation originale est invalide.',
+        'TRANSPORT_ALLOCATION_HISTORY_INCONSISTENT');
+      return { kind: allocation.kind as 'INSTALLMENT' | 'CREDIT',
+        period: allocation.kind === 'INSTALLMENT' ? requireTransportPeriod(allocation.period) : null,
+        amount: allocationAmount };
+    });
+    if (canonicalTransport && (originalAllocationItems.length === 0
+        || originalAllocationItems.reduce((sum, item) => safeAdd(sum, item.amount, 'allocationTotal'), 0)
+          !== originalAmount)) {
+      throw httpsError('failed-precondition', 'Les allocations originales ne correspondent pas au paiement.',
+        'TRANSPORT_ALLOCATION_HISTORY_INCONSISTENT');
+    }
     if (originalReceipt.paymentId !== paymentId || originalReceipt.schoolId !== schoolId
         || originalReceipt.studentId !== studentId || originalReceipt.amount !== originalAmount) {
       throw httpsError(
@@ -1447,7 +1831,11 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
         'FINANCIAL_HISTORY_INCONSISTENT'
       );
     }
-    const remainingBalance = quote.netExpectedAmount - newPaid;
+    const reversedAllocatedAmount = originalAllocationItems
+      .filter(item => item.kind === 'INSTALLMENT')
+      .reduce((sum, item) => safeAdd(sum, item.amount, 'reversedAllocatedAmount'), 0);
+    const remainingBalance = canonicalTransport
+      ? safeAdd(quote.remainingBalance, reversedAllocatedAmount, 'remainingBalance') : quote.netExpectedAmount - newPaid;
     const date = getDoualaDate();
     const correctionNumber = `ANN-${String(originalReceipt.receiptNumber || paymentId)}`;
     const fixtureSnapshot = original.testFixture === true
@@ -1488,6 +1876,7 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
       newPaid,
       remainingBalance,
       benefits: quote.benefits,
+      ...(canonicalTransport ? { allocations: originalAllocationItems.map(item => ({ ...item, amount: -item.amount })) } : {}),
       originalDueDate: quote.originalDueDate,
       effectiveDueDate: quote.effectiveDueDate,
       nextDueDate: remainingBalance > 0 ? quote.effectiveDueDate : null,
@@ -1536,6 +1925,7 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
       newPaid,
       remainingBalance,
       benefits: quote.benefits,
+      ...(canonicalTransport ? { allocationSummary: originalAllocationItems.map(item => ({ ...item, amount: -item.amount })) } : {}),
       originalDueDate: quote.originalDueDate,
       effectiveDueDate: quote.effectiveDueDate,
       nextDueDate: remainingBalance > 0 ? quote.effectiveDueDate : null,
@@ -1549,6 +1939,24 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
     transaction.create(reversalRef, reversalData);
     transaction.create(correctionReceiptRef, correctionReceiptData);
 
+    if (canonicalTransport) {
+      originalAllocationItems.forEach((allocation, index) => {
+        const reversalAllocationId = hashId('transport_allocation_reversal', [reversalId, index]);
+        transaction.create(db.collection('transportPaymentAllocations').doc(reversalAllocationId), {
+          id: reversalAllocationId, allocationId: reversalAllocationId, schoolId, studentId, academicYear,
+          paymentId: reversalId, receiptId: reversalId, originalPaymentId: paymentId,
+          kind: allocation.kind, period: allocation.period, amount: -allocation.amount,
+          status: 'POSTED', sequence: index, createdBy: uid, createdAt: FieldValue.serverTimestamp(),
+          byTransportPaymentEngine: true, byReversePayment: true, ...fixtureSnapshot
+        });
+        transaction.create(db.collection('audit_logs').doc(), auditData(
+          'TRANSPORT_PAYMENT_ALLOCATION_REVERSED', schoolId, uid,
+          'TRANSPORT_ALLOCATION', reversalAllocationId,
+          { paymentId: reversalId, originalPaymentId: paymentId, kind: allocation.kind,
+            period: allocation.period, amount: -allocation.amount }
+        ));
+      });
+    }
     let financePatch: Data;
     if (target.type === 'registration_fee') {
       financePatch = {
@@ -1560,6 +1968,10 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
         finance, school, benefits, payments, moratoriums,
         schoolId, academicYear, date, reversalData
       );
+    } else if (canonicalTransport) {
+      financePatch = buildCanonicalTransportProjection(
+        finance, quote as TransportCollectionQuote,
+        originalAllocationItems.map(item => ({ ...item, amount: -item.amount })), newPaid);
     } else {
       financePatch = buildTransportProjection(finance, quote, String(target.period), newPaid);
     }

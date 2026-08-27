@@ -4,8 +4,13 @@ const {
   calculateBenefits,
   isTransportPeriod,
   resolveCanonicalClassCycle,
+  resolveTransportBenefitGross,
   resolvePaymentSchedule
 } = require('../../functions/lib/secretaryCollections');
+const {
+  planTransportAllocations,
+  resolveItaloTransportFee
+} = require('../../functions/lib/transportPaymentPolicy');
 
 assert.equal(calculateBenefitAmount(70000, 'FIXED_AMOUNT', 10000), 10000);
 assert.equal(calculateBenefitAmount(70000, 'PERCENTAGE', 25), 17500);
@@ -43,6 +48,96 @@ assert.equal(resolveCanonicalClassCycle({ name: '6e', cycle: 'primary' }), 'prim
   'structured cycle must take precedence over the display name');
 assert.equal(resolveCanonicalClassCycle({ name: 'CP', catalogLevelId: 'fr-secondary-6e' }), 'secondary',
   'catalogLevelId must be authoritative when cycle and level are absent');
+const transportFee = zonePk => resolveItaloTransportFee({
+  cycle: 'primary', usesTransport: true, zonePk
+}).monthlyGrossAmount;
+for (const zonePk of [14, 20, 33]) assert.equal(transportFee(zonePk), 4000, `PK${zonePk}`);
+for (const zonePk of [34, 40, 42]) assert.equal(transportFee(zonePk), 5000, `PK${zonePk}`);
+assert.deepEqual(resolveItaloTransportFee({ cycle: 'secondary', usesTransport: true, zonePk: 20 }), {
+  state: 'FREE_SECONDARY', zonePk: null, monthlyGrossAmount: 0
+});
+assert.deepEqual(resolveItaloTransportFee({ cycle: 'primary', usesTransport: false, zonePk: 20 }), {
+  state: 'NOT_SUBSCRIBED', zonePk: null, monthlyGrossAmount: 0
+});
+for (const zonePk of [13, 43, 14.5, 'PK20', null]) {
+  assert.throws(() => resolveItaloTransportFee({ cycle: 'primary', usesTransport: true, zonePk }),
+    /TRANSPORT_ZONE/);
+}
+
+const canonicalBenefitGross = (zonePk, overrides = {}) => resolveTransportBenefitGross({
+  student: { usesTransport: true }, privateData: { transportZonePk: zonePk },
+  classData: { cycle: 'primary' }, finance: { transportMonthlyFee: 99000 },
+  school: { transportPolicy: { feePolicyId: 'ITALO_PK_2026' }, globalFees: { feeTransport: 88000 } },
+  bus: { monthlyFee: 77000 }, ...overrides
+});
+for (const zonePk of [14, 20, 33]) assert.equal(canonicalBenefitGross(zonePk), 4000, `benefit PK${zonePk}`);
+for (const zonePk of [34, 42]) assert.equal(canonicalBenefitGross(zonePk), 5000, `benefit PK${zonePk}`);
+assert.equal(calculateBenefitAmount(canonicalBenefitGross(20), 'FIXED_AMOUNT', 1000), 1000);
+assert.equal(canonicalBenefitGross(20) - calculateBenefitAmount(canonicalBenefitGross(20), 'FIXED_AMOUNT', 1000), 3000);
+assert.equal(calculateBenefitAmount(canonicalBenefitGross(34), 'PERCENTAGE', 50), 2500);
+assert.equal(canonicalBenefitGross(34) - calculateBenefitAmount(canonicalBenefitGross(34), 'PERCENTAGE', 50), 2500);
+for (const zonePk of [undefined, 13, 43]) {
+  assert.throws(() => canonicalBenefitGross(zonePk), /PK transport|périmètre tarifaire/);
+}
+assert.throws(() => canonicalBenefitGross(20, {
+  classData: { cycle: 'secondary' }
+}), /TRANSPORT GRATUIT/);
+assert.throws(() => canonicalBenefitGross(20, {
+  student: { usesTransport: false }
+}), /n’utilise pas le transport/);
+assert.equal(resolveTransportBenefitGross({
+  student: {}, privateData: {}, classData: {}, finance: { transportMonthlyFee: 3500 },
+  school: {}, bus: null
+}), 3500, 'legacy fallback remains available only without canonical ITALO policy');
+
+for (const [mode, value] of [
+  ['FIXED_AMOUNT', 0], ['FIXED_AMOUNT', -1], ['PERCENTAGE', 0], ['PERCENTAGE', 101],
+  ['FIXED_AMOUNT', Number.NaN], ['FIXED_AMOUNT', Number.POSITIVE_INFINITY]
+]) {
+  assert.throws(() => calculateBenefitAmount(4000, mode, value));
+}
+assert.equal(calculateBenefitAmount(4000, 'FIXED_AMOUNT', 5000), 4000,
+  'fixed benefit larger than gross follows the existing capped contract');
+
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-11', remainingBalance: 4000 },
+  { period: '2026-09', remainingBalance: 4000 },
+  { period: '2026-10', remainingBalance: 4000 }
+], 10000), {
+  allocations: [
+    { kind: 'INSTALLMENT', period: '2026-09', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-10', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-11', amount: 2000 }
+  ],
+  allocatedAmount: 10000,
+  creditAmount: 0
+});
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-09', remainingBalance: 5000 },
+  { period: '2026-10', remainingBalance: 5000 }
+], 10000).allocations, [
+  { kind: 'INSTALLMENT', period: '2026-09', amount: 5000 },
+  { kind: 'INSTALLMENT', period: '2026-10', amount: 5000 }
+]);
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-09', remainingBalance: 5000 }
+], 2000), {
+  allocations: [{ kind: 'INSTALLMENT', period: '2026-09', amount: 2000 }],
+  allocatedAmount: 2000,
+  creditAmount: 0
+});
+assert.deepEqual(planTransportAllocations([
+  { period: '2026-09', remainingBalance: 4000 },
+  { period: '2026-10', remainingBalance: 4000 }
+], 10000), {
+  allocations: [
+    { kind: 'INSTALLMENT', period: '2026-09', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-10', amount: 4000 },
+    { kind: 'CREDIT', period: null, amount: 2000 }
+  ],
+  allocatedAmount: 8000,
+  creditAmount: 2000
+});
 
 const deadlineSchool = {
   paymentDeadlines: {

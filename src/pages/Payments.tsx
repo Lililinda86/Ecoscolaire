@@ -231,6 +231,9 @@ interface RecordCashPaymentResult {
   netExpectedAmount: number;
   benefits: Array<{ benefitId: string; benefitType: string; reference?: string; discountAmount: number }>;
   idempotentReplay: boolean;
+  allocations?: Array<{ kind: 'INSTALLMENT' | 'CREDIT'; period: string | null; amount: number }>;
+  transportCredit?: number;
+
 }
 
 interface CollectionQuote {
@@ -248,6 +251,13 @@ interface CollectionQuote {
   moratoriumId: string | null;
   dueStatus: 'PAID' | 'UNCONFIGURED' | 'NOT_DUE' | 'DUE_TODAY' | 'OVERDUE';
   overdue: boolean;
+  transportState?: 'FREE_SECONDARY' | 'NOT_SUBSCRIBED' | 'BILLABLE';
+  feePolicyId?: string;
+  zonePk?: number | null;
+  monthlyGrossAmount?: number;
+  transportCredit?: number;
+  installments?: Array<CollectionQuote & { period: string; allocatedAmount: number }>;
+
 }
 
 interface ReversePaymentResult {
@@ -492,7 +502,7 @@ const Payments: React.FC = () => {
     const supported = currentPayment.type === 'tuition'
       || currentPayment.type === 'transport'
       || currentPayment.type === 'registration_fee';
-    const targetReady = currentPayment.type !== 'transport' || !!currentPayment.period;
+    const targetReady = true;
     if (!isModalOpen || !supported || !targetReady || !currentPayment.studentId
         || !currentSchool?.id || !currentSchool.academicYear) {
       setCollectionQuote(null);
@@ -506,7 +516,7 @@ const Payments: React.FC = () => {
       academicYear: currentSchool.academicYear,
       type: currentPayment.type,
       ...(currentPayment.type === 'tuition' ? { installment: currentPayment.installment || 'T1' } : {}),
-      ...(currentPayment.type === 'transport' ? { period: currentPayment.period } : {})
+      ...(currentPayment.type === 'transport' ? {} : {})
     }).then(result => {
       if (!cancelled) setCollectionQuote(result.data);
     }).catch(error => {
@@ -683,11 +693,6 @@ const Payments: React.FC = () => {
         setIsSaving(false);
         return;
       }
-      if (currentPayment.type === 'transport' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(currentPayment.period || '')) {
-        alert("Veuillez sélectionner un mois de transport valide.");
-        setIsSaving(false);
-        return;
-      }
       if (currentPayment.type !== 'tuition' && currentPayment.type !== 'registration_fee' && currentPayment.type !== 'transport') {
         alert("Ce type de paiement n'est pas pris en charge en espèces.");
         setIsSaving(false);
@@ -701,7 +706,7 @@ const Payments: React.FC = () => {
         amount,
         currentPayment.type,
         currentPayment.installment ?? null,
-        currentPayment.period ?? null,
+        currentPayment.type === 'transport' ? null : currentPayment.period ?? null,
         currentSchool.academicYear,
         (currentPayment.description || '').trim()
       ]);
@@ -736,7 +741,7 @@ const Payments: React.FC = () => {
         ...(currentPayment.description ? { description: currentPayment.description } : {}),
         academicYear: currentSchool.academicYear,
         ...(currentPayment.type === 'tuition' ? { installment: currentPayment.installment } : {}),
-        ...(currentPayment.type === 'transport' ? { period: currentPayment.period } : {})
+        ...(currentPayment.type === 'transport' ? {} : {})
       } as RecordCashPaymentInput;
 
       // Sécurité supplémentaire : suppression de la clé installment si type !== tuition
@@ -770,7 +775,7 @@ const Payments: React.FC = () => {
       const detailsMsg =
         `Nature : ${natureText}\n` +
         (trancheText ? `Tranche : ${trancheText}\n` : '') +
-        (currentPayment.type === 'transport' ? `Période : ${currentPayment.period}\n` : '') +
+        (currentPayment.type === 'transport' ? `Affectation : mensualités les plus anciennes\n` : '') +
         `Montant brut : ${formatCurrency(resData.grossExpectedAmount)}\n` +
         `Bourses / réductions : ${formatCurrency(resData.discountAmount)}\n` +
         `Montant net dû : ${formatCurrency(resData.netExpectedAmount)}\n` +
@@ -2191,7 +2196,7 @@ const Payments: React.FC = () => {
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
              <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
               <label>Nature du Versement</label>
-              <select required value={currentPayment.type || 'tuition'} onChange={e => {
+              <select data-testid="cash-payment-type" required value={currentPayment.type || 'tuition'} onChange={e => {
                 const newType = e.target.value as 'tuition' | 'transport' | 'uniforms' | 'registration_fee' | 'other';
                 if (newType === 'registration_fee') {
                   setCurrentPayment(prev => {
@@ -2246,13 +2251,10 @@ const Payments: React.FC = () => {
             )}
             {currentPayment.type === 'transport' && (
               <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
-                <label>Mois (Transport)</label>
-                <input
-                  type="month"
-                  required
-                  value={currentPayment.period || todayStr.substring(0, 7)}
-                  onChange={e => setCurrentPayment({ ...currentPayment, period: e.target.value, month: e.target.value })}
-                />
+                <label>Affectation transport</label>
+                <div data-testid="transport-auto-allocation" style={{ padding: '.7rem', border: '1px solid var(--border-color)', borderRadius: 4, background: '#f8fafc' }}>
+                  Automatique : mensualité impayée la plus ancienne, puis les suivantes.
+                </div>
               </div>
             )}
             <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
@@ -2271,6 +2273,21 @@ const Payments: React.FC = () => {
               )}
               {collectionQuote && (
                 <div style={{ padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
+                  {collectionQuote.transportState === 'FREE_SECONDARY' && (
+                    <div data-testid="transport-free-secondary" style={{ padding: '.8rem', marginBottom: '.75rem', background: '#ecfdf5', color: '#065f46', fontWeight: 700, borderRadius: 6 }}>
+                      TRANSPORT GRATUIT — montant mensuel 0 FCFA — reste dû 0 FCFA
+                    </div>
+                  )}
+                  {collectionQuote.transportState === 'NOT_SUBSCRIBED' && (
+                    <div data-testid="transport-not-subscribed" style={{ padding: '.8rem', marginBottom: '.75rem', background: '#f8fafc', color: '#475569', fontWeight: 600, borderRadius: 6 }}>
+                      Transport non utilisé — aucune dette transport.
+                    </div>
+                  )}
+                  {collectionQuote.transportState === 'BILLABLE' && (
+                    <div style={{ marginBottom: '.75rem', fontWeight: 600 }}>
+                      Zone PK{collectionQuote.zonePk} · Mensualité brute {formatCurrency(collectionQuote.monthlyGrossAmount || 0)} · Crédit {formatCurrency(collectionQuote.transportCredit || 0)}
+                    </div>
+                  )}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '.75rem' }}>
                     <div><small>Tarif de référence</small><br/><strong>{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
                     <div><small>Bourse / réduction applicable</small><br/><strong>- {formatCurrency(collectionQuote.discountAmount)}</strong></div>
@@ -2286,11 +2303,32 @@ const Payments: React.FC = () => {
                       {collectionQuote.dueStatus === 'OVERDUE' ? 'EN RETARD' : collectionQuote.dueStatus === 'DUE_TODAY' ? "ÉCHÉANCE AUJOURD'HUI" : collectionQuote.dueStatus === 'NOT_DUE' ? 'PAS ENCORE EXIGIBLE' : collectionQuote.dueStatus === 'PAID' ? 'SOLDÉ' : 'ÉCHÉANCE NON CONFIGURÉE'}
                     </strong></div>
                   </div>
+                  {collectionQuote.installments && collectionQuote.installments.length > 0 && (
+                    <div style={{ marginTop: '.85rem', overflowX: 'auto' }}>
+                      <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse', fontSize: '.82rem' }}>
+                        <thead><tr>
+                          <th>Mois</th><th>Brut</th><th>Aide</th><th>Dû net</th><th>Payé</th><th>Reste</th><th>Échéance</th><th>Statut</th>
+                        </tr></thead>
+                        <tbody>{collectionQuote.installments.map(item => (
+                          <tr key={item.period}>
+                            <td>{item.period}</td>
+                            <td>{formatCurrency(item.grossExpectedAmount)}</td>
+                            <td>- {formatCurrency(item.discountAmount)}</td>
+                            <td>{formatCurrency(item.netExpectedAmount)}</td>
+                            <td>{formatCurrency(item.previousPaid)}</td>
+                            <td>{formatCurrency(item.remainingBalance)}</td>
+                            <td>{item.effectiveDueDate ? formatIsoDateFr(item.effectiveDueDate) : 'Non configurée'}</td>
+                            <td>{item.overdue ? 'EN RETARD' : item.status === 'PAID' ? 'SOLDÉ' : item.status === 'PARTIAL' ? 'PARTIEL' : 'À PAYER'}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  )}
                   {collectionQuote.benefits.length > 0 && (
                     <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid var(--border-color)' }}>
                       <small>Détail des avantages conservés dans le calcul</small>
-                      {collectionQuote.benefits.map(benefit => (
-                        <div key={benefit.benefitId} style={{ fontSize: '.85rem' }}>
+                      {collectionQuote.benefits.map((benefit, index) => (
+                        <div key={`${benefit.benefitId}-${index}`} style={{ fontSize: '.85rem' }}>
                           • {benefit.benefitType}{benefit.reference ? ` (${benefit.reference})` : ''} : - {formatCurrency(benefit.discountAmount)}
                         </div>
                       ))}
@@ -2332,6 +2370,7 @@ const Payments: React.FC = () => {
                const resteAvant = collectionQuote.remainingBalance;
                const saisi = Number(currentPayment.amount) || 0;
                const resteApres = Math.max(0, resteAvant - saisi);
+               const creditApres = currentPayment.type === 'transport' ? Math.max(0, saisi - resteAvant) : 0;
                return (
                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f3f4f6', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
                    <div>• <strong>Reste avant versement :</strong> {resteAvant.toLocaleString('fr-FR')} FCFA</div>
@@ -2339,6 +2378,9 @@ const Payments: React.FC = () => {
                    <div style={{ color: resteApres > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold', marginTop: '0.25rem' }}>
                      → Nouveau reste prévisionnel : {resteApres.toLocaleString('fr-FR')} FCFA
                    </div>
+                    {creditApres > 0 && <div style={{ color: '#0369a1', fontWeight: 600 }}>
+                      → Crédit transport prévisionnel : {creditApres.toLocaleString('fr-FR')} FCFA
+                    </div>}
                  </div>
                );
             })()}

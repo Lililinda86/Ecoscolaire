@@ -566,6 +566,14 @@ const Students: React.FC = () => {
       return;
     }
 
+    if (currentStudent.usesTransport === true
+        && (!Number.isSafeInteger(currentStudent.transportZonePk)
+          || Number(currentStudent.transportZonePk) < 14 || Number(currentStudent.transportZonePk) > 42)) {
+      setStepValidationError('Le PK transport structuré doit être un entier de PK14 à PK42.');
+      setCurrentStep(4);
+      return;
+    }
+
     if (!acquireStudentSubmissionLock(saveInFlightRef)) return;
     setIsSaving(true);
     try {
@@ -2431,6 +2439,41 @@ const Students: React.FC = () => {
                     />
                     Aucune allergie ou condition médicale connue à signaler
                   </label>
+                </div>
+
+                <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                  <h4 style={{ margin: '0 0 .65rem', color: '#1e40af' }}>🚌 Abonnement transport</h4>
+                  <p style={{ margin: '0 0 .75rem', color: '#1e3a8a', fontSize: '.82rem' }}>
+                    Le tarif est calculé par le serveur depuis le cycle réel et le PK structuré. Les adresses libres ne déterminent jamais le tarif.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '.75rem', alignItems: 'end' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', minHeight: 44 }}>
+                      <input
+                        type="checkbox"
+                        checked={currentStudent.usesTransport === true}
+                        disabled={isSaving}
+                        onChange={event => setCurrentStudent(previous => ({ ...previous, usesTransport: event.target.checked }))}
+                      />
+                      Utilise le transport scolaire
+                    </label>
+                    <label>Zone structurée (PK)
+                      <input
+                        data-testid="student-transport-zone-pk"
+                        type="number"
+                        min={14}
+                        max={42}
+                        step={1}
+                        inputMode="numeric"
+                        disabled={isSaving || currentStudent.usesTransport !== true}
+                        value={currentStudent.transportZonePk ?? ''}
+                        onChange={event => setCurrentStudent(previous => ({
+                          ...previous,
+                          transportZonePk: event.target.value === '' ? undefined : Number(event.target.value)
+                        }))}
+                        placeholder="14 à 42"
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 {/* Récapitulatif compact */}

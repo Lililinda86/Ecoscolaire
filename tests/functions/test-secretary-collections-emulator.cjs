@@ -86,11 +86,12 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     db.collection('schools').doc(schoolId).set({
       name: 'Collections test school', academicYear, activeAcademicYearId: academicYearId,
       active: true, studentsCount: 0, studentLimit: 100,
-      subscriptionStatus: 'active', globalFees: { feeT1: 70000, feeT2: 70000, feeT3: 70000, feeTransport: 4000 }
+      subscriptionStatus: 'active', globalFees: { feeT1: 70000, feeT2: 70000, feeT3: 70000, feeTransport: 4000 },
+      transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: ['2026-09', '2026-10', '2026-11'] }
       , paymentDeadlines: {
         registrationFee: '2026-09-15',
         tuition: { T1: '2026-09-30', T2: '2027-01-31', T3: '2027-04-30' },
-        transport: { '2026-09': '2026-09-10', '2026-10': '2026-10-10' }
+        transport: { '2026-09': '2026-09-10', '2026-10': '2026-10-10', '2026-11': '2026-11-10' }
       }
     }),
     db.collection('schools').doc(otherSchoolId).set({ name: 'Other school', academicYear, active: true }),
@@ -98,7 +99,10 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     db.collection('classes').doc(classId).set({ schoolId, name: 'CP', level: 'primary', isActive: true, section: 'francophone' }),
     db.collection('students').doc(studentId).set({
       id: studentId, schoolId, name: 'Élève fictif', matricule: 'TEST-COLLECTIONS',
-      classId, academicYearId, academicYear, gender: 'M', section: 'francophone'
+      classId, academicYearId, academicYear, gender: 'M', section: 'francophone', usesTransport: true
+    }),
+    db.collection('studentPrivate').doc(studentId).set({
+      id: studentId, studentId, schoolId, transportZonePk: 20
     }),
     db.collection('studentFinance').doc(studentId).set({
       id: studentId, studentId, schoolId,
@@ -217,12 +221,15 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
         feeT1: 50000, feeT2: 40000, feeT3: 25000, transportMonthlyFee: 4000
       })
     ]);
-    await expectFailure(quote(secretaryId, 'transport', {
-      studentId: secondaryStudentId, period: '2026-09'
-    }), 'TRANSPORT_NOT_AVAILABLE_FOR_CLASS');
+    const freeQuote = await quote(secretaryId, 'transport', { studentId: secondaryStudentId });
+    assert.equal(freeQuote.transportState, 'FREE_SECONDARY');
+    assert.equal(freeQuote.monthlyGrossAmount, 0);
+    assert.equal(freeQuote.remainingBalance, 0);
+    assert.equal(freeQuote.overdue, false);
+    assert.equal(freeQuote.installments.length, 0);
     await expectFailure(pay(secretaryId, `secondary-deny-${index}-${suffix}`, 1000, 'transport', {
-      studentId: secondaryStudentId, period: '2026-09'
-    }), 'TRANSPORT_NOT_AVAILABLE_FOR_CLASS');
+      studentId: secondaryStudentId
+    }), 'TRANSPORT_FREE_SECONDARY');
   }
 
   // Permission matrix and scholarship approval.
@@ -275,9 +282,170 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   const october = await quote(secretaryId, 'transport', { period: '2026-10' });
   assert.equal(october.discountAmount, 0);
   assert.equal(october.remainingBalance, 4000);
-  await expectFailure(quote(secretaryId, 'transport'), 'INVALID_TRANSPORT_PERIOD');
+  const aggregateTransport = await quote(secretaryId, 'transport');
+  assert.equal(aggregateTransport.transportState, 'BILLABLE');
+  const createTransportFixture = async (label, zonePk) => {
+    const id = extraStudentId(`transport-${label}`);
+    await Promise.all([
+      db.collection('students').doc(id).set({
+        id, schoolId, name: `Élève transport ${label}`, matricule: `TEST-TRANSPORT-${label}`,
+        classId, academicYearId, academicYear, gender: 'F', section: 'francophone',
+        usesTransport: true, testFixture: true, testRunId: suffix
+      }),
+      db.collection('studentPrivate').doc(id).set({
+        id, studentId: id, schoolId, transportZonePk: zonePk, testFixture: true, testRunId: suffix
+      }),
+      db.collection('studentFinance').doc(id).set({
+        id, studentId: id, schoolId, feeT1: 70000, feeT2: 70000, feeT3: 70000
+      })
+    ]);
+    return id;
+  };
+
+  // One cash payment is deterministically allocated over several immutable monthly records.
+  const allocationStudentId = await createTransportFixture('allocation-4000', 14);
+  const allocationQuote = await quote(secretaryId, 'transport', { studentId: allocationStudentId });
+  assert.equal(allocationQuote.monthlyGrossAmount, 4000);
+  assert.equal(allocationQuote.netExpectedAmount, 12000);
+  const allocationRequestId = `transport-allocation-${suffix}`;
+  const allocatedPayment = await pay(secretaryId, allocationRequestId, 10000, 'transport', {
+    studentId: allocationStudentId
+  });
+  assert.deepEqual(allocatedPayment.allocations, [
+    { kind: 'INSTALLMENT', period: '2026-09', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-10', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-11', amount: 2000 }
+  ]);
+  assert.equal(allocatedPayment.remainingBalance, 2000);
+  const allocationDocs = await db.collection('transportPaymentAllocations')
+    .where('paymentId', '==', allocatedPayment.paymentId).get();
+  assert.equal(allocationDocs.size, 3);
+  const allocationReplay = await pay(secretaryId, allocationRequestId, 10000, 'transport', {
+    studentId: allocationStudentId
+  });
+  assert.equal(allocationReplay.idempotentReplay, true);
+  assert.deepEqual(allocationReplay.allocations, allocatedPayment.allocations);
+  assert.equal(allocationReplay.transportCredit, allocatedPayment.transportCredit);
+  assert.equal((await db.collection('transportPaymentAllocations')
+    .where('paymentId', '==', allocatedPayment.paymentId).get()).size, 3);
+
+  const allocationReversal = await reverse(ownerId, allocatedPayment.paymentId,
+    `transport-reversal-${suffix}`, 'Annulation fixture transport');
+  assert.equal(allocationReversal.amount, -10000);
+  const netAllocationDocs = await db.collection('transportPaymentAllocations')
+    .where('studentId', '==', allocationStudentId).get();
+  const netByPeriod = {};
+  for (const document of netAllocationDocs.docs) {
+    const item = document.data();
+    const key = item.period || 'CREDIT';
+    netByPeriod[key] = (netByPeriod[key] || 0) + item.amount;
+  }
+  assert.deepEqual(netByPeriod, { '2026-09': 0, '2026-10': 0, '2026-11': 0 });
+  assert.equal((await quote(secretaryId, 'transport', { studentId: allocationStudentId })).remainingBalance, 12000);
+  assert.equal((await db.collection('payments').doc(allocatedPayment.paymentId).get()).exists, true);
+  assert.equal((await db.collection('receipts').doc(allocatedPayment.paymentId).get()).exists, true);
+
+  const zoneBStudentId = await createTransportFixture('allocation-5000', 34);
+  const zoneBPayment = await pay(secretaryId, `transport-zone-b-${suffix}`, 10000, 'transport', {
+    studentId: zoneBStudentId
+  });
+  assert.deepEqual(zoneBPayment.allocations, [
+    { kind: 'INSTALLMENT', period: '2026-09', amount: 5000 },
+    { kind: 'INSTALLMENT', period: '2026-10', amount: 5000 }
+  ]);
+  assert.equal(zoneBPayment.remainingBalance, 5000);
+
+  const partialStudentId = await createTransportFixture('partial-5000', 42);
+  const partialTransport = await pay(secretaryId, `transport-partial-global-${suffix}`, 2000, 'transport', {
+    studentId: partialStudentId
+  });
+  assert.equal(partialTransport.allocations[0].amount, 2000);
+  const partialQuote = await quote(secretaryId, 'transport', { studentId: partialStudentId });
+  assert.equal(partialQuote.installments[0].remainingBalance, 3000);
+
+  const creditStudentId = await createTransportFixture('credit', 20);
+  await pay(secretaryId, `transport-credit-prior-${suffix}`, 4000, 'transport', { studentId: creditStudentId });
+  const creditPayment = await pay(secretaryId, `transport-credit-${suffix}`, 10000, 'transport', {
+    studentId: creditStudentId
+  });
+  assert.deepEqual(creditPayment.allocations, [
+    { kind: 'INSTALLMENT', period: '2026-10', amount: 4000 },
+    { kind: 'INSTALLMENT', period: '2026-11', amount: 4000 },
+    { kind: 'CREDIT', period: null, amount: 2000 }
+  ]);
+  assert.equal(creditPayment.transportCredit, 2000);
+  assert.equal((await quote(secretaryId, 'tuition', {
+    studentId: creditStudentId, installment: 'T1'
+  })).previousPaid, 0, 'transport credit must never reduce tuition');
+
+  const concurrentStudentId = await createTransportFixture('concurrent', 20);
+  await Promise.all([
+    pay(secretaryId, `transport-concurrent-a-${suffix}`, 4000, 'transport', { studentId: concurrentStudentId }),
+    pay(secretaryId, `transport-concurrent-b-${suffix}`, 4000, 'transport', { studentId: concurrentStudentId })
+  ]);
+  const concurrentQuote = await quote(secretaryId, 'transport', { studentId: concurrentStudentId });
+  assert.equal(concurrentQuote.installments[0].previousPaid, 4000);
+  assert.equal(concurrentQuote.installments[1].previousPaid, 4000);
+  assert.equal(concurrentQuote.installments[2].previousPaid, 0);
+
+  const noTransportStudentId = await createTransportFixture('not-subscribed', 20);
+  await db.collection('students').doc(noTransportStudentId).update({ usesTransport: false });
+  const noTransportQuote = await quote(secretaryId, 'transport', { studentId: noTransportStudentId });
+  assert.equal(noTransportQuote.transportState, 'NOT_SUBSCRIBED');
+  assert.equal(noTransportQuote.remainingBalance, 0);
+  await expectFailure(pay(secretaryId, `transport-not-subscribed-${suffix}`, 1000, 'transport', {
+    studentId: noTransportStudentId
+  }), 'TRANSPORT_NOT_SUBSCRIBED');
+
+  const fixedBenefitStudentId = await createTransportFixture('benefit-fixed', 34);
+  const fixedTransportBenefit = await createBenefit(ownerId, `transport-fixed-benefit-${suffix}`, {
+    studentId: fixedBenefitStudentId, paymentType: 'TRANSPORT', installment: undefined,
+    transportStartPeriod: '2026-09', transportEndPeriod: '2026-09',
+    mode: 'FIXED_AMOUNT', value: 1000, maximumUses: 1
+  });
+  await approveFinancialBenefit.run({ benefitId: fixedTransportBenefit.benefitId }, context(ownerId));
+  const fixedBenefitQuote = await quote(secretaryId, 'transport', { studentId: fixedBenefitStudentId });
+  assert.equal(fixedBenefitQuote.installments[0].grossExpectedAmount, 5000);
+  assert.equal(fixedBenefitQuote.installments[0].discountAmount, 1000);
+  assert.equal(fixedBenefitQuote.installments[0].netExpectedAmount, 4000);
+
+  const percentBenefitStudentId = await createTransportFixture('benefit-percent', 40);
+  const percentTransportBenefit = await createBenefit(ownerId, `transport-percent-benefit-${suffix}`, {
+    studentId: percentBenefitStudentId, paymentType: 'TRANSPORT', installment: undefined,
+    transportStartPeriod: '2026-09', transportEndPeriod: '2026-09',
+    mode: 'PERCENTAGE', value: 50, maximumUses: 1
+  });
+  await approveFinancialBenefit.run({ benefitId: percentTransportBenefit.benefitId }, context(ownerId));
+  const percentTransportQuote = await quote(secretaryId, 'transport', { studentId: percentBenefitStudentId });
+  assert.equal(percentTransportQuote.installments[0].discountAmount, 2500);
+  assert.equal(percentTransportQuote.installments[0].netExpectedAmount, 2500);
+  const wrongScopeBenefit = await createBenefit(ownerId, `transport-wrong-scope-${suffix}`, {
+    studentId: percentBenefitStudentId, paymentType: 'TUITION', installment: 'T1',
+    mode: 'FIXED_AMOUNT', value: 2000
+  });
+  await approveFinancialBenefit.run({ benefitId: wrongScopeBenefit.benefitId }, context(ownerId));
+  assert.equal((await quote(secretaryId, 'transport', {
+    studentId: percentBenefitStudentId
+  })).installments[0].discountAmount, 2500, 'tuition benefit must not affect transport');
+
+  const transportMoratoriumId = `transport-moratorium-${suffix}`;
+  await db.collection('paymentMoratoriums').doc(transportMoratoriumId).set({
+    id: transportMoratoriumId, schoolId, studentId: partialStudentId, academicYear,
+    paymentType: 'transport', period: '2026-10', status: 'approved',
+    effectiveDueDate: '2026-11-30', reason: 'Moratoire transport fixture',
+    testFixture: true, testRunId: suffix
+  });
+  const transportMoratoriumQuote = await quote(secretaryId, 'transport', { studentId: partialStudentId });
+  const octoberMoratorium = transportMoratoriumQuote.installments.find(item => item.period === '2026-10');
+  assert.equal(octoberMoratorium.grossExpectedAmount, 5000);
+  assert.equal(octoberMoratorium.netExpectedAmount, 5000);
+  assert.equal(octoberMoratorium.originalDueDate, '2026-10-10');
+  assert.equal(octoberMoratorium.effectiveDueDate, '2026-11-30');
+  assert.equal(octoberMoratorium.overdue, false);
+
+
   await expectFailure(quote(secretaryId, 'transport', { period: 'September' }), 'INVALID_TRANSPORT_PERIOD');
-  await expectFailure(quote(secretaryId, 'transport', { period: '2027-07' }), 'PERIOD_OUTSIDE_ACADEMIC_YEAR');
+  await expectFailure(quote(secretaryId, 'transport', { period: '2028-07' }), 'PERIOD_OUTSIDE_ACADEMIC_YEAR');
 
   // Percentage benefits, stacking and temporal validity are calculated server-side.
   const percentageStudentId = extraStudentId('percentage');
@@ -364,11 +532,14 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   await Promise.all([
     db.collection('students').doc(singleUseStudentId).set({
       id: singleUseStudentId, schoolId, name: 'Élève bon unique fictif', matricule: 'TEST-SINGLE',
-      classId, academicYear, gender: 'M', section: 'francophone'
+      classId, academicYear, gender: 'M', section: 'francophone', usesTransport: true
     }),
     db.collection('studentFinance').doc(singleUseStudentId).set({
       id: singleUseStudentId, studentId: singleUseStudentId, schoolId, transportMonthlyFee: 4000,
       feeT1: 70000, feeT2: 70000, feeT3: 70000
+    }),
+    db.collection('studentPrivate').doc(singleUseStudentId).set({
+      id: singleUseStudentId, studentId: singleUseStudentId, schoolId, transportZonePk: 20
     })
   ]);
   const rangedVoucher = await createBenefit(ownerId, `ranged-voucher-${suffix}`, {
@@ -388,12 +559,15 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   await Promise.all([
     db.collection('students').doc(transportStackStudentId).set({
       id: transportStackStudentId, schoolId, name: 'Élève cumul transport fictif', matricule: 'TEST-TRANSPORT-STACK',
-      classId, academicYear, gender: 'F', section: 'francophone'
+      classId, academicYear, gender: 'F', section: 'francophone', usesTransport: true
     }),
     db.collection('studentFinance').doc(transportStackStudentId).set({
       id: transportStackStudentId, studentId: transportStackStudentId, schoolId,
       feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
-    })
+    }),
+    db.collection('studentPrivate').doc(transportStackStudentId).set({
+      id: transportStackStudentId, studentId: transportStackStudentId, schoolId, transportZonePk: 20
+    }),
   ]);
   const transportScholarship = await createBenefit(ownerId, `transport-scholarship-${suffix}`, {
     studentId: transportStackStudentId, paymentType: 'TRANSPORT', installment: undefined,
