@@ -55,6 +55,7 @@ test('workflow is manual, branch-bound, keyless in Production and verifies lifec
 test('runner is isolated, run-scoped, manifests exact IDs and baselines real data', () => {
   assert.match(runner, /REAL_ITALO_SCHOOL = 'italo-gsb'/);
   assert.match(runner, /assert\.notEqual\(cfg\.fixtureSchoolId, REAL_ITALO_SCHOOL\)/);
+  assert.doesNotMatch(runner, /doc\(REAL_ITALO_SCHOOL\)\.get\(\)/);
   assert.match(runner, /testFixture: true, testRunId: cfg\.testRunId/);
   assert.match(runner, /const manifest =/);
   assert.match(runner, /snapshotInventory/);
