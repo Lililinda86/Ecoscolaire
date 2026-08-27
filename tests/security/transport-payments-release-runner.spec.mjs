@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { validateTransportRunnerConfig } from '../../scripts/test-transport-payments-production.mjs';
+import { validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
 
 const workflow = await readFile('.github/workflows/transport-payments-release-runner.yml', 'utf8');
 const runner = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
