@@ -12,6 +12,14 @@ import { deleteDoc, doc, getDoc, getFirestore, setDoc, updateDoc } from 'firebas
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const REAL_ITALO_SCHOOL = 'italo-gsb';
+export const assertTransportEnvironmentEvidence = ({ expectedProject, runtimeProjectId, networkProjectIds }) => {
+  assert.ok(typeof expectedProject === 'string' && expectedProject.trim(), 'expectedProject is mandatory.');
+  assert.ok(typeof runtimeProjectId === 'string' && runtimeProjectId.trim(), 'Authoritative runtime projectId is mandatory.');
+  assert.equal(runtimeProjectId.trim(), expectedProject.trim(), 'Authoritative runtime project mismatch.');
+  const observed = Array.isArray(networkProjectIds) ? networkProjectIds.filter(Boolean) : [];
+  assert.ok(observed.every((projectId) => projectId === expectedProject), 'Network project ID mismatch.');
+  return { expectedProject: expectedProject.trim(), runtimeProjectId: runtimeProjectId.trim(), networkProjectIds: observed };
+};
 const REQUIRED_FUNCTIONS = [
   'createStudentSecure', 'getCollectionQuote', 'recordCashPayment', 'reversePayment',
   'createFinancialBenefit', 'approveFinancialBenefit', 'closeCashDrawer',
@@ -503,7 +511,8 @@ const main = async () => {
     });
     await page.goto(`${cfg.appUrl}/#/diagnostic`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     const runtimeProject = (await page.getByTestId('diagnostic-firebase-project').textContent())?.trim();
-    assert.equal(runtimeProject, cfg.expectedProject);
+    assertTransportEnvironmentEvidence({ expectedProject: cfg.expectedProject, runtimeProjectId: runtimeProject,
+      networkProjectIds: [...firebaseProjects] });
     await page.goto(`${cfg.appUrl}/#/login`, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('login-email').fill(credentials.get('owner').email);
     await page.getByTestId('login-password').fill(credentials.get('owner').password);
@@ -527,7 +536,8 @@ const main = async () => {
       assert.equal(await page.getByTestId('cash-payment-submit').isDisabled(), true);
       await page.getByRole('button', { name: 'Annuler', exact: true }).click();
     }
-    assert.deepEqual([...firebaseProjects].filter(Boolean), [cfg.expectedProject]);
+    assertTransportEnvironmentEvidence({ expectedProject: cfg.expectedProject, runtimeProjectId: runtimeProject,
+      networkProjectIds: [...firebaseProjects] });
     results = {
       pk14: 4_000, pk33: 4_000, pk34: 5_000, pk42: 5_000, secondary: 'FREE',
       allocation4000: p4000.allocations, allocation5000: p5000.allocations,
