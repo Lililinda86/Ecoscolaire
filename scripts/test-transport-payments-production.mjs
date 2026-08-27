@@ -110,7 +110,7 @@ const main = async () => {
   }, `transport-release-${cfg.testRunId}`);
   const db = getAdminFirestore(adminApp);
   const adminAuth = getAdminAuth(adminApp);
-  const projectProbe = await db.collection('__transport_release_preflight__').doc(cfg.testRunId).get();
+  const projectProbe = await db.collection('transportReleasePreflight').doc(cfg.testRunId).get();
   assert.equal(projectProbe.exists, false, 'Unexpected preflight marker collision.');
   assert.equal(adminApp.options.projectId, cfg.expectedProject, 'Admin runtime project mismatch.');
   assert.equal((await db.collection('schools').doc(cfg.fixtureSchoolId).get()).exists, false,
