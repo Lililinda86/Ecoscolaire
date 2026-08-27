@@ -6,6 +6,10 @@ import { validateTransportRunnerConfig } from '../../scripts/transport-release-r
 const workflow = await readFile('.github/workflows/transport-payments-release-runner.yml', 'utf8');
 const runner = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
 const stagingWorkflow = await readFile('.github/workflows/run-seed.yml', 'utf8');
+const environmentEvidenceSource = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
+const environmentEvidence = new Function('assert', `${environmentEvidenceSource
+  .match(/export const assertTransportEnvironmentEvidence = [\s\S]*?\n};(?=\nconst REQUIRED_FUNCTIONS)/)[0]
+  .replace('export ', '')}; return assertTransportEnvironmentEvidence;`)(assert);
 
 const valid = (mode = 'staging') => {
   const project = mode === 'production' ? 'ecoscolaire-c5861' : 'ecoscolaire-staging';
@@ -22,6 +26,29 @@ const valid = (mode = 'staging') => {
     TRANSPORT_FIREBASE_APP_ID: 'fixture', VERCEL_AUTOMATION_BYPASS_SECRET: 'fixture',
   };
 };
+
+const environment = (overrides = {}) => ({
+  expectedProject: 'ecoscolaire-staging', runtimeProjectId: 'ecoscolaire-staging', networkProjectIds: [], ...overrides,
+});
+
+test('legacy environment evidence accepts authoritative Staging runtime with empty network', () => {
+  assert.equal(environmentEvidence(environment()).runtimeProjectId, 'ecoscolaire-staging');
+});
+
+test('legacy environment evidence accepts matching Staging network IDs', () => {
+  assert.deepEqual(environmentEvidence(environment({
+    networkProjectIds: ['ecoscolaire-staging'],
+  })).networkProjectIds, ['ecoscolaire-staging']);
+});
+
+for (const [name, overrides] of [
+  ['Production runtime with Staging expected', { runtimeProjectId: 'ecoscolaire-c5861' }],
+  ['Production network with Staging runtime', { networkProjectIds: ['ecoscolaire-c5861'] }],
+  ['missing authoritative runtime with empty network', { runtimeProjectId: '' }],
+  ['runtime and network conflict', { networkProjectIds: ['other-project'] }],
+]) test(`legacy environment evidence fails closed: ${name}`, () => {
+  assert.throws(() => environmentEvidence(environment(overrides)));
+});
 
 test('runner accepts only exact staging and production contracts', () => {
   assert.equal(validateTransportRunnerConfig(valid('staging')).expectedProject, 'ecoscolaire-staging');
