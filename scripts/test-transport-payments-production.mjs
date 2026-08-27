@@ -139,15 +139,15 @@ const main = async () => {
   const passwordFor = (role) => `${crypto.randomBytes(24).toString('base64url')}!${role}A7`;
   const credentials = new Map();
   const createFixtureUser = async (role, schoolId = cfg.fixtureSchoolId) => {
-    const email = `${role}-${cfg.testRunId}@example.invalid`.toLowerCase();
+    const credentialKey = role === 'owner' && schoolId === otherSchoolId ? 'crossOwner' : role;
+    const email = `${credentialKey}-${cfg.testRunId}@example.invalid`.toLowerCase();
     const password = passwordFor(role);
     const account = await adminAuth.createUser({ email, password, displayName: `Transport ${role}` });
     fixtureUserIds.add(account.uid); manifest.authUsers.add(account.uid);
     await createMarked('users', account.uid, {
       uid: account.uid, email, name: `Transport ${role}`, role, schoolId, active: true, isActive: true,
     });
-    credentials.set(role === 'owner' && schoolId === otherSchoolId ? 'crossOwner' : role,
-      { uid: account.uid, email, password, schoolId });
+    credentials.set(credentialKey, { uid: account.uid, email, password, schoolId });
   };
   const newClient = async (key) => {
     const creds = credentials.get(key); assert.ok(creds, `Missing ${key} fixture credentials.`);

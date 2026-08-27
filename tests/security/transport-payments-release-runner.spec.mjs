@@ -56,6 +56,8 @@ test('runner is isolated, run-scoped, manifests exact IDs and baselines real dat
   assert.match(runner, /REAL_ITALO_SCHOOL = 'italo-gsb'/);
   assert.match(runner, /assert\.notEqual\(cfg\.fixtureSchoolId, REAL_ITALO_SCHOOL\)/);
   assert.doesNotMatch(runner, /doc\(REAL_ITALO_SCHOOL\)\.get\(\)/);
+  assert.match(runner, /credentialKey = role === 'owner' && schoolId === otherSchoolId \? 'crossOwner' : role/);
+  assert.match(runner, /email = `\$\{credentialKey\}-\$\{cfg\.testRunId\}@example\.invalid`/);
   assert.match(runner, /testFixture: true, testRunId: cfg\.testRunId/);
   assert.match(runner, /const manifest =/);
   assert.match(runner, /snapshotInventory/);
