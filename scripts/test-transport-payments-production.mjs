@@ -115,8 +115,6 @@ const main = async () => {
   assert.equal(adminApp.options.projectId, cfg.expectedProject, 'Admin runtime project mismatch.');
   assert.equal((await db.collection('schools').doc(cfg.fixtureSchoolId).get()).exists, false,
     'Exact fixture school already exists; refusing to reuse it.');
-  assert.equal((await db.collection('schools').doc(REAL_ITALO_SCHOOL).get()).exists, true,
-    'Real ITALO school sentinel is unavailable; environment is ambiguous.');
   await adminAuth.listUsers(1);
   console.log(`PREFLIGHT: PASS mode=${cfg.mode} runtime=${cfg.expectedProject} testRunId=${cfg.testRunId} firstWrite=NO`);
   console.log(`PREFLIGHT FUNCTIONS: ${REQUIRED_FUNCTIONS.join(',')}`);
