@@ -193,6 +193,9 @@ jobs:
         run: npm run build
         working-directory: ./functions
 
+      - name: Verify Staging Function deployment contract
+        run: node scripts/verify-staging-function-deployment-contract.mjs
+
       - name: Install Firebase CLI
         run: npm install -g firebase-tools@15.25.0
 
