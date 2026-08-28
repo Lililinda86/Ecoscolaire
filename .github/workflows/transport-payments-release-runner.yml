@@ -83,7 +83,7 @@ jobs:
           if [ "$TRANSPORT_RELEASE_MODE" = production ]; then
             test "$TRANSPORT_APP_URL" = "https://ecoscolaire.vercel.app"
           else
-            printf '%s' "$TRANSPORT_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\\.vercel\\.app$'
+            printf '%s' "$TRANSPORT_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$'
           fi
           deployed="$(gcloud functions list --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format='value(name)')"
           required=(createStudentSecure getCollectionQuote recordCashPayment reversePayment createFinancialBenefit approveFinancialBenefit closeCashDrawer)
