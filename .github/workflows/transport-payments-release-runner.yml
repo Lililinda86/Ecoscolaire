@@ -69,7 +69,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          expected_ref="refs/heads/${TRANSPORT_RELEASE_MODE}"
+          if [ "$TRANSPORT_RELEASE_MODE" = production ]; then
+            expected_ref='refs/heads/main'
+          elif [ "$TRANSPORT_RELEASE_MODE" = staging ]; then
+            expected_ref='refs/heads/staging'
+          else
+            echo "Unsupported release mode: $TRANSPORT_RELEASE_MODE"
+            exit 1
+          fi
           test "$GITHUB_REF" = "$expected_ref"
           test "$(gcloud config get-value project)" = "$TRANSPORT_FIREBASE_PROJECT_ID"
           test "$TRANSPORT_FIXTURE_SCHOOL_ID" != "italo-gsb"

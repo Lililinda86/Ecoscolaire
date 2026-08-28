@@ -10,6 +10,15 @@ const WEB_ENV = [
 
 const safeToken = (value) => String(value || '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 96);
 
+export const expectedTransportReleaseRef = (mode) => ({ staging: 'refs/heads/staging', production: 'refs/heads/main' })[mode] || null;
+
+export const validateTransportReleaseRef = (mode, actualRef) => {
+  const expectedRef = expectedTransportReleaseRef(mode);
+  assert.ok(expectedRef, 'TRANSPORT_RELEASE_MODE must be staging or production.');
+  assert.equal(actualRef, expectedRef, 'Git ref does not match release mode.');
+  return expectedRef;
+};
+
 export const validateTransportRunnerConfig = (env = process.env) => {
   const mode = String(env.TRANSPORT_RELEASE_MODE || '').trim();
   assert.ok(Object.hasOwn(PROJECTS, mode), 'TRANSPORT_RELEASE_MODE must be staging or production.');
