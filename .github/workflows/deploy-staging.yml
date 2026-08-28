@@ -209,7 +209,7 @@ jobs:
             --format=json \
             > /tmp/staging-functions-gen1.json
           gcloud functions list \
-            --gen2 \
+            --v2 \
             --project "$FIREBASE_PROJECT_ID" \
             --regions us-central1 \
             --format=json \
