@@ -1,0 +1,12 @@
+{
+  "name": "ecoscolaire-functions-staging-transport",
+  "private": true,
+  "description": "Staging-only Transport fixture broker. Never deployed to Production. Not part of the default Firebase functions codebase.",
+  "scripts": {
+    "build": "tsc",
+    "test": "npx --prefix .. --no-install vitest run functions-staging-transport/test"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
