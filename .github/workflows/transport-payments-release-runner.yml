@@ -85,11 +85,13 @@ jobs:
           else
             printf '%s' "$TRANSPORT_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$'
           fi
-          deployed="$(gcloud functions list --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format='value(name)')"
-          required=(createStudentSecure getCollectionQuote recordCashPayment reversePayment createFinancialBenefit approveFinancialBenefit closeCashDrawer)
-          for function_name in "${required[@]}"; do
-            printf '%s\\n' "$deployed" | grep -Fx "$function_name" >/dev/null || { echo "Missing required Function: $function_name"; exit 1; }
-          done
+          gen1_inventory="$(mktemp)"
+          gen2_inventory="$(mktemp)"
+          trap 'rm -f "$gen1_inventory" "$gen2_inventory"' EXIT
+          gcloud functions list --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format=json > "$gen1_inventory"
+          gcloud functions list --gen2 --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format=json > "$gen2_inventory"
+          node scripts/verify-staging-function-deployment-contract.mjs \
+            "$gen1_inventory" "$gen2_inventory" "$TRANSPORT_FIREBASE_PROJECT_ID" us-central1
           token="$(gcloud auth print-access-token)"
           response="$(curl --fail --silent --show-error \\
             -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \\
