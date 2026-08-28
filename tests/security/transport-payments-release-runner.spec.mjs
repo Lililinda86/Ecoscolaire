@@ -68,6 +68,8 @@ test('release ref contract fails closed by mode', () => {
   assert.match(workflow, /elif \[ "\$TRANSPORT_RELEASE_MODE" = staging \]; then[\s\S]*expected_ref='refs\/heads\/staging'/);
   assert.match(workflow, /test "\$GITHUB_REF" = "\$expected_ref"/);
   assert.doesNotMatch(workflow, /expected_ref="refs\/heads\/\$\{TRANSPORT_RELEASE_MODE\}"/);
+  assert.ok(workflow.includes("projects\\.vercel\\.app"));
+  assert.ok(!workflow.includes("projects\\\\.vercel\\\\.app"));
 });
 
 for (const [name, mutate] of [
@@ -76,6 +78,11 @@ for (const [name, mutate] of [
   ['testFixture missing', (env) => { delete env.TRANSPORT_TEST_FIXTURE; }],
   ['real ITALO school requested', (env) => { env.TRANSPORT_FIXTURE_SCHOOL_ID = 'italo-gsb'; }],
   ['production target in staging mode', (env) => { env.TRANSPORT_APP_URL = 'https://ecoscolaire.vercel.app'; }],
+  ['mutable staging alias', (env) => { env.TRANSPORT_APP_URL = 'https://ecoscolaire-git-staging-linda-lemofouet-s-projects.vercel.app'; }],
+  ['wrong Vercel project', (env) => { env.TRANSPORT_APP_URL = 'https://ecoscolaire-abc123-other-projects.vercel.app'; }],
+  ['missing URL', (env) => { env.TRANSPORT_APP_URL = ''; }],
+  ['malformed URL', (env) => { env.TRANSPORT_APP_URL = 'not-a-url'; }],
+  ['unexpected host', (env) => { env.TRANSPORT_APP_URL = 'https://example.com'; }],
   ['required Function unavailable', (env) => { env.TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED = 'false'; }],
   ['cleanup contract unavailable', (env) => { env.TRANSPORT_CLEANUP_CAPABILITY_VERIFIED = 'false'; }],
 ]) test(`fail-closed before writes: ${name}`, () => {
