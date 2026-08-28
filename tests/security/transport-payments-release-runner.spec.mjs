@@ -171,6 +171,18 @@ test('Staging deployment contract queries both generations and keeps the full Fu
   assert.match(workflow, /verify-staging-function-deployment-contract\.mjs/);
 });
 
+test('Staging deployment wires inventory collection and verification before Firebase deploy', () => {
+  const installIndex = stagingDeploymentWorkflow.indexOf('Install Firebase CLI');
+  const authIndex = stagingDeploymentWorkflow.indexOf('Authenticate to Google Cloud');
+  const inventoryIndex = stagingDeploymentWorkflow.indexOf('Collect Staging Function inventories');
+  const verifyIndex = stagingDeploymentWorkflow.indexOf('Verify Staging Function deployment contract');
+  const deployIndex = stagingDeploymentWorkflow.indexOf('Deploy Firebase Backend');
+  assert.ok(installIndex < authIndex && authIndex < inventoryIndex && inventoryIndex < verifyIndex && verifyIndex < deployIndex);
+  assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen1\.json/);
+  assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--gen2 \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen2\.json/);
+  assert.match(stagingDeploymentWorkflow, /verify-staging-function-deployment-contract\.mjs \\\n\s+\/tmp\/staging-functions-gen1\.json \\\n\s+\/tmp\/staging-functions-gen2\.json \\\n\s+"\$FIREBASE_PROJECT_ID" \\\n\s+us-central1/);
+});
+
 test('Function inventory accepts all required Gen1, Gen2, and mixed records', () => {
   for (const inventory of [
     { gen1: functionInventory('GEN_1'), gen2: [] },
