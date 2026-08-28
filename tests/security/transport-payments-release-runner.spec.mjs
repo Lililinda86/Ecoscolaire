@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
+import { assertStagingFunctionDeploymentContract, REQUIRED_STAGING_FUNCTIONS } from '../../scripts/verify-staging-function-deployment-contract.mjs';
 
 const workflow = await readFile('.github/workflows/transport-payments-release-runner.yml', 'utf8');
 const runner = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
 const stagingWorkflow = await readFile('.github/workflows/run-seed.yml', 'utf8');
+const stagingDeploymentWorkflow = await readFile('.github/workflows/deploy-staging.yml', 'utf8');
 const environmentEvidenceSource = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
 const environmentEvidence = new Function('assert', `${environmentEvidenceSource
   .match(/export const assertTransportEnvironmentEvidence = [\s\S]*?\n};(?=\nconst REQUIRED_FUNCTIONS)/)[0]
@@ -148,4 +150,11 @@ test('existing Staging dispatcher runs the isolated gate before the full collect
   assert.match(stagingWorkflow, /testIamPermissions/);
   assert.match(stagingWorkflow, /TRANSPORT_FIXTURE_SCHOOL_ID: transport-release-staging-/);
   assert.doesNotMatch(stagingWorkflow, /TRANSPORT_FIXTURE_SCHOOL_ID: italo-gsb/);
+});
+
+test('Staging deployment contract includes every required Transport Function', () => {
+  assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only functions,firestore:rules,storage/);
+  const compiledExports = REQUIRED_STAGING_FUNCTIONS.map((functionName) => `exports.${functionName}`).join('\n');
+  assert.doesNotThrow(() => assertStagingFunctionDeploymentContract(compiledExports));
+  assert.throws(() => assertStagingFunctionDeploymentContract(compiledExports.replace('exports.approveFinancialBenefit', '')));
 });
