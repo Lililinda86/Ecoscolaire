@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
+import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
 
 const workflow = await readFile('.github/workflows/transport-payments-release-runner.yml', 'utf8');
 const runner = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
@@ -53,6 +53,21 @@ for (const [name, overrides] of [
 test('runner accepts only exact staging and production contracts', () => {
   assert.equal(validateTransportRunnerConfig(valid('staging')).expectedProject, 'ecoscolaire-staging');
   assert.equal(validateTransportRunnerConfig(valid('production')).expectedProject, 'ecoscolaire-c5861');
+});
+
+test('release ref contract fails closed by mode', () => {
+  assert.equal(expectedTransportReleaseRef('production'), 'refs/heads/main');
+  assert.equal(expectedTransportReleaseRef('staging'), 'refs/heads/staging');
+  assert.doesNotThrow(() => validateTransportReleaseRef('production', 'refs/heads/main'));
+  assert.throws(() => validateTransportReleaseRef('production', 'refs/heads/staging'));
+  assert.doesNotThrow(() => validateTransportReleaseRef('staging', 'refs/heads/staging'));
+  assert.throws(() => validateTransportReleaseRef('staging', 'refs/heads/main'));
+  assert.throws(() => validateTransportReleaseRef('unknown', 'refs/heads/main'));
+  assert.throws(() => validateTransportReleaseRef('staging', undefined));
+  assert.match(workflow, /if \[ "\$TRANSPORT_RELEASE_MODE" = production \]; then[\s\S]*expected_ref='refs\/heads\/main'/);
+  assert.match(workflow, /elif \[ "\$TRANSPORT_RELEASE_MODE" = staging \]; then[\s\S]*expected_ref='refs\/heads\/staging'/);
+  assert.match(workflow, /test "\$GITHUB_REF" = "\$expected_ref"/);
+  assert.doesNotMatch(workflow, /expected_ref="refs\/heads\/\$\{TRANSPORT_RELEASE_MODE\}"/);
 });
 
 for (const [name, mutate] of [
@@ -110,6 +125,10 @@ test('runner covers the required Transport contract and real UI', () => {
   assert.match(runner, /\[4_000, 1_000, 3_000\]/);
   assert.match(runner, /\[5_000, 2_500, 2_500\]/);
   assert.match(runner, /\[360, 768, 1440\]/);
+  for (const token of ['amountMatrix', 'assertPaymentBalance', 'matrix-\$\{tariff\}-\$\{amount\}', 'periods\.map']) {
+    assert.ok(runner.includes(token), `missing amount matrix token ${token}`);
+  }
+  assert.match(runner, /allocated \+ \(payment\.transportCredit \|\| 0\), amount/);
 });
 
 test('existing Staging dispatcher runs the isolated gate before the full collections E2E', () => {

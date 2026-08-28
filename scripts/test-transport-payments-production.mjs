@@ -175,7 +175,7 @@ const main = async () => {
 
   try {
     const academicYear = '2025-2026';
-    const periods = ['2025-09', '2025-10', '2025-11'];
+    const periods = ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01'];
     const yearId = mark('academicYears', `transport-year-${cfg.testRunId}`);
     const primaryClassId = mark('classes', `transport-primary-${cfg.testRunId}`);
     const secondaryClassId = mark('classes', `transport-secondary-${cfg.testRunId}`);
@@ -186,6 +186,7 @@ const main = async () => {
       transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: periods },
       paymentDeadlines: { transport: {
         '2025-09': '2025-09-10', '2025-10': '2025-10-10', '2025-11': '2025-11-10',
+        '2025-12': '2025-12-10', '2026-01': '2026-01-10',
       } },
     });
     await createMarked('schools', otherSchoolId, {
@@ -251,6 +252,49 @@ const main = async () => {
     const pk42 = await createStudent('pk42', 42);
     const secondary = await createStudent('secondary', 14, { classId: secondaryClassId });
     const invalid = await createStudent('invalid', undefined);
+    const assertPaymentBalance = (payment, amount) => {
+      const allocated = payment.allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+      assert.equal(allocated + (payment.transportCredit || 0), amount);
+    };
+    const amountMatrix = [
+      [4000, 7000, await createStudent('pk14-7000', 14), [
+        { kind: 'INSTALLMENT', period: periods[0], amount: 4_000 },
+        { kind: 'INSTALLMENT', period: periods[1], amount: 3_000 },
+      ]],
+      [4000, 10000, await createStudent('pk14-10000', 14), [
+        { kind: 'INSTALLMENT', period: periods[0], amount: 4_000 },
+        { kind: 'INSTALLMENT', period: periods[1], amount: 4_000 },
+        { kind: 'INSTALLMENT', period: periods[2], amount: 2_000 },
+      ]],
+      [4000, 15000, await createStudent('pk14-15000', 14), [
+        { kind: 'INSTALLMENT', period: periods[0], amount: 4_000 },
+        { kind: 'INSTALLMENT', period: periods[1], amount: 4_000 },
+        { kind: 'INSTALLMENT', period: periods[2], amount: 4_000 },
+        { kind: 'INSTALLMENT', period: periods[3], amount: 3_000 },
+      ]],
+      [4000, 20000, await createStudent('pk14-20000', 14), periods.map((period) => ({
+        kind: 'INSTALLMENT', period, amount: 4_000,
+      }))],
+      [5000, 7000, await createStudent('pk34-7000', 34), [
+        { kind: 'INSTALLMENT', period: periods[0], amount: 5_000 },
+        { kind: 'INSTALLMENT', period: periods[1], amount: 2_000 },
+      ]],
+      [5000, 10000, await createStudent('pk34-10000', 34), [
+        { kind: 'INSTALLMENT', period: periods[0], amount: 5_000 },
+        { kind: 'INSTALLMENT', period: periods[1], amount: 5_000 },
+      ]],
+      [5000, 15000, await createStudent('pk34-15000', 34), periods.slice(0, 3).map((period) => ({
+        kind: 'INSTALLMENT', period, amount: 5_000,
+      }))],
+      [5000, 20000, await createStudent('pk34-20000', 34), periods.slice(0, 4).map((period) => ({
+        kind: 'INSTALLMENT', period, amount: 5_000,
+      }))],
+    ];
+    for (const [tariff, amount, studentId, expectedAllocations] of amountMatrix) {
+      const payment = await pay(secretary, studentId, `matrix-${tariff}-${amount}-${studentId}`, amount);
+      assert.deepEqual(payment.allocations, expectedAllocations);
+      assertPaymentBalance(payment, amount);
+    }
     await db.collection('studentPrivate').doc(invalid).update({ transportZonePk: 13 });
     assert.deepEqual(await Promise.all([pk14, pk33, pk34, pk42].map(async (id) =>
       (await db.collection('studentPrivate').doc(id).get()).data().transportZonePk)), [14, 33, 34, 42]);
@@ -324,7 +368,7 @@ const main = async () => {
       });
     }
     const benefitQuote = await quote(secretary, benefitStudent);
-    assert.deepEqual(benefitQuote.installments.map((x) => [x.grossExpectedAmount, x.discountAmount, x.netExpectedAmount]), [
+    assert.deepEqual(benefitQuote.installments.slice(0, 3).map((x) => [x.grossExpectedAmount, x.discountAmount, x.netExpectedAmount]), [
       [5_000, 2_000, 3_000], [5_000, 1_500, 3_500], [5_000, 5_000, 0],
     ]);
     assert.equal((await quote(secretary, benefitStudent, 'tuition', { installment: 'T1' })).discountAmount, 2_000);
@@ -424,7 +468,7 @@ const main = async () => {
       pay(secretary, concurrentStudent, `concurrent-a-${cfg.testRunId}`, 4_000),
       pay(secretary, concurrentStudent, `concurrent-b-${cfg.testRunId}`, 4_000),
     ]);
-    assert.deepEqual((await quote(secretary, concurrentStudent)).installments.map((x) => x.previousPaid), [4_000, 4_000, 0]);
+    assert.deepEqual((await quote(secretary, concurrentStudent)).installments.map((x) => x.previousPaid), [4_000, 4_000, 0, 0, 0]);
 
     const reversalStudent = await createStudent('reversal', 14);
     const original = await pay(secretary, reversalStudent, `reversal-source-${cfg.testRunId}`, 10_000);
@@ -518,7 +562,7 @@ const main = async () => {
     await page.getByTestId('login-password').fill(credentials.get('owner').password);
     await page.getByTestId('login-submit').click();
     await page.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 30_000 });
-    const widths = cfg.mode === 'staging' ? [360, 768, 1440] : [1440];
+    const widths = [360, 768, 1440];
     for (const width of widths) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${cfg.appUrl}/#/payments`, { waitUntil: 'domcontentloaded' });
