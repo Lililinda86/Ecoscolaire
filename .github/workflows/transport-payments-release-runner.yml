@@ -89,7 +89,7 @@ jobs:
           gen2_inventory="$(mktemp)"
           trap 'rm -f "$gen1_inventory" "$gen2_inventory"' EXIT
           gcloud functions list --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format=json > "$gen1_inventory"
-          gcloud functions list --gen2 --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format=json > "$gen2_inventory"
+          gcloud functions list --v2 --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format=json > "$gen2_inventory"
           node scripts/verify-staging-function-deployment-contract.mjs \
             "$gen1_inventory" "$gen2_inventory" "$TRANSPORT_FIREBASE_PROJECT_ID" us-central1
           token="$(gcloud auth print-access-token)"
