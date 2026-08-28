@@ -106,6 +106,18 @@ test('workflow is manual, branch-bound, keyless in Production and verifies lifec
   assert.doesNotMatch(workflow, /production-financial-e2e|test-production-financial-e2e/);
 });
 
+test('IAM preflight curl uses single-backslash line continuation and keeps its full contract', () => {
+  const iamCurlMatch = workflow.match(/response="\$\(curl --fail --silent --show-error[\s\S]*?testIamPermissions"\)"/);
+  assert.ok(iamCurlMatch, 'IAM preflight curl block not found');
+  const iamCurl = iamCurlMatch[0];
+  assert.doesNotMatch(iamCurl, /\\\\/);
+  assert.match(iamCurl, /\\\n\s+-H "Authorization: Bearer \$token"/);
+  assert.match(iamCurl, /\\\n\s+-d '\{"permissions":/);
+  assert.match(iamCurl, /-H "Authorization: Bearer \$token" -H 'Content-Type: application\/json'/);
+  assert.match(iamCurl, /-d '\{"permissions":\["datastore\.entities\.create"/);
+  assert.match(iamCurl, /"https:\/\/cloudresourcemanager\.googleapis\.com\/v1\/projects\/\$\{TRANSPORT_FIREBASE_PROJECT_ID\}:testIamPermissions"\)"/);
+});
+
 test('runner is isolated, run-scoped, manifests exact IDs and baselines real data', () => {
   assert.match(runner, /REAL_ITALO_SCHOOL = 'italo-gsb'/);
   assert.match(runner, /assert\.notEqual\(cfg\.fixtureSchoolId, REAL_ITALO_SCHOOL\)/);

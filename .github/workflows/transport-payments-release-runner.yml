@@ -93,9 +93,9 @@ jobs:
           node scripts/verify-staging-function-deployment-contract.mjs \
             "$gen1_inventory" "$gen2_inventory" "$TRANSPORT_FIREBASE_PROJECT_ID" us-central1
           token="$(gcloud auth print-access-token)"
-          response="$(curl --fail --silent --show-error \\
-            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \\
-            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \\
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \
             "https://cloudresourcemanager.googleapis.com/v1/projects/${TRANSPORT_FIREBASE_PROJECT_ID}:testIamPermissions")"
           for permission in datastore.entities.create datastore.entities.get datastore.entities.list datastore.entities.update datastore.entities.delete firebaseauth.users.create firebaseauth.users.get firebaseauth.users.delete; do
             printf '%s' "$response" | grep -Fq "\\"$permission\\"" || { echo "Missing fixture lifecycle permission: $permission"; exit 1; }
