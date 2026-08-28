@@ -118,6 +118,28 @@ test('IAM preflight curl uses single-backslash line continuation and keeps its f
   assert.match(iamCurl, /"https:\/\/cloudresourcemanager\.googleapis\.com\/v1\/projects\/\$\{TRANSPORT_FIREBASE_PROJECT_ID\}:testIamPermissions"\)"/);
 });
 
+test('IAM preflight collects every missing fixture lifecycle permission before failing closed', () => {
+  const iamBlockMatch = workflow.match(/testIamPermissions"\)"\n[\s\S]*?TRANSPORT_CLEANUP_CAPABILITY_VERIFIED=true' >> "\$GITHUB_ENV"/);
+  assert.ok(iamBlockMatch, 'IAM preflight permission-check block not found');
+  const iamBlock = iamBlockMatch[0];
+  assert.match(iamBlock, /missing_permissions=\(\)/);
+  const requiredPermissions = [
+    'datastore.entities.create', 'datastore.entities.get', 'datastore.entities.list',
+    'datastore.entities.update', 'datastore.entities.delete', 'firebaseauth.users.create',
+    'firebaseauth.users.get', 'firebaseauth.users.delete',
+  ];
+  assert.match(iamBlock, new RegExp(`for permission in ${requiredPermissions.join(' ').replace(/\./g, '\\.')}; do`));
+  for (const permission of requiredPermissions) assert.ok(iamBlock.includes(permission), `missing permission token ${permission}`);
+  assert.match(iamBlock, /missing_permissions\+=\("\$permission"\)/);
+  assert.doesNotMatch(iamBlock, /\|\| \{ echo "Missing fixture lifecycle permission: \$permission"; exit 1; \}/);
+  assert.match(iamBlock, /if \[ "\$\{#missing_permissions\[@\]\}" -gt 0 \]; then/);
+  assert.match(iamBlock, /echo 'Missing fixture lifecycle permissions:'/);
+  assert.match(iamBlock, /for permission in "\$\{missing_permissions\[@\]\}"; do/);
+  assert.match(iamBlock, /echo "- \$permission"/);
+  assert.equal((iamBlock.match(/exit 1/g) || []).length, 1);
+  assert.doesNotMatch(iamBlock, /\$response(?!")/);
+});
+
 test('runner is isolated, run-scoped, manifests exact IDs and baselines real data', () => {
   assert.match(runner, /REAL_ITALO_SCHOOL = 'italo-gsb'/);
   assert.match(runner, /assert\.notEqual\(cfg\.fixtureSchoolId, REAL_ITALO_SCHOOL\)/);

@@ -97,9 +97,17 @@ jobs:
             -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
             -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \
             "https://cloudresourcemanager.googleapis.com/v1/projects/${TRANSPORT_FIREBASE_PROJECT_ID}:testIamPermissions")"
+          missing_permissions=()
           for permission in datastore.entities.create datastore.entities.get datastore.entities.list datastore.entities.update datastore.entities.delete firebaseauth.users.create firebaseauth.users.get firebaseauth.users.delete; do
-            printf '%s' "$response" | grep -Fq "\\"$permission\\"" || { echo "Missing fixture lifecycle permission: $permission"; exit 1; }
+            printf '%s' "$response" | grep -Fq "\\"$permission\\"" || missing_permissions+=("$permission")
           done
+          if [ "${#missing_permissions[@]}" -gt 0 ]; then
+            echo 'Missing fixture lifecycle permissions:'
+            for permission in "${missing_permissions[@]}"; do
+              echo "- $permission"
+            done
+            exit 1
+          fi
           echo 'TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED=true' >> "$GITHUB_ENV"
           echo 'TRANSPORT_CLEANUP_CAPABILITY_VERIFIED=true' >> "$GITHUB_ENV"
 
