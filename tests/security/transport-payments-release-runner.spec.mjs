@@ -167,7 +167,8 @@ const functionInventory = (generation = 'GEN_1', overrides = {}) => REQUIRED_STA
 test('Staging deployment contract queries both generations and keeps the full Functions deployment', () => {
   assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only functions,firestore:rules,storage/);
   assert.match(workflow, /gcloud functions list --project .*--regions us-central1 --format=json/);
-  assert.match(workflow, /gcloud functions list --gen2 --project .*--regions us-central1 --format=json/);
+  assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--v2 \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen2\.json/);
+  assert.doesNotMatch(stagingDeploymentWorkflow, /gcloud functions list --gen2/);
   assert.match(workflow, /verify-staging-function-deployment-contract\.mjs/);
 });
 
@@ -179,7 +180,8 @@ test('Staging deployment wires inventory collection and verification before Fire
   const deployIndex = stagingDeploymentWorkflow.indexOf('Deploy Firebase Backend');
   assert.ok(installIndex < authIndex && authIndex < inventoryIndex && inventoryIndex < verifyIndex && verifyIndex < deployIndex);
   assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen1\.json/);
-  assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--gen2 \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen2\.json/);
+  assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--v2 \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen2\.json/);
+  assert.doesNotMatch(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--gen2/);
   assert.match(stagingDeploymentWorkflow, /verify-staging-function-deployment-contract\.mjs \\\n\s+\/tmp\/staging-functions-gen1\.json \\\n\s+\/tmp\/staging-functions-gen2\.json \\\n\s+"\$FIREBASE_PROJECT_ID" \\\n\s+us-central1/);
 });
 
