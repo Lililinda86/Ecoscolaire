@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
-import { assertStagingFunctionDeploymentContract, REQUIRED_STAGING_FUNCTIONS } from '../../scripts/verify-staging-function-deployment-contract.mjs';
+import {
+  formatInventorySummary, normalizeFunctionInventory, REQUIRED_STAGING_FUNCTIONS,
+  validateFunctionInventory,
+} from '../../scripts/verify-staging-function-deployment-contract.mjs';
 
 const workflow = await readFile('.github/workflows/transport-payments-release-runner.yml', 'utf8');
 const runner = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
@@ -152,9 +155,42 @@ test('existing Staging dispatcher runs the isolated gate before the full collect
   assert.doesNotMatch(stagingWorkflow, /TRANSPORT_FIXTURE_SCHOOL_ID: italo-gsb/);
 });
 
-test('Staging deployment contract includes every required Transport Function', () => {
+const functionInventory = (generation = 'GEN_1', overrides = {}) => REQUIRED_STAGING_FUNCTIONS.map((name) => {
+  const project = overrides.project || 'ecoscolaire-staging';
+  const region = overrides.location || overrides.region || 'us-central1';
+  return {
+    name: `projects/${project}/locations/${region}/functions/${name}`,
+    environment: generation, state: 'ACTIVE', ...overrides, logicalName: name,
+  };
+});
+
+test('Staging deployment contract queries both generations and keeps the full Functions deployment', () => {
   assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only functions,firestore:rules,storage/);
-  const compiledExports = REQUIRED_STAGING_FUNCTIONS.map((functionName) => `exports.${functionName}`).join('\n');
-  assert.doesNotThrow(() => assertStagingFunctionDeploymentContract(compiledExports));
-  assert.throws(() => assertStagingFunctionDeploymentContract(compiledExports.replace('exports.approveFinancialBenefit', '')));
+  assert.match(workflow, /gcloud functions list --project .*--regions us-central1 --format=json/);
+  assert.match(workflow, /gcloud functions list --gen2 --project .*--regions us-central1 --format=json/);
+  assert.match(workflow, /verify-staging-function-deployment-contract\.mjs/);
+});
+
+test('Function inventory accepts all required Gen1, Gen2, and mixed records', () => {
+  for (const inventory of [
+    { gen1: functionInventory('GEN_1'), gen2: [] },
+    { gen1: [], gen2: functionInventory('GEN_2') },
+    { gen1: functionInventory('GEN_1').slice(0, 3), gen2: functionInventory('GEN_2').slice(3) },
+  ]) assert.equal(validateFunctionInventory(inventory, { expectedProject: 'ecoscolaire-staging' }).pass, true);
+});
+
+test('Function inventory fails closed for missing, wrong region/project, inactive, empty, and duplicate cases', () => {
+  const complete = { gen1: functionInventory('GEN_1'), gen2: [] };
+  assert.deepEqual(validateFunctionInventory({ gen1: complete.gen1.filter(({ logicalName }) => logicalName !== 'approveFinancialBenefit') }, { expectedProject: 'ecoscolaire-staging' }).failures, ['approveFinancialBenefit']);
+  assert.equal(validateFunctionInventory({ gen1: functionInventory('GEN_1', { location: 'europe-west1' }) }, { expectedProject: 'ecoscolaire-staging' }).pass, false);
+  assert.equal(validateFunctionInventory({ gen1: functionInventory('GEN_1', { project: 'ecoscolaire-c5861' }) }, { expectedProject: 'ecoscolaire-staging' }).pass, false);
+  assert.equal(validateFunctionInventory({ gen1: functionInventory('GEN_1', { state: 'ERROR' }) }, { expectedProject: 'ecoscolaire-staging' }).pass, false);
+  assert.equal(validateFunctionInventory({ gen1: [], gen2: [] }, { expectedProject: 'ecoscolaire-staging' }).pass, false);
+  assert.equal(validateFunctionInventory({ gen1: complete.gen1, gen2: functionInventory('GEN_2') }, { expectedProject: 'ecoscolaire-staging' }).pass, true);
+});
+
+test('Function inventory summary is limited to safe diagnostic fields', () => {
+  const summary = formatInventorySummary(normalizeFunctionInventory({ gen1: [{ name: 'projects/ecoscolaire-staging/locations/us-central1/functions/approveFinancialBenefit', state: 'ACTIVE', secret: 'must-not-print' }] }));
+  assert.match(summary, /approveFinancialBenefit\tGEN_1\tus-central1\tACTIVE/);
+  assert.doesNotMatch(summary, /secret|must-not-print|ecoscolaire-c5861/);
 });
