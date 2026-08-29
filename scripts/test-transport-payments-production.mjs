@@ -200,6 +200,7 @@ const main = async () => {
       section: 'francophone', isActive: true, academicYearId: yearId,
     });
     for (const role of ['owner', 'secretary', 'accountant', 'director']) await createFixtureUser(role);
+    await createFixtureUser('parent');
     await createFixtureUser('owner', otherSchoolId);
 
     const owner = await newClient('owner');
@@ -320,6 +321,26 @@ const main = async () => {
       { kind: 'INSTALLMENT', period: periods[0], amount: 5_000 },
       { kind: 'INSTALLMENT', period: periods[1], amount: 5_000 },
     ]);
+
+    await db.collection('users').doc(credentials.get('parent').uid).update({ studentIds: [pk14] });
+    const parent = await newClient('parent');
+    const otherSchoolReceiptId = `transport-other-receipt-${cfg.testRunId}`.slice(0, 125);
+    await createMarked('receipts', otherSchoolReceiptId, {
+      id: otherSchoolReceiptId, paymentId: otherSchoolReceiptId,
+      receiptNumber: `REC-X-${cfg.testRunId}`.slice(0, 80),
+      schoolId: otherSchoolId, studentId: `transport-other-student-${cfg.testRunId}`.slice(0, 125),
+      academicYear, paymentType: 'transport', type: 'transport',
+      amount: 5_000, date: todayDouala(),
+    });
+    assert.equal((await getDoc(doc(parent.firestore, 'receipts', p4000.receiptId))).exists(), true,
+      'Receipt Privacy: parent must read own child receipt.');
+    await expectFailure(() => getDoc(doc(parent.firestore, 'receipts', p5000.receiptId)), ['permission-denied']);
+    await expectFailure(() => getDoc(doc(parent.firestore, 'receipts', otherSchoolReceiptId)), ['permission-denied']);
+    assert.equal((await getDoc(doc(secretary.firestore, 'receipts', p4000.receiptId))).exists(), true,
+      'Receipt Privacy: same-school secretary must read receipt.');
+    assert.equal((await getDoc(doc(owner.firestore, 'receipts', p4000.receiptId))).exists(), true,
+      'Receipt Privacy: same-school owner must read receipt.');
+    await expectFailure(() => getDoc(doc(crossOwner.firestore, 'receipts', p4000.receiptId)), ['permission-denied']);
     const partial = await pay(secretary, pk42, `pk42-partial-${cfg.testRunId}`, 2_000);
     assert.equal(partial.allocations[0].amount, 2_000);
     assert.equal((await quote(secretary, pk42)).installments[0].remainingBalance, 3_000);
@@ -612,6 +633,10 @@ const main = async () => {
       partialRemaining: 3_000, credit: 2_000, benefits: 'PASS', moratorium: 'PASS',
       idempotence: 'PASS', concurrency: 'PASS', reversal: 'PASS', cashClosure: expectedCash,
       tuitionIsolation: 'PASS', rbac: 'PASS', directWrites: 'DENY', responsive: widths,
+      receiptPrivacy: {
+        ownChild: 'ALLOW', sameSchoolUnrelatedChild: 'DENY', otherSchool: 'DENY',
+        secretary: 'ALLOW', owner: 'ALLOW', crossSchool: 'DENY',
+      },
     };
     console.log(`TRANSPORT RELEASE CONTRACT: PASS ${JSON.stringify(results)}`);
   } finally {
