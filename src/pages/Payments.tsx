@@ -11,7 +11,7 @@ import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { formatCurrency, isOperationalMobileMoneyProvider, translateInstallment, translatePaymentMethod, translatePaymentType } from '../utils/paymentReceipt';
+import { buildReceiptDisplayModel, formatCurrency, isOperationalMobileMoneyProvider, translateInstallment, translatePaymentMethod, translatePaymentType } from '../utils/paymentReceipt';
 import {
   canUseStudentContactWhatsApp,
   mergeStudentRestrictedData,
@@ -767,10 +767,15 @@ const Payments: React.FC = () => {
 
       const cumulLabel = currentPayment.type === 'tuition'
         ? "Cumul sur la tranche"
-        : currentPayment.type === 'transport' ? "Cumul sur le mois" : "Cumul des frais d’inscription";
+        : currentPayment.type === 'transport' ? "Cumul Transport — périodes configurées" : "Cumul des frais d’inscription";
       const resteLabel = currentPayment.type === 'tuition'
         ? "Reste sur la tranche"
-        : currentPayment.type === 'transport' ? "Reste sur le mois" : "Reste des frais d’inscription";
+        : currentPayment.type === 'transport' ? "Reste Transport — périodes configurées" : "Reste des frais d’inscription";
+      const transportAllocationText = currentPayment.type === 'transport' && resData.allocations?.length
+        ? resData.allocations.map(allocation => allocation.kind === 'CREDIT'
+          ? `Crédit : ${formatCurrency(allocation.amount)}`
+          : `${allocation.period || 'Période non renseignée'} : ${formatCurrency(allocation.amount)}`).join('\n')
+        : '';
 
       const detailsMsg =
         `Nature : ${natureText}\n` +
@@ -780,6 +785,8 @@ const Payments: React.FC = () => {
         `Bourses / réductions : ${formatCurrency(resData.discountAmount)}\n` +
         `Montant net dû : ${formatCurrency(resData.netExpectedAmount)}\n` +
         `Versement : ${formatCurrency(resData.amount)}\n` +
+        (transportAllocationText ? `Ventilation :\n${transportAllocationText}\n` : '') +
+        (currentPayment.type === 'transport' ? `Crédit Transport disponible : ${formatCurrency(resData.transportCredit || 0)}\n` : '') +
         `Payé avant ce versement : ${formatCurrency(resData.previousPaid)}\n` +
         `${cumulLabel} : ${formatCurrency(resData.newPaid)}\n` +
         `${resteLabel} : ${formatCurrency(resData.remainingBalance)}`;
@@ -1121,6 +1128,18 @@ const Payments: React.FC = () => {
     window.open(url, '_blank');
   };
 
+  const receiptPrintSnapshot = receiptToPrint
+    ? findSnapshotReceiptForPayment(receiptToPrint, db.receipts)
+    : undefined;
+  const receiptPrintModel = receiptToPrint
+    ? buildReceiptDisplayModel(
+        receiptPrintSnapshot ?? ({ ...receiptToPrint, paymentId: receiptToPrint.id } as ReceiptLike),
+        db.students,
+        db.classes,
+        db.payments
+      )
+    : null;
+
   return (
     <div className="page-container" id="payments-page">
       <style>
@@ -1140,13 +1159,25 @@ const Payments: React.FC = () => {
           <SchoolDocumentHeader school={currentSchool} documentTitle={receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'Reçu Correctif' : 'Reçu de Paiement'} />
           <div style={{ marginTop: '2rem', border: '1px solid #ccc', padding: '2rem', borderRadius: '8px' }}>
             <h2 style={{ color: receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'var(--danger)' : '#0369a1' }}>
-              Reçu N° {findSnapshotReceiptForPayment(receiptToPrint, db.receipts)?.receiptNumber || receiptToPrint.id.substring(0, 8).toUpperCase()}
+              Reçu N° {receiptPrintModel?.receiptNumber || receiptToPrint.id.substring(0, 8).toUpperCase()}
             </h2>
             <div style={{ margin: '1rem 0', fontSize: '1.2rem', lineHeight: '1.8' }}>
               <strong>Élève :</strong> {db.students.find(s => s.id === receiptToPrint.studentId)?.name} <br/>
               <strong>Date :</strong> {new Date(receiptToPrint.date).toLocaleDateString('fr-FR')} <br/>
-              <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Frais d'inscription" : receiptToPrint.type === 'transport' ? `Transport (${receiptToPrint.month || 'Mensuel'})` : receiptToPrint.type === 'tuition' ? `Scolarité (${receiptToPrint.installment || ''})` : receiptToPrint.type} <br/>
+              <strong>Motif :</strong> {receiptToPrint.type === 'registration_fee' ? "Frais d'inscription" : receiptToPrint.type === 'transport' ? 'Transport — périodes configurées' : receiptToPrint.type === 'tuition' ? `Scolarité (${receiptToPrint.installment || ''})` : receiptToPrint.type} <br/>
               <strong>{receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'Montant contre-passé' : 'Montant payé'} :</strong> <span style={{ color: receiptToPrint.kind === 'PAYMENT_REVERSAL' ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold' }}>{receiptToPrint.amount.toLocaleString('fr-FR')} FCFA</span><br/>
+              {receiptToPrint.type === 'transport' && receiptPrintModel && <>
+                <strong>Ventilation du versement :</strong><br/>
+                {receiptPrintModel.allocations.length > 0
+                  ? receiptPrintModel.allocations.map((allocation, index) => (
+                    <React.Fragment key={`${allocation.kind}-${allocation.period || 'credit'}-${index}`}>
+                      &nbsp;&nbsp;{allocation.kind === 'CREDIT' ? 'Crédit Transport' : `Période ${allocation.period || 'non renseignée'}`} : {formatCurrency(allocation.amount)}<br/>
+                    </React.Fragment>
+                  ))
+                  : <>&nbsp;&nbsp;Ventilation historique non disponible.<br/></>}
+                <strong>Crédit Transport disponible :</strong> {receiptPrintModel.formattedTransportCredit || '0 FCFA'}<br/>
+                <strong>Reste Transport :</strong> {receiptPrintModel.formattedRemainingBalance || 'Non disponible'}<br/>
+              </>}
               {receiptToPrint.kind === 'PAYMENT_REVERSAL' && <>
                 <strong>Motif de correction :</strong> {receiptToPrint.reason || 'Non renseigné'}<br/>
                 <strong>Paiement original :</strong> {receiptToPrint.originalPaymentId || 'Non renseigné'}<br/>

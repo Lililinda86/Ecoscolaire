@@ -817,6 +817,12 @@ export interface Payment {
   previousPaid?: number;
   newPaid?: number;
   remainingBalance?: number;
+  allocations?: Array<{
+    kind: 'INSTALLMENT' | 'CREDIT';
+    period: string | null;
+    amount: number;
+  }>;
+  transportCredit?: number;
 }
 
 export interface ReceiptLike {

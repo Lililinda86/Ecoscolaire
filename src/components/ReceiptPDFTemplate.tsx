@@ -125,12 +125,49 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
           </tbody>
         </table>
 
+        {displayModel.paymentType === 'transport' && (
+          <div style={{ marginBottom: '2rem', padding: '1rem', border: '1px solid #bfdbfe', borderRadius: 4, background: '#eff6ff' }}>
+            <h3 style={{ margin: '0 0 .75rem 0', fontSize: '11pt', color: '#1e40af', textTransform: 'uppercase' }}>
+              Ventilation du versement Transport
+            </h3>
+            {displayModel.allocations.length > 0 ? (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt' }}>
+                <tbody>
+                  {displayModel.allocations.map((allocation, index) => (
+                    <tr key={`${allocation.kind}-${allocation.period || 'credit'}-${index}`}>
+                      <td style={{ padding: '.4rem 0', borderBottom: '1px solid #dbeafe' }}>
+                        {allocation.kind === 'CREDIT'
+                          ? 'Crédit Transport créé par ce versement'
+                          : `Période ${allocation.period || 'non renseignée'}`}
+                      </td>
+                      <td style={{ padding: '.4rem 0', borderBottom: '1px solid #dbeafe', textAlign: 'right', fontWeight: 700 }}>
+                        {allocation.amount.toLocaleString('fr-FR')} FCFA
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ fontSize: '10pt', color: '#475569' }}>
+                Ventilation historique non disponible pour ce reçu.
+              </div>
+            )}
+            <div style={{ marginTop: '.75rem', textAlign: 'right', fontSize: '10pt' }}>
+              <strong>Crédit Transport disponible après versement : {displayModel.formattedTransportCredit || '0 FCFA'}</strong>
+            </div>
+          </div>
+        )}
+
         {/* Financial snapshots */}
         <div style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
           {displayModel.hasSnapshots ? (
             <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
               <h3 style={{ margin: '0 0 1rem 0', fontSize: '11pt', color: '#475569', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                {displayModel.paymentType === 'registration_fee' ? "Situation financière des frais d’inscription" : "Situation financière de la tranche"}
+                {displayModel.paymentType === 'registration_fee'
+                  ? "Situation financière des frais d’inscription"
+                  : displayModel.paymentType === 'transport'
+                    ? 'Situation Transport — périodes configurées'
+                    : 'Situation financière de la tranche'}
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '11pt' }}>
                 <div>

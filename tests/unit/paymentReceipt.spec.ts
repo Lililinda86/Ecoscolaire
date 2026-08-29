@@ -16,6 +16,11 @@ describe('secure collection receipt display model', () => {
         benefitId: 'benefit-1', benefitType: 'DISCOUNT_VOUCHER', reference: 'BON-TEST-001',
         mode: 'FIXED_AMOUNT', value: 1000, discountAmount: 1000
       }],
+      allocationSummary: [
+        { kind: 'INSTALLMENT', period: '2026-09', amount: 3000 },
+        { kind: 'CREDIT', period: null, amount: 500 }
+      ],
+      transportCredit: 500,
       createdAt: '2026-09-10T12:00:00.000Z'
     }, [], []);
 
@@ -25,6 +30,12 @@ describe('secure collection receipt display model', () => {
     expect(model.formattedNetExpectedAmount).toContain('5');
     expect(model.formattedRemainingBalance).toContain('2');
     expect(model.collectedByName).toBe('Secrétaire fictive');
+    expect(model.allocations).toEqual([
+      { kind: 'INSTALLMENT', period: '2026-09', amount: 3000 },
+      { kind: 'CREDIT', period: null, amount: 500 }
+    ]);
+    expect(model.transportCredit).toBe(500);
+    expect(model.formattedTransportCredit).toContain('500');
     expect(model.benefits).toEqual([expect.objectContaining({
       benefitType: 'DISCOUNT_VOUCHER', reference: 'BON-TEST-001', discountAmount: 1000
     })]);

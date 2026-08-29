@@ -460,6 +460,31 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                             )}
                           </div>
 
+                          {displayModel.paymentType === 'transport' && (
+                            <div
+                              data-testid={`transport-receipt-allocation-${displayModel.id}`}
+                              style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #bfdbfe', borderRadius: 4, background: '#eff6ff' }}
+                            >
+                              <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: '.75rem' }}>
+                                Ventilation du versement Transport
+                              </div>
+                              {displayModel.allocations.length > 0 ? displayModel.allocations.map((allocation, index) => (
+                                <div
+                                  key={`${allocation.kind}-${allocation.period || 'credit'}-${index}`}
+                                  style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '.35rem 0', borderBottom: '1px solid #dbeafe' }}
+                                >
+                                  <span>{allocation.kind === 'CREDIT' ? 'Crédit Transport' : `Période ${allocation.period || 'non renseignée'}`}</span>
+                                  <strong>{allocation.amount.toLocaleString('fr-FR')} FCFA</strong>
+                                </div>
+                              )) : (
+                                <div style={{ color: 'var(--text-muted)' }}>Ventilation historique non disponible.</div>
+                              )}
+                              <div style={{ marginTop: '.75rem', textAlign: 'right' }}>
+                                <strong>Crédit disponible : {displayModel.formattedTransportCredit || '0 FCFA'}</strong>
+                              </div>
+                            </div>
+                          )}
+
                           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
                             {displayModel.hasSnapshots ? (
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', background: '#fff', padding: '1rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
