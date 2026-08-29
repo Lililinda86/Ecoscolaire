@@ -482,7 +482,7 @@ const main = async () => {
     assert.equal(reversed.amount, -10_000);
     assert.deepEqual((await db.collection('payments').doc(original.paymentId).get()).data(), originalPayment);
     assert.deepEqual((await db.collection('receipts').doc(original.receiptId).get()).data(), originalReceipt);
-    assert.deepEqual((await quote(secretary, reversalStudent)).installments.map((x) => x.previousPaid), [0, 0, 0]);
+    assert.deepEqual((await quote(secretary, reversalStudent)).installments.map((x) => x.previousPaid), periods.map(() => 0));
     const reversedAgain = await reverse(owner, original.paymentId, `reverse-owner-${cfg.testRunId}`, 'Correction fixture');
     assert.equal(reversedAgain.idempotentReplay, true);
     const raceStudent = await createStudent('reversal-race', 14);
