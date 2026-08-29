@@ -1693,7 +1693,7 @@ describe('Student Privacy Security Rules', () => {
     await assertFails(updateDoc(publicRef, { allergies: 'Arachides' }));
   });
 
-  it('allows same-school creation of missing finance and denies cross-school creation', async () => {
+  it('denies direct creation of a missing financial projection for every client role', async () => {
     const ownerDb = testEnv.authenticatedContext('privacy-owner').firestore();
     const audit = {
       createdAt: serverTimestamp(),
@@ -1701,17 +1701,41 @@ describe('Student Privacy Security Rules', () => {
       updatedAt: serverTimestamp(),
       updatedBy: 'privacy-owner'
     };
-    await assertSucceeds(setDoc(doc(ownerDb, 'studentFinance', LEGACY_STUDENT_ID), {
+    await assertFails(setDoc(doc(ownerDb, 'studentFinance', LEGACY_STUDENT_ID), {
       id: LEGACY_STUDENT_ID,
       studentId: LEGACY_STUDENT_ID,
       schoolId: SCHOOL_ID,
       feeT1: 1100,
+      transportMonthlyFee: 4000,
+      transportPaid: 4000,
       ...audit
     }));
 
+    const secretaryDb = testEnv.authenticatedContext('privacy-secretary').firestore();
+    await assertFails(setDoc(doc(secretaryDb, 'studentFinance', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      transportByPeriod: { '2026-09': { paidAmount: 4000 } },
+      transportExpectedGross: 4000,
+      transportExpectedNet: 4000,
+      transportPaid: 4000,
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-secretary',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-secretary'
+    }));
+
+    expect((await getDoc(doc(ownerDb, 'studentFinance', LEGACY_STUDENT_ID))).exists()).toBe(false);
+
     const otherDb = testEnv.authenticatedContext('privacy-other-owner').firestore();
-    await assertFails(updateDoc(doc(otherDb, 'studentFinance', LEGACY_STUDENT_ID), {
-      feeT1: 2200,
+    await assertFails(setDoc(doc(otherDb, 'studentFinance', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      transportPaid: 1,
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-other-owner',
       updatedAt: serverTimestamp(),
       updatedBy: 'privacy-other-owner'
     }));

@@ -200,6 +200,7 @@ const main = async () => {
       section: 'francophone', isActive: true, academicYearId: yearId,
     });
     for (const role of ['owner', 'secretary', 'accountant', 'director']) await createFixtureUser(role);
+    await createFixtureUser('parent');
     await createFixtureUser('owner', otherSchoolId);
 
     const owner = await newClient('owner');
@@ -320,6 +321,26 @@ const main = async () => {
       { kind: 'INSTALLMENT', period: periods[0], amount: 5_000 },
       { kind: 'INSTALLMENT', period: periods[1], amount: 5_000 },
     ]);
+
+    await db.collection('users').doc(credentials.get('parent').uid).update({ studentIds: [pk14] });
+    const parent = await newClient('parent');
+    const otherSchoolReceiptId = `transport-other-receipt-${cfg.testRunId}`.slice(0, 125);
+    await createMarked('receipts', otherSchoolReceiptId, {
+      id: otherSchoolReceiptId, paymentId: otherSchoolReceiptId,
+      receiptNumber: `REC-X-${cfg.testRunId}`.slice(0, 80),
+      schoolId: otherSchoolId, studentId: `transport-other-student-${cfg.testRunId}`.slice(0, 125),
+      academicYear, paymentType: 'transport', type: 'transport',
+      amount: 5_000, date: todayDouala(),
+    });
+    assert.equal((await getDoc(doc(parent.firestore, 'receipts', p4000.receiptId))).exists(), true,
+      'Receipt Privacy: parent must read own child receipt.');
+    await expectFailure(() => getDoc(doc(parent.firestore, 'receipts', p5000.receiptId)), ['permission-denied']);
+    await expectFailure(() => getDoc(doc(parent.firestore, 'receipts', otherSchoolReceiptId)), ['permission-denied']);
+    assert.equal((await getDoc(doc(secretary.firestore, 'receipts', p4000.receiptId))).exists(), true,
+      'Receipt Privacy: same-school secretary must read receipt.');
+    assert.equal((await getDoc(doc(owner.firestore, 'receipts', p4000.receiptId))).exists(), true,
+      'Receipt Privacy: same-school owner must read receipt.');
+    await expectFailure(() => getDoc(doc(crossOwner.firestore, 'receipts', p4000.receiptId)), ['permission-denied']);
     const partial = await pay(secretary, pk42, `pk42-partial-${cfg.testRunId}`, 2_000);
     assert.equal(partial.allocations[0].amount, 2_000);
     assert.equal((await quote(secretary, pk42)).installments[0].remainingBalance, 3_000);
@@ -520,6 +541,28 @@ const main = async () => {
       await expectFailure(() => updateDoc(doc(secretary.firestore, collection, id), { amount: 1 }), ['permission-denied']);
       await expectFailure(() => deleteDoc(doc(secretary.firestore, collection, id)), ['permission-denied']);
     }
+    const missingFinanceStudentId = `transport-legacy-finance-${cfg.testRunId}`.slice(0, 125);
+    await createMarked('students', missingFinanceStudentId, {
+      id: missingFinanceStudentId, schoolId: cfg.fixtureSchoolId,
+      name: 'Transport legacy finance fixture', classId: primaryClassId,
+      academicYear, active: true, isActive: true,
+    });
+    const directFinancePayloads = [
+      { transportMonthlyFee: 4_000, transportPaid: 4_000 },
+      { transportByPeriod: { [periods[0]]: { paidAmount: 4_000 } } },
+      { transportExpectedGross: 20_000, transportExpectedNet: 20_000, transportPaid: 20_000 },
+    ];
+    for (const [role, client] of [['owner', owner], ['secretary', secretary], ['accountant', accountant], ['director', director]]) {
+      for (const projection of directFinancePayloads) {
+        await expectFailure(() => setDoc(doc(client.firestore, 'studentFinance', missingFinanceStudentId), {
+          id: missingFinanceStudentId, studentId: missingFinanceStudentId,
+          schoolId: cfg.fixtureSchoolId, ...projection,
+          createdAt: new Date().toISOString(), createdBy: credentials.get(role).uid,
+          updatedAt: new Date().toISOString(), updatedBy: credentials.get(role).uid,
+        }), ['permission-denied']);
+      }
+    }
+    assert.equal((await db.collection('studentFinance').doc(missingFinanceStudentId).get()).exists, false);
 
     const tuitionStudent = await createStudent('tuition-cash', 20);
     const tuitionBefore = await quote(secretary, tuitionStudent, 'tuition', { installment: 'T1' });
@@ -569,7 +612,18 @@ const main = async () => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${cfg.appUrl}/#/payments`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: /Comptabilité Générale/i }).waitFor({ timeout: 30_000 });
-      await page.getByRole('button', { name: /Encaissement/i }).first().click();
+      const pageMetrics = await page.evaluate(() => ({
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      }));
+      assert.ok(pageMetrics.documentWidth <= pageMetrics.viewportWidth + 1,
+        `Payments page overflows viewport at ${width}px.`);
+      const openCashButton = page.getByTestId('open-cash-payment');
+      const openCashBox = await openCashButton.boundingBox();
+      assert.ok(openCashBox && openCashBox.x >= 0 && openCashBox.x + openCashBox.width <= width + 1,
+        `Cash action is outside viewport at ${width}px.`);
+      assert.ok(openCashBox.height >= 40, `Cash action touch target is too small at ${width}px.`);
+      await openCashButton.click();
       await page.getByTestId('cash-payment-student').selectOption(benefitStudent);
       await page.getByTestId('cash-payment-type').selectOption('transport');
       await page.getByTestId('transport-auto-allocation').waitFor({ state: 'visible' });
@@ -577,10 +631,111 @@ const main = async () => {
       await page.getByText(/Mensualité brute/).waitFor({ state: 'visible' });
       await page.getByText(/Bourse \/ réduction applicable/).waitFor({ state: 'visible' });
       await page.getByText(/Moratoire/).waitFor({ state: 'visible' });
+      const modalMetrics = await page.getByTestId('modal-content').evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left, right: rect.right, width: rect.width,
+          clientWidth: element.clientWidth, scrollWidth: element.scrollWidth,
+        };
+      });
+      assert.ok(modalMetrics.left >= 0 && modalMetrics.right <= width + 1 && modalMetrics.width <= width,
+        `Cash modal is outside viewport at ${width}px.`);
+      assert.ok(modalMetrics.scrollWidth <= modalMetrics.clientWidth + 1,
+        `Cash modal has uncontrolled horizontal overflow at ${width}px.`);
+      const scheduleScroll = page.getByTestId('transport-installments-scroll');
+      const scheduleMetrics = await scheduleScroll.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        overflowX: getComputedStyle(element).overflowX,
+      }));
+      assert.ok(['auto', 'scroll'].includes(scheduleMetrics.overflowX));
+      assert.ok(scheduleMetrics.clientWidth <= modalMetrics.clientWidth);
+      const submitAction = page.getByTestId('cash-payment-submit');
+      await submitAction.scrollIntoViewIfNeeded();
+      const submitBox = await submitAction.boundingBox();
+      assert.ok(submitBox && submitBox.x >= 0 && submitBox.x + submitBox.width <= width + 1,
+        `Cash submit action is outside viewport at ${width}px.`);
+      assert.ok(submitBox.height >= 40, `Cash submit touch target is too small at ${width}px.`);
       await page.getByTestId('cash-payment-student').selectOption(secondary);
       await page.getByTestId('transport-free-secondary').waitFor({ state: 'visible' });
       assert.equal(await page.getByTestId('cash-payment-submit').isDisabled(), true);
       await page.getByRole('button', { name: 'Annuler', exact: true }).click();
+
+      await page.getByRole('button', { name: 'Reçus', exact: true }).click();
+      await page.getByText(creditReceipt.receiptNumber, { exact: true }).waitFor({ timeout: 20_000 });
+      const receiptRow = page.locator('[data-receipt-row="true"]:visible')
+        .filter({ hasText: creditReceipt.receiptNumber });
+      await receiptRow.waitFor({ state: 'visible' });
+      assert.equal(await receiptRow.count(), 1,
+        `Expected one visible row for receipt ${creditReceipt.receiptNumber} at ${width}px.`);
+      const detailToggle = receiptRow.getByTestId(`receipt-detail-toggle-${credit.receiptId}`);
+      await detailToggle.waitFor({ state: 'visible' });
+      assert.equal(await detailToggle.isEnabled(), true);
+      const waitForToggleState = async (expanded) => page.waitForFunction(
+        ({ testId, expected }) => document.querySelector(`[data-testid="${testId}"]`)
+          ?.getAttribute('aria-expanded') === expected,
+        { testId: `receipt-detail-toggle-${credit.receiptId}`, expected: String(expanded) },
+      );
+      if (await detailToggle.getAttribute('aria-expanded') === 'true') {
+        await detailToggle.click();
+        await page.getByTestId(`receipt-detail-${credit.receiptId}`).waitFor({ state: 'hidden' });
+        await waitForToggleState(false);
+      }
+      assert.equal(await detailToggle.getAttribute('aria-expanded'), 'false');
+      const detailToggleBox = await detailToggle.boundingBox();
+      assert.ok(detailToggleBox && detailToggleBox.width >= 44 && detailToggleBox.height >= 44,
+        `Receipt detail touch target is too small at ${width}px.`);
+      await detailToggle.click();
+      await waitForToggleState(true);
+      assert.equal(await detailToggle.getAttribute('aria-expanded'), 'true');
+      const receiptDetail = page.getByTestId(`receipt-detail-${credit.receiptId}`);
+      await receiptDetail.waitFor({ state: 'visible' });
+      const allocationPanel = page.getByTestId(`transport-receipt-allocation-${credit.receiptId}`);
+      await allocationPanel.waitFor({ state: 'visible' });
+      await allocationPanel.getByText(periods.at(-1), { exact: false }).waitFor();
+      await allocationPanel.getByText(/Crédit disponible/i).waitFor();
+      const receiptMetrics = await page.getByTestId('receipt-history-scroll').evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        overflowX: getComputedStyle(element).overflowX,
+      }));
+      assert.ok(receiptMetrics.clientWidth <= width);
+      if (width <= 899) {
+        assert.ok(receiptMetrics.scrollWidth <= receiptMetrics.clientWidth + 1,
+          `Receipt history requires horizontal scrolling at ${width}px.`);
+        assert.equal(receiptMetrics.overflowX, 'visible');
+      } else {
+        assert.ok(['auto', 'scroll'].includes(receiptMetrics.overflowX));
+      }
+      const detailBox = await receiptDetail.boundingBox();
+      assert.ok(detailBox && detailBox.x >= 0 && detailBox.x + detailBox.width <= width + 1,
+        `Receipt detail is outside viewport at ${width}px.`);
+      const allocationBox = await allocationPanel.boundingBox();
+      assert.ok(allocationBox && allocationBox.x >= 0 && allocationBox.x + allocationBox.width <= width + 1,
+        `Receipt allocation is outside viewport at ${width}px.`);
+      const allocationDirection = await allocationPanel.locator('.receipt-history-allocation-row').first()
+        .evaluate((element) => getComputedStyle(element).flexDirection);
+      assert.equal(allocationDirection, width <= 899 ? 'column' : 'row');
+      const creditDisplay = allocationPanel.getByText(/Crédit disponible/i);
+      const creditBox = await creditDisplay.boundingBox();
+      assert.ok(creditBox && creditBox.x >= 0 && creditBox.x + creditBox.width <= width + 1,
+        `Transport credit is clipped at ${width}px.`);
+      const printAction = receiptRow.getByRole('button', { name: 'Imprimer', exact: true });
+      await printAction.scrollIntoViewIfNeeded();
+      const printBox = await printAction.boundingBox();
+      assert.ok(printBox && printBox.x >= 0 && printBox.x + printBox.width <= width + 1,
+        `Receipt print action is outside viewport at ${width}px.`);
+      assert.ok(printBox.height >= 44, `Receipt print touch target is too small at ${width}px.`);
+      const expandedPageMetrics = await page.evaluate(() => ({
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      }));
+      assert.ok(expandedPageMetrics.documentWidth <= expandedPageMetrics.viewportWidth + 1,
+        `Expanded receipt causes global overflow at ${width}px.`);
+      await detailToggle.click();
+      await receiptDetail.waitFor({ state: 'hidden' });
+      await waitForToggleState(false);
+      assert.equal(await detailToggle.getAttribute('aria-expanded'), 'false');
     }
     assertTransportEnvironmentEvidence({ expectedProject: cfg.expectedProject, runtimeProjectId: runtimeProject,
       networkProjectIds: [...firebaseProjects] });
@@ -589,7 +744,12 @@ const main = async () => {
       allocation4000: p4000.allocations, allocation5000: p5000.allocations,
       partialRemaining: 3_000, credit: 2_000, benefits: 'PASS', moratorium: 'PASS',
       idempotence: 'PASS', concurrency: 'PASS', reversal: 'PASS', cashClosure: expectedCash,
-      tuitionIsolation: 'PASS', rbac: 'PASS', directWrites: 'DENY', responsive: widths,
+      tuitionIsolation: 'PASS', rbac: 'PASS', directWrites: 'DENY',
+      responsive: { widths, documentOverflow: 'PASS', actions: 'PASS', receiptAllocation: 'PASS' },
+      receiptPrivacy: {
+        ownChild: 'ALLOW', sameSchoolUnrelatedChild: 'DENY', otherSchool: 'DENY',
+        secretary: 'ALLOW', owner: 'ALLOW', crossSchool: 'DENY',
+      },
     };
     console.log(`TRANSPORT RELEASE CONTRACT: PASS ${JSON.stringify(results)}`);
   } finally {

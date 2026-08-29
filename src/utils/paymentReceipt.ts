@@ -36,6 +36,9 @@ export interface ReceiptDisplayModel {
   paymentType?: string;
   collectedByName?: string;
   benefits: Array<{ benefitType?: string; reference?: string | null; discountAmount?: number }>;
+  allocations: Array<{ kind: 'INSTALLMENT' | 'CREDIT'; period: string | null; amount: number }>;
+  transportCredit: number;
+  formattedTransportCredit: string;
   formattedGrossExpectedAmount: string;
   formattedDiscountAmount: string;
   formattedNetExpectedAmount: string;
@@ -145,6 +148,27 @@ export const buildReceiptDisplayModel = (
   // dans Receipt.
   const rawInstallment = receipt.installment
     ?? findRelatedPayment(receipt, payments)?.installment;
+  const relatedPayment = findRelatedPayment(receipt, payments);
+  const rawAllocations = receipt.allocationSummary ?? receipt.allocations ?? relatedPayment?.allocations;
+  const allocations = Array.isArray(rawAllocations)
+    ? rawAllocations.flatMap(item => {
+        if (!item || typeof item !== 'object') return [];
+        const allocation = item as { kind?: unknown; period?: unknown; amount?: unknown };
+        if ((allocation.kind !== 'INSTALLMENT' && allocation.kind !== 'CREDIT')
+            || typeof allocation.amount !== 'number' || !Number.isSafeInteger(allocation.amount)) {
+          return [];
+        }
+        return [{
+          kind: allocation.kind as 'INSTALLMENT' | 'CREDIT',
+          period: typeof allocation.period === 'string' ? allocation.period : null,
+          amount: allocation.amount
+        }];
+      })
+    : [];
+  const rawTransportCredit = receipt.transportCredit ?? relatedPayment?.transportCredit ?? 0;
+  const transportCredit = typeof rawTransportCredit === 'number' && Number.isSafeInteger(rawTransportCredit)
+    ? rawTransportCredit
+    : 0;
 
   return {
     id: receipt.id || receipt.paymentId || '',
@@ -181,6 +205,9 @@ export const buildReceiptDisplayModel = (
     paymentType: (receipt.type || receipt.paymentType) as string | undefined,
     collectedByName: (receipt.collectedByName || receipt.correctedByRole || receipt.correctedByUserId) as string | undefined,
     benefits: Array.isArray(receipt.benefits) ? receipt.benefits as Array<{ benefitType?: string; reference?: string | null; discountAmount?: number }> : [],
+    allocations,
+    transportCredit,
+    formattedTransportCredit: formatCurrency(transportCredit),
     formattedGrossExpectedAmount: formatCurrency(receipt.grossExpectedAmount as number | undefined),
     formattedDiscountAmount: formatCurrency(receipt.discountAmount as number | undefined),
     formattedNetExpectedAmount: formatCurrency(receipt.netExpectedAmount as number | undefined),
