@@ -159,7 +159,7 @@ export const buildReceiptDisplayModel = (
           return [];
         }
         return [{
-          kind: allocation.kind,
+          kind: allocation.kind as 'INSTALLMENT' | 'CREDIT',
           period: typeof allocation.period === 'string' ? allocation.period : null,
           amount: allocation.amount
         }];
