@@ -412,6 +412,11 @@ export interface AcademicYear {
   createdBy: string;
   updatedAt: string;
   updatedBy: string;
+  tuitionPaymentDeadlines?: {
+    T1: string;
+    T2: string;
+    T3: string;
+  };
 }
 
 export interface Period {

@@ -4323,6 +4323,37 @@ describe('Lot 1B Notes & Bulletins Security Rules', () => {
       const ref = doc(collection(dbOwner, 'academicYears'), 'ay4');
       await assertFails(setDoc(ref, { name: '2023' }));
     });
+
+    it('owner peut enregistrer uniquement des échéances complètes et chronologiques', async () => {
+      await setupAdmin('owner-deadlines', { role: 'owner', schoolId: 'school-a', isActive: true });
+      const database = testEnv.authenticatedContext('owner-deadlines').firestore();
+      const ref = doc(collection(database, 'academicYears'), 'ay-deadlines');
+      await assertSucceeds(setDoc(ref, {
+        schoolId: 'school-a', name: '2026-2027',
+        tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' }
+      }));
+      await assertFails(updateDoc(ref, {
+        tuitionPaymentDeadlines: { T1: '2026-12-05', T2: '2026-10-05', T3: '2027-02-05' }
+      }));
+      await assertFails(updateDoc(ref, {
+        tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05' }
+      }));
+    });
+
+    it('teacher ne peut pas modifier les échéances', async () => {
+      await setupAdmin('teacher-deadlines', { role: 'teacher', schoolId: 'school-a', isActive: true });
+      await testEnv.withSecurityRulesDisabled(async context => {
+        await setDoc(doc(context.firestore(), 'academicYears', 'ay-deadlines-locked'), {
+          schoolId: 'school-a', name: '2026-2027',
+          tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' }
+        });
+      });
+      const ref = doc(testEnv.authenticatedContext('teacher-deadlines').firestore(),
+        'academicYears', 'ay-deadlines-locked');
+      await assertFails(updateDoc(ref, {
+        tuitionPaymentDeadlines: { T1: '2026-10-06', T2: '2026-12-05', T3: '2027-02-05' }
+      }));
+    });
   });
 
   describe('Period', () => {

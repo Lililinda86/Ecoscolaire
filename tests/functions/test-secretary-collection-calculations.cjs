@@ -5,7 +5,8 @@ const {
   isTransportPeriod,
   resolveCanonicalClassCycle,
   resolveTransportBenefitGross,
-  resolvePaymentSchedule
+  resolvePaymentSchedule,
+  withAcademicYearTuitionDeadlines
 } = require('../../functions/lib/secretaryCollections');
 const {
   planTransportAllocations,
@@ -146,6 +147,15 @@ const deadlineSchool = {
     transport: { '2026-09': '2026-09-10' }
   }
 };
+const yearScopedSchool = withAcademicYearTuitionDeadlines(deadlineSchool, {
+  id: 'year-2026-2027', schoolId: 'school-a', name: '2026-2027',
+  tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' }
+});
+assert.deepEqual(yearScopedSchool.paymentDeadlines.tuition, {
+  T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05'
+});
+assert.deepEqual(yearScopedSchool.paymentDeadlines.transport, deadlineSchool.paymentDeadlines.transport,
+  'year-scoped tuition deadlines must not alter transport deadlines');
 const schedule = overrides => resolvePaymentSchedule({
   school: deadlineSchool,
   moratoriums: [],

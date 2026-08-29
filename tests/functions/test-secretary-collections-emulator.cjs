@@ -90,12 +90,14 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
       transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: ['2026-09', '2026-10', '2026-11'] }
       , paymentDeadlines: {
         registrationFee: '2026-09-15',
-        tuition: { T1: '2026-09-30', T2: '2027-01-31', T3: '2027-04-30' },
         transport: { '2026-09': '2026-09-10', '2026-10': '2026-10-10', '2026-11': '2026-11-10' }
       }
     }),
     db.collection('schools').doc(otherSchoolId).set({ name: 'Other school', academicYear, active: true }),
-    db.collection('academicYears').doc(academicYearId).set({ schoolId, name: academicYear, status: 'active' }),
+    db.collection('academicYears').doc(academicYearId).set({
+      schoolId, name: academicYear, status: 'active',
+      tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' }
+    }),
     db.collection('classes').doc(classId).set({ schoolId, name: 'CP', level: 'primary', isActive: true, section: 'francophone' }),
     db.collection('students').doc(studentId).set({
       id: studentId, schoolId, name: 'Élève fictif', matricule: 'TEST-COLLECTIONS',
@@ -199,7 +201,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   const moratoriumQuote = await quote(secretaryId, 'tuition', { installment: 'T1' });
   assert.equal(moratoriumQuote.grossExpectedAmount, 70000);
   assert.equal(moratoriumQuote.netExpectedAmount, 70000);
-  assert.equal(moratoriumQuote.originalDueDate, '2026-09-30');
+  assert.equal(moratoriumQuote.originalDueDate, '2026-10-05');
   assert.equal(moratoriumQuote.effectiveDueDate, '2026-11-30');
   assert.equal(moratoriumQuote.moratoriumStatus, 'ACTIVE');
   assert.equal(moratoriumQuote.overdue, false);

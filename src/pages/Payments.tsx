@@ -18,6 +18,7 @@ import {
   type StudentFinance
 } from '../services/studentPrivacy';
 import FinancialBenefitsPanel from '../components/FinancialBenefitsPanel';
+import { getConfiguredTuitionInstallments } from '../utils/tuitionDeadlines';
 import { createExpense, reverseExpense } from '../services/expenses';
 import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from '../utils/expenseLedger';
 
@@ -364,6 +365,19 @@ const Payments: React.FC = () => {
   };
 
   const mobileMoneyEnabled = isOperationalMobileMoneyProvider(db.school?.paymentSettings?.activeProvider);
+  const selectedPaymentStudent = db.students.find(student => student.id === currentPayment.studentId);
+  const configuredTuitionInstallments = React.useMemo(
+    () => getConfiguredTuitionInstallments(selectedPaymentStudent),
+    [selectedPaymentStudent]
+  );
+
+  useEffect(() => {
+    if (currentPayment.type !== 'tuition' || configuredTuitionInstallments.length === 0) return;
+    if (!currentPayment.installment
+        || !configuredTuitionInstallments.includes(currentPayment.installment)) {
+      setCurrentPayment(previous => ({ ...previous, installment: configuredTuitionInstallments[0] }));
+    }
+  }, [currentPayment.type, currentPayment.installment, configuredTuitionInstallments]);
 
   useEffect(() => {
     if (!mobileMoneyEnabled) {
@@ -2274,9 +2288,11 @@ const Payments: React.FC = () => {
               <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                 <label>Choix de la Tranche</label>
                 <select required value={currentPayment.installment || 'T1'} onChange={e => setCurrentPayment({...currentPayment, installment: e.target.value as 'T1' | 'T2' | 'T3'})}>
-                  <option value="T1">Tranche 1</option>
-                  <option value="T2">Tranche 2</option>
-                  <option value="T3">Tranche 3</option>
+                  {configuredTuitionInstallments.map(installment => (
+                    <option key={installment} value={installment}>
+                      Tranche {installment.slice(1)}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}

@@ -194,7 +194,10 @@ const run = async () => {
   let otherOwnerUid = null;
   let testSchoolId = null;
   let academicYear = null;
+  let activeAcademicYearId = null;
   let academicYearFixtureId = null;
+  let academicYearDeadlinesBefore;
+  let academicYearConfigPatched = false;
   let schoolActiveAcademicYearIdBefore = null;
   let primaryClassId = null;
   let schoolBefore = null;
@@ -260,7 +263,7 @@ const run = async () => {
     schoolActiveAcademicYearIdBefore = typeof schoolBefore.activeAcademicYearId === 'string'
       && schoolBefore.activeAcademicYearId && !schoolBefore.activeAcademicYearId.includes('/')
       ? schoolBefore.activeAcademicYearId : null;
-    let activeAcademicYearId = schoolActiveAcademicYearIdBefore;
+    activeAcademicYearId = schoolActiveAcademicYearIdBefore;
     if (!activeAcademicYearId) {
       assert.match(String(schoolBefore.academicYear || ''), /^\d{4}-\d{4}$/,
         'The staging school has neither a canonical pointer nor a valid legacy year label.');
@@ -285,6 +288,9 @@ const run = async () => {
     assert.equal(academicYearData.status, 'active');
     academicYear = String(academicYearData.name || '');
     assert.match(academicYear, /^\d{4}-\d{4}$/);
+    assert.equal(academicYear, '2026-2027',
+      'The tuition deadline release fixture requires staging academic year 2026-2027.');
+    academicYearDeadlinesBefore = academicYearData.tuitionPaymentDeadlines;
     legacySlotId = makeLegacySlotId({
       schoolId: testSchoolId, studentId: studentIds.legacy, academicYear, installment: 'T1',
     });
@@ -302,14 +308,18 @@ const run = async () => {
     primaryClassId = primaryClass.id;
 
     const today = doualaDate();
-    const originalDueDate = addCalendarDays(today, -30);
-    const futureDueDate = addCalendarDays(today, 60);
+    const originalDueDate = '2026-10-05';
+    const futureDueDate = '2026-12-05';
+    const thirdDueDate = '2027-02-05';
     const moratoriumDueDate = addCalendarDays(today, 90);
     deadlineFixture = {
       registrationFee: originalDueDate,
-      tuition: { T1: originalDueDate, T2: futureDueDate, T3: originalDueDate },
       transport: {},
     };
+    await db.collection('academicYears').doc(activeAcademicYearId).update({
+      tuitionPaymentDeadlines: { T1: originalDueDate, T2: futureDueDate, T3: thirdDueDate },
+    });
+    academicYearConfigPatched = true;
     paymentSettingsFixture = { ...(schoolBefore.paymentSettings || {}), activeProvider: 'none' };
     const preexistingClosureId = `${testSchoolId}__${today}`;
     assert.equal((await db.collection('cashClosures').doc(preexistingClosureId).get()).exists, false,
@@ -474,9 +484,9 @@ const run = async () => {
 
     const mainT3 = await quote(studentIds.main, 'tuition', { installment: 'T3' });
     assert.equal(mainT3.remainingBalance, 70_000);
-    assert.equal(mainT3.originalDueDate, originalDueDate);
-    assert.equal(mainT3.overdue, true);
-    assert.equal(mainT3.dueStatus, 'OVERDUE');
+    assert.equal(mainT3.originalDueDate, thirdDueDate);
+    assert.equal(mainT3.overdue, false);
+    assert.equal(mainT3.dueStatus, 'NOT_DUE');
     assert.deepEqual({
       gross: mainT1Before.grossExpectedAmount + mainT2.grossExpectedAmount + mainT3.grossExpectedAmount,
       net: mainT1Before.netExpectedAmount + mainT2.netExpectedAmount + mainT3.netExpectedAmount,
@@ -748,6 +758,19 @@ const run = async () => {
             patch.activeAcademicYearId = schoolActiveAcademicYearIdBefore ?? FieldValue.delete();
           }
           transaction.update(schoolRef, patch);
+        });
+      }
+
+      if (academicYearConfigPatched && activeAcademicYearId && !academicYearFixtureId) {
+        const yearRef = db.collection('academicYears').doc(activeAcademicYearId);
+        await db.runTransaction(async (transaction) => {
+          const current = await transaction.get(yearRef);
+          assert.deepEqual(current.data()?.tuitionPaymentDeadlines, {
+            T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05',
+          }, 'Refusing to restore an academic-year configuration changed by another operation.');
+          transaction.update(yearRef, {
+            tuitionPaymentDeadlines: academicYearDeadlinesBefore ?? FieldValue.delete(),
+          });
         });
       }
 
