@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertManifestIntegrity,
   buildManifest,
   canonicalize,
   computeManifestDigest,
   computePrepareRequestDigest,
   deriveCrossSchoolId,
   deriveFixtureSchoolId,
+  ManifestIntegrityError,
   planExpectedResourceIds,
 } from '../src/manifest';
 
@@ -49,13 +51,33 @@ describe('manifest', () => {
     expect(manifest.schemaVersion).toBe(1);
     expect(manifest.fixtureSchoolId).toBe('transport-release-staging-33213214352-1');
     expect(manifest.crossSchoolId).toBe('transport-release-staging-33213214352-1-cross');
-    expect(manifest.manifestDigest).toBe(computeManifestDigest({ ...manifest, manifestDigest: undefined } as never));
+    const { manifestDigest, ...withoutDigest } = manifest;
+    expect(manifestDigest).toBe(computeManifestDigest(withoutDigest));
+    expect(() => assertManifestIntegrity(manifest)).not.toThrow();
   });
 
-  it('manifest tampering is detected: any field change changes the digest', () => {
+  it.each([
+    ['fixtureSchoolId', (manifest: ReturnType<typeof buildManifest>) => ({ ...manifest, fixtureSchoolId: 'tampered-school' })],
+    ['crossSchoolId', (manifest: ReturnType<typeof buildManifest>) => ({ ...manifest, crossSchoolId: 'tampered-cross-school' })],
+    ['testRunId', (manifest: ReturnType<typeof buildManifest>) => ({ ...manifest, testRunId: '99999999-9' })],
+    ['projectId', (manifest: ReturnType<typeof buildManifest>) => ({ ...manifest, projectId: 'ecoscolaire-c5861' })],
+    ['allowedCollectionsVersion', (manifest: ReturnType<typeof buildManifest>) => ({
+      ...manifest, allowedCollectionsVersion: 2 as unknown as 1,
+    })],
+    ['authUsers', (manifest: ReturnType<typeof buildManifest>) => ({
+      ...manifest, authUsers: ['attacker@example.invalid'],
+    })],
+    ['expectedResourceIds', (manifest: ReturnType<typeof buildManifest>) => ({
+      ...manifest, expectedResourceIds: [...manifest.expectedResourceIds, 'schools/extra'],
+    })],
+  ])('rejects %s tampering with MANIFEST_INTEGRITY_MISMATCH', (_field, mutate) => {
     const manifest = buildManifest(baseInput);
-    const { manifestDigest, ...withoutDigest } = manifest;
-    const tampered = { ...withoutDigest, expectedResourceIds: [...withoutDigest.expectedResourceIds, 'schools/extra'] };
-    expect(computeManifestDigest(tampered)).not.toBe(manifestDigest);
+    expect(() => assertManifestIntegrity(mutate(manifest)))
+      .toThrowError(ManifestIntegrityError);
+    try {
+      assertManifestIntegrity(mutate(manifest));
+    } catch (error) {
+      expect((error as ManifestIntegrityError).code).toBe('MANIFEST_INTEGRITY_MISMATCH');
+    }
   });
 });

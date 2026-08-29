@@ -8,6 +8,7 @@ import {
 } from './runtimeGuards';
 import { parsePrepareRequest } from './apiSchema';
 import {
+  assertManifestIntegrity,
   buildManifest,
   computePrepareRequestDigest,
   deriveCrossSchoolId,
@@ -108,6 +109,7 @@ export const prepareFixtures = async (
     const existing = await deps.manifestStore.get(request.testRunId);
 
     if (existing) {
+      assertManifestIntegrity(existing.manifest);
       if (existing.manifest.prepareRequestDigest !== prepareRequestDigest) {
         throw new PrepareConflictError(`testRunId ${request.testRunId} was already prepared with a different request.`);
       }
@@ -167,6 +169,7 @@ const appendCreatedResources = async (
   testRunId: string,
   createdResourceIds: readonly string[],
 ): Promise<ManifestRecord> => deps.manifestStore.update(testRunId, (record) => {
+  assertManifestIntegrity(record.manifest);
   const now = deps.clock.now().toISOString();
   const newResources = createdResourceIds
     .filter((id) => !record.resources.some((resource) => resource.documentId === id))

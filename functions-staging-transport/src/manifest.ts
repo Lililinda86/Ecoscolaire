@@ -81,6 +81,35 @@ export const computePrepareRequestDigest = (request: { schemaVersion: number; te
 export const computeManifestDigest = (manifest: Omit<TransportReleaseManifest, 'manifestDigest'>): string =>
   sha256Hex(canonicalize(manifest));
 
+/**
+ * Central fail-closed integrity check for manifests read from the store.
+ * Lifecycle state/events/resources/deletions intentionally live outside the
+ * immutable manifest and therefore never participate in this digest.
+ */
+export class ManifestIntegrityError extends Error {
+  readonly code = 'MANIFEST_INTEGRITY_MISMATCH';
+
+  constructor() {
+    super('Stored Transport fixture manifest does not match its immutable digest.');
+    this.name = 'ManifestIntegrityError';
+  }
+}
+
+export const immutableManifestFields = (
+  manifest: TransportReleaseManifest,
+): Omit<TransportReleaseManifest, 'manifestDigest'> => {
+  const { manifestDigest: _storedDigest, ...immutable } = manifest;
+  void _storedDigest;
+  return immutable;
+};
+
+export const assertManifestIntegrity = (manifest: TransportReleaseManifest): void => {
+  const expectedDigest = computeManifestDigest(immutableManifestFields(manifest));
+  if (manifest.manifestDigest !== expectedDigest) {
+    throw new ManifestIntegrityError();
+  }
+};
+
 export interface BuildManifestInput {
   readonly testRunId: string;
   readonly projectId: string;

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { prepareFixtures } from '../src/prepare';
-import { ALLOWED_CLEANUP_COLLECTIONS, cleanupFixtures, CleanupIdentityError } from '../src/cleanup';
+import { ALLOWED_CLEANUP_COLLECTIONS, cleanupFixtures } from '../src/cleanup';
 import { ConcurrencyLockError } from '../src/prepare';
+import { ManifestIntegrityError } from '../src/manifest';
 import { STAGING_PROJECT_ID } from '../src/runtimeGuards';
 import {
   FakeAuthCleaner, FakeClock, FakeCollectionDeleter, FakeCounterCleaner, FakeFixtureBootstrapper,
@@ -80,14 +81,14 @@ describe('cleanup', () => {
     expect(second.state).toBe('CLEANING');
   });
 
-  it('refuses to delete unless manifest membership, fixtureSchoolId and testFixture all match', async () => {
+  it('refuses all deletion when manifest membership or testFixture identity was tampered', async () => {
     const { manifestStore, cleanupDeps } = await setup();
     await manifestStore.update(TEST_RUN_ID, (record) => ({
       ...record,
       manifest: { ...record.manifest, testFixture: false as unknown as true },
     }));
     await expect(cleanupFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, cleanupDeps))
-      .rejects.toThrowError(CleanupIdentityError);
+      .rejects.toThrowError(ManifestIntegrityError);
   });
 
   it('same-run concurrency is locked', async () => {

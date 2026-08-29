@@ -1,6 +1,6 @@
 import { assertStagingRuntime, RuntimeProjectContext } from './runtimeGuards';
 import { parseCleanupRequest } from './apiSchema';
-import { appendDeletion, appendEvent, ManifestDeletionRecord } from './manifest';
+import { appendDeletion, appendEvent, assertManifestIntegrity, ManifestDeletionRecord } from './manifest';
 import { transition, FixtureRunState } from './stateMachine';
 import { Clock, ConcurrencyLockError, ManifestStore, RunLock } from './prepare';
 import { ManifestNotFoundError } from './inspect';
@@ -112,6 +112,7 @@ export const cleanupFixtures = async (
   try {
     const existing = await deps.manifestStore.get(request.testRunId);
     if (!existing) throw new ManifestNotFoundError(request.testRunId);
+    assertManifestIntegrity(existing.manifest);
 
     const { manifest } = existing;
     if (manifest.testFixture !== true || manifest.testRunId !== request.testRunId) {
@@ -142,12 +143,15 @@ export const cleanupFixtures = async (
 
     const authResult = await deps.authCleaner.deleteFixtureUsers(manifest.authUsers);
 
-    await deps.manifestStore.update(request.testRunId, (record) => ({
-      ...record,
-      state: nextState,
-      events: appendEvent(record.events, { testRunId: request.testRunId, type: 'CLEANUP_PROGRESS', at: now }),
-      deletions: allDeletions.reduce((acc, deletion) => appendDeletion(acc, deletion), record.deletions),
-    }));
+    await deps.manifestStore.update(request.testRunId, (record) => {
+      assertManifestIntegrity(record.manifest);
+      return {
+        ...record,
+        state: nextState,
+        events: appendEvent(record.events, { testRunId: request.testRunId, type: 'CLEANUP_PROGRESS', at: now }),
+        deletions: allDeletions.reduce((acc, deletion) => appendDeletion(acc, deletion), record.deletions),
+      };
+    });
 
     return {
       testRunId: request.testRunId,

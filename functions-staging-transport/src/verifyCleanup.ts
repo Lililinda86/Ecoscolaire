@@ -1,6 +1,6 @@
 import { assertStagingRuntime, RuntimeProjectContext } from './runtimeGuards';
 import { parseVerifyCleanupRequest } from './apiSchema';
-import { appendEvent } from './manifest';
+import { appendEvent, assertManifestIntegrity } from './manifest';
 import { transition, FixtureRunState } from './stateMachine';
 import { Clock, ManifestStore } from './prepare';
 import { ManifestNotFoundError } from './inspect';
@@ -49,6 +49,7 @@ export const verifyCleanup = async (
 
   const existing = await deps.manifestStore.get(request.testRunId);
   if (!existing) throw new ManifestNotFoundError(request.testRunId);
+  assertManifestIntegrity(existing.manifest);
   const { manifest } = existing;
 
   const [byCollection, authResiduals, orphans] = await Promise.all([
@@ -69,11 +70,14 @@ export const verifyCleanup = async (
   const nextState = transition(existing.state, 'verify', { allResidualsZero: passed });
 
   if (nextState === 'VERIFIED' && existing.state !== 'VERIFIED') {
-    await deps.manifestStore.update(request.testRunId, (record) => ({
-      ...record,
-      state: nextState,
-      events: appendEvent(record.events, { testRunId: request.testRunId, type: 'VERIFIED', at: deps.clock.now().toISOString() }),
-    }));
+    await deps.manifestStore.update(request.testRunId, (record) => {
+      assertManifestIntegrity(record.manifest);
+      return {
+        ...record,
+        state: nextState,
+        events: appendEvent(record.events, { testRunId: request.testRunId, type: 'VERIFIED', at: deps.clock.now().toISOString() }),
+      };
+    });
   }
 
   return { testRunId: request.testRunId, state: nextState, passed, residuals, failingCategories };

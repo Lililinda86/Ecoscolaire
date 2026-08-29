@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { prepareFixtures, PrepareConflictError, ConcurrencyLockError } from '../src/prepare';
 import { RuntimeGuardError, STAGING_PROJECT_ID, PRODUCTION_PROJECT_ID } from '../src/runtimeGuards';
 import { SchemaValidationError } from '../src/apiSchema';
-import { deriveCrossSchoolId, deriveFixtureSchoolId } from '../src/manifest';
+import {
+  computeManifestDigest, deriveCrossSchoolId, deriveFixtureSchoolId, ManifestIntegrityError,
+} from '../src/manifest';
 import {
   FakeClock, FakeFixtureBootstrapper, FakeManifestStore, FakeRunLock, FakeStagingBackend, RecordingLogger,
 } from './fakes';
@@ -72,12 +74,28 @@ describe('prepare', () => {
     await prepareFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, deps);
     // Same testRunId always parses to the same request shape (only schemaVersion+testRunId), so we
     // simulate a divergent prior request by tampering the stored digest directly.
-    await deps.manifestStore.update(TEST_RUN_ID, (record) => ({
-      ...record,
-      manifest: { ...record.manifest, prepareRequestDigest: 'tampered-digest' },
-    }));
+    await deps.manifestStore.update(TEST_RUN_ID, (record) => {
+      const { manifestDigest: _oldDigest, ...immutable } = record.manifest;
+      void _oldDigest;
+      const divergent = { ...immutable, prepareRequestDigest: 'different-valid-request-digest' };
+      return {
+        ...record,
+        manifest: { ...divergent, manifestDigest: computeManifestDigest(divergent) },
+      };
+    });
     await expect(prepareFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, deps))
       .rejects.toThrowError(PrepareConflictError);
+  });
+
+  it('fails closed when a replay reads a tampered manifest', async () => {
+    const deps = makeDeps(new FakeStagingBackend());
+    await prepareFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, deps);
+    await deps.manifestStore.update(TEST_RUN_ID, (record) => ({
+      ...record,
+      manifest: { ...record.manifest, fixtureSchoolId: 'tampered-school' },
+    }));
+    await expect(prepareFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, deps))
+      .rejects.toThrowError(ManifestIntegrityError);
   });
 
   it('collision detection: a second distinct testRunId never collides with an existing one', async () => {

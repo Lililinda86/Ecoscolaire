@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { prepareFixtures } from '../src/prepare';
 import { inspectFixtures, ManifestNotFoundError } from '../src/inspect';
 import { STAGING_PROJECT_ID } from '../src/runtimeGuards';
+import { ManifestIntegrityError } from '../src/manifest';
 import {
   FakeAuthInspector, FakeClock, FakeFixtureBootstrapper, FakeManifestStore, FakeResourceInspector, FakeRunLock,
   FakeStagingBackend, RecordingLogger,
@@ -68,5 +69,15 @@ describe('inspect', () => {
     const { inspectDeps } = await setup();
     await expect(inspectFixtures({ schemaVersion: 1, testRunId: '99999999-1' }, STAGING_CONTEXT, inspectDeps))
       .rejects.toThrowError(ManifestNotFoundError);
+  });
+
+  it('fails closed before inspection when the stored manifest was tampered', async () => {
+    const { manifestStore, inspectDeps } = await setup();
+    await manifestStore.update(TEST_RUN_ID, (record) => ({
+      ...record,
+      manifest: { ...record.manifest, crossSchoolId: 'tampered-cross-school' },
+    }));
+    await expect(inspectFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, inspectDeps))
+      .rejects.toThrowError(ManifestIntegrityError);
   });
 });

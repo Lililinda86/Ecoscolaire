@@ -3,6 +3,7 @@ import { prepareFixtures } from '../src/prepare';
 import { ALLOWED_CLEANUP_COLLECTIONS, cleanupFixtures } from '../src/cleanup';
 import { REQUIRED_RESIDUAL_CATEGORIES, verifyCleanup } from '../src/verifyCleanup';
 import { STAGING_PROJECT_ID } from '../src/runtimeGuards';
+import { ManifestIntegrityError } from '../src/manifest';
 import {
   FakeAuthCleaner, FakeClock, FakeCollectionDeleter, FakeCounterCleaner, FakeFixtureBootstrapper,
   FakeManifestStore, FakeResidualCounter, FakeRunLock, FakeStagingBackend, RecordingLogger,
@@ -93,5 +94,16 @@ describe('verifyCleanup', () => {
     const result = await verifyCleanup({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, verifyDeps);
     expect(result.passed).toBe(false);
     expect(result.failingCategories).toContain('orphans');
+  });
+
+  it('fails closed before residual checks when the stored manifest was tampered', async () => {
+    const { manifestStore, verifyDeps } = await setup();
+    await manifestStore.update(TEST_RUN_ID, (record) => ({
+      ...record,
+      state: 'CLEANING',
+      manifest: { ...record.manifest, projectId: 'ecoscolaire-c5861' },
+    }));
+    await expect(verifyCleanup({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, verifyDeps))
+      .rejects.toThrowError(ManifestIntegrityError);
   });
 });

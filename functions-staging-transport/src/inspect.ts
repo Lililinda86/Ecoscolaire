@@ -1,6 +1,6 @@
 import { assertStagingRuntime, RuntimeProjectContext } from './runtimeGuards';
 import { parseInspectRequest } from './apiSchema';
-import { appendEvent } from './manifest';
+import { appendEvent, assertManifestIntegrity } from './manifest';
 import { transition, FixtureRunState } from './stateMachine';
 import { Clock, ManifestStore } from './prepare';
 
@@ -53,14 +53,18 @@ export const inspectFixtures = async (
 
   const existing = await deps.manifestStore.get(request.testRunId);
   if (!existing) throw new ManifestNotFoundError(request.testRunId);
+  assertManifestIntegrity(existing.manifest);
 
   const nextState = transition(existing.state, 'inspect');
   if (nextState !== existing.state) {
-    await deps.manifestStore.update(request.testRunId, (record) => ({
-      ...record,
-      state: nextState,
-      events: appendEvent(record.events, { testRunId: request.testRunId, type: 'INSPECTED', at: deps.clock.now().toISOString() }),
-    }));
+    await deps.manifestStore.update(request.testRunId, (record) => {
+      assertManifestIntegrity(record.manifest);
+      return {
+        ...record,
+        state: nextState,
+        events: appendEvent(record.events, { testRunId: request.testRunId, type: 'INSPECTED', at: deps.clock.now().toISOString() }),
+      };
+    });
   }
 
   const [counts, ownershipViolations, authStatus] = await Promise.all([
