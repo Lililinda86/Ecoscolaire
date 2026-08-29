@@ -201,5 +201,27 @@ jobs:
         with:
           credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Collect Staging Function inventories
+        run: |
+          gcloud functions list \
+            --project "$FIREBASE_PROJECT_ID" \
+            --regions us-central1 \
+            --format=json \
+            > /tmp/staging-functions-gen1.json
+          gcloud functions list \
+            --v2 \
+            --project "$FIREBASE_PROJECT_ID" \
+            --regions us-central1 \
+            --format=json \
+            > /tmp/staging-functions-gen2.json
+
+      - name: Verify Staging Function deployment contract
+        run: |
+          node scripts/verify-staging-function-deployment-contract.mjs \
+            /tmp/staging-functions-gen1.json \
+            /tmp/staging-functions-gen2.json \
+            "$FIREBASE_PROJECT_ID" \
+            us-central1
+
       - name: Deploy Firebase Backend
         run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions,firestore:rules,storage --non-interactive

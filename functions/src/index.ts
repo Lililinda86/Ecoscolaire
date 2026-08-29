@@ -21,6 +21,12 @@ import {
   writeStudentFinanceProjection
 } from './studentFinanceProjection';
 import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from './expenseLedger';
+import {
+  CASH_LEDGER_COLLECTION,
+  CashLedgerIntegrityError,
+  makeCashLedgerDayId,
+  requireCashLedgerTotalAtClose
+} from './cashClosureIntegrity';
 
 
 // Initialize the Firebase Admin SDK
@@ -2963,11 +2969,15 @@ export const closeCashDrawer = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const closureId = `${schoolId}__${date}`;
+  const closureId = makeCashLedgerDayId(schoolId, date);
   const closureRef = db.collection('cashClosures').doc(closureId);
+  const cashLedgerRef = db.collection(CASH_LEDGER_COLLECTION).doc(closureId);
 
   return await db.runTransaction(async (transaction) => {
-    const existingSnap = await transaction.get(closureRef);
+    const [existingSnap, cashLedgerSnap] = await Promise.all([
+      transaction.get(closureRef),
+      transaction.get(cashLedgerRef)
+    ]);
     if (existingSnap.exists) {
       throw new functions.https.HttpsError('already-exists', 'La caisse pour cette date a déjà été clôturée.');
     }
@@ -2981,6 +2991,23 @@ export const closeCashDrawer = functions.https.onCall(async (data, context) => {
       paymentsSnap.docs.map(docSnap => docSnap.data()),
       'cash'
     );
+    try {
+      requireCashLedgerTotalAtClose(
+        cashLedgerSnap.exists ? cashLedgerSnap.data() || {} : null,
+        schoolId,
+        date,
+        cashReceived
+      );
+    } catch (error) {
+      if (error instanceof CashLedgerIntegrityError) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          error.message,
+          { businessCode: error.businessCode }
+        );
+      }
+      throw error;
+    }
 
     const expensesQuery = db.collection('expenses')
       .where('schoolId', '==', schoolId)
@@ -3017,6 +3044,17 @@ export const closeCashDrawer = functions.https.onCall(async (data, context) => {
     };
 
     transaction.set(closureRef, closureDoc);
+    transaction.set(cashLedgerRef, {
+      id: closureId,
+      schoolId,
+      date,
+      status: 'closed',
+      cashReceived,
+      closureId,
+      closedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(!cashLedgerSnap.exists ? { createdAt: FieldValue.serverTimestamp() } : {})
+    }, { merge: true });
 
     return {
       success: true,

@@ -1439,7 +1439,8 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
         ((isOwner() || isDirector() || isSecretary() || isAccountant()) && hasSchoolAccess(resource.data.schoolId)) ||
-        (isParent() && hasSchoolAccess(resource.data.schoolId))
+        (isParent() && hasSchoolAccess(resource.data.schoolId)
+          && resource.data.studentId in getUserData().get('studentIds', []))
       );
       // Écritures gérées uniquement par le backend avec Firebase Admin SDK.
       allow write: if false;
@@ -1564,6 +1565,11 @@ service cloud.firestore {
     match /cashClosures/{closureId} {
       allow get, list: if isAuthenticated() && isActive() && (isSuperAdmin() || (resource.data.schoolId == getUserSchoolId() && (isOwner() || isDirector() || isSecretary() || isAccountant())));
       allow create, update, delete: if false;
+    }
+
+    // Transactional backend-only serialization point for payments/reversals/closure.
+    match /cashLedgerDays/{ledgerId} {
+      allow read, write: if false;
     }
 
     // --- TEACHER ASSIGNMENTS ---

@@ -18,6 +18,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
   id-token: write
 
@@ -50,11 +51,40 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Authenticate Staging with its exact service account
+      - name: Verify exact-SHA deployment succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TRANSPORT_RELEASE_MODE" = staging ]; then
+            deployment_workflow='deploy-staging.yml'
+            expected_branch='staging'
+          elif [ "$TRANSPORT_RELEASE_MODE" = production ]; then
+            deployment_workflow='firebase-deploy.yml'
+            expected_branch='main'
+          else
+            echo "Unsupported release mode: $TRANSPORT_RELEASE_MODE"
+            exit 1
+          fi
+          runs_json="$(mktemp)"
+          trap 'rm -f "$runs_json"' EXIT
+          gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${deployment_workflow}/runs" \
+            -f head_sha="$GITHUB_SHA" \
+            -f branch="$expected_branch" \
+            -f event=push \
+            -f per_page=100 > "$runs_json"
+          node scripts/verify-exact-deployment-run.mjs \
+            "$runs_json" "$GITHUB_SHA" ".github/workflows/${deployment_workflow}" "$expected_branch"
+          echo 'TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED=true' >> "$GITHUB_ENV"
+
+      - name: Authenticate Staging keylessly with its dedicated runner identity
         if: inputs.mode == 'staging'
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          workload_identity_provider: projects/411364288790/locations/global/workloadIdentityPools/italo-transport-staging/providers/github-ecoscolaire-staging
+          service_account: italo-transport-runner-staging@ecoscolaire-staging.iam.gserviceaccount.com
 
       - name: Authenticate Production keylessly
         if: inputs.mode == 'production'
@@ -65,33 +95,70 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Fail-closed target, Function and cleanup capability preflight
+      - name: Fail-closed target, deployment and cleanup capability preflight
         shell: bash
         run: |
           set -euo pipefail
-          expected_ref="refs/heads/${TRANSPORT_RELEASE_MODE}"
+          if [ "$TRANSPORT_RELEASE_MODE" = production ]; then
+            expected_ref='refs/heads/main'
+          elif [ "$TRANSPORT_RELEASE_MODE" = staging ]; then
+            expected_ref='refs/heads/staging'
+          else
+            echo "Unsupported release mode: $TRANSPORT_RELEASE_MODE"
+            exit 1
+          fi
           test "$GITHUB_REF" = "$expected_ref"
           test "$(gcloud config get-value project)" = "$TRANSPORT_FIREBASE_PROJECT_ID"
           test "$TRANSPORT_FIXTURE_SCHOOL_ID" != "italo-gsb"
           if [ "$TRANSPORT_RELEASE_MODE" = production ]; then
             test "$TRANSPORT_APP_URL" = "https://ecoscolaire.vercel.app"
           else
-            printf '%s' "$TRANSPORT_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\\.vercel\\.app$'
+            printf '%s' "$TRANSPORT_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$'
           fi
-          deployed="$(gcloud functions list --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format='value(name)')"
-          required=(createStudentSecure getCollectionQuote recordCashPayment reversePayment createFinancialBenefit approveFinancialBenefit closeCashDrawer)
-          for function_name in "${required[@]}"; do
-            printf '%s\\n' "$deployed" | grep -Fx "$function_name" >/dev/null || { echo "Missing required Function: $function_name"; exit 1; }
-          done
+          test "$TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED" = true
           token="$(gcloud auth print-access-token)"
-          response="$(curl --fail --silent --show-error \\
-            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \\
-            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \\
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \
             "https://cloudresourcemanager.googleapis.com/v1/projects/${TRANSPORT_FIREBASE_PROJECT_ID}:testIamPermissions")"
-          for permission in datastore.entities.create datastore.entities.get datastore.entities.list datastore.entities.update datastore.entities.delete firebaseauth.users.create firebaseauth.users.get firebaseauth.users.delete; do
-            printf '%s' "$response" | grep -Fq "\\"$permission\\"" || { echo "Missing fixture lifecycle permission: $permission"; exit 1; }
+          returned_permissions_json="$(printf '%s' "$response" | jq -ce '
+            if (type == "object")
+              and ((.permissions // []) | type == "array")
+              and ((.permissions // []) | all(type == "string"))
+            then (.permissions // [])
+            else error("invalid testIamPermissions response")
+            end
+          ')"
+          required_permissions=(
+            datastore.entities.create
+            datastore.entities.get
+            datastore.entities.list
+            datastore.entities.update
+            datastore.entities.delete
+            firebaseauth.users.create
+            firebaseauth.users.get
+            firebaseauth.users.delete
+          )
+          mapfile -t returned_permissions < <(printf '%s' "$returned_permissions_json" | jq -r '.[]')
+          printf 'Expected fixture lifecycle permissions:\n'
+          printf -- '- %s\n' "${required_permissions[@]}"
+          printf 'Returned fixture lifecycle permissions:\n'
+          if [ "${#returned_permissions[@]}" -eq 0 ]; then
+            echo '- (none)'
+          else
+            printf -- '- %s\n' "${returned_permissions[@]}"
+          fi
+          missing_permissions=()
+          for permission in "${required_permissions[@]}"; do
+            printf '%s\n' "${returned_permissions[@]}" | grep -Fxq "$permission" || missing_permissions+=("$permission")
           done
-          echo 'TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED=true' >> "$GITHUB_ENV"
+          if [ "${#missing_permissions[@]}" -gt 0 ]; then
+            echo 'Missing fixture lifecycle permissions:'
+            for permission in "${missing_permissions[@]}"; do
+              echo "- $permission"
+            done
+            exit 1
+          fi
           echo 'TRANSPORT_CLEANUP_CAPABILITY_VERIFIED=true' >> "$GITHUB_ENV"
 
       - name: Install dependencies
@@ -100,10 +167,24 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run isolated Transport release contract
+      - name: Run isolated Transport release contract with Staging Firebase client config
+        if: inputs.mode == 'staging'
+        env:
+          TRANSPORT_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
+          TRANSPORT_FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
+          TRANSPORT_FIREBASE_CLIENT_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          TRANSPORT_FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
+          TRANSPORT_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
+          TRANSPORT_FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/test-transport-payments-production.mjs
+
+      - name: Run isolated Transport release contract with Production Firebase client config
+        if: inputs.mode == 'production'
         env:
           TRANSPORT_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           TRANSPORT_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          TRANSPORT_FIREBASE_CLIENT_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           TRANSPORT_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           TRANSPORT_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           TRANSPORT_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
