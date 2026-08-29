@@ -1385,6 +1385,31 @@ describe('Student Privacy Security Rules', () => {
         studentId: OTHER_STUDENT_ID,
         amount: 1000
       });
+      await setDoc(doc(db, 'receipts', 'privacy-receipt-own'), {
+        id: 'privacy-receipt-own',
+        schoolId: SCHOOL_ID,
+        studentId: STUDENT_ID,
+        amount: 1000
+      });
+      await setDoc(doc(db, 'receipts', 'privacy-receipt-other-student'), {
+        id: 'privacy-receipt-other-student',
+        schoolId: SCHOOL_ID,
+        studentId: OTHER_STUDENT_ID,
+        amount: 1000
+      });
+      await setDoc(doc(db, 'receipts', 'privacy-receipt-other-school'), {
+        id: 'privacy-receipt-other-school',
+        schoolId: OTHER_SCHOOL_ID,
+        studentId: 'privacy-cross-student',
+        amount: 1000
+      });
+      await setDoc(doc(db, 'cashLedgerDays', `${SCHOOL_ID}__2026-08-29`), {
+        id: `${SCHOOL_ID}__2026-08-29`,
+        schoolId: SCHOOL_ID,
+        date: '2026-08-29',
+        status: 'open',
+        cashReceived: 1000
+      });
     });
   });
 
@@ -1556,6 +1581,33 @@ describe('Student Privacy Security Rules', () => {
     await assertFails(readAs('privacy-cross-parent', 'studentParentFinance'));
     await assertSucceeds(getDoc(doc(db, 'payments', 'privacy-payment-own')));
     await assertFails(getDoc(doc(db, 'payments', 'privacy-payment-other')));
+  });
+
+  it('limits receipt reads to a parent own children while preserving same-school staff access', async () => {
+    const parentDb = testEnv.authenticatedContext('privacy-parent').firestore();
+    await assertSucceeds(getDoc(doc(parentDb, 'receipts', 'privacy-receipt-own')));
+    await assertFails(getDoc(doc(parentDb, 'receipts', 'privacy-receipt-other-student')));
+    await assertFails(getDoc(doc(parentDb, 'receipts', 'privacy-receipt-other-school')));
+
+    for (const uid of ['privacy-secretary', 'privacy-owner']) {
+      const staffDb = testEnv.authenticatedContext(uid).firestore();
+      await assertSucceeds(getDoc(doc(staffDb, 'receipts', 'privacy-receipt-own')));
+      await assertSucceeds(getDoc(doc(staffDb, 'receipts', 'privacy-receipt-other-student')));
+    }
+
+    for (const uid of ['privacy-other-secretary', 'privacy-other-owner']) {
+      const crossSchoolDb = testEnv.authenticatedContext(uid).firestore();
+      await assertFails(getDoc(doc(crossSchoolDb, 'receipts', 'privacy-receipt-own')));
+    }
+  });
+
+  it('keeps the cash-day serialization ledger backend-only', async () => {
+    const ledgerId = `${SCHOOL_ID}__2026-08-29`;
+    for (const uid of ['privacy-secretary', 'privacy-owner', 'privacy-other-secretary']) {
+      const db = testEnv.authenticatedContext(uid).firestore();
+      await assertFails(getDoc(doc(db, 'cashLedgerDays', ledgerId)));
+      await assertFails(updateDoc(doc(db, 'cashLedgerDays', ledgerId), { cashReceived: 2000 }));
+    }
   });
 
   it('denies parent writes to parent projections', async () => {
