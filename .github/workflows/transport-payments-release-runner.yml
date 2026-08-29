@@ -18,6 +18,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
   id-token: write
 
@@ -50,6 +51,34 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Verify exact-SHA deployment succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TRANSPORT_RELEASE_MODE" = staging ]; then
+            deployment_workflow='deploy-staging.yml'
+            expected_branch='staging'
+          elif [ "$TRANSPORT_RELEASE_MODE" = production ]; then
+            deployment_workflow='firebase-deploy.yml'
+            expected_branch='main'
+          else
+            echo "Unsupported release mode: $TRANSPORT_RELEASE_MODE"
+            exit 1
+          fi
+          runs_json="$(mktemp)"
+          trap 'rm -f "$runs_json"' EXIT
+          gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${deployment_workflow}/runs" \
+            -f head_sha="$GITHUB_SHA" \
+            -f branch="$expected_branch" \
+            -f event=push \
+            -f per_page=100 > "$runs_json"
+          node scripts/verify-exact-deployment-run.mjs \
+            "$runs_json" "$GITHUB_SHA" ".github/workflows/${deployment_workflow}" "$expected_branch"
+          echo 'TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED=true' >> "$GITHUB_ENV"
+
       - name: Authenticate Staging with its exact service account
         if: inputs.mode == 'staging'
         uses: google-github-actions/auth@v2
@@ -65,7 +94,7 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Fail-closed target, Function and cleanup capability preflight
+      - name: Fail-closed target, deployment and cleanup capability preflight
         shell: bash
         run: |
           set -euo pipefail
@@ -85,13 +114,7 @@ jobs:
           else
             printf '%s' "$TRANSPORT_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$'
           fi
-          gen1_inventory="$(mktemp)"
-          gen2_inventory="$(mktemp)"
-          trap 'rm -f "$gen1_inventory" "$gen2_inventory"' EXIT
-          gcloud functions list --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format=json > "$gen1_inventory"
-          gcloud functions list --v2 --project "$TRANSPORT_FIREBASE_PROJECT_ID" --regions us-central1 --format=json > "$gen2_inventory"
-          node scripts/verify-staging-function-deployment-contract.mjs \
-            "$gen1_inventory" "$gen2_inventory" "$TRANSPORT_FIREBASE_PROJECT_ID" us-central1
+          test "$TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED" = true
           token="$(gcloud auth print-access-token)"
           response="$(curl --fail --silent --show-error \
             -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
@@ -108,7 +131,6 @@ jobs:
             done
             exit 1
           fi
-          echo 'TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED=true' >> "$GITHUB_ENV"
           echo 'TRANSPORT_CLEANUP_CAPABILITY_VERIFIED=true' >> "$GITHUB_ENV"
 
       - name: Install dependencies
