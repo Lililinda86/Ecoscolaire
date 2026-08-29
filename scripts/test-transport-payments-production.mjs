@@ -663,26 +663,79 @@ const main = async () => {
 
       await page.getByRole('button', { name: 'Reçus', exact: true }).click();
       await page.getByText(creditReceipt.receiptNumber, { exact: true }).waitFor({ timeout: 20_000 });
-      await page.getByRole('button', {
-        name: `Afficher le détail du reçu ${creditReceipt.receiptNumber}`,
-      }).click();
+      const receiptRow = page.locator('[data-receipt-row="true"]:visible')
+        .filter({ hasText: creditReceipt.receiptNumber });
+      await receiptRow.waitFor({ state: 'visible' });
+      assert.equal(await receiptRow.count(), 1,
+        `Expected one visible row for receipt ${creditReceipt.receiptNumber} at ${width}px.`);
+      const detailToggle = receiptRow.getByTestId(`receipt-detail-toggle-${credit.receiptId}`);
+      await detailToggle.waitFor({ state: 'visible' });
+      assert.equal(await detailToggle.isEnabled(), true);
+      const waitForToggleState = async (expanded) => page.waitForFunction(
+        ({ testId, expected }) => document.querySelector(`[data-testid="${testId}"]`)
+          ?.getAttribute('aria-expanded') === expected,
+        { testId: `receipt-detail-toggle-${credit.receiptId}`, expected: String(expanded) },
+      );
+      if (await detailToggle.getAttribute('aria-expanded') === 'true') {
+        await detailToggle.click();
+        await page.getByTestId(`receipt-detail-${credit.receiptId}`).waitFor({ state: 'hidden' });
+        await waitForToggleState(false);
+      }
+      assert.equal(await detailToggle.getAttribute('aria-expanded'), 'false');
+      const detailToggleBox = await detailToggle.boundingBox();
+      assert.ok(detailToggleBox && detailToggleBox.width >= 44 && detailToggleBox.height >= 44,
+        `Receipt detail touch target is too small at ${width}px.`);
+      await detailToggle.click();
+      await waitForToggleState(true);
+      assert.equal(await detailToggle.getAttribute('aria-expanded'), 'true');
+      const receiptDetail = page.getByTestId(`receipt-detail-${credit.receiptId}`);
+      await receiptDetail.waitFor({ state: 'visible' });
       const allocationPanel = page.getByTestId(`transport-receipt-allocation-${credit.receiptId}`);
       await allocationPanel.waitFor({ state: 'visible' });
       await allocationPanel.getByText(periods.at(-1), { exact: false }).waitFor();
       await allocationPanel.getByText(/Crédit disponible/i).waitFor();
       const receiptMetrics = await page.getByTestId('receipt-history-scroll').evaluate((element) => ({
         clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
         overflowX: getComputedStyle(element).overflowX,
       }));
       assert.ok(receiptMetrics.clientWidth <= width);
-      assert.ok(['auto', 'scroll'].includes(receiptMetrics.overflowX));
-      const receiptRow = page.locator('tr').filter({ hasText: creditReceipt.receiptNumber }).first();
+      if (width <= 899) {
+        assert.ok(receiptMetrics.scrollWidth <= receiptMetrics.clientWidth + 1,
+          `Receipt history requires horizontal scrolling at ${width}px.`);
+        assert.equal(receiptMetrics.overflowX, 'visible');
+      } else {
+        assert.ok(['auto', 'scroll'].includes(receiptMetrics.overflowX));
+      }
+      const detailBox = await receiptDetail.boundingBox();
+      assert.ok(detailBox && detailBox.x >= 0 && detailBox.x + detailBox.width <= width + 1,
+        `Receipt detail is outside viewport at ${width}px.`);
+      const allocationBox = await allocationPanel.boundingBox();
+      assert.ok(allocationBox && allocationBox.x >= 0 && allocationBox.x + allocationBox.width <= width + 1,
+        `Receipt allocation is outside viewport at ${width}px.`);
+      const allocationDirection = await allocationPanel.locator('.receipt-history-allocation-row').first()
+        .evaluate((element) => getComputedStyle(element).flexDirection);
+      assert.equal(allocationDirection, width <= 899 ? 'column' : 'row');
+      const creditDisplay = allocationPanel.getByText(/Crédit disponible/i);
+      const creditBox = await creditDisplay.boundingBox();
+      assert.ok(creditBox && creditBox.x >= 0 && creditBox.x + creditBox.width <= width + 1,
+        `Transport credit is clipped at ${width}px.`);
       const printAction = receiptRow.getByRole('button', { name: 'Imprimer', exact: true });
       await printAction.scrollIntoViewIfNeeded();
       const printBox = await printAction.boundingBox();
       assert.ok(printBox && printBox.x >= 0 && printBox.x + printBox.width <= width + 1,
         `Receipt print action is outside viewport at ${width}px.`);
-      assert.ok(printBox.height >= 40, `Receipt print touch target is too small at ${width}px.`);
+      assert.ok(printBox.height >= 44, `Receipt print touch target is too small at ${width}px.`);
+      const expandedPageMetrics = await page.evaluate(() => ({
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      }));
+      assert.ok(expandedPageMetrics.documentWidth <= expandedPageMetrics.viewportWidth + 1,
+        `Expanded receipt causes global overflow at ${width}px.`);
+      await detailToggle.click();
+      await receiptDetail.waitFor({ state: 'hidden' });
+      await waitForToggleState(false);
+      assert.equal(await detailToggle.getAttribute('aria-expanded'), 'false');
     }
     assertTransportEnvironmentEvidence({ expectedProject: cfg.expectedProject, runtimeProjectId: runtimeProject,
       networkProjectIds: [...firebaseProjects] });

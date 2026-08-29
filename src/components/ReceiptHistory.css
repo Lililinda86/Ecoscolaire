@@ -1,0 +1,256 @@
+.receipt-history-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.receipt-history-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+}
+
+.receipt-history-row {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.receipt-history-toggle-cell,
+.receipt-history-actions-cell {
+  padding: 1rem;
+  text-align: center;
+}
+
+.receipt-history-number-cell {
+  padding: 1rem;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+.receipt-history-number {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.receipt-history-date-cell {
+  padding: 1rem;
+}
+
+.receipt-history-student-cell {
+  padding: 1rem;
+  font-weight: 500;
+}
+
+.receipt-history-payment-cell {
+  padding: 1rem;
+  font-family: monospace;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.receipt-history-amount-cell {
+  padding: 1rem;
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.receipt-history-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.receipt-history-detail-row {
+  background: #f8fafc;
+}
+
+.receipt-history-detail-cell {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  min-width: 0;
+}
+
+.receipt-history-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 1rem;
+}
+
+.receipt-history-allocation {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  background: #eff6ff;
+  min-width: 0;
+}
+
+.receipt-history-allocation-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #dbeafe;
+}
+
+.receipt-history-allocation-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.receipt-history-allocation-row > strong {
+  white-space: nowrap;
+}
+
+.receipt-history-credit {
+  margin-top: 0.75rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.receipt-history-financial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: #fff;
+}
+
+@media (max-width: 899px) {
+  .receipt-history-scroll {
+    overflow-x: visible;
+  }
+
+  .receipt-history-table,
+  .receipt-history-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .receipt-history-table thead {
+    display: none;
+  }
+
+  .receipt-history-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem 0.75rem;
+    margin: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .receipt-history-row > td {
+    display: block;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .receipt-history-number-cell {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .receipt-history-toggle-cell {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+
+  .receipt-history-student-cell {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .receipt-history-date-cell,
+  .receipt-history-payment-cell,
+  .receipt-history-amount-cell,
+  .receipt-history-actions-cell {
+    grid-column: 1 / -1;
+  }
+
+  .receipt-history-date-cell::before {
+    content: 'Date : ';
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .receipt-history-payment-cell::before {
+    content: 'Paiement : ';
+    color: var(--text-muted);
+    font-family: inherit;
+  }
+
+  .receipt-history-amount-cell {
+    text-align: left;
+  }
+
+  .receipt-history-amount-cell::before {
+    content: 'Montant : ';
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .receipt-history-actions {
+    justify-content: flex-start;
+  }
+
+  .receipt-history-actions > button {
+    flex: 1 1 130px;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .receipt-history-detail-row {
+    display: block;
+    margin: -0.75rem 0.75rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-top: 0;
+    border-radius: 0 0 10px 10px;
+  }
+
+  .receipt-history-detail-row[hidden] {
+    display: none;
+  }
+
+  .receipt-history-detail-cell {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    box-sizing: border-box;
+  }
+
+  .receipt-history-allocation-row {
+    flex-direction: column;
+  }
+
+  .receipt-history-credit {
+    text-align: left;
+  }
+}
+
+@media (max-width: 420px) {
+  .receipt-history-row {
+    margin-inline: 0.5rem;
+    padding: 0.85rem;
+  }
+
+  .receipt-history-detail-row {
+    margin-inline: 0.5rem;
+  }
+
+  .receipt-history-actions > button {
+    flex-basis: 100%;
+  }
+}
