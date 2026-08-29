@@ -159,14 +159,8 @@ const main = async () => {
   };
   const newClient = async (key) => {
     const creds = credentials.get(key); assert.ok(creds, `Missing ${key} fixture credentials.`);
-    const app = initializeApp({
-      apiKey: process.env.TRANSPORT_FIREBASE_API_KEY,
-      authDomain: process.env.TRANSPORT_FIREBASE_AUTH_DOMAIN,
-      projectId: cfg.expectedProject,
-      storageBucket: process.env.TRANSPORT_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.TRANSPORT_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.TRANSPORT_FIREBASE_APP_ID,
-    }, `transport-${key}-${cfg.testRunId}-${clientApps.length}`);
+    const app = initializeApp(cfg.firebaseClientConfig,
+      `transport-${key}-${cfg.testRunId}-${clientApps.length}`);
     clientApps.push(app);
     const auth = getAuth(app);
     await signInWithEmailAndPassword(auth, creds.email, creds.password);
