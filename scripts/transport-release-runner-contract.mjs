@@ -4,9 +4,14 @@ const PROJECTS = { staging: 'ecoscolaire-staging', production: 'ecoscolaire-c586
 const REAL_ITALO_SCHOOL = 'italo-gsb';
 const WEB_ENV = [
   'TRANSPORT_FIREBASE_API_KEY', 'TRANSPORT_FIREBASE_AUTH_DOMAIN',
+  'TRANSPORT_FIREBASE_CLIENT_PROJECT_ID',
   'TRANSPORT_FIREBASE_STORAGE_BUCKET', 'TRANSPORT_FIREBASE_MESSAGING_SENDER_ID',
   'TRANSPORT_FIREBASE_APP_ID',
 ];
+const AUTH_DOMAINS = {
+  staging: 'ecoscolaire-staging.firebaseapp.com',
+  production: 'ecoscolaire-c5861.firebaseapp.com',
+};
 
 const safeToken = (value) => String(value || '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 96);
 
@@ -34,6 +39,18 @@ export const validateTransportRunnerConfig = (env = process.env) => {
   const expectedSchool = `transport-release-${mode}-${testRunId}`.slice(0, 120);
   assert.equal(env.TRANSPORT_FIXTURE_SCHOOL_ID, expectedSchool, 'Fixture school ID is not exact for this run.');
   for (const name of ['TRANSPORT_APP_URL', ...WEB_ENV]) assert.ok(env[name]?.trim(), `Missing ${name}.`);
+  const firebaseClientConfig = {
+    apiKey: env.TRANSPORT_FIREBASE_API_KEY.trim(),
+    authDomain: env.TRANSPORT_FIREBASE_AUTH_DOMAIN.trim(),
+    projectId: env.TRANSPORT_FIREBASE_CLIENT_PROJECT_ID.trim(),
+    storageBucket: env.TRANSPORT_FIREBASE_STORAGE_BUCKET.trim(),
+    messagingSenderId: env.TRANSPORT_FIREBASE_MESSAGING_SENDER_ID.trim(),
+    appId: env.TRANSPORT_FIREBASE_APP_ID.trim(),
+  };
+  assert.equal(firebaseClientConfig.projectId, expectedProject,
+    'Firebase Client project does not match release mode.');
+  assert.equal(firebaseClientConfig.authDomain, AUTH_DOMAINS[mode],
+    'Firebase Client authDomain does not match release mode.');
   const url = new URL(env.TRANSPORT_APP_URL);
   assert.equal(url.protocol, 'https:', 'Application URL must be HTTPS.');
   if (mode === 'production') assert.equal(url.hostname, 'ecoscolaire.vercel.app', 'Production URL mismatch.');
@@ -42,5 +59,8 @@ export const validateTransportRunnerConfig = (env = process.env) => {
       'Staging requires an immutable Vercel Preview URL.');
     assert.ok(env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim(), 'Missing Preview bypass secret.');
   }
-  return { mode, expectedProject, testRunId, fixtureSchoolId: expectedSchool, appUrl: url.origin };
+  return {
+    mode, expectedProject, testRunId, fixtureSchoolId: expectedSchool, appUrl: url.origin,
+    firebaseClientConfig,
+  };
 };

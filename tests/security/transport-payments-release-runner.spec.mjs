@@ -28,7 +28,10 @@ const valid = (mode = 'staging') => {
     TRANSPORT_FIXTURE_SCHOOL_ID: `transport-release-${mode}-${testRunId}`,
     TRANSPORT_APP_URL: mode === 'production' ? 'https://ecoscolaire.vercel.app'
       : 'https://ecoscolaire-abc123-linda-lemofouet-s-projects.vercel.app',
-    TRANSPORT_FIREBASE_API_KEY: 'fixture', TRANSPORT_FIREBASE_AUTH_DOMAIN: 'fixture',
+    TRANSPORT_FIREBASE_API_KEY: 'fixture',
+    TRANSPORT_FIREBASE_AUTH_DOMAIN: mode === 'production'
+      ? 'ecoscolaire-c5861.firebaseapp.com' : 'ecoscolaire-staging.firebaseapp.com',
+    TRANSPORT_FIREBASE_CLIENT_PROJECT_ID: project,
     TRANSPORT_FIREBASE_STORAGE_BUCKET: 'fixture', TRANSPORT_FIREBASE_MESSAGING_SENDER_ID: 'fixture',
     TRANSPORT_FIREBASE_APP_ID: 'fixture', VERCEL_AUTOMATION_BYPASS_SECRET: 'fixture',
   };
@@ -81,6 +84,13 @@ test('release ref contract fails closed by mode', () => {
 
 for (const [name, mutate] of [
   ['wrong projectId', (env) => { env.TRANSPORT_FIREBASE_PROJECT_ID = 'ecoscolaire-c5861'; }],
+  ['wrong Firebase Client projectId', (env) => { env.TRANSPORT_FIREBASE_CLIENT_PROJECT_ID = 'ecoscolaire-c5861'; }],
+  ['missing Firebase Client API key', (env) => { delete env.TRANSPORT_FIREBASE_API_KEY; }],
+  ['missing Firebase Client authDomain', (env) => { delete env.TRANSPORT_FIREBASE_AUTH_DOMAIN; }],
+  ['Production Firebase Client config', (env) => {
+    env.TRANSPORT_FIREBASE_CLIENT_PROJECT_ID = 'ecoscolaire-c5861';
+    env.TRANSPORT_FIREBASE_AUTH_DOMAIN = 'ecoscolaire-c5861.firebaseapp.com';
+  }],
   ['missing testRunId', (env) => { delete env.TRANSPORT_TEST_RUN_ID; }],
   ['testFixture missing', (env) => { delete env.TRANSPORT_TEST_FIXTURE; }],
   ['real ITALO school requested', (env) => { env.TRANSPORT_FIXTURE_SCHOOL_ID = 'italo-gsb'; }],
@@ -95,6 +105,33 @@ for (const [name, mutate] of [
 ]) test(`fail-closed before writes: ${name}`, () => {
   const env = valid('staging'); mutate(env);
   assert.throws(() => validateTransportRunnerConfig(env));
+});
+
+test('exact Staging Firebase Client config is accepted', () => {
+  const config = validateTransportRunnerConfig(valid('staging'));
+  assert.equal(config.firebaseClientConfig.projectId, 'ecoscolaire-staging');
+  assert.equal(config.firebaseClientConfig.authDomain, 'ecoscolaire-staging.firebaseapp.com');
+  assert.equal(config.firebaseClientConfig.apiKey, 'fixture');
+});
+
+test('Staging runner sources its Firebase Client config only from Staging secrets', () => {
+  const stagingStep = workflow.match(
+    /- name: Run isolated Transport release contract with Staging Firebase client config[\s\S]*?run: node scripts\/test-transport-payments-production\.mjs/,
+  )?.[0];
+  assert.ok(stagingStep, 'Staging Firebase Client runner step not found');
+  const mappings = {
+    TRANSPORT_FIREBASE_API_KEY: 'STAGING_FIREBASE_API_KEY',
+    TRANSPORT_FIREBASE_AUTH_DOMAIN: 'STAGING_FIREBASE_AUTH_DOMAIN',
+    TRANSPORT_FIREBASE_CLIENT_PROJECT_ID: 'STAGING_FIREBASE_PROJECT_ID',
+    TRANSPORT_FIREBASE_STORAGE_BUCKET: 'STAGING_FIREBASE_STORAGE_BUCKET',
+    TRANSPORT_FIREBASE_MESSAGING_SENDER_ID: 'STAGING_FIREBASE_MESSAGING_SENDER_ID',
+    TRANSPORT_FIREBASE_APP_ID: 'STAGING_FIREBASE_APP_ID',
+  };
+  assert.match(stagingStep, /if: inputs\.mode == 'staging'/);
+  for (const [variable, secret] of Object.entries(mappings)) {
+    assert.match(stagingStep, new RegExp(`${variable}: \\\$\\{\\{ secrets\\.${secret} \\}\\}`));
+  }
+  assert.doesNotMatch(stagingStep, /secrets\.VITE_FIREBASE_/);
 });
 
 const requiredFixturePermissions = [
