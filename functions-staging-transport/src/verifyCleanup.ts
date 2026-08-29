@@ -2,7 +2,7 @@ import { assertStagingRuntime, RuntimeProjectContext } from './runtimeGuards';
 import { parseVerifyCleanupRequest } from './apiSchema';
 import { appendEvent, assertManifestIntegrity } from './manifest';
 import { transition, FixtureRunState } from './stateMachine';
-import { Clock, ManifestStore } from './prepare';
+import { Clock, ConcurrencyLockError, ManifestStore, RunLock } from './prepare';
 import { ManifestNotFoundError } from './inspect';
 import { ALLOWED_CLEANUP_COLLECTIONS, AllowedCleanupCollection } from './cleanup';
 
@@ -27,6 +27,7 @@ export interface ResidualCounter {
 
 export interface VerifyCleanupDependencies {
   readonly manifestStore: ManifestStore;
+  readonly runLock: RunLock;
   readonly residualCounter: ResidualCounter;
   readonly clock: Clock;
 }
@@ -47,38 +48,46 @@ export const verifyCleanup = async (
   assertStagingRuntime(runtimeContext);
   const request = parseVerifyCleanupRequest(rawRequest);
 
-  const existing = await deps.manifestStore.get(request.testRunId);
-  if (!existing) throw new ManifestNotFoundError(request.testRunId);
-  assertManifestIntegrity(existing.manifest);
-  const { manifest } = existing;
-
-  const [byCollection, authResiduals, orphans] = await Promise.all([
-    deps.residualCounter.countResidualsByCollection(manifest.fixtureSchoolId, manifest.testRunId),
-    deps.residualCounter.countResidualAuthUsers(manifest.authUsers),
-    deps.residualCounter.countOrphans(manifest.fixtureSchoolId, manifest.crossSchoolId, manifest.testRunId),
-  ]);
-
-  const residuals: Record<ResidualCategory, number> = {
-    ...byCollection,
-    authUsers: authResiduals,
-    orphans,
-  } as Record<ResidualCategory, number>;
-
-  const failingCategories = REQUIRED_RESIDUAL_CATEGORIES.filter((category) => residuals[category] !== 0);
-  const passed = failingCategories.length === 0;
-
-  const nextState = transition(existing.state, 'verify', { allResidualsZero: passed });
-
-  if (nextState === 'VERIFIED' && existing.state !== 'VERIFIED') {
-    await deps.manifestStore.update(request.testRunId, (record) => {
-      assertManifestIntegrity(record.manifest);
-      return {
-        ...record,
-        state: nextState,
-        events: appendEvent(record.events, { testRunId: request.testRunId, type: 'VERIFIED', at: deps.clock.now().toISOString() }),
-      };
-    });
+  if (!deps.runLock.acquire(request.testRunId)) {
+    throw new ConcurrencyLockError(`Fixture run ${request.testRunId} is locked by a concurrent operation.`);
   }
 
-  return { testRunId: request.testRunId, state: nextState, passed, residuals, failingCategories };
+  try {
+    const existing = await deps.manifestStore.get(request.testRunId);
+    if (!existing) throw new ManifestNotFoundError(request.testRunId);
+    assertManifestIntegrity(existing.manifest);
+    const { manifest } = existing;
+
+    const [byCollection, authResiduals, orphans] = await Promise.all([
+      deps.residualCounter.countResidualsByCollection(manifest.fixtureSchoolId, manifest.testRunId),
+      deps.residualCounter.countResidualAuthUsers(manifest.authUsers),
+      deps.residualCounter.countOrphans(manifest.fixtureSchoolId, manifest.crossSchoolId, manifest.testRunId),
+    ]);
+
+    const residuals: Record<ResidualCategory, number> = {
+      ...byCollection,
+      authUsers: authResiduals,
+      orphans,
+    } as Record<ResidualCategory, number>;
+
+    const failingCategories = REQUIRED_RESIDUAL_CATEGORIES.filter((category) => residuals[category] !== 0);
+    const passed = failingCategories.length === 0;
+
+    const nextState = transition(existing.state, 'verify', { allResidualsZero: passed });
+
+    if (nextState === 'VERIFIED' && existing.state !== 'VERIFIED') {
+      await deps.manifestStore.update(request.testRunId, (record) => {
+        assertManifestIntegrity(record.manifest);
+        return {
+          ...record,
+          state: nextState,
+          events: appendEvent(record.events, { testRunId: request.testRunId, type: 'VERIFIED', at: deps.clock.now().toISOString() }),
+        };
+      });
+    }
+
+    return { testRunId: request.testRunId, state: nextState, passed, residuals, failingCategories };
+  } finally {
+    deps.runLock.release(request.testRunId);
+  }
 };

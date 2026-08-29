@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prepareFixtures } from '../src/prepare';
+import { ConcurrencyLockError, prepareFixtures } from '../src/prepare';
 import { inspectFixtures, ManifestNotFoundError } from '../src/inspect';
 import { STAGING_PROJECT_ID } from '../src/runtimeGuards';
 import { ManifestIntegrityError } from '../src/manifest';
@@ -14,9 +14,10 @@ const STAGING_CONTEXT = { projectId: STAGING_PROJECT_ID };
 const setup = async () => {
   const backend = new FakeStagingBackend();
   const manifestStore = new FakeManifestStore();
+  const runLock = new FakeRunLock();
   const prepareDeps = {
     manifestStore,
-    runLock: new FakeRunLock(),
+    runLock,
     fixtureBootstrapper: new FakeFixtureBootstrapper(backend),
     clock: new FakeClock(),
     logger: new RecordingLogger(),
@@ -29,11 +30,12 @@ const setup = async () => {
 
   const inspectDeps = {
     manifestStore,
+    runLock,
     resourceInspector: new FakeResourceInspector(backend),
     authInspector: new FakeAuthInspector(backend),
     clock: new FakeClock(),
   };
-  return { backend, manifestStore, inspectDeps };
+  return { backend, manifestStore, runLock, inspectDeps };
 };
 
 describe('inspect', () => {
@@ -79,5 +81,13 @@ describe('inspect', () => {
     }));
     await expect(inspectFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, inspectDeps))
       .rejects.toThrowError(ManifestIntegrityError);
+  });
+
+  it('fails deterministically when another lifecycle operation owns the same run lock', async () => {
+    const { runLock, inspectDeps } = await setup();
+    expect(runLock.acquire(TEST_RUN_ID)).toBe(true);
+    await expect(inspectFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, inspectDeps))
+      .rejects.toThrowError(ConcurrencyLockError);
+    runLock.release(TEST_RUN_ID);
   });
 });

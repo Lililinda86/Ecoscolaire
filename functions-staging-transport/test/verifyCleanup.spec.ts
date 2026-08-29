@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prepareFixtures } from '../src/prepare';
+import { ConcurrencyLockError, prepareFixtures } from '../src/prepare';
 import { ALLOWED_CLEANUP_COLLECTIONS, cleanupFixtures } from '../src/cleanup';
 import { REQUIRED_RESIDUAL_CATEGORIES, verifyCleanup } from '../src/verifyCleanup';
 import { STAGING_PROJECT_ID } from '../src/runtimeGuards';
@@ -40,8 +40,13 @@ const setup = async () => {
     authCleaner: new FakeAuthCleaner(backend),
     clock: new FakeClock(),
   };
-  const verifyDeps = { manifestStore, residualCounter: new FakeResidualCounter(backend), clock: new FakeClock() };
-  return { backend, manifestStore, cleanupDeps, verifyDeps };
+  const verifyDeps = {
+    manifestStore,
+    runLock,
+    residualCounter: new FakeResidualCounter(backend),
+    clock: new FakeClock(),
+  };
+  return { backend, manifestStore, runLock, cleanupDeps, verifyDeps };
 };
 
 describe('verifyCleanup', () => {
@@ -105,5 +110,13 @@ describe('verifyCleanup', () => {
     }));
     await expect(verifyCleanup({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, verifyDeps))
       .rejects.toThrowError(ManifestIntegrityError);
+  });
+
+  it('fails deterministically when another lifecycle operation owns the same run lock', async () => {
+    const { runLock, verifyDeps } = await setup();
+    expect(runLock.acquire(TEST_RUN_ID)).toBe(true);
+    await expect(verifyCleanup({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, verifyDeps))
+      .rejects.toThrowError(ConcurrencyLockError);
+    runLock.release(TEST_RUN_ID);
   });
 });

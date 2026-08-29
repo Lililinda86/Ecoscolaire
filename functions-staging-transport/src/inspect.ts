@@ -2,7 +2,7 @@ import { assertStagingRuntime, RuntimeProjectContext } from './runtimeGuards';
 import { parseInspectRequest } from './apiSchema';
 import { appendEvent, assertManifestIntegrity } from './manifest';
 import { transition, FixtureRunState } from './stateMachine';
-import { Clock, ManifestStore } from './prepare';
+import { Clock, ConcurrencyLockError, ManifestStore, RunLock } from './prepare';
 
 export class ManifestNotFoundError extends Error {
   readonly code = 'MANIFEST_NOT_FOUND';
@@ -30,6 +30,7 @@ export interface AuthInspector {
 
 export interface InspectDependencies {
   readonly manifestStore: ManifestStore;
+  readonly runLock: RunLock;
   readonly resourceInspector: ResourceInspector;
   readonly authInspector: AuthInspector;
   readonly clock: Clock;
@@ -51,27 +52,35 @@ export const inspectFixtures = async (
   assertStagingRuntime(runtimeContext);
   const request = parseInspectRequest(rawRequest);
 
-  const existing = await deps.manifestStore.get(request.testRunId);
-  if (!existing) throw new ManifestNotFoundError(request.testRunId);
-  assertManifestIntegrity(existing.manifest);
-
-  const nextState = transition(existing.state, 'inspect');
-  if (nextState !== existing.state) {
-    await deps.manifestStore.update(request.testRunId, (record) => {
-      assertManifestIntegrity(record.manifest);
-      return {
-        ...record,
-        state: nextState,
-        events: appendEvent(record.events, { testRunId: request.testRunId, type: 'INSPECTED', at: deps.clock.now().toISOString() }),
-      };
-    });
+  if (!deps.runLock.acquire(request.testRunId)) {
+    throw new ConcurrencyLockError(`Fixture run ${request.testRunId} is locked by a concurrent operation.`);
   }
 
-  const [counts, ownershipViolations, authStatus] = await Promise.all([
-    deps.resourceInspector.countByCollection(existing.manifest.fixtureSchoolId),
-    deps.resourceInspector.findOwnershipViolations(existing.manifest.fixtureSchoolId, existing.manifest.expectedResourceIds),
-    deps.authInspector.checkExistence(existing.manifest.authUsers),
-  ]);
+  try {
+    const existing = await deps.manifestStore.get(request.testRunId);
+    if (!existing) throw new ManifestNotFoundError(request.testRunId);
+    assertManifestIntegrity(existing.manifest);
 
-  return { testRunId: request.testRunId, state: nextState, counts, ownershipViolations, authStatus };
+    const nextState = transition(existing.state, 'inspect');
+    if (nextState !== existing.state) {
+      await deps.manifestStore.update(request.testRunId, (record) => {
+        assertManifestIntegrity(record.manifest);
+        return {
+          ...record,
+          state: nextState,
+          events: appendEvent(record.events, { testRunId: request.testRunId, type: 'INSPECTED', at: deps.clock.now().toISOString() }),
+        };
+      });
+    }
+
+    const [counts, ownershipViolations, authStatus] = await Promise.all([
+      deps.resourceInspector.countByCollection(existing.manifest.fixtureSchoolId),
+      deps.resourceInspector.findOwnershipViolations(existing.manifest.fixtureSchoolId, existing.manifest.expectedResourceIds),
+      deps.authInspector.checkExistence(existing.manifest.authUsers),
+    ]);
+
+    return { testRunId: request.testRunId, state: nextState, counts, ownershipViolations, authStatus };
+  } finally {
+    deps.runLock.release(request.testRunId);
+  }
 };
