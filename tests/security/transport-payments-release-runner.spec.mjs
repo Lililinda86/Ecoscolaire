@@ -97,14 +97,24 @@ for (const [name, mutate] of [
   assert.throws(() => validateTransportRunnerConfig(env));
 });
 
-test('workflow is manual, branch-bound, keyless in Production and verifies lifecycle IAM', () => {
+const requiredFixturePermissions = [
+  'datastore.entities.create', 'datastore.entities.get', 'datastore.entities.list',
+  'datastore.entities.update', 'datastore.entities.delete', 'firebaseauth.users.create',
+  'firebaseauth.users.get', 'firebaseauth.users.delete',
+];
+
+test('workflow is manual, branch-bound, keyless in Staging and Production, and verifies lifecycle IAM', () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /\n\s+push:/);
   assert.match(workflow, /refs\/heads\/staging/);
   assert.match(workflow, /refs\/heads\/main/);
-  assert.match(workflow, /workload_identity_provider/);
+  assert.match(workflow, /permissions:\n\s+actions: read\n\s+contents: read\n\s+id-token: write/);
+  assert.match(workflow, /workload_identity_provider: projects\/411364288790\/locations\/global\/workloadIdentityPools\/italo-transport-staging\/providers\/github-ecoscolaire-staging/);
+  assert.match(workflow, /service_account: italo-transport-runner-staging@ecoscolaire-staging\.iam\.gserviceaccount\.com/);
+  assert.doesNotMatch(workflow, /credentials_json/);
+  assert.doesNotMatch(workflow, /STAGING_FIREBASE_SERVICE_ACCOUNT/);
   assert.match(workflow, /testIamPermissions/);
-  for (const permission of ['datastore.entities.delete', 'firebaseauth.users.delete']) assert.match(workflow, new RegExp(permission));
+  for (const permission of requiredFixturePermissions) assert.match(workflow, new RegExp(permission));
   assert.doesNotMatch(workflow, /production-financial-e2e|test-production-financial-e2e/);
 });
 
@@ -125,13 +135,9 @@ test('IAM preflight collects every missing fixture lifecycle permission before f
   assert.ok(iamBlockMatch, 'IAM preflight permission-check block not found');
   const iamBlock = iamBlockMatch[0];
   assert.match(iamBlock, /missing_permissions=\(\)/);
-  const requiredPermissions = [
-    'datastore.entities.create', 'datastore.entities.get', 'datastore.entities.list',
-    'datastore.entities.update', 'datastore.entities.delete', 'firebaseauth.users.create',
-    'firebaseauth.users.get', 'firebaseauth.users.delete',
-  ];
-  assert.match(iamBlock, new RegExp(`for permission in ${requiredPermissions.join(' ').replace(/\./g, '\\.')}; do`));
-  for (const permission of requiredPermissions) assert.ok(iamBlock.includes(permission), `missing permission token ${permission}`);
+  assert.match(iamBlock, /required_permissions=\(\n(?:\s+[a-z]+(?:\.[a-z]+)+\n){8}\s+\)/);
+  assert.match(iamBlock, /for permission in "\$\{required_permissions\[@\]\}"; do/);
+  for (const permission of requiredFixturePermissions) assert.ok(iamBlock.includes(permission), `missing permission token ${permission}`);
   assert.match(iamBlock, /missing_permissions\+=\("\$permission"\)/);
   assert.doesNotMatch(iamBlock, /\|\| \{ echo "Missing fixture lifecycle permission: \$permission"; exit 1; \}/);
   assert.match(iamBlock, /if \[ "\$\{#missing_permissions\[@\]\}" -gt 0 \]; then/);
@@ -139,7 +145,20 @@ test('IAM preflight collects every missing fixture lifecycle permission before f
   assert.match(iamBlock, /for permission in "\$\{missing_permissions\[@\]\}"; do/);
   assert.match(iamBlock, /echo "- \$permission"/);
   assert.equal((iamBlock.match(/exit 1/g) || []).length, 1);
-  assert.doesNotMatch(iamBlock, /\$response(?!")/);
+  assert.match(iamBlock, /jq -ce/);
+  assert.match(iamBlock, /mapfile -t returned_permissions/);
+  assert.match(iamBlock, /Expected fixture lifecycle permissions:/);
+  assert.match(iamBlock, /Returned fixture lifecycle permissions:/);
+});
+
+test('IAM preflight requests exactly the eight fixture lifecycle permissions before fixture creation', () => {
+  const payloadMatch = workflow.match(/-d '(\{"permissions":\[[^']+\]\})'/);
+  assert.ok(payloadMatch, 'testIamPermissions request payload not found');
+  assert.deepEqual(JSON.parse(payloadMatch[1]).permissions, requiredFixturePermissions);
+  const preflightIndex = workflow.indexOf('testIamPermissions');
+  const installIndex = workflow.indexOf('- name: Install dependencies');
+  const fixtureRunnerIndex = workflow.indexOf('node scripts/test-transport-payments-production.mjs');
+  assert.ok(preflightIndex > 0 && preflightIndex < installIndex && installIndex < fixtureRunnerIndex);
 });
 
 const exactDeploymentSha = '6deb2e324822923aa8e4e6ee1a21942f952b26e6';
