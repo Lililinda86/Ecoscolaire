@@ -15,6 +15,11 @@ test('live collections E2E is staging-only and uses environment-scoped secrets',
   assert.match(workflow, /VERCEL_AUTOMATION_BYPASS_SECRET:\s*\$\{\{ secrets\.VERCEL_AUTOMATION_BYPASS_SECRET \}\}/);
   assert.match(workflow, /node scripts\/test-secretary-collections-staging\.mjs/);
   assert.match(workflow, /node scripts\/test-secretary-collections-staging-completion\.mjs/);
+  assert.ok(
+    workflow.indexOf('node scripts/test-secretary-collections-staging-completion.mjs')
+      < workflow.indexOf('node scripts/test-secretary-collections-staging.mjs'),
+    'Tuition deadlines must run before the secretary scenario that closes its fixture cash day.',
+  );
   assert.doesNotMatch(workflow, /PRODUCTION_FIREBASE|PRODUCTION_TEST|production-service-account/i);
 });
 
@@ -30,9 +35,14 @@ test('completion runner covers live financial schedules, reversals and exact cle
   assert.match(source, /mode: 'PERCENTAGE'/);
   assert.match(source, /tuitionDiscounts/);
   assert.match(source, /paymentMoratoriums/);
-  assert.match(source, /e2e-complete-academic-year-/);
-  assert.match(source, /schoolActiveAcademicYearIdBefore/);
-  assert.match(source, /Refusing to restore an academic year pointer changed by another operation/);
+  assert.match(source, /tuition-deadlines-staging-\$\{suffix\}/);
+  assert.match(source, /tuition-deadlines-year-\$\{suffix\}/);
+  assert.match(source, /tuition-deadlines-class-\$\{suffix\}/);
+  assert.match(source, /e2e-tuition-secretary-\$\{suffix\}/);
+  assert.match(source, /assertFixtureCashDayOpen/);
+  assert.match(source, /markCashDayFixture/);
+  assert.match(source, /cleanupCashDayFixture/);
+  assert.match(source, /cashLedgerDays/);
   assert.match(source, /academicYears.*academicYearFixtureId.*exists, false/s);
   assert.match(source, /ownerReverseCall/);
   assert.match(source, /secretaryReverseCall/);
@@ -47,6 +57,7 @@ test('completion runner covers live financial schedules, reversals and exact cle
   assert.match(source, /STAGING COMPLETION ORPHANS: 0/);
   assert.match(source, /RECEIPT COUNTER REWOUND: NO/);
   assert.match(source, /finally \{[\s\S]*CLEANUP COMPLETE/);
+  assert.doesNotMatch(source, /school-alpha-001|secretary\.alpha@ecoscolaire\.com/);
   assert.doesNotMatch(source, /firebase use|firebase deploy|ecoscolaire-c5861\.firebaseio\.com/);
   assert.doesNotMatch(source, /console\.(?:log|error)\([^\n]*(?:PASSWORD|SERVICE_ACCOUNT|API_KEY)/);
 });
@@ -83,6 +94,8 @@ test('runner fails closed against Production and always executes exact cleanup',
   assert.match(source, /kind: 'CREDIT'/);
   assert.match(source, /transportPaymentAllocations/);
   assert.match(source, /const boundedDrain = async/);
+  assert.match(source, /cleanupCashDayFixture/);
+  assert.match(source, /cashLedgerDay: 0/);
   assert.match(source, /testRunId.*suffix/);
   assert.match(source, /classId: secondaryClassId/);
   assert.match(source, /classId: primaryClassId/);

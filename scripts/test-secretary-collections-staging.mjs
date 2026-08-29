@@ -14,6 +14,11 @@ import {
   assertStagingRuntimeProject,
   classifyFirebaseRequest,
 } from './staging-firebase-precheck.mjs';
+import {
+  assertFixtureCashDayOpen,
+  cleanupCashDayFixture,
+  markCashDayFixture,
+} from './staging-cash-day-fixture.mjs';
 
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
 const SECRETARY_EMAIL = 'secretary.alpha@ecoscolaire.com';
@@ -297,9 +302,7 @@ const run = async () => {
     schoolStudentsCountBefore = school.studentsCount;
     assert.ok(Number.isSafeInteger(schoolStudentsCountBefore), 'The staging student counter is not initialized.');
     const today = doualaDate();
-    const expectedClosureId = `${testSchoolId}__${today}`;
-    assert.equal((await db.collection('cashClosures').doc(expectedClosureId).get()).exists, false,
-      'A staging cash closure already exists for today; refusing to overwrite it.');
+    const expectedClosureId = await assertFixtureCashDayOpen({ db, schoolId: testSchoolId, date: today });
     schoolTransportPolicyBefore = school.transportPolicy;
     schoolPaymentDeadlinesBefore = school.paymentDeadlines;
     await db.collection('schools').doc(testSchoolId).update({
@@ -671,6 +674,10 @@ const run = async () => {
     assert.equal(closureData.cashReceived, cashReceived);
     assert.equal(closureData.closedBy, secretaryUid);
     assert.equal(closureData.notes, `E2E encaissements ${suffix}`);
+    await markCashDayFixture({
+      db, schoolId: testSchoolId, date: today, testRunId: suffix,
+      closureNotes: `E2E encaissements ${suffix}`,
+    });
     assert.equal(payments.docs.some((doc) => doc.data().type === 'transport'), true);
     assert.equal(payments.docs.some((doc) => doc.data().type === 'tuition'), true);
 
@@ -825,13 +832,10 @@ const run = async () => {
         }
       }
       if (closureId) {
-        const closureRef = db.collection('cashClosures').doc(closureId);
-        const closureSnapshot = await closureRef.get();
-        if (closureSnapshot.exists) {
-          assert.equal(closureSnapshot.data()?.notes, `E2E encaissements ${suffix}`,
-            'Refusing to delete a cash closure not owned by this test run.');
-          await closureRef.delete();
-        }
+        await cleanupCashDayFixture({
+          db, schoolId: testSchoolId, date: today, testRunId: suffix,
+          closureNotes: `E2E encaissements ${suffix}`,
+        });
       }
       await boundedDrain();
 
@@ -846,6 +850,8 @@ const run = async () => {
         references: referenceId
           && (await db.collection('financialBenefitReferences').doc(referenceId).get()).exists ? 1 : 0,
         closure: closureId && (await db.collection('cashClosures').doc(closureId).get()).exists ? 1 : 0,
+        cashLedgerDay: closureId
+          && (await db.collection('cashLedgerDays').doc(closureId).get()).exists ? 1 : 0,
         reservations: (await Promise.all([
           matriculeReservationId
             ? db.collection('studentMatriculeReservations').doc(matriculeReservationId).get() : null,
@@ -865,7 +871,8 @@ const run = async () => {
       };
       assert.deepEqual(remaining, {
         student: 0, privateDocs: 0, payments: 0, receipts: 0, benefits: 0,
-        references: 0, closure: 0, reservations: 0, academicYearFixture: 0, secondaryClassFixture: 0,
+        references: 0, closure: 0, cashLedgerDay: 0, reservations: 0,
+        academicYearFixture: 0, secondaryClassFixture: 0,
         allocations: 0, moratoriums: 0, audits: 0, transportStudents: 0,
       });
       if (testSchoolId) {
