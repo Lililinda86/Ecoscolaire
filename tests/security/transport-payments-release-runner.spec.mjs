@@ -2,16 +2,18 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
+import { validateExactDeploymentRun } from '../../scripts/verify-exact-deployment-run.mjs';
 import {
   formatInventorySummary, normalizeFunctionInventory, REQUIRED_STAGING_FUNCTIONS,
   validateFunctionInventory,
 } from '../../scripts/verify-staging-function-deployment-contract.mjs';
 
-const workflow = await readFile('.github/workflows/transport-payments-release-runner.yml', 'utf8');
-const runner = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
-const stagingWorkflow = await readFile('.github/workflows/run-seed.yml', 'utf8');
-const stagingDeploymentWorkflow = await readFile('.github/workflows/deploy-staging.yml', 'utf8');
-const environmentEvidenceSource = await readFile('scripts/test-transport-payments-production.mjs', 'utf8');
+const readText = async (path) => (await readFile(path, 'utf8')).replace(/\r\n/g, '\n');
+const workflow = await readText('.github/workflows/transport-payments-release-runner.yml');
+const runner = await readText('scripts/test-transport-payments-production.mjs');
+const stagingWorkflow = await readText('.github/workflows/run-seed.yml');
+const stagingDeploymentWorkflow = await readText('.github/workflows/deploy-staging.yml');
+const environmentEvidenceSource = await readText('scripts/test-transport-payments-production.mjs');
 const environmentEvidence = new Function('assert', `${environmentEvidenceSource
   .match(/export const assertTransportEnvironmentEvidence = [\s\S]*?\n};(?=\nconst REQUIRED_FUNCTIONS)/)[0]
   .replace('export ', '')}; return assertTransportEnvironmentEvidence;`)(assert);
@@ -140,6 +142,42 @@ test('IAM preflight collects every missing fixture lifecycle permission before f
   assert.doesNotMatch(iamBlock, /\$response(?!")/);
 });
 
+const exactDeploymentSha = '6deb2e324822923aa8e4e6ee1a21942f952b26e6';
+const oldDeploymentSha = '1111111111111111111111111111111111111111';
+const deploymentRun = (overrides = {}) => ({
+  conclusion: 'success', event: 'push', head_branch: 'staging', head_sha: exactDeploymentSha,
+  id: 124, path: '.github/workflows/deploy-staging.yml', status: 'completed', ...overrides,
+});
+const validateDeployment = (workflowRuns) => validateExactDeploymentRun({ workflow_runs: workflowRuns }, {
+  expectedBranch: 'staging', expectedSha: exactDeploymentSha,
+  expectedWorkflowPath: '.github/workflows/deploy-staging.yml',
+});
+
+for (const [name, run] of [
+  ['failed', deploymentRun({ conclusion: 'failure' })],
+  ['pending', deploymentRun({ conclusion: null, status: 'in_progress' })],
+  ['wrong SHA', deploymentRun({ head_sha: '2222222222222222222222222222222222222222' })],
+  ['old successful SHA', deploymentRun({ head_sha: oldDeploymentSha })],
+]) test(`exact-SHA deployment gate denies a ${name} Deploy Staging run`, () => {
+  assert.throws(() => validateDeployment([run]));
+});
+
+test('exact-SHA deployment gate allows an exact successful Deploy Staging run', () => {
+  assert.equal(validateDeployment([deploymentRun()]).id, 124);
+});
+
+test('runner queries GitHub Actions fail-closed for an exact deployment SHA', () => {
+  assert.match(workflow, /actions: read/);
+  assert.match(workflow, /deployment_workflow='deploy-staging\.yml'/);
+  assert.match(workflow, /gh api --method GET/);
+  assert.match(workflow, /-f head_sha="\$GITHUB_SHA"/);
+  assert.match(workflow, /-f branch="\$expected_branch"/);
+  assert.match(workflow, /-f event=push/);
+  assert.match(workflow, /verify-exact-deployment-run\.mjs/);
+  assert.doesNotMatch(workflow, /gcloud functions list/);
+  assert.doesNotMatch(workflow, /cloudfunctions\.functions\.list/);
+});
+
 test('runner is isolated, run-scoped, manifests exact IDs and baselines real data', () => {
   assert.match(runner, /REAL_ITALO_SCHOOL = 'italo-gsb'/);
   assert.match(runner, /assert\.notEqual\(cfg\.fixtureSchoolId, REAL_ITALO_SCHOOL\)/);
@@ -200,12 +238,10 @@ const functionInventory = (generation = 'GEN_1', overrides = {}) => REQUIRED_STA
 
 test('Staging deployment contract queries both generations and keeps the full Functions deployment', () => {
   assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only functions,firestore:rules,storage/);
-  assert.match(workflow, /gcloud functions list --project .*--regions us-central1 --format=json/);
-  assert.match(workflow, /gcloud functions list --v2 --project .*--regions us-central1 --format=json/);
-  assert.doesNotMatch(workflow, /gcloud functions list --gen2/);
   assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--v2 \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen2\.json/);
   assert.doesNotMatch(stagingDeploymentWorkflow, /gcloud functions list --gen2/);
-  assert.match(workflow, /verify-staging-function-deployment-contract\.mjs/);
+  assert.match(stagingDeploymentWorkflow, /verify-staging-function-deployment-contract\.mjs/);
+  assert.doesNotMatch(workflow, /verify-staging-function-deployment-contract\.mjs/);
 });
 
 test('Staging deployment wires inventory collection and verification before Firebase deploy', () => {
