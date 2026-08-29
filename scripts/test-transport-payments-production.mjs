@@ -520,6 +520,28 @@ const main = async () => {
       await expectFailure(() => updateDoc(doc(secretary.firestore, collection, id), { amount: 1 }), ['permission-denied']);
       await expectFailure(() => deleteDoc(doc(secretary.firestore, collection, id)), ['permission-denied']);
     }
+    const missingFinanceStudentId = `transport-legacy-finance-${cfg.testRunId}`.slice(0, 125);
+    await createMarked('students', missingFinanceStudentId, {
+      id: missingFinanceStudentId, schoolId: cfg.fixtureSchoolId,
+      name: 'Transport legacy finance fixture', classId: primaryClassId,
+      academicYear, active: true, isActive: true,
+    });
+    const directFinancePayloads = [
+      { transportMonthlyFee: 4_000, transportPaid: 4_000 },
+      { transportByPeriod: { [periods[0]]: { paidAmount: 4_000 } } },
+      { transportExpectedGross: 20_000, transportExpectedNet: 20_000, transportPaid: 20_000 },
+    ];
+    for (const [role, client] of [['owner', owner], ['secretary', secretary], ['accountant', accountant], ['director', director]]) {
+      for (const projection of directFinancePayloads) {
+        await expectFailure(() => setDoc(doc(client.firestore, 'studentFinance', missingFinanceStudentId), {
+          id: missingFinanceStudentId, studentId: missingFinanceStudentId,
+          schoolId: cfg.fixtureSchoolId, ...projection,
+          createdAt: new Date().toISOString(), createdBy: credentials.get(role).uid,
+          updatedAt: new Date().toISOString(), updatedBy: credentials.get(role).uid,
+        }), ['permission-denied']);
+      }
+    }
+    assert.equal((await db.collection('studentFinance').doc(missingFinanceStudentId).get()).exists, false);
 
     const tuitionStudent = await createStudent('tuition-cash', 20);
     const tuitionBefore = await quote(secretary, tuitionStudent, 'tuition', { installment: 'T1' });
