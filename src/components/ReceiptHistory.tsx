@@ -328,8 +328,8 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div data-testid="receipt-history-scroll" style={{ maxWidth: '100%', overflowX: 'auto', overscrollBehaviorInline: 'contain' }}>
+        <table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse' }}>
           <thead style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
             <tr>
               <th style={{ padding: '1rem', textAlign: 'left', width: '40px' }}></th>
@@ -360,6 +360,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                         <button
                           type="button"
                           className="secondary"
+                          aria-label={isExpanded ? `Masquer le détail du reçu ${displayModel.receiptNumber}` : `Afficher le détail du reçu ${displayModel.receiptNumber}`}
                           style={{ padding: '0.2rem', display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
                           onClick={() => setExpandedReceiptId(isExpanded ? null : displayModel.id)}
                         >
@@ -384,10 +385,10 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                       <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{displayModel.paymentId}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: displayModel.isCorrection ? 'var(--danger)' : undefined }}>{displayModel.formattedAmount}</td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                           <button
                             className="secondary"
-                            style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            style={{ padding: '0.4rem 0.75rem', minHeight: 40, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => generatePDF(receipt, 'download')}
                             disabled={isGenerating === displayModel.id || displayModel.receiptNumber === 'En attente'}
                             title="Télécharger le PDF"
@@ -397,7 +398,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                           </button>
                           <button
                             className="secondary"
-                            style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            style={{ padding: '0.4rem 0.75rem', minHeight: 40, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => generatePDF(receipt, 'print')}
                             disabled={isGenerating === displayModel.id || displayModel.receiptNumber === 'En attente'}
                             title="Imprimer"
@@ -408,7 +409,7 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                           <button
                             className="secondary"
                             id={`wa-btn-${displayModel.id}`}
-                            style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            style={{ padding: '0.4rem 0.75rem', minHeight: 40, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => handleWhatsAppClick(receipt)}
                             disabled={isGenerating === displayModel.id || displayModel.receiptNumber === 'En attente'}
                             title="Envoyer par WhatsApp"
@@ -459,6 +460,31 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                               </div>
                             )}
                           </div>
+
+                          {displayModel.paymentType === 'transport' && (
+                            <div
+                              data-testid={`transport-receipt-allocation-${displayModel.id}`}
+                              style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #bfdbfe', borderRadius: 4, background: '#eff6ff' }}
+                            >
+                              <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: '.75rem' }}>
+                                Ventilation du versement Transport
+                              </div>
+                              {displayModel.allocations.length > 0 ? displayModel.allocations.map((allocation, index) => (
+                                <div
+                                  key={`${allocation.kind}-${allocation.period || 'credit'}-${index}`}
+                                  style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '.35rem 0', borderBottom: '1px solid #dbeafe' }}
+                                >
+                                  <span>{allocation.kind === 'CREDIT' ? 'Crédit Transport' : `Période ${allocation.period || 'non renseignée'}`}</span>
+                                  <strong>{allocation.amount.toLocaleString('fr-FR')} FCFA</strong>
+                                </div>
+                              )) : (
+                                <div style={{ color: 'var(--text-muted)' }}>Ventilation historique non disponible.</div>
+                              )}
+                              <div style={{ marginTop: '.75rem', textAlign: 'right' }}>
+                                <strong>Crédit disponible : {displayModel.formattedTransportCredit || '0 FCFA'}</strong>
+                              </div>
+                            </div>
+                          )}
 
                           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
                             {displayModel.hasSnapshots ? (

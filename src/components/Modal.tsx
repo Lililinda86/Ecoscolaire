@@ -32,6 +32,7 @@ const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
+      data-testid="modal-backdrop"
       onClick={(e) => {
         if (!closeOnBackdrop) return;
         if (e.target === e.currentTarget) {
@@ -42,17 +43,25 @@ const Modal: React.FC<ModalProps> = ({
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1000, padding: '1rem'
+        zIndex: 1000, padding: 'clamp(0.5rem, 2vw, 1rem)', boxSizing: 'border-box'
       }}
     >
       <div
+        data-testid="modal-content"
         className="card"
         onClick={(e) => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{
+          width: '100%',
+          maxWidth: '500px',
+          maxHeight: 'calc(100dvh - 1rem)',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          boxSizing: 'border-box'
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ margin: 0 }}>{title}</h2>
-          <button className="secondary" onClick={onClose} style={{ padding: '0.25rem 0.5rem' }}>✕</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', marginBottom: '1.5rem' }}>
+          <h2 style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>{title}</h2>
+          <button aria-label="Fermer" className="secondary" onClick={onClose} style={{ minWidth: 44, minHeight: 44, padding: '0.25rem 0.5rem', flexShrink: 0 }}>✕</button>
         </div>
         {children}
       </div>

@@ -748,27 +748,8 @@ service cloud.firestore {
           || (resource != null && hasSchoolAccess(resource.data.schoolId))
         ))
       );
-      allow create: if isAuthenticated()
-                    && isActive()
-                    && canManagePedagogy(request.resource.data.schoolId)
-                    && request.resource.data.keys().hasAll([
-                      'id', 'schoolId', 'studentId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
-                    ])
-                    && request.resource.data.keys().hasOnly([
-                      'id', 'schoolId', 'studentId', 'feeAmount', 'feeT1', 'feeT2', 'feeT3',
-                      'feeTransport', 'feeUniforms', 'financialBypass', 'registrationFeeExpected',
-                      'registrationFeePaid', 'registrationFeeStatus', 'tuitionExpected', 'tuitionPaid',
-                      'tuitionStatus', 'transportMonthlyFee', 'transportPaid',
-                      'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
-                    ])
-                    && request.resource.data.id == studentId
-                    && request.resource.data.studentId == studentId
-                    && request.resource.data.createdAt == request.time
-                    && request.resource.data.updatedAt == request.time
-                    && request.resource.data.createdBy == request.auth.uid
-                    && request.resource.data.updatedBy == request.auth.uid
-                    && exists(/databases/$(database)/documents/students/$(studentId))
-                    && get(/databases/$(database)/documents/students/$(studentId)).data.schoolId == request.resource.data.schoolId;
+      // Canonical financial projection: server functions only.
+      allow create: if false;
       /* Schéma conservé comme documentation de migration serveur.
       allow create: if request.resource.data.keys().hasAll([
                       'id', 'schoolId', 'studentId', 'registrationFeePaid', 'registrationFeeStatus',
