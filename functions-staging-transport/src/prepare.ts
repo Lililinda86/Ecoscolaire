@@ -9,6 +9,7 @@ import {
 import { parsePrepareRequest } from './apiSchema';
 import {
   assertManifestIntegrity,
+  assertRunNotExpired,
   buildManifest,
   computePrepareRequestDigest,
   deriveCrossSchoolId,
@@ -110,6 +111,7 @@ export const prepareFixtures = async (
 
     if (existing) {
       assertManifestIntegrity(existing.manifest);
+      assertRunNotExpired(existing.manifest, deps.clock.now());
       if (existing.manifest.prepareRequestDigest !== prepareRequestDigest) {
         throw new PrepareConflictError(`testRunId ${request.testRunId} was already prepared with a different request.`);
       }

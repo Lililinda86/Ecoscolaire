@@ -110,6 +110,23 @@ export const assertManifestIntegrity = (manifest: TransportReleaseManifest): voi
   }
 };
 
+export class RunExpiredError extends Error {
+  readonly code = 'RUN_EXPIRED';
+
+  constructor(testRunId: string) {
+    super(`Transport fixture run ${testRunId} has expired.`);
+    this.name = 'RunExpiredError';
+  }
+}
+
+/** Fail closed for lifecycle operations that are unsafe after the immutable expiry. */
+export const assertRunNotExpired = (manifest: TransportReleaseManifest, now: Date): void => {
+  const expiresAt = Date.parse(manifest.expiresAt);
+  if (!Number.isFinite(expiresAt) || now.getTime() >= expiresAt) {
+    throw new RunExpiredError(manifest.testRunId);
+  }
+};
+
 export interface BuildManifestInput {
   readonly testRunId: string;
   readonly projectId: string;

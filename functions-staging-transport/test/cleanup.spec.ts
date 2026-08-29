@@ -17,11 +17,12 @@ const setup = async () => {
   const backend = new FakeStagingBackend();
   const manifestStore = new FakeManifestStore();
   const runLock = new FakeRunLock();
+  const clock = new FakeClock();
   const prepareDeps = {
     manifestStore,
     runLock,
     fixtureBootstrapper: new FakeFixtureBootstrapper(backend),
-    clock: new FakeClock(),
+    clock,
     logger: new RecordingLogger(),
     invokerServiceAccount: 'broker@ecoscolaire-staging.iam.gserviceaccount.com',
     authUserPlan: (testRunId: string) => [`secretary-${testRunId}@example.invalid`],
@@ -39,9 +40,9 @@ const setup = async () => {
     collectionDeleter: new FakeCollectionDeleter(backend),
     counterCleaner: new FakeCounterCleaner(),
     authCleaner: new FakeAuthCleaner(backend),
-    clock: new FakeClock(),
+    clock,
   };
-  return { backend, manifestStore, runLock, cleanupDeps };
+  return { backend, manifestStore, runLock, clock, cleanupDeps };
 };
 
 describe('cleanup', () => {
@@ -79,6 +80,13 @@ describe('cleanup', () => {
     const second = await cleanupFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, cleanupDeps);
     for (const collection of ALLOWED_CLEANUP_COLLECTIONS) expect(second.deletedByCollection[collection]).toBe(0);
     expect(second.state).toBe('CLEANING');
+  });
+
+  it('allows cleanup after the run expires', async () => {
+    const { clock, cleanupDeps } = await setup();
+    clock.advance(60_001);
+    await expect(cleanupFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, cleanupDeps))
+      .resolves.toMatchObject({ state: 'CLEANING' });
   });
 
   it('refuses all deletion when manifest membership or testFixture identity was tampered', async () => {

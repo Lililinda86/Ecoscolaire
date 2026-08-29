@@ -1,6 +1,6 @@
 import { assertStagingRuntime, RuntimeProjectContext } from './runtimeGuards';
 import { parseInspectRequest } from './apiSchema';
-import { appendEvent, assertManifestIntegrity } from './manifest';
+import { appendEvent, assertManifestIntegrity, assertRunNotExpired } from './manifest';
 import { transition, FixtureRunState } from './stateMachine';
 import { Clock, ConcurrencyLockError, ManifestStore, RunLock } from './prepare';
 
@@ -60,6 +60,7 @@ export const inspectFixtures = async (
     const existing = await deps.manifestStore.get(request.testRunId);
     if (!existing) throw new ManifestNotFoundError(request.testRunId);
     assertManifestIntegrity(existing.manifest);
+    assertRunNotExpired(existing.manifest, deps.clock.now());
 
     const nextState = transition(existing.state, 'inspect');
     if (nextState !== existing.state) {

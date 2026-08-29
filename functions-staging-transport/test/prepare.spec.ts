@@ -3,7 +3,7 @@ import { prepareFixtures, PrepareConflictError, ConcurrencyLockError } from '../
 import { RuntimeGuardError, STAGING_PROJECT_ID, PRODUCTION_PROJECT_ID } from '../src/runtimeGuards';
 import { SchemaValidationError } from '../src/apiSchema';
 import {
-  computeManifestDigest, deriveCrossSchoolId, deriveFixtureSchoolId, ManifestIntegrityError,
+  computeManifestDigest, deriveCrossSchoolId, deriveFixtureSchoolId, ManifestIntegrityError, RunExpiredError,
 } from '../src/manifest';
 import {
   FakeClock, FakeFixtureBootstrapper, FakeManifestStore, FakeRunLock, FakeStagingBackend, RecordingLogger,
@@ -67,6 +67,14 @@ describe('prepare', () => {
     const second = await prepareFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, deps);
     expect(second.replay).toBe(true);
     expect(second.manifest.manifestDigest).toBe(first.manifest.manifestDigest);
+  });
+
+  it('denies an idempotent prepare replay after the run expires', async () => {
+    const deps = makeDeps(new FakeStagingBackend());
+    await prepareFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, deps);
+    (deps.clock as FakeClock).advance(deps.expiresInMs + 1);
+    await expect(prepareFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, deps))
+      .rejects.toThrowError(RunExpiredError);
   });
 
   it('divergent replay (same testRunId, would-be different manifest) is a collision, not a replay', async () => {

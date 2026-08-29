@@ -17,11 +17,12 @@ const setup = async () => {
   const backend = new FakeStagingBackend();
   const manifestStore = new FakeManifestStore();
   const runLock = new FakeRunLock();
+  const clock = new FakeClock();
   const prepareDeps = {
     manifestStore,
     runLock,
     fixtureBootstrapper: new FakeFixtureBootstrapper(backend),
-    clock: new FakeClock(),
+    clock,
     logger: new RecordingLogger(),
     invokerServiceAccount: 'broker@ecoscolaire-staging.iam.gserviceaccount.com',
     authUserPlan: (testRunId: string) => [`secretary-${testRunId}@example.invalid`],
@@ -38,15 +39,15 @@ const setup = async () => {
     collectionDeleter: new FakeCollectionDeleter(backend),
     counterCleaner: new FakeCounterCleaner(),
     authCleaner: new FakeAuthCleaner(backend),
-    clock: new FakeClock(),
+    clock,
   };
   const verifyDeps = {
     manifestStore,
     runLock,
     residualCounter: new FakeResidualCounter(backend),
-    clock: new FakeClock(),
+    clock,
   };
-  return { backend, manifestStore, runLock, cleanupDeps, verifyDeps };
+  return { backend, manifestStore, runLock, clock, cleanupDeps, verifyDeps };
 };
 
 describe('verifyCleanup', () => {
@@ -90,6 +91,14 @@ describe('verifyCleanup', () => {
     const second = await verifyCleanup({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, verifyDeps);
     expect(second.state).toBe('VERIFIED');
     expect(second.passed).toBe(true);
+  });
+
+  it('allows cleanup verification after the run expires', async () => {
+    const { clock, cleanupDeps, verifyDeps } = await setup();
+    clock.advance(60_001);
+    await cleanupFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, cleanupDeps);
+    await expect(verifyCleanup({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, verifyDeps))
+      .resolves.toMatchObject({ state: 'VERIFIED', passed: true });
   });
 
   it('counts orphans as a distinct required category', async () => {

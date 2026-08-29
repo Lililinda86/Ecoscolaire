@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ConcurrencyLockError, prepareFixtures } from '../src/prepare';
 import { inspectFixtures, ManifestNotFoundError } from '../src/inspect';
 import { STAGING_PROJECT_ID } from '../src/runtimeGuards';
-import { ManifestIntegrityError } from '../src/manifest';
+import { ManifestIntegrityError, RunExpiredError } from '../src/manifest';
 import {
   FakeAuthInspector, FakeClock, FakeFixtureBootstrapper, FakeManifestStore, FakeResourceInspector, FakeRunLock,
   FakeStagingBackend, RecordingLogger,
@@ -15,11 +15,12 @@ const setup = async () => {
   const backend = new FakeStagingBackend();
   const manifestStore = new FakeManifestStore();
   const runLock = new FakeRunLock();
+  const clock = new FakeClock();
   const prepareDeps = {
     manifestStore,
     runLock,
     fixtureBootstrapper: new FakeFixtureBootstrapper(backend),
-    clock: new FakeClock(),
+    clock,
     logger: new RecordingLogger(),
     invokerServiceAccount: 'broker@ecoscolaire-staging.iam.gserviceaccount.com',
     authUserPlan: (testRunId: string) => [`secretary-${testRunId}@example.invalid`],
@@ -33,9 +34,9 @@ const setup = async () => {
     runLock,
     resourceInspector: new FakeResourceInspector(backend),
     authInspector: new FakeAuthInspector(backend),
-    clock: new FakeClock(),
+    clock,
   };
-  return { backend, manifestStore, runLock, inspectDeps };
+  return { backend, manifestStore, runLock, clock, inspectDeps };
 };
 
 describe('inspect', () => {
@@ -81,6 +82,13 @@ describe('inspect', () => {
     }));
     await expect(inspectFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, inspectDeps))
       .rejects.toThrowError(ManifestIntegrityError);
+  });
+
+  it('denies inspection after the run expires', async () => {
+    const { clock, inspectDeps } = await setup();
+    clock.advance(60_001);
+    await expect(inspectFixtures({ schemaVersion: 1, testRunId: TEST_RUN_ID }, STAGING_CONTEXT, inspectDeps))
+      .rejects.toThrowError(RunExpiredError);
   });
 
   it('fails deterministically when another lifecycle operation owns the same run lock', async () => {
