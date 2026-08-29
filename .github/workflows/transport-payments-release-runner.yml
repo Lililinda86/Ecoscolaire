@@ -79,11 +79,12 @@ jobs:
             "$runs_json" "$GITHUB_SHA" ".github/workflows/${deployment_workflow}" "$expected_branch"
           echo 'TRANSPORT_REQUIRED_FUNCTIONS_VERIFIED=true' >> "$GITHUB_ENV"
 
-      - name: Authenticate Staging with its exact service account
+      - name: Authenticate Staging keylessly with its dedicated runner identity
         if: inputs.mode == 'staging'
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          workload_identity_provider: projects/411364288790/locations/global/workloadIdentityPools/italo-transport-staging/providers/github-ecoscolaire-staging
+          service_account: italo-transport-runner-staging@ecoscolaire-staging.iam.gserviceaccount.com
 
       - name: Authenticate Production keylessly
         if: inputs.mode == 'production'
@@ -120,9 +121,36 @@ jobs:
             -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
             -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \
             "https://cloudresourcemanager.googleapis.com/v1/projects/${TRANSPORT_FIREBASE_PROJECT_ID}:testIamPermissions")"
+          returned_permissions_json="$(printf '%s' "$response" | jq -ce '
+            if (type == "object")
+              and ((.permissions // []) | type == "array")
+              and ((.permissions // []) | all(type == "string"))
+            then (.permissions // [])
+            else error("invalid testIamPermissions response")
+            end
+          ')"
+          required_permissions=(
+            datastore.entities.create
+            datastore.entities.get
+            datastore.entities.list
+            datastore.entities.update
+            datastore.entities.delete
+            firebaseauth.users.create
+            firebaseauth.users.get
+            firebaseauth.users.delete
+          )
+          mapfile -t returned_permissions < <(printf '%s' "$returned_permissions_json" | jq -r '.[]')
+          printf 'Expected fixture lifecycle permissions:\n'
+          printf -- '- %s\n' "${required_permissions[@]}"
+          printf 'Returned fixture lifecycle permissions:\n'
+          if [ "${#returned_permissions[@]}" -eq 0 ]; then
+            echo '- (none)'
+          else
+            printf -- '- %s\n' "${returned_permissions[@]}"
+          fi
           missing_permissions=()
-          for permission in datastore.entities.create datastore.entities.get datastore.entities.list datastore.entities.update datastore.entities.delete firebaseauth.users.create firebaseauth.users.get firebaseauth.users.delete; do
-            printf '%s' "$response" | grep -Fq "\\"$permission\\"" || missing_permissions+=("$permission")
+          for permission in "${required_permissions[@]}"; do
+            printf '%s\n' "${returned_permissions[@]}" | grep -Fxq "$permission" || missing_permissions+=("$permission")
           done
           if [ "${#missing_permissions[@]}" -gt 0 ]; then
             echo 'Missing fixture lifecycle permissions:'
