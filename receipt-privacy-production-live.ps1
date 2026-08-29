@@ -154,6 +154,54 @@ function Remove-RpDocument([string]$collection, [string]$id) {
   Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Delete -Uri $uri -Headers $rpOAuthHeaders | Out-Null
 }
 
+function Get-RpObjectProperty([object]$inputObject, [string]$name) {
+  if ($null -eq $inputObject) { return $null }
+  if ($inputObject -is [System.Collections.IDictionary]) {
+    if (-not $inputObject.Contains($name)) { return $null }
+    return $inputObject[$name]
+  }
+  $property = $inputObject.PSObject.Properties[$name]
+  if ($null -eq $property) { return $null }
+  return $property.Value
+}
+
+function Get-RpFirestoreStringField([object]$fields, [string]$name) {
+  $field = Get-RpObjectProperty $fields $name
+  $value = Get-RpObjectProperty $field 'stringValue'
+  if ($value -isnot [string]) { return $null }
+  return [string]$value
+}
+
+function Test-RpFirestoreBooleanFieldTrue([object]$fields, [string]$name) {
+  $field = Get-RpObjectProperty $fields $name
+  $value = Get-RpObjectProperty $field 'booleanValue'
+  return ($value -is [bool] -and $value -eq $true)
+}
+
+function Get-RpDocumentId([object]$document) {
+  $name = Get-RpObjectProperty $document 'name'
+  if ($name -isnot [string] -or [string]::IsNullOrWhiteSpace($name)) { return $null }
+  $documentId = [uri]::UnescapeDataString(($name -split '/')[-1])
+  if ([string]::IsNullOrWhiteSpace($documentId)) { return $null }
+  return $documentId
+}
+
+function Get-TechnicalSchoolId([object]$document, [string]$collection) {
+  $fields = Get-RpObjectProperty $document 'fields'
+  if ($collection -ceq 'schools') {
+    $documentId = Get-RpDocumentId $document
+    if ($null -eq $documentId) { return $null }
+    $idField = Get-RpObjectProperty $fields 'id'
+    $fieldId = Get-RpFirestoreStringField $fields 'id'
+    if ($null -ne $idField -and
+      ($null -eq $fieldId -or $fieldId -cne $documentId)) {
+      throw 'Root school id field is invalid or does not match documentId.'
+    }
+    return $documentId
+  }
+  return Get-RpFirestoreStringField $fields 'schoolId'
+}
+
 function Get-RpCollection([string]$collection) {
   $rows = [System.Collections.Generic.List[object]]::new()
   $pageToken = $null
@@ -161,18 +209,21 @@ function Get-RpCollection([string]$collection) {
     $uri = "$rpDatabaseBase/$collection`?pageSize=1000"
     if ($pageToken) { $uri += "&pageToken=$([uri]::EscapeDataString($pageToken))" }
     $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $rpOAuthHeaders
-    foreach ($document in @($response.documents)) {
+    foreach ($document in @(Get-RpObjectProperty $response 'documents')) {
       if ($null -eq $document) { continue }
-      $id = [uri]::UnescapeDataString(($document.name -split '/')[-1])
-      $schoolId = if ($document.fields.schoolId.stringValue) { [string]$document.fields.schoolId.stringValue } else { $null }
-      $testRunId = if ($document.fields.testRunId.stringValue) { [string]$document.fields.testRunId.stringValue } else { $null }
-      $testFixture = [bool]($document.fields.testFixture.booleanValue)
+      $fields = Get-RpObjectProperty $document 'fields'
+      $id = Get-RpDocumentId $document
+      $schoolId = Get-TechnicalSchoolId $document $collection
+      $testRunId = Get-RpFirestoreStringField $fields 'testRunId'
+      $testFixture = Test-RpFirestoreBooleanFieldTrue $fields 'testFixture'
+      $updateTime = Get-RpObjectProperty $document 'updateTime'
       $rows.Add([pscustomobject]@{
-        id = $id; updateTime = [string]$document.updateTime; schoolId = $schoolId
+        id = $id; updateTime = if ($null -eq $updateTime) { $null } else { [string]$updateTime }; schoolId = $schoolId
         testRunId = $testRunId; testFixture = $testFixture
       })
     }
-    $pageToken = if ($response.nextPageToken) { [string]$response.nextPageToken } else { $null }
+    $nextPageToken = Get-RpObjectProperty $response 'nextPageToken'
+    $pageToken = if ($nextPageToken -is [string] -and $nextPageToken) { [string]$nextPageToken } else { $null }
   } while ($pageToken)
   return @($rows)
 }
