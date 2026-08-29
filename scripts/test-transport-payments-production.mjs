@@ -612,7 +612,18 @@ const main = async () => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${cfg.appUrl}/#/payments`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: /Comptabilité Générale/i }).waitFor({ timeout: 30_000 });
-      await page.getByRole('button', { name: /Encaissement/i }).first().click();
+      const pageMetrics = await page.evaluate(() => ({
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      }));
+      assert.ok(pageMetrics.documentWidth <= pageMetrics.viewportWidth + 1,
+        `Payments page overflows viewport at ${width}px.`);
+      const openCashButton = page.getByTestId('open-cash-payment');
+      const openCashBox = await openCashButton.boundingBox();
+      assert.ok(openCashBox && openCashBox.x >= 0 && openCashBox.x + openCashBox.width <= width + 1,
+        `Cash action is outside viewport at ${width}px.`);
+      assert.ok(openCashBox.height >= 40, `Cash action touch target is too small at ${width}px.`);
+      await openCashButton.click();
       await page.getByTestId('cash-payment-student').selectOption(benefitStudent);
       await page.getByTestId('cash-payment-type').selectOption('transport');
       await page.getByTestId('transport-auto-allocation').waitFor({ state: 'visible' });
@@ -620,10 +631,58 @@ const main = async () => {
       await page.getByText(/Mensualité brute/).waitFor({ state: 'visible' });
       await page.getByText(/Bourse \/ réduction applicable/).waitFor({ state: 'visible' });
       await page.getByText(/Moratoire/).waitFor({ state: 'visible' });
+      const modalMetrics = await page.getByTestId('modal-content').evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left, right: rect.right, width: rect.width,
+          clientWidth: element.clientWidth, scrollWidth: element.scrollWidth,
+        };
+      });
+      assert.ok(modalMetrics.left >= 0 && modalMetrics.right <= width + 1 && modalMetrics.width <= width,
+        `Cash modal is outside viewport at ${width}px.`);
+      assert.ok(modalMetrics.scrollWidth <= modalMetrics.clientWidth + 1,
+        `Cash modal has uncontrolled horizontal overflow at ${width}px.`);
+      const scheduleScroll = page.getByTestId('transport-installments-scroll');
+      const scheduleMetrics = await scheduleScroll.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        overflowX: getComputedStyle(element).overflowX,
+      }));
+      assert.ok(['auto', 'scroll'].includes(scheduleMetrics.overflowX));
+      assert.ok(scheduleMetrics.clientWidth <= modalMetrics.clientWidth);
+      const submitAction = page.getByTestId('cash-payment-submit');
+      await submitAction.scrollIntoViewIfNeeded();
+      const submitBox = await submitAction.boundingBox();
+      assert.ok(submitBox && submitBox.x >= 0 && submitBox.x + submitBox.width <= width + 1,
+        `Cash submit action is outside viewport at ${width}px.`);
+      assert.ok(submitBox.height >= 40, `Cash submit touch target is too small at ${width}px.`);
       await page.getByTestId('cash-payment-student').selectOption(secondary);
       await page.getByTestId('transport-free-secondary').waitFor({ state: 'visible' });
       assert.equal(await page.getByTestId('cash-payment-submit').isDisabled(), true);
       await page.getByRole('button', { name: 'Annuler', exact: true }).click();
+
+      await page.getByRole('button', { name: 'Reçus', exact: true }).click();
+      await page.getByText(creditReceipt.receiptNumber, { exact: true }).waitFor({ timeout: 20_000 });
+      await page.getByRole('button', {
+        name: `Afficher le détail du reçu ${creditReceipt.receiptNumber}`,
+      }).click();
+      const allocationPanel = page.getByTestId(`transport-receipt-allocation-${credit.receiptId}`);
+      await allocationPanel.waitFor({ state: 'visible' });
+      await allocationPanel.getByText(periods.at(-1), { exact: false }).waitFor();
+      await allocationPanel.getByText(/Crédit disponible/i).waitFor();
+      const receiptMetrics = await page.getByTestId('receipt-history-scroll').evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        overflowX: getComputedStyle(element).overflowX,
+      }));
+      assert.ok(receiptMetrics.clientWidth <= width);
+      assert.ok(['auto', 'scroll'].includes(receiptMetrics.overflowX));
+      const receiptRow = page.locator('tr').filter({ hasText: creditReceipt.receiptNumber }).first();
+      const printAction = receiptRow.getByRole('button', { name: 'Imprimer', exact: true });
+      await printAction.scrollIntoViewIfNeeded();
+      const printBox = await printAction.boundingBox();
+      assert.ok(printBox && printBox.x >= 0 && printBox.x + printBox.width <= width + 1,
+        `Receipt print action is outside viewport at ${width}px.`);
+      assert.ok(printBox.height >= 40, `Receipt print touch target is too small at ${width}px.`);
     }
     assertTransportEnvironmentEvidence({ expectedProject: cfg.expectedProject, runtimeProjectId: runtimeProject,
       networkProjectIds: [...firebaseProjects] });
@@ -632,7 +691,8 @@ const main = async () => {
       allocation4000: p4000.allocations, allocation5000: p5000.allocations,
       partialRemaining: 3_000, credit: 2_000, benefits: 'PASS', moratorium: 'PASS',
       idempotence: 'PASS', concurrency: 'PASS', reversal: 'PASS', cashClosure: expectedCash,
-      tuitionIsolation: 'PASS', rbac: 'PASS', directWrites: 'DENY', responsive: widths,
+      tuitionIsolation: 'PASS', rbac: 'PASS', directWrites: 'DENY',
+      responsive: { widths, documentOverflow: 'PASS', actions: 'PASS', receiptAllocation: 'PASS' },
       receiptPrivacy: {
         ownChild: 'ALLOW', sameSchoolUnrelatedChild: 'DENY', otherSchool: 'DENY',
         secretary: 'ALLOW', owner: 'ALLOW', crossSchool: 'DENY',

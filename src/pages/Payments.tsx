@@ -1255,8 +1255,8 @@ const Payments: React.FC = () => {
       <div className="page-header no-print">
         <h1>{t('payments', 'Comptabilité Générale')}</h1>
         {canWrite && (
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={handleOpenModal} style={{ background: 'var(--success)' }} disabled={isSchoolSuspended}>
+          <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+            <button data-testid="open-cash-payment" onClick={handleOpenModal} style={{ background: 'var(--success)', minHeight: 44 }} disabled={isSchoolSuspended}>
               <Plus size={18} /> Encaissement (+)
             </button>
             <button onClick={handleOpenExpenseModal} style={{ background: 'var(--danger)' }} disabled={isSchoolSuspended}>
@@ -2335,7 +2335,7 @@ const Payments: React.FC = () => {
                     </strong></div>
                   </div>
                   {collectionQuote.installments && collectionQuote.installments.length > 0 && (
-                    <div style={{ marginTop: '.85rem', overflowX: 'auto' }}>
+                    <div data-testid="transport-installments-scroll" style={{ marginTop: '.85rem', maxWidth: '100%', overflowX: 'auto', overscrollBehaviorInline: 'contain' }}>
                       <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse', fontSize: '.82rem' }}>
                         <thead><tr>
                           <th>Mois</th><th>Brut</th><th>Aide</th><th>Dû net</th><th>Payé</th><th>Reste</th><th>Échéance</th><th>Statut</th>
@@ -2481,14 +2481,14 @@ const Payments: React.FC = () => {
              </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isProcessingMoMo || momoSuccess || isSaving}>Annuler</button>
+          <div data-testid="cash-payment-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '.75rem', flexWrap: 'wrap', marginTop: '2rem' }}>
+            <button type="button" className="secondary" onClick={() => setModalOpen(false)} disabled={isProcessingMoMo || momoSuccess || isSaving} style={{ minHeight: 44 }}>Annuler</button>
             <button
               type="submit"
               data-testid="cash-payment-submit"
               disabled={isProcessingMoMo || momoSuccess || isSaving
                 || (paymentMethod === 'cash' && (!collectionQuote || collectionQuote.remainingBalance <= 0))}
-              style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)' }}
+              style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)', minHeight: 44 }}
             >
               {isSaving ? "Enregistrement..." : (paymentMethod === 'cash' ? "Enregistrer l'encaissement" : "Lancer le paiement Mobile")}
             </button>
