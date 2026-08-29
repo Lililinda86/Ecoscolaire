@@ -4,6 +4,7 @@ import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
 import { resolveStudentFinanceData, writeStudentFinanceProjection } from './studentFinanceProjection';
 import { makeTuitionDiscountSlotId } from './utils/discountHelpers';
+import { calculateCollectedPaymentTotal } from './expenseLedger';
 import {
   ITALO_TRANSPORT_FEE_POLICY_ID,
   planTransportAllocations,
@@ -11,6 +12,12 @@ import {
   TransportAllocationPlanItem,
   TransportFeeResolution
 } from './transportPaymentPolicy';
+import {
+  CASH_LEDGER_COLLECTION,
+  CashLedgerIntegrityError,
+  makeCashLedgerDayId,
+  requireOpenCashLedger
+} from './cashClosureIntegrity';
 
 type Data = Record<string, unknown>;
 type PaymentType = 'registration_fee' | 'tuition' | 'transport';
@@ -39,6 +46,22 @@ const httpsError = (
   message,
   businessCode ? { businessCode } : undefined
 );
+
+const requireOpenCashDay = (
+  ledger: Data | null,
+  closureExists: boolean,
+  schoolId: string,
+  date: string
+): number => {
+  try {
+    return requireOpenCashLedger(ledger, closureExists, schoolId, date);
+  } catch (error) {
+    if (error instanceof CashLedgerIntegrityError) {
+      throw httpsError('failed-precondition', error.message, error.businessCode);
+    }
+    throw error;
+  }
+};
 
 const requireId = (value: unknown, field: string): string => {
   if (typeof value !== 'string' || !value.trim() || value !== value.trim()
@@ -1490,6 +1513,31 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       user, school, student, finance, benefits, payments, moratoriums,
       quote, classData, financeRef, financeSnap
     } = contextData;
+    const date = getDoualaDate();
+    const cashLedgerId = makeCashLedgerDayId(input.schoolId, date);
+    const cashLedgerRef = db.collection(CASH_LEDGER_COLLECTION).doc(cashLedgerId);
+    const cashClosureRef = db.collection('cashClosures').doc(cashLedgerId);
+    const [cashLedgerSnap, cashClosureSnap] = await Promise.all([
+      transaction.get(cashLedgerRef),
+      transaction.get(cashClosureRef)
+    ]);
+    let currentCashReceived = requireOpenCashDay(
+      cashLedgerSnap.exists ? cashLedgerSnap.data() || {} : null,
+      cashClosureSnap.exists,
+      input.schoolId,
+      date
+    );
+    if (!cashLedgerSnap.exists) {
+      const legacyCashPaymentsSnap = await transaction.get(
+        db.collection('payments')
+          .where('schoolId', '==', input.schoolId)
+          .where('date', '==', date)
+      );
+      currentCashReceived = calculateCollectedPaymentTotal(
+        legacyCashPaymentsSnap.docs.map(document => document.data()),
+        'cash'
+      );
+    }
     const canonicalTransport = input.type === 'transport' && input.period === null;
     const transportQuote = canonicalTransport ? quote as TransportCollectionQuote : null;
     if (transportQuote && transportQuote.transportState !== 'BILLABLE') {
@@ -1520,7 +1568,6 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     if (typeof lastNumber !== 'number' || !Number.isSafeInteger(lastNumber) || lastNumber < 0) {
       throw httpsError('failed-precondition', 'Receipt counter is invalid.', 'RECEIPT_COUNTER_CORRUPTED');
     }
-    const date = getDoualaDate();
     const nextNumber = safeAdd(lastNumber, 1, 'receipt number');
     const receiptNumber = `REC-${date.slice(0, 4)}-${String(nextNumber).padStart(4, '0')}`;
     const fixtureSnapshot = student.testFixture === true
@@ -1594,6 +1641,15 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     transaction.set(counterRef, { lastReceiptNumber: nextNumber }, { merge: true });
     transaction.create(paymentRef, paymentData);
     transaction.create(receiptRef, receiptData);
+    transaction.set(cashLedgerRef, {
+      id: cashLedgerId,
+      schoolId: input.schoolId,
+      date,
+      status: 'open',
+      cashReceived: safeAdd(currentCashReceived, amount, 'cashReceived'),
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(!cashLedgerSnap.exists ? { createdAt: FieldValue.serverTimestamp() } : {})
+    }, { merge: true });
 
     let financePatch: Data;
     if (input.type === 'registration_fee') {
@@ -1837,6 +1893,30 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
     const remainingBalance = canonicalTransport
       ? safeAdd(quote.remainingBalance, reversedAllocatedAmount, 'remainingBalance') : quote.netExpectedAmount - newPaid;
     const date = getDoualaDate();
+    const cashLedgerId = makeCashLedgerDayId(schoolId, date);
+    const cashLedgerRef = db.collection(CASH_LEDGER_COLLECTION).doc(cashLedgerId);
+    const cashClosureRef = db.collection('cashClosures').doc(cashLedgerId);
+    const [cashLedgerSnap, cashClosureSnap] = await Promise.all([
+      transaction.get(cashLedgerRef),
+      transaction.get(cashClosureRef)
+    ]);
+    let currentCashReceived = requireOpenCashDay(
+      cashLedgerSnap.exists ? cashLedgerSnap.data() || {} : null,
+      cashClosureSnap.exists,
+      schoolId,
+      date
+    );
+    if (!cashLedgerSnap.exists) {
+      const legacyCashPaymentsSnap = await transaction.get(
+        db.collection('payments')
+          .where('schoolId', '==', schoolId)
+          .where('date', '==', date)
+      );
+      currentCashReceived = calculateCollectedPaymentTotal(
+        legacyCashPaymentsSnap.docs.map(document => document.data()),
+        'cash'
+      );
+    }
     const correctionNumber = `ANN-${String(originalReceipt.receiptNumber || paymentId)}`;
     const fixtureSnapshot = original.testFixture === true
       && typeof original.testRunId === 'string'
@@ -1938,6 +2018,15 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
 
     transaction.create(reversalRef, reversalData);
     transaction.create(correctionReceiptRef, correctionReceiptData);
+    transaction.set(cashLedgerRef, {
+      id: cashLedgerId,
+      schoolId,
+      date,
+      status: 'open',
+      cashReceived: safeAdd(currentCashReceived, -originalAmount, 'cashReceived'),
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(!cashLedgerSnap.exists ? { createdAt: FieldValue.serverTimestamp() } : {})
+    }, { merge: true });
 
     if (canonicalTransport) {
       originalAllocationItems.forEach((allocation, index) => {
