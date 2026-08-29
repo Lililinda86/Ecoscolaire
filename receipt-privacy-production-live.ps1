@@ -8,8 +8,8 @@ $rpSchoolId = "transport-release-production-receipt-$rpRunId"
 $rpCrossSchoolId = "$rpSchoolId-cross"
 $rpDatabaseBase = "https://firestore.googleapis.com/v1/projects/$rpProject/databases/(default)/documents"
 $rpAuthBase = 'https://identitytoolkit.googleapis.com/v1'
-$rpOAuthToken = (gcloud auth print-access-token).Trim()
-$rpOAuthHeaders = @{ Authorization = "Bearer $rpOAuthToken"; 'Content-Type' = 'application/json' }
+$rpExpectedQuotaProject = 'ecoscolaire-c5861'
+$rpQuotaProject = 'ecoscolaire-c5861'
 $rpCreatedDocs = [System.Collections.Generic.List[object]]::new()
 $rpCreatedUsers = [System.Collections.Generic.List[object]]::new()
 $rpResults = [ordered]@{}
@@ -26,6 +26,65 @@ function New-RpString([string]$value) { return @{ stringValue = $value } }
 function New-RpBool([bool]$value) { return @{ booleanValue = $value } }
 function New-RpInt([long]$value) { return @{ integerValue = [string]$value } }
 function New-RpArray([object[]]$values) { return @{ arrayValue = @{ values = $values } } }
+
+function New-RpAuthHeaders([string]$quotaProject, [string]$bearerToken) {
+  if ([string]::IsNullOrWhiteSpace($quotaProject)) {
+    throw 'Auth quota project is required.'
+  }
+  if ($quotaProject -cne $rpExpectedQuotaProject) {
+    throw 'Auth quota project is not allowed.'
+  }
+
+  $headers = @{
+    'Content-Type' = 'application/json'
+    'x-goog-user-project' = $quotaProject
+  }
+  if (-not [string]::IsNullOrWhiteSpace($bearerToken)) {
+    $headers['Authorization'] = "Bearer $bearerToken"
+  }
+  return $headers
+}
+
+function Assert-RpAuthHeaders([System.Collections.IDictionary]$headers) {
+  if ($null -eq $headers -or -not $headers.Contains('x-goog-user-project')) {
+    throw 'Auth quota project header is required.'
+  }
+  $quotaProject = $headers['x-goog-user-project']
+  if ($quotaProject -isnot [string] -or $quotaProject -cne $rpExpectedQuotaProject) {
+    throw 'Auth quota project header is not allowed.'
+  }
+}
+
+function Invoke-RpAuthRestRequest(
+  [string]$method,
+  [string]$uri,
+  [System.Collections.IDictionary]$headers,
+  [string]$body,
+  [string]$operation
+) {
+  Assert-RpAuthHeaders $headers
+  try {
+    $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method $method -Uri $uri -Headers $headers -Body $body
+  } catch {
+    throw "Auth REST $operation transport failure."
+  }
+
+  $statusCode = [int]$response.StatusCode
+  if ($statusCode -lt 200 -or $statusCode -ge 300) {
+    throw "Auth REST $operation failed with HTTP $statusCode."
+  }
+  if ([string]::IsNullOrWhiteSpace([string]$response.Content)) { return $null }
+  try {
+    return $response.Content | ConvertFrom-Json
+  } catch {
+    throw "Auth REST $operation returned invalid JSON."
+  }
+}
+
+$rpOAuthToken = (gcloud auth print-access-token).Trim()
+$rpOAuthHeaders = @{ Authorization = "Bearer $rpOAuthToken"; 'Content-Type' = 'application/json' }
+$rpAuthOAuthHeaders = New-RpAuthHeaders $rpQuotaProject $rpOAuthToken
+$rpAuthApiHeaders = New-RpAuthHeaders $rpQuotaProject $null
 
 function Get-RpFixtureStringField([System.Collections.IDictionary]$fields, [string]$name) {
   if ($null -eq $fields -or -not $fields.Contains($name)) { return $null }
@@ -243,7 +302,7 @@ function New-RpAuthUser([string]$role, [string]$schoolId, [string[]]$studentIds,
   $email = "$role-$rpRunId@example.invalid".ToLowerInvariant()
   $password = ([guid]::NewGuid().ToString('N') + '!Aa7')
   $signupBody = @{ email = $email; password = $password; returnSecureToken = $true } | ConvertTo-Json -Compress
-  $signup = Invoke-RestMethod -Method Post -Uri "$rpAuthBase/accounts:signUp?key=$apiKey" -ContentType 'application/json' -Body $signupBody
+  $signup = Invoke-RpAuthRestRequest 'Post' "$rpAuthBase/accounts:signUp?key=$apiKey" $rpAuthApiHeaders $signupBody 'accounts:signUp'
   $user = [pscustomobject]@{ uid = [string]$signup.localId; email = $email; password = $password; idToken = [string]$signup.idToken }
   $rpCreatedUsers.Add($user)
   $rpFixtureManifest.users[$user.uid] = @{ schoolId = $schoolId }
@@ -273,13 +332,13 @@ function Test-RpReceiptRead([string]$idToken, [string]$receiptId, [int]$expected
 
 function Remove-RpAuthUser([string]$uid) {
   $body = @{ localId = $uid } | ConvertTo-Json -Compress
-  Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -Uri "$rpAuthBase/projects/$rpProject/accounts`:delete" -Headers $rpOAuthHeaders -Body $body | Out-Null
+  Invoke-RpAuthRestRequest 'Post' "$rpAuthBase/projects/$rpProject/accounts`:delete" $rpAuthOAuthHeaders $body 'accounts:delete' | Out-Null
 }
 
 function Get-RpAuthResidualCount {
   if ($rpCreatedUsers.Count -eq 0) { return 0 }
   $body = @{ localId = @($rpCreatedUsers | ForEach-Object uid) } | ConvertTo-Json -Depth 4 -Compress
-  $response = Invoke-RestMethod -Method Post -Uri "$rpAuthBase/projects/$rpProject/accounts`:lookup" -Headers $rpOAuthHeaders -Body $body
+  $response = Invoke-RpAuthRestRequest 'Post' "$rpAuthBase/projects/$rpProject/accounts`:lookup" $rpAuthOAuthHeaders $body 'accounts:lookup'
   return @($response.users).Count
 }
 
