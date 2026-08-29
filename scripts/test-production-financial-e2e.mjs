@@ -142,6 +142,9 @@ const run = async () => {
   assert.equal(academicYearData.schoolId, EXPECTED_SCHOOL);
   assert.equal(academicYearData.status, 'active');
   assert.match(String(academicYearData.name || ''), /^\d{4}-\d{4}$/);
+  assert.deepEqual(academicYearData.tuitionPaymentDeadlines, {
+    T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05'
+  }, 'P1 CONFIGURATION: Production tuition deadlines are not exact.');
   const academicYear = String(academicYearData.name);
   const [startYear, endYear] = academicYear.split('-').map(Number);
   assert.equal(endYear, startYear + 1);
@@ -196,6 +199,7 @@ const run = async () => {
   let matriculeReservationId = null;
   let duplicateReservationId = null;
   let closureId = null;
+  let moratoriumId = null;
   let secretaryClient = null;
   let ownerClient = null;
   let browser = null;
@@ -324,6 +328,23 @@ const run = async () => {
     await expectFailure(() => secretaryApprove({ benefitId: scholarship.benefitId }),
       ['PERMISSION_DENIED', 'functions/permission-denied']);
     await ownerApprove({ benefitId: scholarship.benefitId });
+
+    moratoriumId = `${marker}-MORATORIUM`;
+    await db.collection('paymentMoratoriums').doc(moratoriumId).create({
+      id: moratoriumId, schoolId: EXPECTED_SCHOOL, studentId, academicYear,
+      paymentType: 'tuition', installment: 'T1', status: 'approved',
+      effectiveDueDate: '2026-11-30', reason: marker,
+      testFixture: true, testRunId: marker
+    });
+    const moratoriumQuote = await quote('tuition', { installment: 'T1' });
+    assert.equal(moratoriumQuote.grossExpectedAmount, t1Gross);
+    assert.equal(moratoriumQuote.discountAmount, scholarshipValue);
+    assert.equal(moratoriumQuote.netExpectedAmount, t1Gross - scholarshipValue);
+    assert.equal(moratoriumQuote.remainingBalance, t1Gross - scholarshipValue,
+      'A moratorium must not reduce the debt.');
+    assert.equal(moratoriumQuote.originalDueDate, '2026-10-05');
+    assert.equal(moratoriumQuote.effectiveDueDate, '2026-11-30');
+    assert.equal(moratoriumQuote.moratoriumStatus, 'ACTIVE');
 
     const voucherValue = Math.max(1, Math.floor(configuredTransport / 10));
     const voucherReference = `${marker}-VOUCHER`.slice(0, 80).toUpperCase();
@@ -483,12 +504,15 @@ const run = async () => {
       if (browser) await browser.close();
 
       if (studentId) {
-        const [paymentSnapshots, receiptSnapshots, benefitSnapshots] = await Promise.all([
+        const [paymentSnapshots, receiptSnapshots, benefitSnapshots, moratoriumSnapshots] = await Promise.all([
           db.collection('payments').where('studentId', '==', studentId).get(),
           db.collection('receipts').where('studentId', '==', studentId).get(),
-          db.collection('financialBenefits').where('studentId', '==', studentId).get()
+          db.collection('financialBenefits').where('studentId', '==', studentId).get(),
+          db.collection('paymentMoratoriums').where('studentId', '==', studentId).get()
         ]);
-        for (const snapshot of [...paymentSnapshots.docs, ...receiptSnapshots.docs, ...benefitSnapshots.docs]) {
+        for (const snapshot of [
+          ...paymentSnapshots.docs, ...receiptSnapshots.docs, ...benefitSnapshots.docs, ...moratoriumSnapshots.docs
+        ]) {
           assert.equal(snapshot.data().schoolId, EXPECTED_SCHOOL);
           if (snapshot.ref.parent.id === 'payments') {
             assert.ok(snapshot.data().description === marker || snapshot.data().studentId === studentId);
@@ -505,6 +529,7 @@ const run = async () => {
           ...paymentSnapshots.docs.map(item => item.ref),
           ...receiptSnapshots.docs.map(item => item.ref),
           ...benefitSnapshots.docs.map(item => item.ref),
+          ...moratoriumSnapshots.docs.map(item => item.ref),
           ...[...benefitReferenceIds].map(id => db.collection('financialBenefitReferences').doc(id)),
           closureId ? db.collection('cashClosures').doc(closureId) : null
         ]);
@@ -572,6 +597,8 @@ const run = async () => {
         payments: studentId ? (await db.collection('payments').where('studentId', '==', studentId).get()).size : 0,
         receipts: studentId ? (await db.collection('receipts').where('studentId', '==', studentId).get()).size : 0,
         benefits: studentId ? (await db.collection('financialBenefits').where('studentId', '==', studentId).get()).size : 0,
+        moratoriums: studentId
+          ? (await db.collection('paymentMoratoriums').where('studentId', '==', studentId).get()).size : 0,
         benefitReferences: (await Promise.all([...benefitReferenceIds].map(id =>
           db.collection('financialBenefitReferences').doc(id).get()))).filter(item => item.exists).length,
         closure: closureId && (await db.collection('cashClosures').doc(closureId).get()).exists ? 1 : 0,
@@ -583,7 +610,7 @@ const run = async () => {
         ].filter(Boolean))).filter(item => item.exists).length
       };
       assert.deepEqual(residual, {
-        students: 0, privateDocs: 0, payments: 0, receipts: 0, benefits: 0,
+        students: 0, privateDocs: 0, payments: 0, receipts: 0, benefits: 0, moratoriums: 0,
         benefitReferences: 0, closure: 0, profiles: 0, reservations: 0
       });
       for (const uid of [secretaryUid, ownerUid].filter(Boolean)) {

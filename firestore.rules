@@ -114,6 +114,23 @@ service cloud.firestore {
       return validKeys && validTypes;
     }
 
+    function isValidTuitionPaymentDeadlines(data) {
+      let deadlines = data.get('tuitionPaymentDeadlines', null);
+      return deadlines == null || (
+        deadlines is map
+        && deadlines.keys().hasOnly(['T1', 'T2', 'T3'])
+        && deadlines.keys().hasAll(['T1', 'T2', 'T3'])
+        && deadlines.T1 is string
+        && deadlines.T2 is string
+        && deadlines.T3 is string
+        && deadlines.T1.matches('^\\d{4}-(0[1-9]|1[0-2])-([0-2]\\d|3[01])$')
+        && deadlines.T2.matches('^\\d{4}-(0[1-9]|1[0-2])-([0-2]\\d|3[01])$')
+        && deadlines.T3.matches('^\\d{4}-(0[1-9]|1[0-2])-([0-2]\\d|3[01])$')
+        && deadlines.T1 < deadlines.T2
+        && deadlines.T2 < deadlines.T3
+      );
+    }
+
     function isAcademicCalendarPointerUpdate(schoolId) {
       let isAllowedRole = isSuperAdmin() || (hasSchoolAccess(schoolId) && (isAdminOrOwner() || isDirector()));
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
@@ -1256,11 +1273,14 @@ service cloud.firestore {
 
     match /academicYears/{yearId} {
       allow read: if isAuthenticated() && isActive() && !isBoardViewer() && (resource == null || hasSchoolAccess(resource.data.schoolId));
-      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector()) && hasSchoolAccess(request.resource.data.schoolId);
+      allow create: if isAuthenticated() && isActive() && (isAdminOrOwner() || isDirector())
+        && hasSchoolAccess(request.resource.data.schoolId)
+        && isValidTuitionPaymentDeadlines(request.resource.data);
       allow update: if isAuthenticated() && isActive() && (
         (isAdminOrOwner() || isDirector()) &&
         hasSchoolAccess(request.resource.data.schoolId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['openPeriodId'])
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['openPeriodId']) &&
+        isValidTuitionPaymentDeadlines(request.resource.data)
       );
       allow delete: if false;
     }

@@ -2,12 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Edit2, Trash2, BookOpen } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 import type { School, EducationCycle } from '../types';
 import { AcademicCalendarSettings } from '../components/Settings/AcademicCalendarSettings';
+import { TuitionDeadlineSettings } from '../components/Settings/TuitionDeadlineSettings';
+import {
+  validateTuitionPaymentDeadlines,
+  type TuitionPaymentDeadlines
+} from '../utils/tuitionDeadlines';
 
 const Settings: React.FC = () => {
   const { db, safeMergeDB, currentUser } = useAppContext();
@@ -16,6 +21,10 @@ const Settings: React.FC = () => {
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
   const [currentClassId, setCurrentClassId] = useState('');
   const [campaySecretInput, setCampaySecretInput] = useState('');
+  const [isSavingTuitionDeadlines, setIsSavingTuitionDeadlines] = useState(false);
+  const [draftTuitionDeadlines, setDraftTuitionDeadlines] = useState<TuitionPaymentDeadlines>({
+    T1: '', T2: '', T3: ''
+  });
 
   // Draft state variables for batch updates
   const [draftName, setDraftName] = useState('');
@@ -31,6 +40,41 @@ const Settings: React.FC = () => {
   const [draftEducationCycles, setDraftEducationCycles] = useState<EducationCycle[]>([]);
   const [draftFounderName, setDraftFounderName] = useState('');
   const [draftPrincipalName, setDraftPrincipalName] = useState('');
+
+  const activeAcademicYear = (db.academicYears || []).find(year =>
+    year.id === db.school?.activeAcademicYearId && year.schoolId === db.school?.id
+  );
+
+  useEffect(() => {
+    setDraftTuitionDeadlines(activeAcademicYear?.tuitionPaymentDeadlines || { T1: '', T2: '', T3: '' });
+  }, [activeAcademicYear?.id, activeAcademicYear?.tuitionPaymentDeadlines]);
+
+  const handleSaveTuitionDeadlines = async () => {
+    if (!activeAcademicYear || !currentUser || isSavingTuitionDeadlines) return;
+    const validationError = validateTuitionPaymentDeadlines(activeAcademicYear.name, draftTuitionDeadlines);
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
+    setIsSavingTuitionDeadlines(true);
+    try {
+      await updateDoc(doc(firestoreDb, 'academicYears', activeAcademicYear.id), {
+        tuitionPaymentDeadlines: draftTuitionDeadlines
+      });
+      await safeMergeDB({
+        ...db,
+        academicYears: (db.academicYears || []).map(year => year.id === activeAcademicYear.id
+          ? { ...year, tuitionPaymentDeadlines: { ...draftTuitionDeadlines } }
+          : year)
+      });
+      alert('Échéances de scolarité enregistrées. Aucun montant ni calendrier Transport n’a été modifié.');
+    } catch (error) {
+      console.error(error);
+      alert("Impossible d’enregistrer les échéances de scolarité.");
+    } finally {
+      setIsSavingTuitionDeadlines(false);
+    }
+  };
 
   const [draftCycleNames, setDraftCycleNames] = useState({
     nursery: '',
@@ -778,6 +822,15 @@ const Settings: React.FC = () => {
 
         </div>
       </div>
+
+      <TuitionDeadlineSettings
+        academicYearName={activeAcademicYear?.name || ''}
+        value={draftTuitionDeadlines}
+        disabled={!canEditFees || !activeAcademicYear}
+        saving={isSavingTuitionDeadlines}
+        onChange={setDraftTuitionDeadlines}
+        onSave={handleSaveTuitionDeadlines}
+      />
 
       <div className="card">
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-color)' }}>
