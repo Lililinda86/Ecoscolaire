@@ -14,14 +14,17 @@ import {
   assertStagingRuntimeProject,
   classifyFirebaseRequest,
 } from './staging-firebase-precheck.mjs';
+import {
+  assertFixtureCashDayOpen,
+  cleanupCashDayFixture,
+  markCashDayFixture,
+} from './staging-cash-day-fixture.mjs';
 
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
 const PRODUCTION_PROJECT = 'ecoscolaire-c5861';
-const SECRETARY_EMAIL = 'secretary.alpha@ecoscolaire.com';
 const REQUIRED_ENV = [
   'STAGING_APP_URL',
   'STAGING_FIREBASE_SERVICE_ACCOUNT',
-  'STAGING_TEST_ALPHA_PASSWORD',
   'STAGING_FIREBASE_API_KEY',
   'STAGING_FIREBASE_AUTH_DOMAIN',
   'STAGING_FIREBASE_PROJECT_ID',
@@ -90,12 +93,6 @@ const makeLegacySlotId = ({ schoolId, studentId, academicYear, installment }) =>
   const canonical = JSON.stringify({ schoolId, studentId, academicYear, installment });
   return `slot_${crypto.createHash('sha256').update(canonical).digest('hex')}`;
 };
-
-const stableStringify = (value) => JSON.stringify((function sortDeep(item) {
-  if (Array.isArray(item)) return item.map(sortDeep);
-  if (!item || typeof item !== 'object') return item;
-  return Object.fromEntries(Object.keys(item).sort().map((key) => [key, sortDeep(item[key])]));
-}(value)));
 
 const deleteSnapshots = async (db, snapshots) => {
   const refs = snapshots.flatMap((snapshot) => snapshot?.docs || [snapshot])
@@ -196,15 +193,13 @@ const run = async () => {
   let academicYear = null;
   let activeAcademicYearId = null;
   let academicYearFixtureId = null;
-  let academicYearDeadlinesBefore;
-  let academicYearConfigPatched = false;
-  let schoolActiveAcademicYearIdBefore = null;
   let primaryClassId = null;
-  let schoolBefore = null;
-  let schoolConfigPatched = false;
   let deadlineFixture = null;
   let paymentSettingsFixture = null;
+  let fixtureSecretaryEmail = null;
+  let fixturePassword = null;
   let closureId = null;
+  let cashDate = null;
   let referenceId = null;
   const targetIds = new Set(Object.values(benefitIds));
   const paymentIds = new Set();
@@ -246,103 +241,72 @@ const run = async () => {
     const isolation = assertStagingFirebasePrecheck({ runtimeProject, requestUrls: firebaseRequestUrls });
     console.log(`PRECHECK COMPLETE: runtime=${isolation.runtimeProject}, staging requests=${isolation.stagingRequests}, production requests=0`);
 
-    const secretaryAccount = await adminAuth.getUserByEmail(SECRETARY_EMAIL);
-    secretaryUid = secretaryAccount.uid;
-    const secretaryProfile = await db.collection('users').doc(secretaryUid).get();
-    assert.equal(secretaryProfile.exists, true);
-    const secretary = secretaryProfile.data() || {};
-    assert.equal(secretary.role, 'secretary');
-    assert.equal(secretary.active === true || secretary.isActive === true, true);
-    testSchoolId = String(secretary.schoolId || '').trim();
-    assert.ok(testSchoolId);
-
-    const schoolRef = db.collection('schools').doc(testSchoolId);
-    const schoolSnapshot = await schoolRef.get();
-    assert.equal(schoolSnapshot.exists, true);
-    schoolBefore = schoolSnapshot.data() || {};
-    schoolActiveAcademicYearIdBefore = typeof schoolBefore.activeAcademicYearId === 'string'
-      && schoolBefore.activeAcademicYearId && !schoolBefore.activeAcademicYearId.includes('/')
-      ? schoolBefore.activeAcademicYearId : null;
-    activeAcademicYearId = schoolActiveAcademicYearIdBefore;
-    if (!activeAcademicYearId) {
-      assert.match(String(schoolBefore.academicYear || ''), /^\d{4}-\d{4}$/,
-        'The staging school has neither a canonical pointer nor a valid legacy year label.');
-      academicYearFixtureId = `e2e-complete-academic-year-${suffix}`;
-      const fixtureYearRef = db.collection('academicYears').doc(academicYearFixtureId);
-      assert.equal((await fixtureYearRef.get()).exists, false);
-      await fixtureYearRef.create({
-        id: academicYearFixtureId,
-        schoolId: testSchoolId,
-        name: schoolBefore.academicYear,
-        status: 'active',
-        testFixture: true,
-        testRunId: suffix,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-      activeAcademicYearId = academicYearFixtureId;
-    }
-    const academicYearSnapshot = await db.collection('academicYears').doc(activeAcademicYearId).get();
-    assert.equal(academicYearSnapshot.exists, true);
-    const academicYearData = academicYearSnapshot.data() || {};
-    assert.equal(academicYearData.schoolId, testSchoolId);
-    assert.equal(academicYearData.status, 'active');
-    academicYear = String(academicYearData.name || '');
-    assert.match(academicYear, /^\d{4}-\d{4}$/);
-    assert.equal(academicYear, '2026-2027',
-      'The tuition deadline release fixture requires staging academic year 2026-2027.');
-    academicYearDeadlinesBefore = academicYearData.tuitionPaymentDeadlines;
-    legacySlotId = makeLegacySlotId({
-      schoolId: testSchoolId, studentId: studentIds.legacy, academicYear, installment: 'T1',
-    });
-
-    const classes = await db.collection('classes').where('schoolId', '==', testSchoolId).get();
-    const primaryClass = classes.docs.find((item) => {
-      const data = item.data();
-      const cycle = String(data.cycle || data.level || '').toLowerCase();
-      return data.isActive !== false && (
-        ['primary', 'primaire'].includes(cycle)
-        || ['SIL', 'CP', 'CE1', 'CE2', 'CM1'].includes(String(data.name))
-      );
-    });
-    assert.ok(primaryClass, 'No same-school primary class is available for completion fixtures.');
-    primaryClassId = primaryClass.id;
-
+    testSchoolId = `tuition-deadlines-staging-${suffix}`;
+    academicYear = '2026-2027';
+    academicYearFixtureId = `tuition-deadlines-year-${suffix}`;
+    activeAcademicYearId = academicYearFixtureId;
+    primaryClassId = `tuition-deadlines-class-${suffix}`;
     const today = doualaDate();
     const originalDueDate = '2026-10-05';
     const futureDueDate = '2026-12-05';
     const thirdDueDate = '2027-02-05';
     const moratoriumDueDate = addCalendarDays(today, 90);
-    deadlineFixture = {
-      registrationFee: originalDueDate,
-      transport: {},
-    };
-    await db.collection('academicYears').doc(activeAcademicYearId).update({
-      tuitionPaymentDeadlines: { T1: originalDueDate, T2: futureDueDate, T3: thirdDueDate },
-    });
-    academicYearConfigPatched = true;
-    paymentSettingsFixture = { ...(schoolBefore.paymentSettings || {}), activeProvider: 'none' };
-    const preexistingClosureId = `${testSchoolId}__${today}`;
-    assert.equal((await db.collection('cashClosures').doc(preexistingClosureId).get()).exists, false,
-      'A same-school staging cash closure already exists for today.');
-    const schoolFixturePatch = {
-      paymentDeadlines: deadlineFixture,
-      paymentSettings: paymentSettingsFixture,
-      e2ePaymentsLiveConfig: { testFixture: true, testRunId: suffix },
-    };
-    if (academicYearFixtureId) schoolFixturePatch.activeAcademicYearId = academicYearFixtureId;
-    await schoolRef.update(schoolFixturePatch);
-    schoolConfigPatched = true;
+    deadlineFixture = { registrationFee: originalDueDate, transport: {} };
+    paymentSettingsFixture = { activeProvider: 'none' };
+    await assertFixtureCashDayOpen({ db, schoolId: testSchoolId, date: today });
 
-    const tempPassword = `Aa1!${crypto.randomBytes(24).toString('base64url')}`;
+    const schoolRef = db.collection('schools').doc(testSchoolId);
+    const fixtureYearRef = db.collection('academicYears').doc(academicYearFixtureId);
+    const fixtureClassRef = db.collection('classes').doc(primaryClassId);
+    assert.equal((await schoolRef.get()).exists, false, 'Tuition fixture school already exists.');
+    assert.equal((await fixtureYearRef.get()).exists, false, 'Tuition fixture academic year already exists.');
+    assert.equal((await fixtureClassRef.get()).exists, false, 'Tuition fixture class already exists.');
+    await Promise.all([
+      schoolRef.create({
+        id: testSchoolId, name: `Tuition Deadlines Staging ${suffix}`, academicYear,
+        activeAcademicYearId, studentsCount: 0, paymentDeadlines: deadlineFixture,
+        paymentSettings: paymentSettingsFixture, status: 'active',
+        testFixture: true, testRunId: suffix,
+        e2ePaymentsLiveConfig: { testFixture: true, testRunId: suffix },
+        createdAt: FieldValue.serverTimestamp(),
+      }),
+      fixtureYearRef.create({
+        id: academicYearFixtureId, schoolId: testSchoolId, name: academicYear, status: 'active',
+        tuitionPaymentDeadlines: { T1: originalDueDate, T2: futureDueDate, T3: thirdDueDate },
+        testFixture: true, testRunId: suffix, createdAt: FieldValue.serverTimestamp(),
+      }),
+      fixtureClassRef.create({
+        id: primaryClassId, schoolId: testSchoolId, name: 'CM1', cycle: 'primary', level: 'primary',
+        section: 'francophone', academicYearId: activeAcademicYearId, isActive: true,
+        testFixture: true, testRunId: suffix, createdAt: FieldValue.serverTimestamp(),
+      }),
+    ]);
+    legacySlotId = makeLegacySlotId({
+      schoolId: testSchoolId, studentId: studentIds.legacy, academicYear, installment: 'T1',
+    });
+
+    fixturePassword = `Aa1!${crypto.randomBytes(24).toString('base64url')}`;
+    fixtureSecretaryEmail = `e2e-tuition-secretary-${suffix}@tests.ecoscolaire.invalid`;
     const ownerEmail = `e2e-owner-${suffix}@tests.ecoscolaire.invalid`;
     const otherOwnerEmail = `e2e-other-owner-${suffix}@tests.ecoscolaire.invalid`;
-    const ownerUser = await adminAuth.createUser({ email: ownerEmail, password: tempPassword, disabled: false });
+    const secretaryUser = await adminAuth.createUser({
+      email: fixtureSecretaryEmail, password: fixturePassword, disabled: false,
+    });
+    secretaryUid = secretaryUser.uid;
+    createdAuthUids.add(secretaryUid);
+    const ownerUser = await adminAuth.createUser({ email: ownerEmail, password: fixturePassword, disabled: false });
     ownerUid = ownerUser.uid;
     createdAuthUids.add(ownerUid);
-    const otherOwnerUser = await adminAuth.createUser({ email: otherOwnerEmail, password: tempPassword, disabled: false });
+    const otherOwnerUser = await adminAuth.createUser({
+      email: otherOwnerEmail, password: fixturePassword, disabled: false,
+    });
     otherOwnerUid = otherOwnerUser.uid;
     createdAuthUids.add(otherOwnerUid);
     await Promise.all([
+      db.collection('users').doc(secretaryUid).create({
+        id: secretaryUid, email: fixtureSecretaryEmail, role: 'secretary', schoolId: testSchoolId,
+        active: true, isActive: true, testFixture: true, testRunId: suffix,
+      }),
       db.collection('users').doc(ownerUid).create({
         id: ownerUid, email: ownerEmail, role: 'owner', schoolId: testSchoolId,
         active: true, isActive: true, testFixture: true, testRunId: suffix,
@@ -363,10 +327,10 @@ const run = async () => {
     ownerRaceAuth = getAuth(ownerRaceApp);
     otherOwnerAuth = getAuth(otherOwnerApp);
     await Promise.all([
-      signInWithEmailAndPassword(secretaryAuth, SECRETARY_EMAIL, process.env.STAGING_TEST_ALPHA_PASSWORD),
-      signInWithEmailAndPassword(ownerAuth, ownerEmail, tempPassword),
-      signInWithEmailAndPassword(ownerRaceAuth, ownerEmail, tempPassword),
-      signInWithEmailAndPassword(otherOwnerAuth, otherOwnerEmail, tempPassword),
+      signInWithEmailAndPassword(secretaryAuth, fixtureSecretaryEmail, fixturePassword),
+      signInWithEmailAndPassword(ownerAuth, ownerEmail, fixturePassword),
+      signInWithEmailAndPassword(ownerRaceAuth, ownerEmail, fixturePassword),
+      signInWithEmailAndPassword(otherOwnerAuth, otherOwnerEmail, fixturePassword),
     ]);
 
     const secretaryFunctions = getFunctions(secretaryApp, 'us-central1');
@@ -614,8 +578,8 @@ const run = async () => {
       });
       try {
         await page.goto(`${appUrl}/#/login`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-        await page.getByTestId('login-email').fill(SECRETARY_EMAIL);
-        await page.getByTestId('login-password').fill(process.env.STAGING_TEST_ALPHA_PASSWORD);
+        await page.getByTestId('login-email').fill(fixtureSecretaryEmail);
+        await page.getByTestId('login-password').fill(fixturePassword);
         await page.getByTestId('login-submit').click();
         await page.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 30_000 });
         await page.goto(`${appUrl}/#/payments`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
@@ -656,8 +620,8 @@ const run = async () => {
 
     console.log('CASH CLOSURE COMPLETE: signed reversals and cross-school denial');
     const currentDate = doualaDate();
-    closureId = `${testSchoolId}__${currentDate}`;
-    assert.equal((await db.collection('cashClosures').doc(closureId).get()).exists, false);
+    cashDate = currentDate;
+    closureId = await assertFixtureCashDayOpen({ db, schoolId: testSchoolId, date: currentDate });
     await expectCallableFailure(() => otherOwnerCloseCall({
       schoolId: testSchoolId, academicYear, date: currentDate,
       openingBalance: 0, countedBalance: 0, notes: marker,
@@ -686,6 +650,9 @@ const run = async () => {
     assert.equal(closureSnapshot.data()?.cashReceived, expectedCash);
     assert.equal(closureSnapshot.data()?.countedBalance, countedBalance);
     assert.equal(closureSnapshot.data()?.closedBy, secretaryUid);
+    await markCashDayFixture({
+      db, schoolId: testSchoolId, date: currentDate, testRunId: suffix, closureNotes: marker,
+    });
     await expectCallableFailure(() => secretaryCloseCall({
       schoolId: testSchoolId, academicYear, date: currentDate,
       openingBalance, countedBalance, notes: marker,
@@ -729,48 +696,8 @@ const run = async () => {
       await deleteSnapshots(db, taggedSnapshots);
 
       if (closureId) {
-        const closureRef = db.collection('cashClosures').doc(closureId);
-        const snapshot = await closureRef.get();
-        if (snapshot.exists) {
-          assert.equal(snapshot.data()?.notes, marker);
-          assert.equal(snapshot.data()?.schoolId, testSchoolId);
-          await closureRef.delete();
-        }
-      }
-
-      if (testSchoolId && schoolBefore && schoolConfigPatched && deadlineFixture && paymentSettingsFixture) {
-        const schoolRef = db.collection('schools').doc(testSchoolId);
-        await db.runTransaction(async (transaction) => {
-          const current = await transaction.get(schoolRef);
-          const currentData = current.data() || {};
-          assert.equal(currentData.e2ePaymentsLiveConfig?.testRunId, suffix,
-            'Refusing to restore a staging school configuration owned by another operation.');
-          assert.equal(stableStringify(currentData.paymentDeadlines), stableStringify(deadlineFixture));
-          assert.equal(stableStringify(currentData.paymentSettings), stableStringify(paymentSettingsFixture));
-          const patch = {
-            paymentDeadlines: schoolBefore.paymentDeadlines ?? FieldValue.delete(),
-            paymentSettings: schoolBefore.paymentSettings ?? FieldValue.delete(),
-            e2ePaymentsLiveConfig: FieldValue.delete(),
-          };
-          if (academicYearFixtureId) {
-            assert.equal(currentData.activeAcademicYearId, academicYearFixtureId,
-              'Refusing to restore an academic year pointer changed by another operation.');
-            patch.activeAcademicYearId = schoolActiveAcademicYearIdBefore ?? FieldValue.delete();
-          }
-          transaction.update(schoolRef, patch);
-        });
-      }
-
-      if (academicYearConfigPatched && activeAcademicYearId && !academicYearFixtureId) {
-        const yearRef = db.collection('academicYears').doc(activeAcademicYearId);
-        await db.runTransaction(async (transaction) => {
-          const current = await transaction.get(yearRef);
-          assert.deepEqual(current.data()?.tuitionPaymentDeadlines, {
-            T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05',
-          }, 'Refusing to restore an academic-year configuration changed by another operation.');
-          transaction.update(yearRef, {
-            tuitionPaymentDeadlines: academicYearDeadlinesBefore ?? FieldValue.delete(),
-          });
+        await cleanupCashDayFixture({
+          db, schoolId: testSchoolId, date: cashDate, testRunId: suffix, closureNotes: marker,
         });
       }
 
@@ -781,6 +708,24 @@ const run = async () => {
           assert.equal(fixtureYear.data()?.testRunId, suffix);
           assert.equal(fixtureYear.data()?.schoolId, testSchoolId);
           await fixtureYearRef.delete();
+        }
+      }
+      if (primaryClassId) {
+        const fixtureClassRef = db.collection('classes').doc(primaryClassId);
+        const fixtureClass = await fixtureClassRef.get();
+        if (fixtureClass.exists) {
+          assert.equal(fixtureClass.data()?.testRunId, suffix);
+          assert.equal(fixtureClass.data()?.schoolId, testSchoolId);
+          await fixtureClassRef.delete();
+        }
+      }
+      if (testSchoolId) {
+        const fixtureSchoolRef = db.collection('schools').doc(testSchoolId);
+        const fixtureSchool = await fixtureSchoolRef.get();
+        if (fixtureSchool.exists) {
+          assert.equal(fixtureSchool.data()?.testFixture, true);
+          assert.equal(fixtureSchool.data()?.testRunId, suffix);
+          await fixtureSchoolRef.delete();
         }
       }
 
@@ -797,19 +742,15 @@ const run = async () => {
         remaining[name] = (await db.collection(name).where('testRunId', '==', suffix).get()).size;
       }
       assert.deepEqual(remaining, Object.fromEntries(taggedCollections.map((name) => [name, 0])));
-      if (testSchoolId) {
-        const schoolAfter = (await db.collection('schools').doc(testSchoolId).get()).data() || {};
-        assert.equal(schoolAfter.e2ePaymentsLiveConfig, undefined);
-        assert.equal(stableStringify(schoolAfter.paymentDeadlines), stableStringify(schoolBefore.paymentDeadlines));
-        assert.equal(stableStringify(schoolAfter.paymentSettings), stableStringify(schoolBefore.paymentSettings));
-        if (academicYearFixtureId) {
-          assert.equal(schoolAfter.activeAcademicYearId ?? null, schoolActiveAcademicYearIdBefore);
-        }
-      }
+      if (testSchoolId) assert.equal((await db.collection('schools').doc(testSchoolId).get()).exists, false);
       if (academicYearFixtureId) {
         assert.equal((await db.collection('academicYears').doc(academicYearFixtureId).get()).exists, false);
       }
-      if (closureId) assert.equal((await db.collection('cashClosures').doc(closureId).get()).exists, false);
+      if (primaryClassId) assert.equal((await db.collection('classes').doc(primaryClassId).get()).exists, false);
+      if (closureId) {
+        assert.equal((await db.collection('cashClosures').doc(closureId).get()).exists, false);
+        assert.equal((await db.collection('cashLedgerDays').doc(closureId).get()).exists, false);
+      }
       for (const uid of createdAuthUids) {
         await assert.rejects(() => adminAuth.getUser(uid), (error) => error?.code === 'auth/user-not-found');
       }
