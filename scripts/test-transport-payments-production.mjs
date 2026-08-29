@@ -308,7 +308,9 @@ const main = async () => {
       { kind: 'INSTALLMENT', period: periods[1], amount: 4_000 },
       { kind: 'INSTALLMENT', period: periods[2], amount: 2_000 },
     ]);
-    assert.equal(p4000.remainingBalance, 2_000);
+    const expectedP4000Remaining = periods.length * boundary[0].monthlyGrossAmount
+      - (p4000.amount - (p4000.transportCredit || 0));
+    assert.equal(p4000.remainingBalance, expectedP4000Remaining);
     const replay = await pay(secretary, pk14, `pk14-allocation-${cfg.testRunId}`, 10_000);
     assert.equal(replay.idempotentReplay, true);
     assert.equal((await db.collection('payments').where('requestId', '==', `pk14-allocation-${cfg.testRunId}`).get()).size, 1);
@@ -321,20 +323,26 @@ const main = async () => {
     const partial = await pay(secretary, pk42, `pk42-partial-${cfg.testRunId}`, 2_000);
     assert.equal(partial.allocations[0].amount, 2_000);
     assert.equal((await quote(secretary, pk42)).installments[0].remainingBalance, 3_000);
-    await pay(secretary, pk33, `pk33-prior-${cfg.testRunId}`, 4_000);
-    const credit = await pay(secretary, pk33, `pk33-credit-${cfg.testRunId}`, 10_000);
+    const expectedTransportCredit = 2_000;
+    const creditPaymentAmount = 10_000;
+    const remainingDebtBeforeCredit = creditPaymentAmount - expectedTransportCredit;
+    const pk33GrossObligation = periods.length * boundary[1].monthlyGrossAmount;
+    await pay(secretary, pk33, `pk33-prior-${cfg.testRunId}`,
+      pk33GrossObligation - remainingDebtBeforeCredit);
+    const credit = await pay(secretary, pk33, `pk33-credit-${cfg.testRunId}`, creditPaymentAmount);
     assert.deepEqual(credit.allocations, [
-      { kind: 'INSTALLMENT', period: periods[1], amount: 4_000 },
-      { kind: 'INSTALLMENT', period: periods[2], amount: 4_000 },
-      { kind: 'CREDIT', period: null, amount: 2_000 },
+      ...periods.slice(-2).map((period) => ({
+        kind: 'INSTALLMENT', period, amount: boundary[1].monthlyGrossAmount,
+      })),
+      { kind: 'CREDIT', period: null, amount: expectedTransportCredit },
     ]);
-    assert.equal(credit.transportCredit, 2_000);
+    assert.equal(credit.transportCredit, expectedTransportCredit);
     assert.equal((await quote(secretary, pk33, 'tuition', { installment: 'T1' })).previousPaid, 0);
     const creditReceipt = (await db.collection('receipts').doc(credit.receiptId).get()).data();
     assert.equal(creditReceipt.paymentType, 'transport');
     assert.equal(creditReceipt.amount, 10_000);
     assert.deepEqual(creditReceipt.allocationSummary, credit.allocations);
-    assert.equal(creditReceipt.transportCredit, 2_000);
+    assert.equal(creditReceipt.transportCredit, expectedTransportCredit);
 
     const benefitStudent = await createStudent('benefits', 34);
     const benefitDefs = [

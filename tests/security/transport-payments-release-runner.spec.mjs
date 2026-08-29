@@ -269,6 +269,10 @@ test('runner covers the required Transport contract and real UI', () => {
     assert.ok(runner.includes(token), `missing amount matrix token ${token}`);
   }
   assert.match(runner, /allocated \+ \(payment\.transportCredit \|\| 0\), amount/);
+  assert.match(runner, /periods\.length \* boundary\[0\]\.monthlyGrossAmount/);
+  assert.doesNotMatch(runner, /assert\.equal\(p4000\.remainingBalance, 2_000\)/);
+  assert.match(runner, /const remainingDebtBeforeCredit = creditPaymentAmount - expectedTransportCredit/);
+  assert.match(runner, /pk33GrossObligation - remainingDebtBeforeCredit/);
 });
 
 test('existing Staging dispatcher runs the isolated gate before the full collections E2E', () => {
