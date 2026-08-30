@@ -9,7 +9,10 @@ import {
 } from '../../scripts/verify-staging-function-deployment-contract.mjs';
 
 const readText = async (path) => (await readFile(path, 'utf8')).replace(/\r\n/g, '\n');
-const workflow = await readText('.github/workflows/transport-payments-release-runner.yml');
+const transportWorkflowPath = '.github/workflows/transport-payments-release-runner.yml';
+const tuitionUiWorkflowPath = '.github/workflows/payment-forward-recovery-staging-ui.yml';
+const workflow = await readText(transportWorkflowPath);
+const tuitionUiWorkflow = await readText(tuitionUiWorkflowPath);
 const runner = await readText('scripts/test-transport-payments-production.mjs');
 const stagingWorkflow = await readText('.github/workflows/run-seed.yml');
 const stagingDeploymentWorkflow = await readText('.github/workflows/deploy-staging.yml');
@@ -153,6 +156,38 @@ test('workflow is manual, branch-bound, keyless in Staging and Production, and v
   assert.match(workflow, /testIamPermissions/);
   for (const permission of requiredFixturePermissions) assert.match(workflow, new RegExp(permission));
   assert.doesNotMatch(workflow, /production-financial-e2e|test-production-financial-e2e/);
+});
+
+test('lot1 tuition UI operation routes only through the WIF-authorized Transport caller', () => {
+  assert.match(workflow, /operation:\n\s+description: Exact isolated operation\n\s+required: true\n\s+default: transport\n\s+type: choice\n\s+options: \[transport, lot1_tuition_ui\]/);
+  const transportJob = workflow.match(/  isolated-transport-release:\n[\s\S]*?(?=\n  lot1-tuition-ui:)/)?.[0];
+  const tuitionUiJob = workflow.match(/  lot1-tuition-ui:\n[\s\S]*$/)?.[0];
+  assert.ok(transportJob, 'Transport job not found');
+  assert.ok(tuitionUiJob, 'LOT 1 tuition UI job not found');
+  assert.match(transportJob, /inputs\.operation == 'transport'/);
+  assert.doesNotMatch(transportJob, /lot1_tuition_ui/);
+  assert.match(tuitionUiJob, /inputs\.operation == 'lot1_tuition_ui'/);
+  assert.match(tuitionUiJob, /inputs\.mode == 'staging'/);
+  assert.match(tuitionUiJob, /github\.ref == 'refs\/heads\/staging'/);
+  assert.match(tuitionUiJob, /inputs\.confirmation == 'RUN_LOT1_STAGING_UI'/);
+  assert.match(tuitionUiJob, /uses: \.\/\.github\/workflows\/payment-forward-recovery-staging-ui\.yml/);
+  assert.match(tuitionUiJob, /expected_sha: \$\{\{ inputs\.expected_sha \}\}/);
+  assert.doesNotMatch(tuitionUiJob, /test-transport-payments-production|test-secretary-collections-staging|production-financial-e2e/);
+  assert.match(tuitionUiJob, /permissions:\n\s+actions: read\n\s+contents: read\n\s+id-token: write/);
+  assert.match(tuitionUiWorkflow, /workflow_call:/);
+  assert.match(tuitionUiWorkflow, /environment: staging/);
+  assert.doesNotMatch(`${workflow}\n${tuitionUiWorkflow}`, /credentials_json/);
+  assert.doesNotMatch(tuitionUiJob, /testIamPermissions|datastore\.entities|firebaseauth\.users|roles\//);
+  assert.doesNotMatch(`${workflow}\n${tuitionUiWorkflow}`, /gcloud iam|providers (?:create|update)|add-iam-policy-binding/);
+  assert.equal((workflow.match(/github-ecoscolaire-staging/g) || []).length, 1);
+  assert.equal(
+    `Lililinda86/Ecoscolaire/${transportWorkflowPath}@refs/heads/staging`,
+    'Lililinda86/Ecoscolaire/.github/workflows/transport-payments-release-runner.yml@refs/heads/staging',
+  );
+  assert.equal(
+    `Lililinda86/Ecoscolaire/${tuitionUiWorkflowPath}@refs/heads/staging`,
+    'Lililinda86/Ecoscolaire/.github/workflows/payment-forward-recovery-staging-ui.yml@refs/heads/staging',
+  );
 });
 
 test('IAM preflight curl uses single-backslash line continuation and keeps its full contract', () => {

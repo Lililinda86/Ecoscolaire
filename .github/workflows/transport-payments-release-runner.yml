@@ -3,14 +3,24 @@ name: Transport Payments Isolated Release Runner
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Exact isolated operation
+        required: true
+        default: transport
+        type: choice
+        options: [transport, lot1_tuition_ui]
       mode:
         description: Exact isolated target
         required: true
         type: choice
         options: [staging, production]
       confirmation:
-        description: RUN_ISOLATED_TRANSPORT_STAGING or RUN_ISOLATED_TRANSPORT_PRODUCTION
+        description: Exact confirmation for the selected operation and target
         required: true
+        type: string
+      expected_sha:
+        description: Exact deployed Staging SHA required by lot1_tuition_ui
+        required: false
         type: string
       app_url:
         description: Immutable Staging Preview URL or https://ecoscolaire.vercel.app
@@ -25,10 +35,11 @@ permissions:
 jobs:
   isolated-transport-release:
     if: >-
-      (inputs.mode == 'staging' && github.ref == 'refs/heads/staging' &&
-       inputs.confirmation == 'RUN_ISOLATED_TRANSPORT_STAGING') ||
-      (inputs.mode == 'production' && github.ref == 'refs/heads/main' &&
-       inputs.confirmation == 'RUN_ISOLATED_TRANSPORT_PRODUCTION')
+      inputs.operation == 'transport' &&
+      ((inputs.mode == 'staging' && github.ref == 'refs/heads/staging' &&
+        inputs.confirmation == 'RUN_ISOLATED_TRANSPORT_STAGING') ||
+       (inputs.mode == 'production' && github.ref == 'refs/heads/main' &&
+        inputs.confirmation == 'RUN_ISOLATED_TRANSPORT_PRODUCTION'))
     runs-on: ubuntu-latest
     environment: ${{ inputs.mode }}
     timeout-minutes: 45
@@ -190,3 +201,20 @@ jobs:
           TRANSPORT_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: node scripts/test-transport-payments-production.mjs
+
+  lot1-tuition-ui:
+    if: >-
+      inputs.operation == 'lot1_tuition_ui' &&
+      inputs.mode == 'staging' &&
+      github.ref == 'refs/heads/staging' &&
+      inputs.confirmation == 'RUN_LOT1_STAGING_UI'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/payment-forward-recovery-staging-ui.yml
+    with:
+      expected_sha: ${{ inputs.expected_sha }}
+      app_url: ${{ inputs.app_url }}
+      confirmation: ${{ inputs.confirmation }}
+    secrets: inherit
