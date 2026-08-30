@@ -28,6 +28,15 @@ jobs:
       - name: Validate production deployment manifest
         run: npm run test:production-workflow
 
+      - name: Validate Production tuition backup gate safety
+        run: node --test tests/security/production-backup-gate.spec.mjs
+
+      - name: Validate Production isolated tuition runner safety
+        run: node --test tests/security/production-tuition-safety.spec.mjs
+
+      - name: Validate Production tuition backfill safety
+        run: node --test tests/security/production-backfill-guard.spec.mjs
+
       - name: Validate staging collections E2E safety contract
         run: node --check scripts/test-secretary-collections-staging.mjs && node --test tests/security/staging-collections-e2e.spec.mjs tests/security/staging-firebase-precheck.spec.mjs
 
