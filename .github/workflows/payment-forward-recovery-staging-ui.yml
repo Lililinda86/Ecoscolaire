@@ -15,6 +15,20 @@ on:
         description: Exact confirmation RUN_LOT1_STAGING_UI
         required: true
         type: string
+  workflow_call:
+    inputs:
+      expected_sha:
+        description: Exact deployed Staging SHA
+        required: true
+        type: string
+      app_url:
+        description: Immutable Vercel Staging URL for the exact SHA
+        required: true
+        type: string
+      confirmation:
+        description: Exact confirmation RUN_LOT1_STAGING_UI
+        required: true
+        type: string
 
 permissions:
   actions: read
