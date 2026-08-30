@@ -107,7 +107,13 @@ test('runner fails closed against Production and always executes exact cleanup',
   assert.match(source, /transportPaymentAllocations/);
   assert.match(source, /const boundedDrain = async/);
   assert.match(source, /cleanupCashDayFixture/);
-  assert.match(source, /cashLedgerDay: 0/);
+  assert.match(source, /const fixtureCashDate = doualaDate\(\)/);
+  assert.doesNotMatch(source, /const today = doualaDate\(\)/);
+  assert.match(source, /markOpenCashLedgerFixture/);
+  assert.match(source, /if \(testSchoolId\) \{[\s\S]*cleanupCashDayFixture\(\{[\s\S]*date: fixtureCashDate/);
+  assert.match(source, /cashClosures: 0, cashLedgerDays: 0, counters: 0, authUsers: 0/);
+  assert.match(source, /audit residuals=0/);
+  assert.match(source, /const orphanCount = Object\.values\(remaining\)/);
   assert.match(source, /testRunId.*suffix/);
   assert.match(source, /classId: secondaryClassId/);
   assert.match(source, /classId: primaryClassId/);

@@ -71,6 +71,24 @@ export const assertFixtureCashLedgerOpen = async ({
   return { id, data: ledgerData };
 };
 
+export const markOpenCashLedgerFixture = async ({ db, schoolId, date, testRunId }) => {
+  const id = exactCashDayId(schoolId, date);
+  const ledgerRef = db.collection('cashLedgerDays').doc(id);
+  await db.runTransaction(async (transaction) => {
+    const ledger = await transaction.get(ledgerRef);
+    assert.equal(ledger.exists, true, 'Fixture cash ledger day does not exist.');
+    const data = ledger.data() || {};
+    assertExactDocument({ data, schoolId, date, label: 'Cash ledger day' });
+    assert.equal(data.status, 'open', 'Fixture cash ledger day is not open.');
+    assert.equal(data.closureId, undefined, 'Fixture cash ledger day is already paired with a closure.');
+    if (data.testRunId !== undefined) {
+      assertRunMarker({ data, testRunId, label: 'Cash ledger day' });
+    }
+    transaction.update(ledgerRef, { testFixture: true, testRunId });
+  });
+  return id;
+};
+
 export const markCashDayFixture = async ({ db, schoolId, date, testRunId, closureNotes }) => {
   const id = exactCashDayId(schoolId, date);
   const closureRef = db.collection('cashClosures').doc(id);

@@ -18,6 +18,7 @@ import {
   assertFixtureCashDayOpen,
   cleanupCashDayFixture,
   markCashDayFixture,
+  markOpenCashLedgerFixture,
 } from './staging-cash-day-fixture.mjs';
 
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
@@ -102,6 +103,7 @@ const run = async () => {
   const appUrl = requireEnvironment();
   const runToken = String(process.env.GITHUB_RUN_ID || Date.now()).replace(/[^A-Za-z0-9_-]/g, '-');
   const attempt = String(process.env.GITHUB_RUN_ATTEMPT || '1').replace(/[^A-Za-z0-9_-]/g, '-');
+  const fixtureCashDate = doualaDate();
   const suffix = `${runToken}-${attempt}`;
   const studentId = `e2e-collections-student-${suffix}`;
   const studentName = `Élève fictif Encaissements ${suffix}`;
@@ -301,8 +303,9 @@ const run = async () => {
     }
     schoolStudentsCountBefore = school.studentsCount;
     assert.ok(Number.isSafeInteger(schoolStudentsCountBefore), 'The staging student counter is not initialized.');
-    const today = doualaDate();
-    const expectedClosureId = await assertFixtureCashDayOpen({ db, schoolId: testSchoolId, date: today });
+    const expectedClosureId = await assertFixtureCashDayOpen({
+      db, schoolId: testSchoolId, date: fixtureCashDate,
+    });
     schoolTransportPolicyBefore = school.transportPolicy;
     schoolPaymentDeadlinesBefore = school.paymentDeadlines;
     await db.collection('schools').doc(testSchoolId).update({
@@ -417,6 +420,9 @@ const run = async () => {
       const result = (await payCall({
         schoolId: testSchoolId, studentId, academicYear, requestId, amount, type, ...extra,
       })).data;
+      await markOpenCashLedgerFixture({
+        db, schoolId: testSchoolId, date: fixtureCashDate, testRunId: suffix,
+      });
       paymentIds.add(result.paymentId);
       targetIds.add(result.paymentId);
       receiptNumbers.add(result.receiptNumber);
@@ -648,9 +654,9 @@ const run = async () => {
     ]) assert.equal(publicStudent[forbidden], undefined, `${forbidden} leaked into students`);
 
     const allTodayPayments = await db.collection('payments')
-      .where('schoolId', '==', testSchoolId).where('date', '==', today).get();
+      .where('schoolId', '==', testSchoolId).where('date', '==', fixtureCashDate).get();
     const allTodayExpenses = await db.collection('expenses')
-      .where('schoolId', '==', testSchoolId).where('date', '==', today).get();
+      .where('schoolId', '==', testSchoolId).where('date', '==', fixtureCashDate).get();
     const cashReceived = allTodayPayments.docs.reduce((sum, doc) => {
       const payment = doc.data();
       const status = String(payment.status || 'completed').toLowerCase();
@@ -665,7 +671,7 @@ const run = async () => {
     const openingBalance = Math.max(0, cashExpenses - cashReceived);
     const countedBalance = openingBalance + cashReceived - cashExpenses;
     const closure = (await closeCall({
-      schoolId: testSchoolId, academicYear, date: today,
+      schoolId: testSchoolId, academicYear, date: fixtureCashDate,
       openingBalance, countedBalance, notes: `E2E encaissements ${suffix}`,
     })).data;
     closureId = closure.closureId;
@@ -675,7 +681,7 @@ const run = async () => {
     assert.equal(closureData.closedBy, secretaryUid);
     assert.equal(closureData.notes, `E2E encaissements ${suffix}`);
     await markCashDayFixture({
-      db, schoolId: testSchoolId, date: today, testRunId: suffix,
+      db, schoolId: testSchoolId, date: fixtureCashDate, testRunId: suffix,
       closureNotes: `E2E encaissements ${suffix}`,
     });
     assert.equal(payments.docs.some((doc) => doc.data().type === 'transport'), true);
@@ -831,14 +837,29 @@ const run = async () => {
           await fixtureClassRef.delete();
         }
       }
-      if (closureId) {
+      if (testSchoolId) {
         await cleanupCashDayFixture({
-          db, schoolId: testSchoolId, date: today, testRunId: suffix,
+          db, schoolId: testSchoolId, date: fixtureCashDate, testRunId: suffix,
           closureNotes: `E2E encaissements ${suffix}`,
         });
       }
       await boundedDrain();
 
+      const cashDayId = testSchoolId ? `${testSchoolId}__${fixtureCashDate}` : null;
+      const postAuditSnapshot = testSchoolId
+        ? await db.collection('audit_logs').where('schoolId', '==', testSchoolId).get()
+        : { docs: [] };
+      const exactAuditResiduals = postAuditSnapshot.docs.filter((doc) => (
+        doc.data().testRunId === suffix || targetIds.has(String(doc.data().targetId || ''))
+      ));
+      const counterResiduals = await db.collection('counters').where('testRunId', '==', suffix).get();
+      let authResiduals = 0;
+      try {
+        await adminAuth.getUser(studentId);
+        authResiduals = 1;
+      } catch (error) {
+        if (error?.code !== 'auth/user-not-found') throw error;
+      }
       const remaining = {
         student: (await db.collection('students').doc(studentId).get()).exists ? 1 : 0,
         privateDocs: (await Promise.all([
@@ -849,9 +870,12 @@ const run = async () => {
         benefits: (await db.collection('financialBenefits').where('studentId', '==', studentId).get()).size,
         references: referenceId
           && (await db.collection('financialBenefitReferences').doc(referenceId).get()).exists ? 1 : 0,
-        closure: closureId && (await db.collection('cashClosures').doc(closureId).get()).exists ? 1 : 0,
-        cashLedgerDay: closureId
-          && (await db.collection('cashLedgerDays').doc(closureId).get()).exists ? 1 : 0,
+        cashClosures: cashDayId
+          && (await db.collection('cashClosures').doc(cashDayId).get()).exists ? 1 : 0,
+        cashLedgerDays: cashDayId
+          && (await db.collection('cashLedgerDays').doc(cashDayId).get()).exists ? 1 : 0,
+        counters: counterResiduals.size,
+        authUsers: authResiduals,
         reservations: (await Promise.all([
           matriculeReservationId
             ? db.collection('studentMatriculeReservations').doc(matriculeReservationId).get() : null,
@@ -864,17 +888,20 @@ const run = async () => {
           && (await db.collection('classes').doc(secondaryClassFixtureId).get()).exists ? 1 : 0,
         allocations: (await db.collection('transportPaymentAllocations').where('testRunId', '==', suffix).get()).size,
         moratoriums: (await db.collection('paymentMoratoriums').where('testRunId', '==', suffix).get()).size,
-        audits: (await db.collection('audit_logs').where('testRunId', '==', suffix).get()).size,
+        audits: exactAuditResiduals.length,
         transportStudents: (await Promise.all([...transportFixtureStudentIds].map(
           (id) => db.collection('students').doc(id).get(),
         ))).filter((item) => item.exists).length,
       };
       assert.deepEqual(remaining, {
         student: 0, privateDocs: 0, payments: 0, receipts: 0, benefits: 0,
-        references: 0, closure: 0, cashLedgerDay: 0, reservations: 0,
+        references: 0, cashClosures: 0, cashLedgerDays: 0, counters: 0, authUsers: 0,
+        reservations: 0,
         academicYearFixture: 0, secondaryClassFixture: 0,
         allocations: 0, moratoriums: 0, audits: 0, transportStudents: 0,
       });
+      const orphanCount = Object.values(remaining).reduce((sum, value) => sum + Number(value), 0);
+      assert.equal(orphanCount, 0, `Fixture cleanup residuals: ${JSON.stringify(remaining)}`);
       if (testSchoolId) {
         const schoolAfter = (await db.collection('schools').doc(testSchoolId).get()).data() || {};
         if (Number.isSafeInteger(schoolStudentsCountBefore)) {
@@ -888,7 +915,10 @@ const run = async () => {
           assert.deepEqual(schoolAfter.paymentDeadlines, schoolPaymentDeadlinesBefore);
         }
       }
-      console.log(`STAGING FIXTURE CLEANUP: PASS testRunId=${suffix} residuals=0 orphans=0`);
+      console.log(
+        `STAGING FIXTURE CLEANUP: PASS testRunId=${suffix} residuals=0 `
+        + 'cashClosures=0 cashLedgerDays=0 counters=0 Auth residuals=0 audit residuals=0 orphans=0',
+      );
     } finally {
       await context.close();
       await browser.close();
