@@ -5,7 +5,8 @@ const {
   isTransportPeriod,
   resolveCanonicalClassCycle,
   resolveTransportBenefitGross,
-  resolvePaymentSchedule
+  resolvePaymentSchedule,
+  withAcademicYearTuitionDeadlines
 } = require('../../functions/lib/secretaryCollections');
 const {
   planTransportAllocations,
@@ -146,6 +147,45 @@ const deadlineSchool = {
     transport: { '2026-09': '2026-09-10' }
   }
 };
+const yearScopedSchool = withAcademicYearTuitionDeadlines(deadlineSchool, {
+  id: 'year-2026-2027', schoolId: 'school-a', name: '2026-2027',
+  tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' }
+});
+assert.deepEqual(yearScopedSchool.paymentDeadlines.tuition, {
+  T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05'
+});
+assert.deepEqual(yearScopedSchool.paymentDeadlines.transport, deadlineSchool.paymentDeadlines.transport,
+  'year-scoped tuition deadlines must not alter transport deadlines');
+assert.strictEqual(withAcademicYearTuitionDeadlines(deadlineSchool, {}), deadlineSchool,
+  'missing academic-year deadlines must preserve the historical school fallback');
+const yearSchedule = installment => resolvePaymentSchedule({
+  school: yearScopedSchool,
+  moratoriums: [],
+  type: 'tuition',
+  installment,
+  period: null,
+  today: '2026-09-01',
+  remainingBalance: 40000
+});
+assert.equal(yearSchedule('T1').originalDueDate, '2026-10-05');
+assert.equal(yearSchedule('T2').originalDueDate, '2026-12-05');
+assert.equal(yearSchedule('T3').originalDueDate, '2027-02-05');
+const yearDeferred = resolvePaymentSchedule({
+  school: yearScopedSchool,
+  moratoriums: [{
+    id: 'year-moratorium-test', status: 'approved', paymentType: 'tuition', installment: 'T1',
+    effectiveDueDate: '2026-11-30', reason: 'Report temporaire TEST'
+  }],
+  type: 'tuition',
+  installment: 'T1',
+  period: null,
+  today: '2026-10-10',
+  remainingBalance: 40000
+});
+assert.equal(yearDeferred.originalDueDate, '2026-10-05');
+assert.equal(yearDeferred.effectiveDueDate, '2026-11-30');
+assert.equal(yearDeferred.remainingBalance, undefined,
+  'academic-year deadlines and moratoriums must not mutate the debt');
 const schedule = overrides => resolvePaymentSchedule({
   school: deadlineSchool,
   moratoriums: [],
