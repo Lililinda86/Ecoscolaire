@@ -23,6 +23,8 @@ const schoolId = `collections-school-${suffix}`;
 const otherSchoolId = `other-school-${suffix}`;
 const studentId = `collections-student-${suffix}`;
 const classId = `collections-class-${suffix}`;
+const twoInstallmentClassId = `collections-class-two-installments-${suffix}`;
+const differentClassId = `collections-class-different-${suffix}`;
 const secretaryId = `secretary-${suffix}`;
 const ownerId = `owner-${suffix}`;
 const otherOwnerId = `other-owner-${suffix}`;
@@ -87,6 +89,11 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
       name: 'Collections test school', academicYear, activeAcademicYearId: academicYearId,
       active: true, studentsCount: 0, studentLimit: 100,
       subscriptionStatus: 'active', globalFees: { feeT1: 70000, feeT2: 70000, feeT3: 70000, feeTransport: 4000 },
+      classFees: {
+        CP: { tuition: 210000, t1: 70000, t2: 70000, t3: 70000 },
+        CM2: { tuition: 90000, t1: 50000, t2: 40000, t3: 0 },
+        CE1: { tuition: 165000, t1: 55000, t2: 55000, t3: 55000 }
+      },
       transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: ['2026-09', '2026-10', '2026-11'] }
       , paymentDeadlines: {
         registrationFee: '2026-09-15',
@@ -99,6 +106,12 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
       tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' }
     }),
     db.collection('classes').doc(classId).set({ schoolId, name: 'CP', level: 'primary', isActive: true, section: 'francophone' }),
+    db.collection('classes').doc(twoInstallmentClassId).set({
+      schoolId, name: 'CM2', level: 'primary', isActive: true, section: 'francophone'
+    }),
+    db.collection('classes').doc(differentClassId).set({
+      schoolId, name: 'CE1', level: 'primary', isActive: true, section: 'francophone'
+    }),
     db.collection('students').doc(studentId).set({
       id: studentId, schoolId, name: 'Élève fictif', matricule: 'TEST-COLLECTIONS',
       classId, academicYearId, academicYear, gender: 'M', section: 'francophone', usesTransport: true
@@ -109,12 +122,49 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     db.collection('studentFinance').doc(studentId).set({
       id: studentId, studentId, schoolId,
       registrationFeeExpected: 15000, registrationFeePaid: 0, registrationFeeStatus: 'unpaid',
-      feeT1: 70000, feeT2: 70000, feeT3: 70000, transportMonthlyFee: 4000
+      feeT1: 0, feeT2: 0, feeT3: 0, transportMonthlyFee: 4000
     })
   ]);
 
   // Canonical academic year validation is based on academicYearId and the active year document.
-  assert.equal((await quote(secretaryId, 'tuition', { installment: 'T1' })).grossExpectedAmount, 70000);
+  const initialT1 = await quote(secretaryId, 'tuition', { installment: 'T1' });
+  const initialT2 = await quote(secretaryId, 'tuition', { installment: 'T2' });
+  const initialT3 = await quote(secretaryId, 'tuition', { installment: 'T3' });
+  assert.equal(initialT1.grossExpectedAmount, 70000);
+  assert.equal(initialT2.grossExpectedAmount, 70000);
+  assert.equal(initialT3.grossExpectedAmount, 70000);
+
+  const differentClassStudentId = extraStudentId('different-class-fee');
+  await Promise.all([
+    db.collection('students').doc(differentClassStudentId).set({
+      id: differentClassStudentId, schoolId, name: 'Élève classe différente fictif',
+      matricule: 'TEST-DIFFERENT-CLASS-FEE', classId: differentClassId, academicYearId, academicYear,
+      gender: 'F', section: 'francophone'
+    }),
+    db.collection('studentFinance').doc(differentClassStudentId).set({
+      id: differentClassStudentId, studentId: differentClassStudentId, schoolId,
+      feeT1: 0, feeT2: 0, feeT3: 0
+    })
+  ]);
+  assert.equal((await quote(secretaryId, 'tuition', {
+    studentId: differentClassStudentId, installment: 'T1'
+  })).grossExpectedAmount, 55000);
+
+  const twoInstallmentStudentId = extraStudentId('two-installments');
+  await Promise.all([
+    db.collection('students').doc(twoInstallmentStudentId).set({
+      id: twoInstallmentStudentId, schoolId, name: 'Élève deux tranches fictif',
+      matricule: 'TEST-TWO-INSTALLMENTS', classId: twoInstallmentClassId, academicYearId, academicYear,
+      gender: 'F', section: 'francophone'
+    }),
+    db.collection('studentFinance').doc(twoInstallmentStudentId).set({
+      id: twoInstallmentStudentId, studentId: twoInstallmentStudentId, schoolId,
+      feeT1: 50000, feeT2: 40000, feeT3: 70000, transportMonthlyFee: 0
+    })
+  ]);
+  await expectFailure(quote(secretaryId, 'tuition', {
+    studentId: twoInstallmentStudentId, installment: 'T3'
+  }), 'GROSS_AMOUNT_NOT_CONFIGURED');
   const academicStudent = async (label, data) => {
     const id = extraStudentId(label);
     await Promise.all([
