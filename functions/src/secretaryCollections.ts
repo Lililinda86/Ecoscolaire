@@ -278,6 +278,29 @@ const paymentDeadline = (
   return value;
 };
 
+export const withAcademicYearTuitionDeadlines = (school: Data, academicYear: Data): Data => {
+  const yearDeadlines = academicYear.tuitionPaymentDeadlines;
+  if (yearDeadlines === undefined || yearDeadlines === null) return school;
+  if (typeof yearDeadlines !== 'object' || Array.isArray(yearDeadlines)) {
+    throw httpsError('failed-precondition', 'Tuition deadline configuration is invalid.',
+      'PAYMENT_DEADLINE_CORRUPTED');
+  }
+  const tuition = yearDeadlines as Data;
+  for (const installment of ['T1', 'T2', 'T3']) {
+    if (typeof tuition[installment] !== 'string' || !isCalendarDate(tuition[installment])) {
+      throw httpsError('failed-precondition', 'Tuition deadline configuration is invalid.',
+        'PAYMENT_DEADLINE_CORRUPTED');
+    }
+  }
+  if (!(String(tuition.T1) < String(tuition.T2) && String(tuition.T2) < String(tuition.T3))) {
+    throw httpsError('failed-precondition', 'Tuition deadlines are not chronological.',
+      'PAYMENT_DEADLINE_CORRUPTED');
+  }
+  const legacy = school.paymentDeadlines && typeof school.paymentDeadlines === 'object'
+    ? school.paymentDeadlines as Data : {};
+  return { ...school, paymentDeadlines: { ...legacy, tuition: { ...tuition } } };
+};
+
 const moratoriumMatchesTarget = (
   moratorium: Data,
   type: PaymentType,
@@ -545,6 +568,21 @@ const resolveGross = (
   }
   if (typeof gross !== 'number' || !Number.isSafeInteger(gross) || gross <= 0) {
     throw httpsError('failed-precondition', 'Le tarif brut attendu n’est pas configuré.', 'GROSS_AMOUNT_NOT_CONFIGURED');
+  }
+  return gross;
+};
+
+const resolveConfiguredTuitionGross = (
+  installment: Installment,
+  finance: Data,
+  school: Data
+): number | null => {
+  const fees = school.globalFees && typeof school.globalFees === 'object' ? school.globalFees as Data : {};
+  const gross = finance[`fee${installment}`] ?? fees[`fee${installment}`];
+  if (gross === undefined || gross === null || gross === 0) return null;
+  if (typeof gross !== 'number' || !Number.isSafeInteger(gross) || gross < 0) {
+    throw httpsError('failed-precondition', 'Le tarif brut attendu est invalide.',
+      'GROSS_AMOUNT_CORRUPTED');
   }
   return gross;
 };
@@ -819,7 +857,7 @@ const validateCollectionAcademicYear = async (
   student: Data,
   schoolId: string,
   academicYear: string
-): Promise<void> => {
+): Promise<Data> => {
   const activeAcademicYearId = typeof school.activeAcademicYearId === 'string'
     ? school.activeAcademicYearId.trim() : '';
   if (!activeAcademicYearId || activeAcademicYearId.includes('/') || activeAcademicYearId.length > 128) {
@@ -855,6 +893,7 @@ const validateCollectionAcademicYear = async (
       || year.name !== academicYear) {
     throw httpsError('failed-precondition', 'Student academic year mismatch.', 'INVALID_ACADEMIC_YEAR');
   }
+  return year;
 };
 
 const auditData = (
@@ -1084,9 +1123,10 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
     const targetInstallment = benefit.paymentType === 'TUITION' && benefit.installment !== 'ALL_TUITION'
       ? benefit.installment as Installment : null;
     const gross = benefit.paymentType === 'TUITION' && benefit.installment === 'ALL_TUITION'
-      ? (['T1', 'T2', 'T3'] as Installment[]).reduce((sum, item) => safeAdd(
-          sum, resolveGross('tuition', item, finance, schoolSnap.data() || {}, null), 'grossExpectedAmount'
-        ), 0)
+      ? (['T1', 'T2', 'T3'] as Installment[]).reduce((sum, item) => {
+          const configured = resolveConfiguredTuitionGross(item, finance, schoolSnap.data() || {});
+          return configured === null ? sum : safeAdd(sum, configured, 'grossExpectedAmount');
+        }, 0)
       : targetType === 'transport'
         ? resolveTransportBenefitGross({ student, privateData: privateSnap.data() || {}, classData, finance, school, bus })
         : resolveGross(targetType, targetInstallment, finance, school, bus);
@@ -1245,7 +1285,10 @@ const readQuoteContext = async (
   if (!studentSnap.exists) throw httpsError('not-found', 'Student not found.', 'STUDENT_NOT_FOUND');
   const student = studentSnap.data() || {};
   validateCollectionStudentTenant(student, input.schoolId);
-  await validateCollectionAcademicYear(transaction, db, school, student, input.schoolId, input.academicYear);
+  const academicYearConfig = await validateCollectionAcademicYear(
+    transaction, db, school, student, input.schoolId, input.academicYear
+  );
+  const scheduleSchool = withAcademicYearTuitionDeadlines(school, academicYearConfig);
   const finance = resolveStudentFinanceData(student, financeSnap);
   let bus: Data | null = null;
   if (input.type === 'transport' && typeof student.busId === 'string' && student.busId) {
@@ -1288,7 +1331,7 @@ const readQuoteContext = async (
     } else if (!input.period) {
       quote = buildTransportCollectionQuote({
         fee, periods: resolveTransportBillingPeriods(school, input.academicYear), benefits, payments,
-        allocations, moratoriums, school, schoolId: input.schoolId,
+        allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
         academicYear: input.academicYear, today: getDoualaDate()
       });
     } else {
@@ -1300,16 +1343,16 @@ const readQuoteContext = async (
           'TRANSPORT_PERIOD_NOT_BILLABLE');
       }
       quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, fee),
-        benefits, payments, moratoriums, school, schoolId: input.schoolId, academicYear: input.academicYear,
+        benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
         type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
     }
   } else {
     quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus),
-      benefits, payments, moratoriums, school, schoolId: input.schoolId, academicYear: input.academicYear,
+      benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
       type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
   }
   return {
-    user, school, student, finance, benefits, payments, moratoriums, allocations,
+    user, school: scheduleSchool, student, finance, benefits, payments, moratoriums, allocations,
     quote, classData, financeRef, financeSnap
   };
 };
@@ -1341,7 +1384,8 @@ const buildTuitionProjection = (
   let netTotal = 0;
   let paidTotal = 0;
   for (const installment of ['T1', 'T2', 'T3'] as Installment[]) {
-    const gross = resolveGross('tuition', installment, finance, school, null);
+    const gross = resolveConfiguredTuitionGross(installment, finance, school);
+    if (gross === null) continue;
     const targetPayments = [...payments, pendingPayment];
     const quote = buildQuote({ gross, benefits, payments: targetPayments, moratoriums, school, schoolId, academicYear,
       type: 'tuition', installment, period: null, today });

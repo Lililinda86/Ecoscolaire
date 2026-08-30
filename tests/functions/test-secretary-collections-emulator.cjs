@@ -90,12 +90,14 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
       transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: ['2026-09', '2026-10', '2026-11'] }
       , paymentDeadlines: {
         registrationFee: '2026-09-15',
-        tuition: { T1: '2026-09-30', T2: '2027-01-31', T3: '2027-04-30' },
         transport: { '2026-09': '2026-09-10', '2026-10': '2026-10-10', '2026-11': '2026-11-10' }
       }
     }),
     db.collection('schools').doc(otherSchoolId).set({ name: 'Other school', academicYear, active: true }),
-    db.collection('academicYears').doc(academicYearId).set({ schoolId, name: academicYear, status: 'active' }),
+    db.collection('academicYears').doc(academicYearId).set({
+      schoolId, name: academicYear, status: 'active',
+      tuitionPaymentDeadlines: { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' }
+    }),
     db.collection('classes').doc(classId).set({ schoolId, name: 'CP', level: 'primary', isActive: true, section: 'francophone' }),
     db.collection('students').doc(studentId).set({
       id: studentId, schoolId, name: 'Élève fictif', matricule: 'TEST-COLLECTIONS',
@@ -112,7 +114,29 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   ]);
 
   // Canonical academic year validation is based on academicYearId and the active year document.
-  assert.equal((await quote(secretaryId, 'tuition', { installment: 'T1' })).grossExpectedAmount, 70000);
+  const initialT1 = await quote(secretaryId, 'tuition', { installment: 'T1' });
+  const initialT2 = await quote(secretaryId, 'tuition', { installment: 'T2' });
+  const initialT3 = await quote(secretaryId, 'tuition', { installment: 'T3' });
+  assert.equal(initialT1.grossExpectedAmount, 70000);
+  assert.equal(initialT1.originalDueDate, '2026-10-05');
+  assert.equal(initialT2.originalDueDate, '2026-12-05');
+  assert.equal(initialT3.originalDueDate, '2027-02-05');
+
+  const twoInstallmentStudentId = extraStudentId('two-installments');
+  await Promise.all([
+    db.collection('students').doc(twoInstallmentStudentId).set({
+      id: twoInstallmentStudentId, schoolId, name: 'Élève deux tranches fictif',
+      matricule: 'TEST-TWO-INSTALLMENTS', classId, academicYearId, academicYear,
+      gender: 'F', section: 'francophone'
+    }),
+    db.collection('studentFinance').doc(twoInstallmentStudentId).set({
+      id: twoInstallmentStudentId, studentId: twoInstallmentStudentId, schoolId,
+      feeT1: 50000, feeT2: 40000, feeT3: 0, transportMonthlyFee: 0
+    })
+  ]);
+  await expectFailure(quote(secretaryId, 'tuition', {
+    studentId: twoInstallmentStudentId, installment: 'T3'
+  }), 'GROSS_AMOUNT_NOT_CONFIGURED');
   const academicStudent = async (label, data) => {
     const id = extraStudentId(label);
     await Promise.all([
@@ -199,7 +223,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   const moratoriumQuote = await quote(secretaryId, 'tuition', { installment: 'T1' });
   assert.equal(moratoriumQuote.grossExpectedAmount, 70000);
   assert.equal(moratoriumQuote.netExpectedAmount, 70000);
-  assert.equal(moratoriumQuote.originalDueDate, '2026-09-30');
+  assert.equal(moratoriumQuote.originalDueDate, '2026-10-05');
   assert.equal(moratoriumQuote.effectiveDueDate, '2026-11-30');
   assert.equal(moratoriumQuote.moratoriumStatus, 'ACTIVE');
   assert.equal(moratoriumQuote.overdue, false);
@@ -474,6 +498,8 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   });
   assert.equal(percentageQuote.discountAmount, 24500, '25% scholarship + 10% voucher must stack on gross');
   assert.equal(percentageQuote.netExpectedAmount, 45500);
+  assert.equal(percentageQuote.originalDueDate, '2027-02-05',
+    'benefits must not alter the original academic-year deadline');
 
   const invalidStudentId = extraStudentId('invalid-benefits');
   await Promise.all([
