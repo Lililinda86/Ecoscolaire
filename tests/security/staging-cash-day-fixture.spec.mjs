@@ -8,6 +8,7 @@ import {
   countFixtureCleanupOrphans,
   exactTuitionReceiptCounterId,
   markCashDayFixture,
+  markOpenCashLedgerFixture,
 } from '../../scripts/staging-cash-day-fixture.mjs';
 
 const fakeDb = (entries = {}) => {
@@ -83,6 +84,50 @@ test('first cash payment creates an open ledger owned by the current fixture run
     db, schoolId, date, testRunId, expectedCash: 10_000,
   });
   assert.equal(ledger.data.status, 'open');
+});
+
+test('successful cash payment marks the exact open ledger for finally cleanup', async () => {
+  const schoolId = 'school-alpha-001';
+  const date = '2026-08-30';
+  const testRunId = 'run-a';
+  const id = `${schoolId}__${date}`;
+  const db = fakeDb({ [`cashLedgerDays/${id}`]: openLedger(schoolId, date, 10_000) });
+  await markOpenCashLedgerFixture({ db, schoolId, date, testRunId });
+  assert.deepEqual(db.documents.get(`cashLedgerDays/${id}`), {
+    ...openLedger(schoolId, date, 10_000), testFixture: true, testRunId,
+  });
+  await cleanupCashDayFixture({
+    db, schoolId, date, testRunId, closureNotes: `E2E ${testRunId}`,
+  });
+  assert.equal(db.documents.has(`cashLedgerDays/${id}`), false);
+});
+
+test('failure before the first payment leaves exact cash-day cleanup idempotent', async () => {
+  const db = fakeDb();
+  const options = {
+    db, schoolId: 'school-alpha-001', date: '2026-08-30',
+    testRunId: 'run-a', closureNotes: 'E2E run-a',
+  };
+  await cleanupCashDayFixture(options);
+  await cleanupCashDayFixture(options);
+  assert.equal(db.documents.size, 0);
+});
+
+test('finally cleanup never deletes another cash date', async () => {
+  const schoolId = 'school-alpha-001';
+  const testRunId = 'run-a';
+  const fixtureDate = '2026-08-30';
+  const otherDate = '2026-08-29';
+  const otherId = `${schoolId}__${otherDate}`;
+  const db = fakeDb({
+    [`cashLedgerDays/${otherId}`]: {
+      ...openLedger(schoolId, otherDate, 5_000), testFixture: true, testRunId,
+    },
+  });
+  await cleanupCashDayFixture({
+    db, schoolId, date: fixtureDate, testRunId, closureNotes: `E2E ${testRunId}`,
+  });
+  assert.equal(db.documents.has(`cashLedgerDays/${otherId}`), true);
 });
 
 test('cash payments and reversals update the expected open-ledger total', async () => {
