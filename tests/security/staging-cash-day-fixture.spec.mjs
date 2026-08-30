@@ -4,6 +4,9 @@ import {
   assertFixtureCashDayOpen,
   assertFixtureCashLedgerOpen,
   cleanupCashDayFixture,
+  cleanupTuitionReceiptCounter,
+  countFixtureCleanupOrphans,
+  exactTuitionReceiptCounterId,
   markCashDayFixture,
 } from '../../scripts/staging-cash-day-fixture.mjs';
 
@@ -14,6 +17,9 @@ const fakeDb = (entries = {}) => {
     async get() {
       const data = documents.get(this.key);
       return { exists: data !== undefined, data: () => data, ref: this };
+    },
+    async delete() {
+      documents.delete(this.key);
     },
   });
   return {
@@ -48,6 +54,10 @@ const fixtureSchool = (schoolId, testRunId) => ({
 
 const openLedger = (schoolId, date, cashReceived) => ({
   schoolId, date, status: 'open', cashReceived,
+});
+
+const receiptCounter = (schoolId, lastReceiptNumber = 10) => ({
+  [`counters/receipts_${schoolId}`]: { lastReceiptNumber },
 });
 
 const markAndCleanup = async (db, schoolId, date, testRunId) => {
@@ -102,34 +112,107 @@ test('an open same-run ledger is accepted immediately before cash closure', asyn
   await assertFixtureCashLedgerOpen({ db, schoolId, date, testRunId, expectedCash: 80_500 });
 });
 
-test('failure before closure cleanup removes the exact open ledger', async () => {
+test('failure before closure cleanup removes the exact open ledger and receipt counter', async () => {
   const schoolId = 'tuition-deadlines-staging-run-a';
   const date = '2026-08-29';
   const testRunId = 'run-a';
   const db = fakeDb({
     ...fixtureSchool(schoolId, testRunId),
     [`cashLedgerDays/${schoolId}__${date}`]: openLedger(schoolId, date, 80_500),
+    ...receiptCounter(schoolId),
   });
   await cleanupCashDayFixture({
     db, schoolId, date, testRunId, closureNotes: `E2E ${testRunId}`,
   });
+  await cleanupTuitionReceiptCounter({
+    db, schoolId, testRunId, counterId: `receipts_${schoolId}`,
+  });
   assert.equal(db.documents.has(`cashLedgerDays/${schoolId}__${date}`), false);
   assert.equal(db.documents.has(`cashClosures/${schoolId}__${date}`), false);
+  assert.equal(db.documents.has(`counters/receipts_${schoolId}`), false);
 });
 
-test('failure after closure cleanup removes the exact unmarked closure and ledger', async () => {
+test('failure after closure cleanup removes the exact closure, ledger and receipt counter', async () => {
   const schoolId = 'tuition-deadlines-staging-run-a';
   const date = '2026-08-29';
   const testRunId = 'run-a';
   const db = fakeDb({
     ...fixtureSchool(schoolId, testRunId),
     ...fixtureDocuments({ schoolId, date, testRunId }),
+    ...receiptCounter(schoolId),
   });
   await cleanupCashDayFixture({
     db, schoolId, date, testRunId, closureNotes: `E2E ${testRunId}`,
   });
+  await cleanupTuitionReceiptCounter({
+    db, schoolId, testRunId, counterId: `receipts_${schoolId}`,
+  });
   assert.equal(db.documents.has(`cashLedgerDays/${schoolId}__${date}`), false);
   assert.equal(db.documents.has(`cashClosures/${schoolId}__${date}`), false);
+  assert.equal(db.documents.has(`counters/receipts_${schoolId}`), false);
+});
+
+test('exact Tuition fixture receipt counter is deleted and residuals.counters becomes zero', async () => {
+  const testRunId = 'run-a';
+  const schoolId = `tuition-deadlines-staging-${testRunId}`;
+  const counterId = exactTuitionReceiptCounterId({ schoolId, testRunId });
+  const db = fakeDb(receiptCounter(schoolId));
+  await cleanupTuitionReceiptCounter({ db, schoolId, testRunId, counterId });
+  const residuals = { counters: Number(db.documents.has(`counters/${counterId}`)) };
+  assert.deepEqual(residuals, { counters: 0 });
+  assert.equal(countFixtureCleanupOrphans(residuals), 0);
+});
+
+test('wrong-school receipt counter is denied', async () => {
+  const testRunId = 'run-a';
+  const schoolId = `tuition-deadlines-staging-${testRunId}`;
+  const db = fakeDb(receiptCounter('another-school'));
+  await assert.rejects(() => cleanupTuitionReceiptCounter({
+    db, schoolId, testRunId, counterId: 'receipts_another-school',
+  }));
+  assert.equal(db.documents.has('counters/receipts_another-school'), true);
+});
+
+test('wrong testRunId is denied', async () => {
+  const schoolId = 'tuition-deadlines-staging-run-a';
+  const db = fakeDb(receiptCounter(schoolId));
+  await assert.rejects(() => cleanupTuitionReceiptCounter({
+    db, schoolId, testRunId: 'run-b', counterId: `receipts_${schoolId}`,
+  }));
+  assert.equal(db.documents.has(`counters/receipts_${schoolId}`), true);
+});
+
+test('receipts_italo-gsb is always denied', async () => {
+  const db = fakeDb(receiptCounter('italo-gsb'));
+  await assert.rejects(() => cleanupTuitionReceiptCounter({
+    db, schoolId: 'italo-gsb', testRunId: 'run-a', counterId: 'receipts_italo-gsb',
+  }));
+  assert.equal(db.documents.has('counters/receipts_italo-gsb'), true);
+});
+
+test('another run receipt counter is denied', async () => {
+  const testRunId = 'run-a';
+  const schoolId = `tuition-deadlines-staging-${testRunId}`;
+  const otherCounterId = 'receipts_tuition-deadlines-staging-run-b';
+  const db = fakeDb(receiptCounter('tuition-deadlines-staging-run-b'));
+  await assert.rejects(() => cleanupTuitionReceiptCounter({
+    db, schoolId, testRunId, counterId: otherCounterId,
+  }));
+  assert.equal(db.documents.has(`counters/${otherCounterId}`), true);
+});
+
+test('receipt counter cleanup is idempotent', async () => {
+  const testRunId = 'run-a';
+  const schoolId = `tuition-deadlines-staging-${testRunId}`;
+  const counterId = `receipts_${schoolId}`;
+  const db = fakeDb(receiptCounter(schoolId));
+  await cleanupTuitionReceiptCounter({ db, schoolId, testRunId, counterId });
+  await cleanupTuitionReceiptCounter({ db, schoolId, testRunId, counterId });
+  assert.equal(db.documents.has(`counters/${counterId}`), false);
+});
+
+test('orphan accounting includes a residual receipt counter', () => {
+  assert.equal(countFixtureCleanupOrphans({ cashClosures: 0, cashLedgerDays: 0, counters: 1 }), 1);
 });
 
 test('close then cleanup removes the exact cash closure and cash ledger day', async () => {

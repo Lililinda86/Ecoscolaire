@@ -6,6 +6,28 @@ export const exactCashDayId = (schoolId, date) => {
   return `${schoolId}__${date}`;
 };
 
+export const exactTuitionReceiptCounterId = ({ schoolId, testRunId }) => {
+  assert.match(testRunId, /^[A-Za-z0-9_-]+$/, 'Fixture testRunId must be an exact document ID segment.');
+  const expectedSchoolId = `tuition-deadlines-staging-${testRunId}`;
+  assert.equal(schoolId, expectedSchoolId, 'Receipt counter school is not the exact Tuition fixture school.');
+  const counterId = `receipts_${schoolId}`;
+  assert.notEqual(counterId, 'receipts_italo-gsb', 'The real ITALO receipt counter is forbidden.');
+  return counterId;
+};
+
+export const cleanupTuitionReceiptCounter = async ({ db, schoolId, testRunId, counterId }) => {
+  const expectedCounterId = exactTuitionReceiptCounterId({ schoolId, testRunId });
+  assert.equal(counterId, expectedCounterId, 'Refusing to delete another receipt counter.');
+  assert.notEqual(counterId, 'receipts_italo-gsb', 'The real ITALO receipt counter is forbidden.');
+  await db.collection('counters').doc(counterId).delete();
+  return counterId;
+};
+
+export const countFixtureCleanupOrphans = (residuals) => Object.values(residuals).reduce((sum, value) => {
+  assert.ok(Number.isSafeInteger(value) && value >= 0, 'Cleanup residual counts must be safe integers.');
+  return sum + value;
+}, 0);
+
 const assertExactDocument = ({ data, schoolId, date, label }) => {
   assert.equal(data.schoolId, schoolId, `${label} belongs to another school.`);
   assert.equal(data.date, date, `${label} belongs to another cash date.`);

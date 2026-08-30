@@ -44,8 +44,11 @@ test('completion runner covers live financial schedules, reversals and exact cle
   assert.match(source, /expectedCash/);
   assert.match(source, /status, 'closed'/);
   assert.match(source, /cashLedgerDayId/);
+  assert.match(source, /fixtureReceiptCounterId/);
+  assert.match(source, /exactTuitionReceiptCounterId/);
   assert.match(source, /markCashDayFixture/);
   assert.match(source, /cleanupCashDayFixture/);
+  assert.match(source, /cleanupTuitionReceiptCounter/);
   assert.match(source, /cashLedgerDays/);
   assert.match(source, /academicYears.*academicYearFixtureId.*exists, false/s);
   assert.match(source, /ownerReverseCall/);
@@ -59,7 +62,10 @@ test('completion runner covers live financial schedules, reversals and exact cle
   assert.match(source, /CASH CLOSURE EXPECTED/);
   assert.match(source, /STAGING COMPLETION RESIDUALS: 0/);
   assert.match(source, /STAGING COMPLETION ORPHANS: 0/);
-  assert.match(source, /RECEIPT COUNTER REWOUND: NO/);
+  assert.match(source, /STAGING COMPLETION COUNTER RESIDUALS: 0/);
+  assert.match(source, /TUITION FIXTURE RECEIPT COUNTER CLEANUP: PASS/);
+  assert.match(source, /residuals\.counters/);
+  assert.match(source, /countFixtureCleanupOrphans\(residuals\)/);
   assert.match(source, /finally \{[\s\S]*CLEANUP COMPLETE/);
   assert.match(source, /if \(cashLedgerDayId\) \{[\s\S]*cleanupCashDayFixture/);
   assert.doesNotMatch(source, /if \(closureId\) \{[\s\S]*cleanupCashDayFixture/);

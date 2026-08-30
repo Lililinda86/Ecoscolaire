@@ -18,7 +18,10 @@ import {
   assertFixtureCashDayOpen,
   assertFixtureCashLedgerOpen,
   cleanupCashDayFixture,
+  cleanupTuitionReceiptCounter,
+  countFixtureCleanupOrphans,
   exactCashDayId,
+  exactTuitionReceiptCounterId,
   markCashDayFixture,
 } from './staging-cash-day-fixture.mjs';
 
@@ -203,6 +206,7 @@ const run = async () => {
   let closureId = null;
   let cashDate = null;
   let cashLedgerDayId = null;
+  let fixtureReceiptCounterId = null;
   let referenceId = null;
   const targetIds = new Set(Object.values(benefitIds));
   const paymentIds = new Set();
@@ -252,6 +256,7 @@ const run = async () => {
     const today = doualaDate();
     cashDate = today;
     cashLedgerDayId = exactCashDayId(testSchoolId, cashDate);
+    fixtureReceiptCounterId = exactTuitionReceiptCounterId({ schoolId: testSchoolId, testRunId: suffix });
     const originalDueDate = '2026-10-05';
     const futureDueDate = '2026-12-05';
     const thirdDueDate = '2027-02-05';
@@ -717,6 +722,11 @@ const run = async () => {
           db, schoolId: testSchoolId, date: cashDate, testRunId: suffix, closureNotes: marker,
         });
       }
+      if (fixtureReceiptCounterId) {
+        await cleanupTuitionReceiptCounter({
+          db, schoolId: testSchoolId, testRunId: suffix, counterId: fixtureReceiptCounterId,
+        });
+      }
 
       if (academicYearFixtureId) {
         const fixtureYearRef = db.collection('academicYears').doc(academicYearFixtureId);
@@ -758,32 +768,44 @@ const run = async () => {
       for (const name of taggedCollections) {
         remaining[name] = (await db.collection(name).where('testRunId', '==', suffix).get()).size;
       }
-      assert.deepEqual(remaining, Object.fromEntries(taggedCollections.map((name) => [name, 0])));
-      if (testSchoolId) assert.equal((await db.collection('schools').doc(testSchoolId).get()).exists, false);
-      if (academicYearFixtureId) {
-        assert.equal((await db.collection('academicYears').doc(academicYearFixtureId).get()).exists, false);
-      }
-      if (primaryClassId) assert.equal((await db.collection('classes').doc(primaryClassId).get()).exists, false);
-      if (cashLedgerDayId) {
-        assert.equal((await db.collection('cashClosures').doc(cashLedgerDayId).get()).exists, false);
-        assert.equal((await db.collection('cashLedgerDays').doc(cashLedgerDayId).get()).exists, false);
-      }
+      const residuals = { ...remaining };
+      residuals.fixtureSchool = testSchoolId
+        ? Number((await db.collection('schools').doc(testSchoolId).get()).exists) : 0;
+      residuals.academicYear = academicYearFixtureId
+        ? Number((await db.collection('academicYears').doc(academicYearFixtureId).get()).exists) : 0;
+      residuals.primaryClass = primaryClassId
+        ? Number((await db.collection('classes').doc(primaryClassId).get()).exists) : 0;
+      residuals.cashClosures = cashLedgerDayId
+        ? Number((await db.collection('cashClosures').doc(cashLedgerDayId).get()).exists) : 0;
+      residuals.cashLedgerDays = cashLedgerDayId
+        ? Number((await db.collection('cashLedgerDays').doc(cashLedgerDayId).get()).exists) : 0;
+      residuals.counters = fixtureReceiptCounterId
+        ? Number((await db.collection('counters').doc(fixtureReceiptCounterId).get()).exists) : 0;
+      residuals.authUsers = 0;
       for (const uid of createdAuthUids) {
-        await assert.rejects(() => adminAuth.getUser(uid), (error) => error?.code === 'auth/user-not-found');
+        try {
+          await adminAuth.getUser(uid);
+          residuals.authUsers += 1;
+        } catch (error) {
+          if (error?.code !== 'auth/user-not-found') throw error;
+        }
       }
       const postAuditSnapshot = testSchoolId
         ? await db.collection('audit_logs').where('schoolId', '==', testSchoolId).get()
         : { docs: [] };
-      assert.equal(postAuditSnapshot.docs.filter((item) => {
+      residuals.auditLogs = postAuditSnapshot.docs.filter((item) => {
         const data = item.data();
         return targetIds.has(String(data.targetId || ''))
           || Object.values(studentIds).includes(String(data.targetId || ''))
           || String(data.targetName || '').includes(marker);
-      }).length, 0);
+      }).length;
+      const orphanCount = countFixtureCleanupOrphans(residuals);
+      assert.equal(orphanCount, 0, `Fixture cleanup residuals: ${JSON.stringify(residuals)}`);
       console.log('STAGING COMPLETION FIXTURE CLEANUP: PASS');
       console.log('STAGING COMPLETION RESIDUALS: 0');
       console.log('STAGING COMPLETION ORPHANS: 0');
-      console.log('RECEIPT COUNTER REWOUND: NO');
+      console.log('STAGING COMPLETION COUNTER RESIDUALS: 0');
+      console.log('TUITION FIXTURE RECEIPT COUNTER CLEANUP: PASS');
     } catch (error) {
       cleanupError = error;
       console.error(`STAGING COMPLETION FIXTURE CLEANUP: FAIL ${redactSecrets(error?.message)}`);
