@@ -1,0 +1,141 @@
+name: Production Tuition Deadlines Safety Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Read-only dry run, controlled backfill, or isolated smoke
+        required: true
+        type: choice
+        options: [dry-run, backfill, isolated-smoke]
+      school_id:
+        description: Exact schoolId for dry-run/backfill only
+        required: false
+        type: string
+      confirmation:
+        description: Exact confirmation required for mutating operations
+        required: false
+        type: string
+      backup_max_age_hours:
+        description: Maximum accepted Firestore export age
+        required: true
+        default: "24"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  production-tuition-safety:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 35
+    concurrency:
+      group: production-tuition-deadlines-safety
+      cancel-in-progress: false
+    env:
+      PRODUCTION_FIREBASE_PROJECT_ID: ecoscolaire-c5861
+      PRODUCTION_APP_URL: https://ecoscolaire.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Guard exact operation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$PRODUCTION_FIREBASE_PROJECT_ID" = 'ecoscolaire-c5861'
+          case '${{ inputs.operation }}' in
+            dry-run) test -n '${{ inputs.school_id }}' ;;
+            backfill)
+              test -n '${{ inputs.school_id }}'
+              test '${{ inputs.confirmation }}' = 'BACKFILL_TUITION_DEADLINES_2026_2027'
+              ;;
+            isolated-smoke)
+              test '${{ inputs.confirmation }}' = 'RUN_ISOLATED_TUITION_DEADLINES_PRODUCTION'
+              test '${{ inputs.school_id }}' != 'italo-gsb'
+              ;;
+            *) exit 1 ;;
+          esac
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Detect latest existing Firestore backup
+        shell: bash
+        run: gcloud firestore operations list --project "$PRODUCTION_FIREBASE_PROJECT_ID" --format=json > "$RUNNER_TEMP/firestore-operations.json"
+      - name: Fail-closed Production backup gate
+        env:
+          PRODUCTION_BACKUP_OPERATIONS_PATH: ${{ runner.temp }}/firestore-operations.json
+          PRODUCTION_BACKUP_RECEIPT_PATH: ${{ runner.temp }}/production-backup-receipt.json
+          PRODUCTION_BACKUP_MAX_AGE_HOURS: ${{ inputs.backup_max_age_hours }}
+        run: node scripts/verify-production-backup-gate.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Capture read-only baseline
+        if: inputs.operation == 'dry-run' || inputs.operation == 'backfill'
+        env:
+          FIREBASE_PROJECT_ID: ecoscolaire-c5861
+          SCHOOL_ID: ${{ inputs.school_id }}
+          AUDIT_OUTPUT_PATH: ${{ runner.temp }}/tuition-before.json
+        run: node scripts/audit-tuition-deadlines-readonly.mjs
+      - name: Read baseline academic year
+        if: inputs.operation == 'dry-run' || inputs.operation == 'backfill'
+        id: baseline
+        shell: bash
+        run: echo "academic_year_id=$(jq -r .academicYearId "$RUNNER_TEMP/tuition-before.json")" >> "$GITHUB_OUTPUT"
+      - name: Backfill dry-run
+        if: inputs.operation == 'dry-run' || inputs.operation == 'backfill'
+        env:
+          FIREBASE_PROJECT_ID: ecoscolaire-c5861
+          SCHOOL_ID: ${{ inputs.school_id }}
+          ACADEMIC_YEAR_ID: ${{ steps.baseline.outputs.academic_year_id }}
+          TUITION_BASELINE_PATH: ${{ runner.temp }}/tuition-before.json
+        run: node scripts/backfill-production-tuition-deadlines.mjs
+      - name: Execute dates-only backfill
+        if: inputs.operation == 'backfill'
+        env:
+          FIREBASE_PROJECT_ID: ecoscolaire-c5861
+          SCHOOL_ID: ${{ inputs.school_id }}
+          ACADEMIC_YEAR_ID: ${{ steps.baseline.outputs.academic_year_id }}
+          TUITION_BASELINE_PATH: ${{ runner.temp }}/tuition-before.json
+          PRODUCTION_BACKUP_RECEIPT_PATH: ${{ runner.temp }}/production-backup-receipt.json
+        run: node scripts/backfill-production-tuition-deadlines.mjs --execute
+      - name: Prove idempotence
+        if: inputs.operation == 'backfill'
+        env:
+          FIREBASE_PROJECT_ID: ecoscolaire-c5861
+          SCHOOL_ID: ${{ inputs.school_id }}
+          ACADEMIC_YEAR_ID: ${{ steps.baseline.outputs.academic_year_id }}
+          TUITION_BASELINE_PATH: ${{ runner.temp }}/tuition-before.json
+          PRODUCTION_BACKUP_RECEIPT_PATH: ${{ runner.temp }}/production-backup-receipt.json
+        run: node scripts/backfill-production-tuition-deadlines.mjs --execute
+      - name: Capture and compare post-backfill baseline
+        if: inputs.operation == 'backfill'
+        env:
+          FIREBASE_PROJECT_ID: ecoscolaire-c5861
+          SCHOOL_ID: ${{ inputs.school_id }}
+          AUDIT_OUTPUT_PATH: ${{ runner.temp }}/tuition-after.json
+        run: |
+          node scripts/audit-tuition-deadlines-readonly.mjs
+          node scripts/compare-production-tuition-baselines.mjs "$RUNNER_TEMP/tuition-before.json" "$RUNNER_TEMP/tuition-after.json"
+      - name: Install Chromium
+        if: inputs.operation == 'isolated-smoke'
+        run: npx playwright install --with-deps chromium
+      - name: Run isolated Production Tuition Deadlines smoke
+        if: inputs.operation == 'isolated-smoke'
+        env:
+          PRODUCTION_BACKUP_RECEIPT_PATH: ${{ runner.temp }}/production-backup-receipt.json
+          PRODUCTION_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          PRODUCTION_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          PRODUCTION_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          PRODUCTION_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          PRODUCTION_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: node scripts/test-production-tuition-deadlines-isolated.mjs

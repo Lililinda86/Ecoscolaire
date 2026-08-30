@@ -1,24 +1,17 @@
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import process from 'node:process';
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import {
+  buildTuitionAmountFingerprint,
+  canonicalize,
+  digest,
+} from './tuition-deadline-safety.mjs';
 
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'ecoscolaire-c5861';
 const SCHOOL_ID = process.env.SCHOOL_ID || 'italo-gsb';
 const OUTPUT_PATH = process.env.AUDIT_OUTPUT_PATH || '';
-
-const canonicalize = value => {
-  if (value === null || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (typeof value.toDate === 'function') return value.toDate().toISOString();
-  return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalize(value[key])]));
-};
-
-const digest = value => crypto.createHash('sha256')
-  .update(JSON.stringify(canonicalize(value)), 'utf8')
-  .digest('hex');
 
 const snapshotCollection = async (db, collectionName) => {
   const snapshot = await db.collection(collectionName).where('schoolId', '==', SCHOOL_ID).get();
@@ -44,6 +37,7 @@ const academicYear = academicYearSnapshot.data() || {};
 assert.equal(academicYear.schoolId, SCHOOL_ID, 'Academic year belongs to another school.');
 
 const classFees = canonicalize(school.classFees || {});
+const amountFingerprint = buildTuitionAmountFingerprint(classFees);
 const monetarySnapshot = canonicalize({
   globalFees: school.globalFees || null,
   classFees
@@ -61,7 +55,13 @@ const report = canonicalize({
   academicYearId: school.activeAcademicYearId,
   academicYearName: academicYear.name || null,
   classFees,
-  classFeesSha256: digest(classFees),
+  classFeesSha256: amountFingerprint.classFeesSha256,
+  annualAmountsSha256: amountFingerprint.annualAmountsSha256,
+  installmentAmountsSha256: amountFingerprint.installmentAmountsSha256,
+  installmentCountsSha256: amountFingerprint.installmentCountsSha256,
+  annualAmounts: amountFingerprint.annualAmounts,
+  installmentAmounts: amountFingerprint.installmentAmounts,
+  installmentCounts: amountFingerprint.installmentCounts,
   monetarySnapshotSha256: digest(monetarySnapshot),
   paymentDeadlines: school.paymentDeadlines || null,
   tuitionPaymentDeadlines: academicYear.tuitionPaymentDeadlines || null,

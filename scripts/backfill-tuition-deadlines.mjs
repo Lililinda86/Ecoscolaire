@@ -12,6 +12,9 @@ const EXPECTED_CLASS_FEES_SHA256 = process.env.EXPECTED_CLASS_FEES_SHA256;
 const EXPECTED_ACADEMIC_YEAR = process.env.EXPECTED_ACADEMIC_YEAR || '2026-2027';
 const deadlines = { T1: '2026-10-05', T2: '2026-12-05', T3: '2027-02-05' };
 
+assert.notEqual(PROJECT_ID, 'ecoscolaire-c5861',
+  'Direct Production backfill is forbidden; use backfill-production-tuition-deadlines.mjs with the backup gate.');
+
 for (const [name, value] of Object.entries({
   FIREBASE_PROJECT_ID: PROJECT_ID, SCHOOL_ID, ACADEMIC_YEAR_ID, EXPECTED_CLASS_FEES_SHA256
 })) assert.ok(value, `${name} is required.`);
