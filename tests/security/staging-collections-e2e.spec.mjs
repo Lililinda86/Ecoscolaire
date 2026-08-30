@@ -40,6 +40,10 @@ test('completion runner covers live financial schedules, reversals and exact cle
   assert.match(source, /tuition-deadlines-class-\$\{suffix\}/);
   assert.match(source, /e2e-tuition-secretary-\$\{suffix\}/);
   assert.match(source, /assertFixtureCashDayOpen/);
+  assert.match(source, /assertFixtureCashLedgerOpen/);
+  assert.match(source, /expectedCash/);
+  assert.match(source, /status, 'closed'/);
+  assert.match(source, /cashLedgerDayId/);
   assert.match(source, /markCashDayFixture/);
   assert.match(source, /cleanupCashDayFixture/);
   assert.match(source, /cashLedgerDays/);
@@ -57,6 +61,8 @@ test('completion runner covers live financial schedules, reversals and exact cle
   assert.match(source, /STAGING COMPLETION ORPHANS: 0/);
   assert.match(source, /RECEIPT COUNTER REWOUND: NO/);
   assert.match(source, /finally \{[\s\S]*CLEANUP COMPLETE/);
+  assert.match(source, /if \(cashLedgerDayId\) \{[\s\S]*cleanupCashDayFixture/);
+  assert.doesNotMatch(source, /if \(closureId\) \{[\s\S]*cleanupCashDayFixture/);
   assert.doesNotMatch(source, /school-alpha-001|secretary\.alpha@ecoscolaire\.com/);
   assert.doesNotMatch(source, /firebase use|firebase deploy|ecoscolaire-c5861\.firebaseio\.com/);
   assert.doesNotMatch(source, /console\.(?:log|error)\([^\n]*(?:PASSWORD|SERVICE_ACCOUNT|API_KEY)/);

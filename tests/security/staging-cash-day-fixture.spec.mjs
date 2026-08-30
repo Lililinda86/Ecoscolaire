@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   assertFixtureCashDayOpen,
+  assertFixtureCashLedgerOpen,
   cleanupCashDayFixture,
   markCashDayFixture,
 } from '../../scripts/staging-cash-day-fixture.mjs';
@@ -41,11 +42,95 @@ const fixtureDocuments = ({ schoolId, date, testRunId, marked = false }) => {
   };
 };
 
+const fixtureSchool = (schoolId, testRunId) => ({
+  [`schools/${schoolId}`]: { schoolId, testFixture: true, testRunId },
+});
+
+const openLedger = (schoolId, date, cashReceived) => ({
+  schoolId, date, status: 'open', cashReceived,
+});
+
 const markAndCleanup = async (db, schoolId, date, testRunId) => {
   const options = { db, schoolId, date, testRunId, closureNotes: `E2E ${testRunId}` };
   await markCashDayFixture(options);
   await cleanupCashDayFixture(options);
 };
+
+test('ledger is absent before the first cash payment', async () => {
+  const schoolId = 'tuition-deadlines-staging-run-a';
+  const date = '2026-08-29';
+  await assertFixtureCashDayOpen({ db: fakeDb(), schoolId, date });
+});
+
+test('first cash payment creates an open ledger owned by the current fixture run', async () => {
+  const schoolId = 'tuition-deadlines-staging-run-a';
+  const date = '2026-08-29';
+  const testRunId = 'run-a';
+  const db = fakeDb(fixtureSchool(schoolId, testRunId));
+  await assertFixtureCashDayOpen({ db, schoolId, date });
+  db.documents.set(`cashLedgerDays/${schoolId}__${date}`, openLedger(schoolId, date, 10_000));
+  const ledger = await assertFixtureCashLedgerOpen({
+    db, schoolId, date, testRunId, expectedCash: 10_000,
+  });
+  assert.equal(ledger.data.status, 'open');
+});
+
+test('cash payments and reversals update the expected open-ledger total', async () => {
+  const schoolId = 'tuition-deadlines-staging-run-a';
+  const date = '2026-08-29';
+  const testRunId = 'run-a';
+  const id = `${schoolId}__${date}`;
+  const db = fakeDb({
+    ...fixtureSchool(schoolId, testRunId),
+    [`cashLedgerDays/${id}`]: openLedger(schoolId, date, 10_000),
+  });
+  await assertFixtureCashLedgerOpen({ db, schoolId, date, testRunId, expectedCash: 10_000 });
+  db.documents.get(`cashLedgerDays/${id}`).cashReceived += 5_000;
+  await assertFixtureCashLedgerOpen({ db, schoolId, date, testRunId, expectedCash: 15_000 });
+  db.documents.get(`cashLedgerDays/${id}`).cashReceived -= 3_000;
+  await assertFixtureCashLedgerOpen({ db, schoolId, date, testRunId, expectedCash: 12_000 });
+});
+
+test('an open same-run ledger is accepted immediately before cash closure', async () => {
+  const schoolId = 'tuition-deadlines-staging-run-a';
+  const date = '2026-08-29';
+  const testRunId = 'run-a';
+  const db = fakeDb({
+    ...fixtureSchool(schoolId, testRunId),
+    [`cashLedgerDays/${schoolId}__${date}`]: openLedger(schoolId, date, 80_500),
+  });
+  await assertFixtureCashLedgerOpen({ db, schoolId, date, testRunId, expectedCash: 80_500 });
+});
+
+test('failure before closure cleanup removes the exact open ledger', async () => {
+  const schoolId = 'tuition-deadlines-staging-run-a';
+  const date = '2026-08-29';
+  const testRunId = 'run-a';
+  const db = fakeDb({
+    ...fixtureSchool(schoolId, testRunId),
+    [`cashLedgerDays/${schoolId}__${date}`]: openLedger(schoolId, date, 80_500),
+  });
+  await cleanupCashDayFixture({
+    db, schoolId, date, testRunId, closureNotes: `E2E ${testRunId}`,
+  });
+  assert.equal(db.documents.has(`cashLedgerDays/${schoolId}__${date}`), false);
+  assert.equal(db.documents.has(`cashClosures/${schoolId}__${date}`), false);
+});
+
+test('failure after closure cleanup removes the exact unmarked closure and ledger', async () => {
+  const schoolId = 'tuition-deadlines-staging-run-a';
+  const date = '2026-08-29';
+  const testRunId = 'run-a';
+  const db = fakeDb({
+    ...fixtureSchool(schoolId, testRunId),
+    ...fixtureDocuments({ schoolId, date, testRunId }),
+  });
+  await cleanupCashDayFixture({
+    db, schoolId, date, testRunId, closureNotes: `E2E ${testRunId}`,
+  });
+  assert.equal(db.documents.has(`cashLedgerDays/${schoolId}__${date}`), false);
+  assert.equal(db.documents.has(`cashClosures/${schoolId}__${date}`), false);
+});
 
 test('close then cleanup removes the exact cash closure and cash ledger day', async () => {
   const schoolId = 'tuition-deadlines-staging-run-a';

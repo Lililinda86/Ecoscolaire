@@ -16,7 +16,9 @@ import {
 } from './staging-firebase-precheck.mjs';
 import {
   assertFixtureCashDayOpen,
+  assertFixtureCashLedgerOpen,
   cleanupCashDayFixture,
+  exactCashDayId,
   markCashDayFixture,
 } from './staging-cash-day-fixture.mjs';
 
@@ -200,6 +202,7 @@ const run = async () => {
   let fixturePassword = null;
   let closureId = null;
   let cashDate = null;
+  let cashLedgerDayId = null;
   let referenceId = null;
   const targetIds = new Set(Object.values(benefitIds));
   const paymentIds = new Set();
@@ -247,6 +250,8 @@ const run = async () => {
     activeAcademicYearId = academicYearFixtureId;
     primaryClassId = `tuition-deadlines-class-${suffix}`;
     const today = doualaDate();
+    cashDate = today;
+    cashLedgerDayId = exactCashDayId(testSchoolId, cashDate);
     const originalDueDate = '2026-10-05';
     const futureDueDate = '2026-12-05';
     const thirdDueDate = '2027-02-05';
@@ -437,6 +442,9 @@ const run = async () => {
     assert.equal(mainT1Before.nextDueDate, moratoriumDueDate);
     const mainT1Payment = await pay(requestIds.mainT1Partial, studentIds.main, 10_000, 'tuition', { installment: 'T1' });
     assert.equal(mainT1Payment.remainingBalance, 50_000);
+    await assertFixtureCashLedgerOpen({
+      db, schoolId: testSchoolId, date: cashDate, testRunId: suffix, expectedCash: 10_000,
+    });
 
     const mainT2 = await quote(studentIds.main, 'tuition', { installment: 'T2' });
     assert.deepEqual({ gross: mainT2.grossExpectedAmount, discount: mainT2.discountAmount,
@@ -619,9 +627,8 @@ const run = async () => {
     assertStagingFirebasePrecheck({ runtimeProject, requestUrls: firebaseRequestUrls });
 
     console.log('CASH CLOSURE COMPLETE: signed reversals and cross-school denial');
-    const currentDate = doualaDate();
-    cashDate = currentDate;
-    closureId = await assertFixtureCashDayOpen({ db, schoolId: testSchoolId, date: currentDate });
+    const currentDate = cashDate;
+    const expectedClosureId = cashLedgerDayId;
     await expectCallableFailure(() => otherOwnerCloseCall({
       schoolId: testSchoolId, academicYear, date: currentDate,
       openingBalance: 0, countedBalance: 0, notes: marker,
@@ -640,14 +647,24 @@ const run = async () => {
     const cashExpenses = todayExpenses.docs.reduce((sum, item) => sum + Number(item.data().amount || 0), 0);
     const openingBalance = Math.max(0, cashExpenses - expectedCash);
     const countedBalance = openingBalance + expectedCash - cashExpenses;
+    const openLedger = await assertFixtureCashLedgerOpen({
+      db, schoolId: testSchoolId, date: currentDate, testRunId: suffix, expectedCash,
+    });
+    assert.equal(openLedger.id, expectedClosureId);
     const closure = (await secretaryCloseCall({
       schoolId: testSchoolId, academicYear, date: currentDate,
       openingBalance, countedBalance, notes: marker,
     })).data;
-    assert.equal(closure.closureId, closureId);
+    assert.equal(closure.closureId, expectedClosureId);
+    closureId = closure.closureId;
     const closureSnapshot = await db.collection('cashClosures').doc(closureId).get();
+    const closedLedgerSnapshot = await db.collection('cashLedgerDays').doc(cashLedgerDayId).get();
     assert.equal(closureSnapshot.exists, true);
+    assert.equal(closedLedgerSnapshot.exists, true);
     assert.equal(closureSnapshot.data()?.cashReceived, expectedCash);
+    assert.equal(closedLedgerSnapshot.data()?.cashReceived, expectedCash);
+    assert.equal(closedLedgerSnapshot.data()?.status, 'closed');
+    assert.equal(closedLedgerSnapshot.data()?.closureId, closureId);
     assert.equal(closureSnapshot.data()?.countedBalance, countedBalance);
     assert.equal(closureSnapshot.data()?.closedBy, secretaryUid);
     await markCashDayFixture({
@@ -695,7 +712,7 @@ const run = async () => {
       await deleteSnapshots(db, exactAudits);
       await deleteSnapshots(db, taggedSnapshots);
 
-      if (closureId) {
+      if (cashLedgerDayId) {
         await cleanupCashDayFixture({
           db, schoolId: testSchoolId, date: cashDate, testRunId: suffix, closureNotes: marker,
         });
@@ -747,9 +764,9 @@ const run = async () => {
         assert.equal((await db.collection('academicYears').doc(academicYearFixtureId).get()).exists, false);
       }
       if (primaryClassId) assert.equal((await db.collection('classes').doc(primaryClassId).get()).exists, false);
-      if (closureId) {
-        assert.equal((await db.collection('cashClosures').doc(closureId).get()).exists, false);
-        assert.equal((await db.collection('cashLedgerDays').doc(closureId).get()).exists, false);
+      if (cashLedgerDayId) {
+        assert.equal((await db.collection('cashClosures').doc(cashLedgerDayId).get()).exists, false);
+        assert.equal((await db.collection('cashLedgerDays').doc(cashLedgerDayId).get()).exists, false);
       }
       for (const uid of createdAuthUids) {
         await assert.rejects(() => adminAuth.getUser(uid), (error) => error?.code === 'auth/user-not-found');
