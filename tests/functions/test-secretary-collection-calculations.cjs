@@ -4,6 +4,7 @@ const {
   calculateBenefits,
   isTransportPeriod,
   resolveCanonicalClassCycle,
+  resolveTuitionGross,
   resolveTransportBenefitGross,
   resolvePaymentSchedule,
   withAcademicYearTuitionDeadlines
@@ -12,6 +13,41 @@ const {
   planTransportAllocations,
   resolveItaloTransportFee
 } = require('../../functions/lib/transportPaymentPolicy');
+
+const expectBusinessCode = (operation, expected) => assert.throws(operation, error => {
+  assert.equal(error.details?.businessCode, expected);
+  return true;
+});
+
+const classFeeSchool = {
+  classFees: {
+    CP: { tuition: 120000, t1: 50000, t2: 40000, t3: 30000 },
+    CE1: { tuition: 135000, t1: 55000, t2: 45000, t3: 35000 },
+    CM2: { tuition: 90000, t1: 50000, t2: 40000, t3: 0 }
+  },
+  globalFees: { feeT1: 0, feeT2: 0, feeT3: 0 }
+};
+assert.equal(resolveTuitionGross('T1', { feeT1: 0 }, classFeeSchool, { name: 'CP' }), 50000);
+assert.equal(resolveTuitionGross('T2', { feeT2: 999999 }, classFeeSchool, { name: 'CP' }), 40000);
+assert.equal(resolveTuitionGross('T3', {}, classFeeSchool, { name: 'CP' }), 30000);
+assert.equal(resolveTuitionGross('T1', {}, classFeeSchool, { name: 'CE1' }), 55000,
+  'two classes must resolve their own exact class fee');
+assert.equal(resolveTuitionGross('T1', { feeT1: 0 }, classFeeSchool, { name: 'CP' }), 50000,
+  'an uninitialized zero student projection must not override classFees');
+assert.equal(resolveTuitionGross('T1', {}, classFeeSchool, { name: 'CP' }), 50000,
+  'a zero legacy global fee must not override classFees');
+expectBusinessCode(() => resolveTuitionGross('T3', { feeT3: 70000 }, classFeeSchool, { name: 'CM2' }),
+  'GROSS_AMOUNT_NOT_CONFIGURED');
+expectBusinessCode(() => resolveTuitionGross('T1', { feeT1: 70000 }, classFeeSchool, { name: 'Missing' }),
+  'CLASS_FEE_NOT_CONFIGURED');
+expectBusinessCode(() => resolveTuitionGross('T1', {}, {
+  classFees: { CP: { t1: -1 } }
+}, { name: 'CP' }), 'CLASS_FEE_CORRUPTED');
+expectBusinessCode(() => resolveTuitionGross('T1', {}, {
+  classFees: { CP: { t1: 12.5 } }
+}, { name: 'CP' }), 'CLASS_FEE_CORRUPTED');
+assert.equal(resolveTuitionGross('T1', { feeT1: 0 }, { globalFees: { feeT1: 71000 } }, {}), 71000,
+  'legacy global fallback remains available only when classFees is absent');
 
 assert.equal(calculateBenefitAmount(70000, 'FIXED_AMOUNT', 10000), 10000);
 assert.equal(calculateBenefitAmount(70000, 'PERCENTAGE', 25), 17500);
