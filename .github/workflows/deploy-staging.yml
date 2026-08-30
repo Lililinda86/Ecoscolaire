@@ -4,12 +4,27 @@ on:
   push:
     branches:
       - staging
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact deployed Staging SHA for the isolated LOT 1 UI validation
+        required: true
+        type: string
+      app_url:
+        description: Immutable Vercel Staging URL for the exact SHA
+        required: true
+        type: string
+      confirmation:
+        description: Exact confirmation RUN_LOT1_STAGING_UI
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   frontend-ci:
+    if: github.event_name == 'push'
     name: Frontend CI
     runs-on: ubuntu-latest
     steps:
@@ -42,6 +57,7 @@ jobs:
         run: npx vitest run tests/unit/FinancialBenefitsPanel.spec.tsx tests/unit/paymentReceipt.spec.ts tests/unit/TeacherAssignmentsPanel.spec.tsx tests/unit/TuitionDeadlineSettings.spec.tsx
 
   functions-ci:
+    if: github.event_name == 'push'
     name: Functions CI
     runs-on: ubuntu-latest
     steps:
@@ -109,6 +125,7 @@ jobs:
         run: npm run test:functions:secretary-collections
 
   firestore-rules-ci:
+    if: github.event_name == 'push'
     name: Firestore Rules CI
     runs-on: ubuntu-latest
     steps:
@@ -147,6 +164,7 @@ jobs:
           FIREBASE_PROJECT: demo-ecoscolaire
 
   deploy-firebase:
+    if: github.event_name == 'push'
     name: Deploy to Staging
     needs: [frontend-ci, functions-ci, firestore-rules-ci]
     runs-on: ubuntu-latest
@@ -225,3 +243,18 @@ jobs:
 
       - name: Deploy Firebase Backend
         run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions,firestore:rules,storage --non-interactive
+
+  lot1-staging-ui:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.confirmation == 'RUN_LOT1_STAGING_UI'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/payment-forward-recovery-staging-ui.yml
+    with:
+      expected_sha: ${{ inputs.expected_sha }}
+      app_url: ${{ inputs.app_url }}
+      confirmation: ${{ inputs.confirmation }}
+    secrets: inherit
