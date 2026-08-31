@@ -17,8 +17,9 @@ export const selectStudentClassOption = async ({
   assert.equal(await option.getAttribute("value"), classId);
   assert.equal(normalizeOptionLabel(await option.textContent()), expectedLabel);
 
-  const select = option.locator("xpath=parent::select");
-  assert.equal(await select.count(), 1, `class option ${classId} must have one select parent`);
+  const select = form.locator(`select:has(option[value="${classId}"])`);
+  await select.waitFor({ state: "attached", timeout });
+  assert.equal(await select.count(), 1, `class option ${classId} must belong to one select`);
   await select.selectOption({ value: classId });
   assert.equal(await select.inputValue(), classId);
   assert.equal(
