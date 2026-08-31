@@ -4,7 +4,11 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { chromium } from "@playwright/test";
 import dotenv from "dotenv";
-import { deleteOwnedStudentFinanceFinal } from "./payment-forward-recovery-cleanup.mjs";
+import {
+  deleteOwnedFixtureReceiptCounter,
+  deleteOwnedStudentFinanceFinal,
+  waitForStudentFinanceTriggerConvergence,
+} from "./payment-forward-recovery-cleanup.mjs";
 import {
   assertLabelledFrenchCurrencyAmount,
   parseFrenchCurrencyAmount,
@@ -65,6 +69,33 @@ const waitForQuote = async (form, expectedGross) => {
   return quote;
 };
 
+const assertTransportInstallmentRow = async (form, expected) => {
+  const rows = form.getByTestId("transport-installments-scroll").locator("tbody tr")
+    .filter({ hasText: expected.period });
+  assert.equal(await rows.count(), 1, `Expected one row for ${expected.period}.`);
+  const cells = await rows.first().locator("td").allTextContents();
+  assert.equal(normalized(cells[0]), expected.period);
+  assert.equal(parseFrenchCurrencyAmount(cells[1]), expected.gross);
+  assert.equal(parseFrenchCurrencyAmount(cells[2]), -expected.discount);
+  assert.equal(parseFrenchCurrencyAmount(cells[3]), expected.net);
+  assert.equal(parseFrenchCurrencyAmount(cells[4]), expected.previousPaid);
+  assert.equal(parseFrenchCurrencyAmount(cells[5]), expected.remaining);
+  assert.equal(normalized(cells[6]), expected.dueDate);
+  assert.equal(normalized(cells[7]), expected.status);
+};
+
+const assertAllocationRows = async (rows, expected, { creditLabel = "Crédit généré" } = {}) => {
+  assert.equal(await rows.count(), expected.length);
+  const actual = await rows.allTextContents();
+  for (const [index, item] of expected.entries()) {
+    const label = item.kind === "CREDIT" ? creditLabel : `Période ${item.period}`;
+    const match = normalized(actual[index]).match(/^•?\s*(.+?)\s*:\s*(-?[\d ]+ FCFA)$/);
+    assert.ok(match, `Expected a labelled allocation at index ${index}.`);
+    assert.equal(match[1], label);
+    assert.equal(parseFrenchCurrencyAmount(match[2]), item.amount);
+  }
+};
+
 const createStudentFixture = async ({ id, name, classId, zonePk, status, neighborhood, pickup }) => {
   await Promise.all([
     track("students", id).create({
@@ -94,22 +125,38 @@ const deleteExactOwned = async (collection, id) => {
   await ref.delete();
 };
 
+const deleteTaggedDocuments = async (collection) => {
+  const snapshot = await db.collection(collection).where("testRunId", "==", testRunId).get();
+  for (const document of snapshot.docs) {
+    assert.equal(document.data().testFixture, true);
+    assert.equal(document.data().schoolId, schoolId);
+    await document.ref.delete();
+  }
+  return snapshot.size;
+};
+
 const cleanup = async () => {
   if (browserContext) await browserContext.close().catch(() => {});
   if (browser) await browser.close().catch(() => {});
   if (!db) return;
-  const dynamic = [
-    "transportPaymentAllocations", "payments", "receipts", "financialBenefits",
-    "paymentMoratoriums", "audit_logs", "cashClosures", "cashLedgerDays",
-  ];
-  for (const collection of dynamic) {
-    const snapshot = await db.collection(collection).where("testRunId", "==", testRunId).get();
-    for (const document of snapshot.docs) {
-      assert.equal(document.data().testFixture, true);
-      assert.equal(document.data().schoolId, schoolId);
-      await document.ref.delete();
-    }
+  const deletedPayments = await deleteTaggedDocuments("payments");
+  await deleteTaggedDocuments("transportPaymentAllocations");
+  if (deletedPayments > 0) {
+    await waitForStudentFinanceTriggerConvergence({
+      db,
+      studentIds: Object.values(studentIds),
+      schoolId,
+      testRunId,
+      projectionActorIds: createdAuthUids,
+      expectedTriggerFields: { [studentIds.pk28]: { transportPaid: 0 } },
+      timeoutMs: 20_000,
+      pollMs: 250,
+      stableReads: 2,
+    });
   }
+  for (const collection of [
+    "receipts", "financialBenefits", "paymentMoratoriums", "cashClosures", "cashLedgerDays",
+  ]) await deleteTaggedDocuments(collection);
   for (const collection of ["cashClosures", "cashLedgerDays"]) {
     const schoolScoped = await db.collection(collection).where("schoolId", "==", schoolId).get();
     for (const document of schoolScoped.docs) {
@@ -119,14 +166,20 @@ const cleanup = async () => {
     }
   }
   for (const { collection, id } of [...tracked].reverse()) await deleteExactOwned(collection, id);
-  await new Promise(resolve => setTimeout(resolve, 750));
   await deleteOwnedStudentFinanceFinal({
-    db, studentIds: Object.values(studentIds), schoolId, testRunId, verificationReads: 3,
+    db,
+    studentIds: Object.values(studentIds),
+    schoolId,
+    testRunId,
+    projectionActorIds: createdAuthUids,
+    verificationReads: 3,
+    pollMs: 250,
   });
-  await deleteExactOwned("counters", `receipts_${schoolId}`);
   for (const uid of createdAuthUids) await adminAuth.deleteUser(uid).catch(error => {
     if (error?.code !== "auth/user-not-found") throw error;
   });
+  await deleteTaggedDocuments("audit_logs");
+  await deleteOwnedFixtureReceiptCounter({ db, schoolId });
   const residualCollections = [
     "students", "studentPrivate", "studentFinance", "payments", "receipts",
     "transportPaymentAllocations", "financialBenefits", "paymentMoratoriums",
@@ -134,6 +187,12 @@ const cleanup = async () => {
   ];
   const residualCounts = {};
   for (const collection of residualCollections) {
+    if (collection === "studentFinance") {
+      const snapshots = await Promise.all(Object.values(studentIds)
+        .map(id => db.collection(collection).doc(id).get()));
+      residualCounts[collection] = snapshots.filter(snapshot => snapshot.exists).length;
+      continue;
+    }
     const field = collection === "cashClosures" || collection === "cashLedgerDays"
       ? "schoolId" : "testRunId";
     const value = field === "schoolId" ? schoolId : testRunId;
@@ -201,6 +260,7 @@ try {
   });
 
   const benefitId = `lot3-benefit-${testRunId}`;
+  const tuitionBenefitId = `lot3-tuition-benefit-${testRunId}`;
   const moratoriumId = `lot3-moratorium-${testRunId}`;
   const priorAllocationId = `lot3-prior-${testRunId}`;
   const priorCreditId = `lot3-credit-${testRunId}`;
@@ -212,6 +272,14 @@ try {
       transportStartPeriod: periods[0], transportEndPeriod: periods[0], stackable: true,
       status: "approved", usageCount: 0, maximumUses: 1, appliedTargets: [],
       reference: "LOT3-BON-1000", reason: "Fixture LOT3", ...tagged,
+    }),
+    track("financialBenefits", tuitionBenefitId).create({
+      id: tuitionBenefitId, schoolId, studentId: studentIds.pk28, academicYear: ACADEMIC_YEAR,
+      requestId: `request-${tuitionBenefitId}`, benefitType: "SCHOLARSHIP",
+      paymentType: "TUITION", installment: "T1", mode: "FIXED_AMOUNT", value: 2500,
+      stackable: true, status: "approved", usageCount: 0, maximumUses: 1,
+      appliedTargets: [], reference: "LOT3-TUITION-ISOLATED",
+      reason: "Fixture isolation Tuition LOT3", ...tagged,
     }),
     track("paymentMoratoriums", moratoriumId).create({
       id: moratoriumId, schoolId, studentId: studentIds.pk28, academicYear: ACADEMIC_YEAR,
@@ -262,7 +330,25 @@ try {
   });
   assert.equal(await form.getByTestId("transport-installments-scroll").locator("tbody tr").count(), 3);
   await form.getByText("LOT3-BON-1000", { exact: false }).waitFor();
+  assert.equal(await form.getByText("LOT3-TUITION-ISOLATED", { exact: false }).count(), 0);
+  assert.equal(parseFrenchCurrencyAmount(
+    await form.getByTestId("collection-quote-gross").textContent()), 12_000);
+  assert.equal(parseFrenchCurrencyAmount(
+    await form.getByTestId("collection-quote-net").textContent()), 11_000);
+  assert.equal(parseFrenchCurrencyAmount(
+    await form.getByTestId("collection-quote-remaining").textContent()), 10_000);
+  const benefitValue = form.getByText("Bourse / réduction applicable", { exact: true })
+    .locator("xpath=following-sibling::strong[1]");
+  assert.equal(parseFrenchCurrencyAmount(await benefitValue.textContent()), -1000);
   await form.getByText(/ACTIF — dette inchangée/).waitFor();
+  assert.equal(normalized(await form.getByText("Échéance initiale", { exact: true })
+    .locator("xpath=following-sibling::strong[1]").textContent()), "15/09/2026");
+  assert.equal(normalized(await form.getByText("Échéance effective", { exact: true })
+    .locator("xpath=following-sibling::strong[1]").textContent()), "15/12/2026");
+  await assertTransportInstallmentRow(form, {
+    period: "2026-09", gross: 4000, discount: 1000, net: 3000,
+    previousPaid: 1000, remaining: 2000, dueDate: "15/12/2026", status: "PARTIEL",
+  });
   assertLabelledFrenchCurrencyAmount(await form.getByTestId("transport-existing-credit").textContent(), {
     label: "Crédit existant", expected: 500,
   });
@@ -270,6 +356,13 @@ try {
 
   await form.getByTestId("cash-payment-amount").fill("11000");
   await form.getByTestId("transport-payment-preview").waitFor({ state: "visible" });
+  const expectedAllocations = [
+    { kind: "INSTALLMENT", period: "2026-09", amount: 2000 },
+    { kind: "INSTALLMENT", period: "2026-10", amount: 4000 },
+    { kind: "INSTALLMENT", period: "2026-11", amount: 4000 },
+    { kind: "CREDIT", period: null, amount: 1000 },
+  ];
+  await assertAllocationRows(form.getByTestId("transport-preview-allocation"), expectedAllocations);
   assertLabelledFrenchCurrencyAmount(await form.getByTestId("transport-generated-credit").textContent(), {
     label: "Crédit généré", expected: 1000,
   });
@@ -307,6 +400,10 @@ try {
     transportState: "BILLABLE", billingPeriods: periods,
   });
   assert.equal(receipt.transportCredit, 1500);
+  assert.equal(receipt.remainingBalance, 0);
+  assert.equal(receipt.discountAmount, 1000);
+  assert.deepEqual(receipt.allocationSummary, expectedAllocations);
+  assert.equal(receipt.benefits.some(item => item.benefitId === tuitionBenefitId), false);
   await page.getByRole("button", { name: "Reçus", exact: true }).click();
   await page.getByText(receipt.receiptNumber, { exact: true }).waitFor({ timeout: 20_000 });
   const receiptRow = page.locator('[data-receipt-row="true"]:visible').filter({ hasText: receipt.receiptNumber });
@@ -315,6 +412,14 @@ try {
   const receiptContext = page.getByTestId(`transport-receipt-context-${receiptDocument.id}`);
   await receiptContext.waitFor({ state: "visible" });
   assert.match(normalized(await receiptContext.textContent()), /PK28.*Quartier A.*Point A.*ITALO PK.*4 000 FCFA/s);
+  const receiptDetail = page.locator(`#receipt-detail-${receiptDocument.id}`);
+  await receiptDetail.getByText("LOT3 Primaire", { exact: true }).waitFor();
+  const receiptAllocation = receiptDetail.getByTestId(`transport-receipt-allocation-${receiptDocument.id}`);
+  await assertAllocationRows(receiptAllocation.locator(".receipt-history-allocation-row"),
+    expectedAllocations, { creditLabel: "Crédit Transport" });
+  const receiptRemaining = receiptDetail.getByText("Reste à payer", { exact: true })
+    .locator("xpath=following-sibling::div[1]");
+  assert.equal(parseFrenchCurrencyAmount(await receiptRemaining.textContent()), 0);
   console.log(`LOT3_UI PASS staging_sha=${process.env.EXPECTED_STAGING_SHA} receipt=${receipt.receiptNumber}`);
 } finally {
   await cleanup();
