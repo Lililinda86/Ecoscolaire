@@ -366,9 +366,17 @@ const Payments: React.FC = () => {
 
   const mobileMoneyEnabled = isOperationalMobileMoneyProvider(db.school?.paymentSettings?.activeProvider);
   const selectedPaymentStudent = db.students.find(student => student.id === currentPayment.studentId);
+  const selectedPaymentClass = db.classes.find(classSection => classSection.id === selectedPaymentStudent?.classId);
+  const selectedPaymentClassFees = selectedPaymentClass
+    ? db.school?.classFees?.[selectedPaymentClass.name]
+    : undefined;
   const configuredTuitionInstallments = React.useMemo(
-    () => getConfiguredTuitionInstallments(selectedPaymentStudent),
-    [selectedPaymentStudent]
+    () => getConfiguredTuitionInstallments({
+      feeT1: selectedPaymentClassFees?.t1,
+      feeT2: selectedPaymentClassFees?.t2,
+      feeT3: selectedPaymentClassFees?.t3
+    }),
+    [selectedPaymentClassFees]
   );
 
   useEffect(() => {
@@ -2286,8 +2294,14 @@ const Payments: React.FC = () => {
             </div>
             {currentPayment.type === 'tuition' && (
               <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
-                <label>Choix de la Tranche</label>
-                <select required value={currentPayment.installment || 'T1'} onChange={e => setCurrentPayment({...currentPayment, installment: e.target.value as 'T1' | 'T2' | 'T3'})}>
+                <label htmlFor="tuition-installment-select">Choix de la Tranche</label>
+                <select
+                  id="tuition-installment-select"
+                  data-testid="tuition-installment-select"
+                  required
+                  value={currentPayment.installment || 'T1'}
+                  onChange={e => setCurrentPayment({...currentPayment, installment: e.target.value as 'T1' | 'T2' | 'T3'})}
+                >
                   {configuredTuitionInstallments.map(installment => (
                     <option key={installment} value={installment}>
                       Tranche {installment.slice(1)}
