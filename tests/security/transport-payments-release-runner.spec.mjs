@@ -261,6 +261,33 @@ test('tuition amounts and adjustments remain server-authoritative in the UI', ()
   assert.doesNotMatch(paymentsUi, /Montant attendu/);
 });
 
+test('tuition quote lifecycle clears stale values for every target and exposes safe states', () => {
+  assert.match(paymentsUi, /React\.useLayoutEffect\(\(\) => \{[\s\S]*?setCollectionQuote\(null\);[\s\S]*?setQuoteError\(null\);[\s\S]*?setQuoteLoading\(targetReady\)/);
+  assert.match(paymentsUi, /currentPayment\.studentId, currentPayment\.type, currentPayment\.installment, currentPayment\.period,[\s\S]*?currentSchool\?\.academicYear, currentSchool\?\.id, isModalOpen, quoteRefresh/);
+  assert.match(paymentsUi, /setQuoteLoading\(true\);\n\s+setCollectionQuote\(null\);\n\s+setQuoteError\(null\);[\s\S]*?installment: currentPayment\.installment \|\| 'T1'/);
+  assert.match(paymentsUi, /catch\(error => \{[\s\S]*?setCollectionQuote\(null\);[\s\S]*?setQuoteError\('Impossible de calculer le devis actuel\./);
+  assert.match(paymentsUi, /data-testid="collection-quote-loading"/);
+  assert.match(paymentsUi, /!quoteLoading && collectionQuote && \(/);
+  assert.match(paymentsUi, /data-testid="collection-quote-current"/);
+  assert.match(paymentsUi, /data-testid="collection-quote-gross"/);
+  assert.match(paymentsUi, /data-testid="collection-quote-net"/);
+  assert.match(paymentsUi, /data-testid="collection-quote-remaining"/);
+  assert.match(paymentsUi, /data-testid="collection-quote-error" role="alert"/);
+});
+
+test('tuition UI harness waits for installment and student quote refreshes', () => {
+  assert.match(tuitionUiHarness, /const awaitCurrentQuote = async/);
+  assert.match(tuitionUiHarness, /const selectInstallmentAndAwaitQuote = async/);
+  assert.match(tuitionUiHarness, /select\.selectOption\(installment\)[\s\S]*?inputValue\(\), installment/);
+  assert.match(tuitionUiHarness, /collection-quote-loading[\s\S]*?state: "visible"[\s\S]*?collection-quote-current[\s\S]*?count\(\), 0/);
+  assert.match(tuitionUiHarness, /collection-quote-gross[\s\S]*?count\(\), 0[\s\S]*?state: "hidden"/);
+  assert.match(tuitionUiHarness, /assertCurrencyCard\(form, "Tarif de référence", expectedAmount\)/);
+  assert.match(tuitionUiHarness, /selectInstallmentAndAwaitQuote\(form, "T2", 30_000\)/);
+  assert.match(tuitionUiHarness, /selectInstallmentAndAwaitQuote\(form, "T3", 15_000\)/);
+  assert.match(tuitionUiHarness, /selectOption\(studentIds\.b120\);\n\s+await awaitCurrentQuote\(form, 20_000\)/);
+  assert.match(tuitionUiHarness, /selectOption\("other"\)[\s\S]*?collection-quote-current[\s\S]*?state: "hidden"/);
+});
+
 test('French currency assertions normalize separators but keep the numeric value strict', () => {
   const equivalents = [
     "40\u202f000 FCFA",

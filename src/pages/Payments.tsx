@@ -298,6 +298,7 @@ const Payments: React.FC = () => {
   const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({ date: new Date().toISOString().split('T')[0], type: 'tuition', amount: '' as unknown as number });
   const [collectionQuote, setCollectionQuote] = useState<CollectionQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [quoteRefresh, setQuoteRefresh] = useState(0);
   const [isConfirmingTx, setIsConfirmingTx] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -518,6 +519,21 @@ const Payments: React.FC = () => {
     setCurrentPayment(prev => ({ ...prev, amount: '' as unknown as number }));
   }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, currentPayment.period]);
 
+  // Invalidate the previous quote before painting a newly selected target.
+  React.useLayoutEffect(() => {
+    const supported = currentPayment.type === 'tuition'
+      || currentPayment.type === 'transport'
+      || currentPayment.type === 'registration_fee';
+    const targetReady = Boolean(isModalOpen && supported && currentPayment.studentId
+      && currentSchool?.id && currentSchool.academicYear);
+    setCollectionQuote(null);
+    setQuoteError(null);
+    setQuoteLoading(targetReady);
+  }, [
+    currentPayment.studentId, currentPayment.type, currentPayment.installment, currentPayment.period,
+    currentSchool?.academicYear, currentSchool?.id, isModalOpen, quoteRefresh
+  ]);
+
   // Fetch a server-side quote. The browser displays it but never authorizes the amount.
   React.useEffect(() => {
     let cancelled = false;
@@ -527,10 +543,14 @@ const Payments: React.FC = () => {
     const targetReady = true;
     if (!isModalOpen || !supported || !targetReady || !currentPayment.studentId
         || !currentSchool?.id || !currentSchool.academicYear) {
+      setQuoteLoading(false);
       setCollectionQuote(null);
+      setQuoteError(null);
       return () => { cancelled = true; };
     }
     setQuoteLoading(true);
+    setCollectionQuote(null);
+    setQuoteError(null);
     const getQuote = httpsCallable<Record<string, unknown>, CollectionQuote>(functions, 'getCollectionQuote');
     getQuote({
       schoolId: currentSchool.id,
@@ -543,7 +563,10 @@ const Payments: React.FC = () => {
       if (!cancelled) setCollectionQuote(result.data);
     }).catch(error => {
       console.warn('Unable to calculate collection quote', error);
-      if (!cancelled) setCollectionQuote(null);
+      if (!cancelled) {
+        setCollectionQuote(null);
+        setQuoteError('Impossible de calculer le devis actuel. Vérifiez la configuration puis réessayez.');
+      }
     }).finally(() => {
       if (!cancelled) setQuoteLoading(false);
     });
@@ -2326,14 +2349,19 @@ const Payments: React.FC = () => {
           {currentPayment.type !== 'other' && (
             <div className="form-group" aria-live="polite">
               <label>Situation financière calculée par le serveur</label>
-              {quoteLoading && <div style={{ padding: '.75rem', background: '#f8fafc' }}>Calcul en cours…</div>}
-              {!quoteLoading && !collectionQuote && (
+              {quoteLoading && <div data-testid="collection-quote-loading" style={{ padding: '.75rem', background: '#f8fafc' }}>Calcul en cours…</div>}
+              {!quoteLoading && quoteError && (
+                <div data-testid="collection-quote-error" role="alert" style={{ padding: '.75rem', background: '#fef2f2', color: '#991b1b' }}>
+                  {quoteError}
+                </div>
+              )}
+              {!quoteLoading && !quoteError && !collectionQuote && (
                 <div role="alert" style={{ padding: '.75rem', background: '#fef2f2', color: '#991b1b' }}>
                   Sélectionnez un élève et une échéance disposant d’un tarif configuré.
                 </div>
               )}
-              {collectionQuote && (
-                <div style={{ padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
+              {!quoteLoading && collectionQuote && (
+                <div data-testid="collection-quote-current" style={{ padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
                   {collectionQuote.transportState === 'FREE_SECONDARY' && (
                     <div data-testid="transport-free-secondary" style={{ padding: '.8rem', marginBottom: '.75rem', background: '#ecfdf5', color: '#065f46', fontWeight: 700, borderRadius: 6 }}>
                       TRANSPORT GRATUIT — montant mensuel 0 FCFA — reste dû 0 FCFA
@@ -2350,11 +2378,11 @@ const Payments: React.FC = () => {
                     </div>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '.75rem' }}>
-                    <div><small>Tarif de référence</small><br/><strong>{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
+                    <div><small>Tarif de référence</small><br/><strong data-testid="collection-quote-gross">{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
                     <div><small>Bourse / réduction applicable</small><br/><strong>- {formatCurrency(collectionQuote.discountAmount)}</strong></div>
-                    <div><small>Montant réellement dû</small><br/><strong>{formatCurrency(collectionQuote.netExpectedAmount)}</strong></div>
+                    <div><small>Montant réellement dû</small><br/><strong data-testid="collection-quote-net">{formatCurrency(collectionQuote.netExpectedAmount)}</strong></div>
                     <div><small>Sommes déjà versées</small><br/><strong>{formatCurrency(collectionQuote.previousPaid)}</strong></div>
-                    <div><small>Reste à payer</small><br/><strong>{formatCurrency(collectionQuote.remainingBalance)}</strong></div>
+                    <div><small>Reste à payer</small><br/><strong data-testid="collection-quote-remaining">{formatCurrency(collectionQuote.remainingBalance)}</strong></div>
                     <div><small>Statut de paiement</small><br/><strong>{collectionQuote.status === 'PAID' ? 'SOLDÉ' : collectionQuote.status === 'PARTIAL' ? 'PARTIEL' : 'NON PAYÉ'}</strong></div>
                     <div><small>Échéance initiale</small><br/><strong>{collectionQuote.originalDueDate ? formatIsoDateFr(collectionQuote.originalDueDate) : 'Non configurée'}</strong></div>
                     <div><small>Échéance effective</small><br/><strong>{collectionQuote.effectiveDueDate ? formatIsoDateFr(collectionQuote.effectiveDueDate) : 'Non configurée'}</strong></div>
