@@ -8,7 +8,7 @@ on:
         required: true
         default: transport
         type: choice
-        options: [transport, lot1_tuition_ui]
+        options: [transport, lot1_tuition_ui, lot2_transport_student]
       mode:
         description: Exact isolated target
         required: true
@@ -213,6 +213,23 @@ jobs:
       contents: read
       id-token: write
     uses: ./.github/workflows/payment-forward-recovery-staging-ui.yml
+    with:
+      expected_sha: ${{ inputs.expected_sha }}
+      app_url: ${{ inputs.app_url }}
+      confirmation: ${{ inputs.confirmation }}
+    secrets: inherit
+
+  lot2-transport-student-ui:
+    if: >-
+      inputs.operation == 'lot2_transport_student' &&
+      inputs.mode == 'staging' &&
+      github.ref == 'refs/heads/staging' &&
+      inputs.confirmation == 'RUN_LOT2_TRANSPORT_STUDENT_UI'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/student-transport-staging-ui.yml
     with:
       expected_sha: ${{ inputs.expected_sha }}
       app_url: ${{ inputs.app_url }}
