@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { deleteOwnedFixtureAudits, isOwnedFixtureAudit } from '../../scripts/payment-forward-recovery-cleanup.mjs';
 import { assertFrenchCurrencyAmount, normalizeFrenchNumberText } from '../../scripts/payment-forward-recovery-currency.mjs';
+import { waitForFinalTuitionQuoteState } from '../../scripts/payment-forward-recovery-quote-wait.mjs';
 import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
 import { validateExactDeploymentRun } from '../../scripts/verify-exact-deployment-run.mjs';
 import {
@@ -276,16 +277,65 @@ test('tuition quote lifecycle clears stale values for every target and exposes s
 });
 
 test('tuition UI harness waits for installment and student quote refreshes', () => {
-  assert.match(tuitionUiHarness, /const awaitCurrentQuote = async/);
+  assert.match(tuitionUiHarness, /const waitForCurrentQuote = async/);
   assert.match(tuitionUiHarness, /const selectInstallmentAndAwaitQuote = async/);
-  assert.match(tuitionUiHarness, /select\.selectOption\(installment\)[\s\S]*?inputValue\(\), installment/);
-  assert.match(tuitionUiHarness, /collection-quote-loading[\s\S]*?state: "visible"[\s\S]*?collection-quote-current[\s\S]*?count\(\), 0/);
-  assert.match(tuitionUiHarness, /collection-quote-gross[\s\S]*?count\(\), 0[\s\S]*?state: "hidden"/);
-  assert.match(tuitionUiHarness, /assertCurrencyCard\(form, "Tarif de référence", expectedAmount\)/);
-  assert.match(tuitionUiHarness, /selectInstallmentAndAwaitQuote\(form, "T2", 30_000\)/);
-  assert.match(tuitionUiHarness, /selectInstallmentAndAwaitQuote\(form, "T3", 15_000\)/);
-  assert.match(tuitionUiHarness, /selectOption\(studentIds\.b120\);\n\s+await awaitCurrentQuote\(form, 20_000\)/);
+  assert.match(tuitionUiHarness, /select\.selectOption\(installment\)[\s\S]*?waitForCurrentQuote/);
+  assert.match(tuitionUiHarness, /waitForFinalTuitionQuoteState\(\{[\s\S]*?expectedStudentId[\s\S]*?expectedInstallment[\s\S]*?expectedGross/);
+  assert.doesNotMatch(tuitionUiHarness, /loading\.waitFor\(\{ state: "visible"/);
+  assert.match(tuitionUiHarness, /parseFrenchCurrencyAmount\(await gross\.textContent\(\)\)/);
+  assert.match(tuitionUiHarness, /expectedStudentId: studentIds\.c2, expectedInstallment: "T1"[\s\S]*?expectedGross: 50_000[\s\S]*?forbiddenInstallments: \["T3"\]/);
+  assert.match(tuitionUiHarness, /expectedStudentId: studentIds\.main, expectedInstallment: "T2"[\s\S]*?expectedGross: 30_000/);
   assert.match(tuitionUiHarness, /selectOption\("other"\)[\s\S]*?collection-quote-current[\s\S]*?state: "hidden"/);
+});
+
+const quoteState = (overrides = {}) => ({
+  studentId: 'student-c2', installment: 'T1', installments: ['T1', 'T2'],
+  loading: false, currentGross: 50_000, ...overrides,
+});
+
+const stateReader = (states) => {
+  let index = 0;
+  return async () => states[Math.min(index++, states.length - 1)];
+};
+
+const waitForC2Quote = (states, overrides = {}) => waitForFinalTuitionQuoteState({
+  readState: stateReader(states), expectedStudentId: 'student-c2',
+  expectedInstallment: 'T1', expectedGross: 50_000, previousGross: 20_000,
+  forbiddenInstallments: ['T3'], timeoutMs: 10, pollMs: 0, ...overrides,
+});
+
+test('final quote wait accepts an observed loading state followed by the exact result', async () => {
+  const result = await waitForC2Quote([
+    quoteState({ loading: true, currentGross: null }), quoteState(),
+  ]);
+  assert.equal(result.loadingObserved, true);
+});
+
+test('final quote wait accepts an exact result when loading was too fast to observe', async () => {
+  const result = await waitForC2Quote([quoteState()]);
+  assert.equal(result.loadingObserved, false);
+});
+
+test('final quote wait rejects a previous quote still presented as current', async () => {
+  await assert.rejects(() => waitForC2Quote([quoteState({ currentGross: 20_000 })]),
+    /previous quote 20000 is still presented as current/);
+});
+
+test('final quote wait rejects an incorrect new amount', async () => {
+  await assert.rejects(() => waitForC2Quote([quoteState({ currentGross: 40_000 })]),
+    /unexpected gross amount/);
+});
+
+test('final quote wait rejects an incorrect final installment', async () => {
+  await assert.rejects(() => waitForC2Quote(
+    [quoteState({ installment: 'T2', currentGross: 35_000 })], { timeoutMs: 1 },
+  ), /Timed out waiting for final tuition quote state/);
+});
+
+test('final quote wait rejects T3 exposed by a two-installment class', async () => {
+  await assert.rejects(() => waitForC2Quote([
+    quoteState({ installments: ['T1', 'T2', 'T3'] }),
+  ]), /Forbidden installment T3/);
 });
 
 test('French currency assertions normalize separators but keep the numeric value strict', () => {

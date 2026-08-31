@@ -12,7 +12,11 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { chromium } from "@playwright/test";
 import dotenv from "dotenv";
 import { deleteOwnedFixtureAudits } from "./payment-forward-recovery-cleanup.mjs";
-import { assertFrenchCurrencyAmount } from "./payment-forward-recovery-currency.mjs";
+import {
+  assertFrenchCurrencyAmount,
+  parseFrenchCurrencyAmount,
+} from "./payment-forward-recovery-currency.mjs";
+import { waitForFinalTuitionQuoteState } from "./payment-forward-recovery-quote-wait.mjs";
 
 dotenv.config({ path: ".env.staging" });
 
@@ -132,20 +136,60 @@ const assertCurrencyCard = async (form, label, expectedAmount) => {
   throw lastError;
 };
 
-const awaitCurrentQuote = async (form, expectedAmount) => {
+const waitForCurrentQuote = async ({
+  form,
+  expectedStudentId,
+  expectedInstallment,
+  expectedGross,
+  previousGross = null,
+  forbiddenInstallments = [],
+}) => {
+  const student = form.getByTestId("cash-payment-student");
+  const installment = form.getByTestId("tuition-installment-select");
   const loading = form.getByTestId("collection-quote-loading");
-  await loading.waitFor({ state: "visible", timeout: 20_000 });
-  assert.equal(await form.getByTestId("collection-quote-current").count(), 0);
-  assert.equal(await form.getByTestId("collection-quote-gross").count(), 0);
-  await loading.waitFor({ state: "hidden", timeout: 20_000 });
-  await assertCurrencyCard(form, "Tarif de référence", expectedAmount);
+  const current = form.getByTestId("collection-quote-current");
+  const gross = form.getByTestId("collection-quote-gross");
+
+  return waitForFinalTuitionQuoteState({
+    expectedStudentId,
+    expectedInstallment,
+    expectedGross,
+    previousGross,
+    forbiddenInstallments,
+    readState: async () => {
+      const currentVisible =
+        (await current.count()) > 0 && (await current.isVisible());
+      return {
+        studentId: await student.inputValue(),
+        installment: await installment.inputValue(),
+        installments: await installment
+          .locator("option")
+          .evaluateAll((options) => options.map((option) => option.value)),
+        loading: (await loading.count()) > 0 && (await loading.isVisible()),
+        currentGross: currentVisible
+          ? parseFrenchCurrencyAmount(await gross.textContent())
+          : null,
+      };
+    },
+  });
 };
 
-const selectInstallmentAndAwaitQuote = async (form, installment, expectedAmount) => {
+const selectInstallmentAndAwaitQuote = async ({
+  form,
+  expectedStudentId,
+  installment,
+  expectedGross,
+  previousGross,
+}) => {
   const select = form.getByTestId("tuition-installment-select");
   await select.selectOption(installment);
-  assert.equal(await select.inputValue(), installment);
-  await awaitCurrentQuote(form, expectedAmount);
+  await waitForCurrentQuote({
+    form,
+    expectedStudentId,
+    expectedInstallment: installment,
+    expectedGross,
+    previousGross,
+  });
 };
 
 const validateUi = async () => {
@@ -241,43 +285,77 @@ const validateUi = async () => {
     .waitFor({ timeout: 20_000 });
   await assertCurrencyCard(form, "Tarif de référence", 40_000);
 
-  await selectInstallmentAndAwaitQuote(form, "T2", 30_000);
-  await selectInstallmentAndAwaitQuote(form, "T3", 15_000);
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.main, installment: "T2",
+    expectedGross: 30_000, previousGross: 40_000,
+  });
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.main, installment: "T3",
+    expectedGross: 15_000, previousGross: 30_000,
+  });
   console.log("UI_85K_INSTALLMENTS PASS T1=40000 T2=30000 T3=15000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.b120);
-  await awaitCurrentQuote(form, 20_000);
+  await waitForCurrentQuote({
+    form, expectedStudentId: studentIds.b120, expectedInstallment: "T3",
+    expectedGross: 20_000, previousGross: 15_000,
+  });
   await installment.locator('option[value="T3"]').waitFor({
     state: "attached",
     timeout: 20_000,
   });
   assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
-  await selectInstallmentAndAwaitQuote(form, "T1", 60_000);
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.b120, installment: "T1",
+    expectedGross: 60_000, previousGross: 20_000,
+  });
   await assertCurrencyCard(form, "Bourse / réduction applicable", -6_000);
   await assertCurrencyCard(form, "Montant réellement dû", 54_000);
-  await selectInstallmentAndAwaitQuote(form, "T2", 40_000);
-  await selectInstallmentAndAwaitQuote(form, "T3", 20_000);
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.b120, installment: "T2",
+    expectedGross: 40_000, previousGross: 60_000,
+  });
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.b120, installment: "T3",
+    expectedGross: 20_000, previousGross: 40_000,
+  });
   console.log("UI_120K_INSTALLMENTS PASS T1=60000 T2=40000 T3=20000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.c2);
-  await awaitCurrentQuote(form, 50_000);
+  await waitForCurrentQuote({
+    form, expectedStudentId: studentIds.c2, expectedInstallment: "T1",
+    expectedGross: 50_000, previousGross: 20_000,
+    forbiddenInstallments: ["T3"],
+  });
   await installment.locator('option[value="T3"]').waitFor({
     state: "detached",
     timeout: 20_000,
   });
   assert.deepEqual(await optionValues(), ["T1", "T2"]);
-  await selectInstallmentAndAwaitQuote(form, "T1", 50_000);
-  await selectInstallmentAndAwaitQuote(form, "T2", 35_000);
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.c2, installment: "T1",
+    expectedGross: 50_000, previousGross: 20_000,
+  });
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.c2, installment: "T2",
+    expectedGross: 35_000, previousGross: 50_000,
+  });
   console.log("UI_TWO_INSTALLMENT PASS T1 T2 ONLY");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.main);
-  await awaitCurrentQuote(form, 30_000);
+  await waitForCurrentQuote({
+    form, expectedStudentId: studentIds.main, expectedInstallment: "T2",
+    expectedGross: 30_000, previousGross: 35_000,
+  });
   await installment.locator('option[value="T3"]').waitFor({
     state: "attached",
     timeout: 20_000,
   });
   assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
-  await selectInstallmentAndAwaitQuote(form, "T1", 40_000);
+  await selectInstallmentAndAwaitQuote({
+    form, expectedStudentId: studentIds.main, installment: "T1",
+    expectedGross: 40_000, previousGross: 30_000,
+  });
   await assertCurrencyCard(
     form,
     "Bourse / réduction applicable",
