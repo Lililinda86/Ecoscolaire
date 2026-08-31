@@ -7,10 +7,11 @@ import { validateExactDeploymentRun } from "../../scripts/verify-exact-deploymen
 const read = (path) => readFile(new URL("../../" + path, import.meta.url), "utf8");
 const callerPath = ".github/workflows/transport-payments-release-runner.yml";
 const reusablePath = ".github/workflows/student-transport-staging-ui.yml";
-const [caller, reusable, harness, ci, paymentsUi] = await Promise.all([
+const [caller, reusable, harness, classSelectHelper, ci, paymentsUi] = await Promise.all([
   read(callerPath),
   read(reusablePath),
   read("scripts/test-student-transport-staging.mjs"),
+  read("scripts/select-student-class-option.mjs"),
   read(".github/workflows/ci.yml"),
   read("src/pages/Payments.tsx"),
 ]);
@@ -34,35 +35,30 @@ const hasExactSuccessfulImmutableUrl = (statuses, expectedUrl) => statuses.filte
 
 
 const fakeClassForm = (definitions) => {
-  const selects = definitions.map((options) => ({ options, selectedValue: "" }));
-  const optionLocator = (matches) => ({
+  const selects = definitions.map((definition) => ({
+    options: Array.isArray(definition) ? definition : definition.options,
+    selectedValue: "",
+  }));
+
+  const createSelectLocator = (matches) => ({
     waitFor: async () => {
-      if (matches.length === 0) throw new Error("class option not attached");
+      if (matches.length === 0) throw new Error("class select not attached");
     },
     count: async () => matches.length,
-    getAttribute: async (name) => (name === "value" ? matches[0]?.option.value ?? null : null),
-    textContent: async () => matches[0]?.option.label ?? null,
+    selectOption: async ({ value }) => {
+      const select = matches[0];
+      if (!select?.options.some((option) => option.value === value)) {
+        throw new Error("option value not found in resolved select");
+      }
+      select.selectedValue = value;
+    },
+    inputValue: async () => matches[0]?.selectedValue ?? "",
     locator: (selector) => {
-      assert.equal(selector, "xpath=parent::select");
-      const parents = [...new Set(matches.map(({ select }) => select))];
+      assert.equal(selector, "option:checked");
       return {
-        count: async () => parents.length,
-        selectOption: async ({ value }) => {
-          const select = parents[0];
-          if (!select?.options.some((option) => option.value === value)) {
-            throw new Error("option value not found in resolved select");
-          }
-          select.selectedValue = value;
-        },
-        inputValue: async () => parents[0]?.selectedValue ?? "",
-        locator: (childSelector) => {
-          assert.equal(childSelector, "option:checked");
-          return {
-            textContent: async () => parents[0]?.options.find(
-              (option) => option.value === parents[0].selectedValue,
-            )?.label ?? null,
-          };
-        },
+        textContent: async () => matches[0]?.options.find(
+          (option) => option.value === matches[0].selectedValue,
+        )?.label ?? null,
       };
     },
   });
@@ -70,28 +66,92 @@ const fakeClassForm = (definitions) => {
   return {
     selects,
     locator: (selector) => {
-      const match = selector.match(/^option\[value="([A-Za-z0-9_-]+)"\]$/);
-      assert.ok(match, `unexpected locator: ${selector}`);
-      const value = match[1];
-      return optionLocator(selects.flatMap((select) => select.options
-        .filter((option) => option.value === value)
-        .map((option) => ({ option, select }))));
+      const optionMatch = selector.match(/^option\[value="([A-Za-z0-9_-]+)"\]$/);
+      if (optionMatch) {
+        const value = optionMatch[1];
+        const matches = selects.flatMap((select) => select.options
+          .filter((option) => option.value === value)
+          .map((option) => ({ option, select })));
+        return {
+          waitFor: async () => {
+            if (matches.length === 0) throw new Error("class option not attached");
+          },
+          count: async () => matches.length,
+          getAttribute: async (name) => (
+            name === "value" ? matches[0]?.option.value ?? null : null
+          ),
+          textContent: async () => matches[0]?.option.label ?? null,
+        };
+      }
+
+      const selectMatch = selector.match(
+        /^select:has\(option\[value="([A-Za-z0-9_-]+)"\]\)$/,
+      );
+      assert.ok(selectMatch, `unexpected locator: ${selector}`);
+      const value = selectMatch[1];
+      return createSelectLocator(
+        selects.filter((select) => select.options.some((option) => option.value === value)),
+      );
     },
   };
 };
 
-test("class option resolves its exact select parent among multiple selects", async () => {
-  const form = fakeClassForm([
-    [{ value: "unrelated", label: "Autre contrôle" }],
-    [{ value: "lot2-primary-123-1", label: "LOT2 Primaire" }],
-  ]);
+test("grouped primary class option resolves and selects exactly", async () => {
+  const form = fakeClassForm([{
+    options: [
+      { value: "lot2-primary-123-1", label: "LOT2 Primaire", group: "PRIMAIRE" },
+    ],
+  }]);
   const select = await selectStudentClassOption({
     form,
     classId: "lot2-primary-123-1",
     expectedLabel: "LOT2 Primaire",
   });
   assert.equal(await select.inputValue(), "lot2-primary-123-1");
+});
+
+test("grouped secondary class option resolves and selects exactly", async () => {
+  const form = fakeClassForm([{
+    options: [
+      {
+        value: "lot2-secondary-123-1",
+        label: "LOT2 Secondaire FREE",
+        group: "SECONDAIRE",
+      },
+    ],
+  }]);
+  const select = await selectStudentClassOption({
+    form,
+    classId: "lot2-secondary-123-1",
+    expectedLabel: "LOT2 Secondaire FREE",
+  });
+  assert.equal(await select.inputValue(), "lot2-secondary-123-1");
+});
+
+test("direct class option under select remains supported", async () => {
+  const form = fakeClassForm([[
+    { value: "lot2-primary-123-1", label: "LOT2 Primaire" },
+  ]]);
+  const select = await selectStudentClassOption({
+    form,
+    classId: "lot2-primary-123-1",
+    expectedLabel: "LOT2 Primaire",
+  });
+  assert.equal(await select.inputValue(), "lot2-primary-123-1");
+});
+
+test("class option isolates the exact select among multiple selects", async () => {
+  const form = fakeClassForm([
+    [{ value: "unrelated", label: "Autre contrôle" }],
+    [{ value: "lot2-primary-123-1", label: "LOT2 Primaire", group: "PRIMAIRE" }],
+  ]);
+  await selectStudentClassOption({
+    form,
+    classId: "lot2-primary-123-1",
+    expectedLabel: "LOT2 Primaire",
+  });
   assert.equal(form.selects[0].selectedValue, "");
+  assert.equal(form.selects[1].selectedValue, "lot2-primary-123-1");
 });
 
 test("class selection fails closed when the exact option is absent", async () => {
@@ -108,7 +168,7 @@ test("class selection fails closed when the exact option is absent", async () =>
 
 test("class selection rejects the right value with the wrong label", async () => {
   const form = fakeClassForm([[
-    { value: "lot2-primary-123-1", label: "Mauvaise classe" },
+    { value: "lot2-primary-123-1", label: "Mauvaise classe", group: "PRIMAIRE" },
   ]]);
   await assert.rejects(
     selectStudentClassOption({
@@ -121,7 +181,7 @@ test("class selection rejects the right value with the wrong label", async () =>
 
 test("class selection rejects the right label with the wrong value", async () => {
   const form = fakeClassForm([[
-    { value: "wrong-primary-123-1", label: "LOT2 Primaire" },
+    { value: "wrong-primary-123-1", label: "LOT2 Primaire", group: "PRIMAIRE" },
   ]]);
   await assert.rejects(
     selectStudentClassOption({
@@ -133,22 +193,28 @@ test("class selection rejects the right label with the wrong value", async () =>
   );
 });
 
-test("class selection supports the secondary fixture without primary hardcoding", async () => {
-  const form = fakeClassForm([[
-    { value: "lot2-primary-123-1", label: "LOT2 Primaire" },
-    { value: "lot2-secondary-123-1", label: "LOT2 Secondaire FREE" },
-  ]]);
-  const select = await selectStudentClassOption({
-    form,
-    classId: "lot2-secondary-123-1",
-    expectedLabel: "LOT2 Secondaire FREE",
-  });
-  assert.equal(await select.inputValue(), "lot2-secondary-123-1");
+test("class selection rejects duplicate selects containing the same value", async () => {
+  const form = fakeClassForm([
+    [{ value: "lot2-primary-123-1", label: "LOT2 Primaire" }],
+    [{ value: "lot2-primary-123-1", label: "LOT2 Primaire", group: "PRIMAIRE" }],
+  ]);
+  await assert.rejects(
+    selectStudentClassOption({
+      form,
+      classId: "lot2-primary-123-1",
+      expectedLabel: "LOT2 Primaire",
+    }),
+    /expected one class option/,
+  );
 });
 
-test("LOT 2 harness uses exact option-parent class selection and exact labels", () => {
+test("LOT 2 harness uses a form-scoped grouped-option locator and exact labels", () => {
   assert.match(harness, /selectStudentClassOption\(\{ form, classId, expectedLabel: className \}\)/);
-  assert.doesNotMatch(harness, /has: form\.locator\('option\[value=/);
+  assert.match(
+    classSelectHelper,
+    /form\.locator\(`select:has\(option\[value="\$\{classId\}"\]\)\`\)/,
+  );
+  assert.doesNotMatch(classSelectHelper, /parent::select/);
   assert.match(harness, /className: "LOT2 Primaire"/);
   assert.match(harness, /className: "LOT2 Secondaire FREE"/);
 });
