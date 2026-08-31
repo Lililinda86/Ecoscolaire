@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { deleteOwnedFixtureAudits, isOwnedFixtureAudit } from '../../scripts/payment-forward-recovery-cleanup.mjs';
+import {
+  deleteOwnedFixtureAudits, deleteOwnedStudentFinanceFinal, isOwnedFixtureAudit,
+  isOwnedFixtureStudentFinance, waitForStudentFinanceTriggerConvergence,
+} from '../../scripts/payment-forward-recovery-cleanup.mjs';
 import { assertFrenchCurrencyAmount, normalizeFrenchNumberText } from '../../scripts/payment-forward-recovery-currency.mjs';
 import { waitForFinalTuitionQuoteState } from '../../scripts/payment-forward-recovery-quote-wait.mjs';
 import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
@@ -602,4 +605,107 @@ test('Function inventory summary is limited to safe diagnostic fields', () => {
   const summary = formatInventorySummary(normalizeFunctionInventory({ gen1: [{ name: 'projects/ecoscolaire-staging/locations/us-central1/functions/approveFinancialBenefit', state: 'ACTIVE', secret: 'must-not-print' }] }));
   assert.match(summary, /approveFinancialBenefit\tGEN_1\tus-central1\tACTIVE/);
   assert.doesNotMatch(summary, /secret|must-not-print|ecoscolaire-c5861/);
+});
+
+
+test('payment modal exposes the resolved class as read-only context and keeps quotes authoritative', () => {
+  assert.match(paymentsUi, /selectedPaymentStudent = db\.students\.find\(student => student\.id === currentPayment\.studentId\)/);
+  assert.match(paymentsUi, /selectedPaymentClass = db\.classes\.find\(classSection => classSection\.id === selectedPaymentStudent\?\.classId\)/);
+  assert.match(paymentsUi, /data-testid="payment-student-class"[\s\S]*?selectedPaymentClass\?\.name/);
+  assert.doesNotMatch(paymentsUi.match(/data-testid="payment-student-class"[\s\S]*?<\/div>/)?.[0] || '', /<(?:input|select|textarea|button)/);
+  assert.match(tuitionUiHarness, /assertPaymentStudentClass\(form, "LOT1 Classe 85K"\)/);
+  assert.match(tuitionUiHarness, /selectOption\(studentIds\.b120\);\n\s+await assertPaymentStudentClass\(form, "LOT1 Classe 120K"\)/);
+  assert.match(tuitionUiHarness, /selectOption\(studentIds\.c2\);\n\s+await assertPaymentStudentClass\(form, "LOT1 Classe 2 tranches"\)/);
+  assert.match(paymentsUi, /collectionQuote\.grossExpectedAmount/);
+});
+
+const financeOwnership = {
+  studentIds: new Set(['fixture-student']), schoolId: 'fixture-school', testRunId: 'lot1-run',
+};
+const ownedFinance = {
+  id: 'fixture-student', studentId: 'fixture-student', schoolId: 'fixture-school',
+  testFixture: true, testRunId: 'lot1-run', tuitionPaid: 0,
+};
+
+test('studentFinance ownership accepts exact marked and system-recreated fixture projections', () => {
+  assert.equal(isOwnedFixtureStudentFinance('fixture-student', ownedFinance, financeOwnership), true);
+  const recreated = { ...ownedFinance, testFixture: undefined, testRunId: undefined,
+    createdBy: 'system:updateStudentFinancialStatus' };
+  assert.equal(isOwnedFixtureStudentFinance('fixture-student', recreated, financeOwnership), true);
+});
+
+test('studentFinance ownership denies wrong school, real student, italo-gsb and unexpected creator', () => {
+  assert.equal(isOwnedFixtureStudentFinance('fixture-student', { ...ownedFinance, schoolId: 'foreign-school' }, financeOwnership), false);
+  assert.equal(isOwnedFixtureStudentFinance('real-student', { ...ownedFinance, id: 'real-student', studentId: 'real-student' }, financeOwnership), false);
+  assert.equal(isOwnedFixtureStudentFinance('fixture-student', ownedFinance, { ...financeOwnership, schoolId: 'italo-gsb' }), false);
+  assert.equal(isOwnedFixtureStudentFinance('fixture-student', { ...ownedFinance, testFixture: undefined,
+    testRunId: undefined, createdBy: 'unexpected' }, financeOwnership), false);
+});
+
+const snapshot = (data) => ({ exists: data !== null, data: () => data });
+
+test('payment deletion convergence stabilizes the zero projection before exact final cleanup', async () => {
+  let reads = 0;
+  let deleted = false;
+  let current = ownedFinance;
+  const triggerProjection = { ...ownedFinance, tuitionPaid: 0, registrationFeePaid: 0,
+    transportPaid: 0, updatedBy: 'system:updateStudentFinancialStatus', updatedAt: 2 };
+  const ref = {
+    get: async () => {
+      reads += 1;
+      if (!deleted && reads >= 2) current = triggerProjection;
+      return snapshot(current);
+    },
+    delete: async () => { deleted = true; current = null; },
+  };
+  const db = { collection: (name) => { assert.equal(name, 'studentFinance'); return { doc: () => ref }; } };
+  await waitForStudentFinanceTriggerConvergence({ db, studentIds: ['fixture-student'],
+    schoolId: 'fixture-school', testRunId: 'lot1-run',
+    expectedTriggerFields: { 'fixture-student': { tuitionPaid: 0, registrationFeePaid: 0, transportPaid: 0 } },
+    timeoutMs: 50, pollMs: 0, stableReads: 2 });
+  assert.equal(await deleteOwnedStudentFinanceFinal({ db, studentIds: ['fixture-student'],
+    schoolId: 'fixture-school', testRunId: 'lot1-run', pollMs: 0 }), 1);
+  assert.equal(current, null);
+});
+
+test('studentFinance final cleanup deletes exact unmarked projections, is idempotent and rejects foreign documents', async () => {
+  let current = { ...ownedFinance, testFixture: undefined, testRunId: undefined,
+    createdBy: 'system:updateStudentFinancialStatus' };
+  const ref = { get: async () => snapshot(current), delete: async () => { current = null; } };
+  const db = { collection: () => ({ doc: () => ref }) };
+  const args = { db, studentIds: ['fixture-student'], schoolId: 'fixture-school',
+    testRunId: 'lot1-run', pollMs: 0 };
+  assert.equal(await deleteOwnedStudentFinanceFinal(args), 1);
+  assert.equal(current, null);
+  assert.equal(await deleteOwnedStudentFinanceFinal(args), 0);
+  assert.equal(await deleteOwnedStudentFinanceFinal(args), 0);
+  current = { ...ownedFinance, schoolId: 'foreign-school' };
+  await assert.rejects(() => deleteOwnedStudentFinanceFinal(args), /Refusing to delete foreign/);
+});
+
+test('studentFinance final cleanup detects a late recreation', async () => {
+  let current = ownedFinance;
+  let verificationRead = 0;
+  let deleted = false;
+  const ref = {
+    get: async () => {
+      if (!deleted) return snapshot(current);
+      verificationRead += 1;
+      if (verificationRead === 2) current = { ...ownedFinance, testFixture: undefined,
+        testRunId: undefined, createdBy: 'system:updateStudentFinancialStatus' };
+      return snapshot(current);
+    },
+    delete: async () => { deleted = true; current = null; },
+  };
+  const db = { collection: () => ({ doc: () => ref }) };
+  await assert.rejects(() => deleteOwnedStudentFinanceFinal({ db,
+    studentIds: ['fixture-student'], schoolId: 'fixture-school', testRunId: 'lot1-run',
+    verificationReads: 2, pollMs: 0 }), /recreated after final cleanup/);
+});
+
+test('LOT 1 harness deletes payments, converges triggers, and deletes studentFinance last', () => {
+  assert.match(tuitionUiHarness, /paymentItems[\s\S]*?item\.collection\)\.doc\(item\.id\)\.delete\(\)[\s\S]*?waitForStudentFinanceTriggerConvergence/);
+  assert.match(tuitionUiHarness, /waitForStudentFinanceTriggerConvergence[\s\S]*?otherItems[\s\S]*?deleteOwnedStudentFinanceFinal/);
+  assert.match(tuitionUiHarness, /expectedTriggerFields:[\s\S]*?tuitionPaid: 0[\s\S]*?verificationReads: 2/);
+  assert.match(tuitionUiHarness, /residuals\[collection\][\s\S]*?assert\.equal\(total, 0/);
 });

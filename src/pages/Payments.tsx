@@ -2269,6 +2269,15 @@ const Payments: React.FC = () => {
               {db.students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.section})</option>)}
             </select>
           </div>
+          {selectedPaymentStudent && (
+            <div
+              data-testid="payment-student-class"
+              aria-live="polite"
+              style={{ marginTop: '-.35rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}
+            >
+              <strong>Classe :</strong> {selectedPaymentClass?.name || 'Non renseignée'}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
              <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
               <label>Nature du Versement</label>

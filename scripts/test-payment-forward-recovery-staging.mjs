@@ -11,7 +11,11 @@ import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { chromium } from "@playwright/test";
 import dotenv from "dotenv";
-import { deleteOwnedFixtureAudits } from "./payment-forward-recovery-cleanup.mjs";
+import {
+  deleteOwnedFixtureAudits,
+  deleteOwnedStudentFinanceFinal,
+  waitForStudentFinanceTriggerConvergence,
+} from "./payment-forward-recovery-cleanup.mjs";
 import {
   assertFrenchCurrencyAmount,
   parseFrenchCurrencyAmount,
@@ -115,6 +119,13 @@ const assertValueCard = async (form, label, expected) => {
   await card.waitFor({ state: "visible", timeout: 20_000 });
   await card.getByText(expected).waitFor({ state: "visible", timeout: 20_000 });
   assert.match(normalizedText(await card.textContent()), expected);
+};
+
+const assertPaymentStudentClass = async (form, expectedClassName) => {
+  const classDisplay = form.getByTestId("payment-student-class");
+  await classDisplay.waitFor({ state: "visible", timeout: 20_000 });
+  assert.equal(normalizedText(await classDisplay.textContent()), `Classe : ${expectedClassName}`);
+  assert.equal(await classDisplay.locator("input, select, textarea, button").count(), 0);
 };
 
 const assertCurrencyCard = async (form, label, expectedAmount) => {
@@ -256,6 +267,7 @@ const validateUi = async () => {
     .filter({ has: page.getByTestId("cash-payment-student") });
   await page.getByTestId("cash-payment-student").selectOption(studentIds.main);
   await page.getByTestId("cash-payment-type").selectOption("tuition");
+  await assertPaymentStudentClass(form, "LOT1 Classe 85K");
   const installment = form.getByTestId("tuition-installment-select");
   const labeledInstallment = form.getByLabel("Choix de la Tranche");
   await labeledInstallment.waitFor({ state: "visible", timeout: 20_000 });
@@ -296,6 +308,7 @@ const validateUi = async () => {
   console.log("UI_85K_INSTALLMENTS PASS T1=40000 T2=30000 T3=15000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.b120);
+  await assertPaymentStudentClass(form, "LOT1 Classe 120K");
   await waitForCurrentQuote({
     form, expectedStudentId: studentIds.b120, expectedInstallment: "T3",
     expectedGross: 20_000, previousGross: 15_000,
@@ -322,6 +335,7 @@ const validateUi = async () => {
   console.log("UI_120K_INSTALLMENTS PASS T1=60000 T2=40000 T3=20000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.c2);
+  await assertPaymentStudentClass(form, "LOT1 Classe 2 tranches");
   await waitForCurrentQuote({
     form, expectedStudentId: studentIds.c2, expectedInstallment: "T1",
     expectedGross: 50_000, previousGross: 20_000,
@@ -343,6 +357,7 @@ const validateUi = async () => {
   console.log("UI_TWO_INSTALLMENT PASS T1 T2 ONLY");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.main);
+  await assertPaymentStudentClass(form, "LOT1 Classe 85K");
   await waitForCurrentQuote({
     form, expectedStudentId: studentIds.main, expectedInstallment: "T2",
     expectedGross: 30_000, previousGross: 35_000,
@@ -380,12 +395,7 @@ const validateUi = async () => {
     "No server-side getCollectionQuote request was observed.",
   );
 
-  const visibleClass = page.getByText("LOT1 Classe 85K", { exact: true });
-  assert.ok(
-    (await visibleClass.count()) > 0,
-    "The selected student class is not visible in the current payment UI.",
-  );
-  await visibleClass.first().waitFor({ state: "visible", timeout: 10_000 });
+  await assertPaymentStudentClass(form, "LOT1 Classe 85K");
   console.log("UI_CLASS PASS LOT1 Classe 85K");
   console.log("UI_INSTALLMENT PASS T1");
   console.log("UI_EXPECTED_AMOUNT PASS 40000");
@@ -425,9 +435,37 @@ const cleanup = async () => {
         ]),
       ],
     });
-    for (const item of [...tracked].reverse()) {
+    const paymentItems = tracked.filter(({ collection }) => collection === "payments");
+    const financeItems = tracked.filter(({ collection }) => collection === "studentFinance");
+    const otherItems = tracked.filter(
+      ({ collection }) => collection !== "payments" && collection !== "studentFinance",
+    );
+    for (const item of [...paymentItems].reverse()) {
       await db.collection(item.collection).doc(item.id).delete();
     }
+    await waitForStudentFinanceTriggerConvergence({
+      db,
+      studentIds: financeItems.map(({ id }) => id),
+      schoolId,
+      testRunId: suffix,
+      expectedTriggerFields: {
+        [studentIds.main]: {
+          registrationFeePaid: 0,
+          tuitionPaid: 0,
+          transportPaid: 0,
+        },
+      },
+    });
+    for (const item of [...otherItems].reverse()) {
+      await db.collection(item.collection).doc(item.id).delete();
+    }
+    await deleteOwnedStudentFinanceFinal({
+      db,
+      studentIds: financeItems.map(({ id }) => id),
+      schoolId,
+      testRunId: suffix,
+      verificationReads: 2,
+    });
     for (const uid of createdAuthUids) {
       try {
         await adminAuth.deleteUser(uid);
