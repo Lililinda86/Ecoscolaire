@@ -13,6 +13,7 @@ const transportWorkflowPath = '.github/workflows/transport-payments-release-runn
 const tuitionUiWorkflowPath = '.github/workflows/payment-forward-recovery-staging-ui.yml';
 const workflow = await readText(transportWorkflowPath);
 const tuitionUiWorkflow = await readText(tuitionUiWorkflowPath);
+const tuitionUiHarness = await readText('scripts/test-payment-forward-recovery-staging.mjs');
 const runner = await readText('scripts/test-transport-payments-production.mjs');
 const stagingWorkflow = await readText('.github/workflows/run-seed.yml');
 const stagingDeploymentWorkflow = await readText('.github/workflows/deploy-staging.yml');
@@ -188,6 +189,38 @@ test('lot1 tuition UI operation routes only through the WIF-authorized Transport
     `Lililinda86/Ecoscolaire/${tuitionUiWorkflowPath}@refs/heads/staging`,
     'Lililinda86/Ecoscolaire/.github/workflows/payment-forward-recovery-staging-ui.yml@refs/heads/staging',
   );
+});
+
+test('lot1 tuition UI uses Firestore user profiles without custom claims or extra Auth IAM', () => {
+  assert.equal((tuitionUiHarness.match(/adminAuth\.createUser\(/g) || []).length, 2);
+  assert.doesNotMatch(tuitionUiHarness, /setCustomUserClaims/);
+  assert.doesNotMatch(`${tuitionUiHarness}\n${tuitionUiWorkflow}`, /firebaseauth\.users\.update/);
+
+  const userFixtures = tuitionUiHarness.match(/track\("users", [\s\S]*?\n\s+}\),/g) || [];
+  assert.equal(userFixtures.length, 2);
+  for (const fixture of userFixtures) {
+    assert.match(fixture, /role: "secretary"/);
+    assert.match(fixture, /schoolId(?:,|: otherSchoolId)/);
+    assert.match(fixture, /\.\.\.tagged/);
+  }
+  assert.match(tuitionUiHarness, /const tagged = \{ testFixture: true, testRunId: suffix }/);
+
+  assert.match(
+    tuitionUiHarness,
+    /otherQuote\([\s\S]*?"CROSS_SCHOOL_DENIED"/,
+  );
+});
+
+test('tuition quote resolves secretary role and school from users uid document', async () => {
+  const backend = await readText('functions/src/secretaryCollections.ts');
+  assert.match(backend, /const userRef = db\.collection\('users'\)\.doc\(uid\)/);
+  assert.match(backend, /transaction\.get\(userRef\)/);
+  assert.match(backend, /const user = validateActiveUser\(userSnap, PAYMENT_ROLES\)/);
+  assert.match(backend, /roles\.has\(String\(user\.role\)\)/);
+  assert.match(backend, /validateTenant\(user, input\.schoolId\)/);
+  assert.match(backend, /user\.schoolId !== schoolId/);
+  assert.match(backend, /Cross-school operation denied\.', 'CROSS_SCHOOL_DENIED'/);
+  assert.doesNotMatch(backend, /context\.auth(?:\?\.)?\.token\.(?:role|schoolId)/);
 });
 
 test('IAM preflight curl uses single-backslash line continuation and keeps its full contract', () => {

@@ -305,20 +305,12 @@ try {
     disabled: false,
   });
   createdAuthUids.push(secretary.uid);
-  await adminAuth.setCustomUserClaims(secretary.uid, {
-    role: "secretary",
-    schoolId,
-  });
   const otherSecretary = await adminAuth.createUser({
     email: otherEmail,
     password,
     disabled: false,
   });
   createdAuthUids.push(otherSecretary.uid);
-  await adminAuth.setCustomUserClaims(otherSecretary.uid, {
-    role: "secretary",
-    schoolId: otherSchoolId,
-  });
 
   const tagged = { testFixture: true, testRunId: suffix };
   await Promise.all([
