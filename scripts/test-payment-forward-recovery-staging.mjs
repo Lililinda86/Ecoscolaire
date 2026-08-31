@@ -12,6 +12,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { chromium } from "@playwright/test";
 import dotenv from "dotenv";
 import { deleteOwnedFixtureAudits } from "./payment-forward-recovery-cleanup.mjs";
+import { assertFrenchCurrencyAmount } from "./payment-forward-recovery-currency.mjs";
 
 dotenv.config({ path: ".env.staging" });
 
@@ -112,6 +113,14 @@ const assertValueCard = async (form, label, expected) => {
   assert.match(normalizedText(await card.textContent()), expected);
 };
 
+const assertCurrencyCard = async (form, label, expectedAmount) => {
+  const card = form.locator("small", { hasText: label }).last().locator("..");
+  await card.waitFor({ state: "visible", timeout: 20_000 });
+  const value = card.locator("strong");
+  await value.waitFor({ state: "visible", timeout: 20_000 });
+  assertFrenchCurrencyAmount(await value.textContent(), expectedAmount);
+};
+
 const validateUi = async () => {
   const appUrl = requireStagingAppUrl();
   browser = await chromium.launch({ headless: true });
@@ -203,12 +212,12 @@ const validateUi = async () => {
   await form
     .getByText("Situation financière calculée par le serveur")
     .waitFor({ timeout: 20_000 });
-  await assertValueCard(form, "Tarif de référence", /40[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 40_000);
 
   await installment.selectOption("T2");
-  await assertValueCard(form, "Tarif de référence", /30[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 30_000);
   await installment.selectOption("T3");
-  await assertValueCard(form, "Tarif de référence", /15[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 15_000);
   console.log("UI_85K_INSTALLMENTS PASS T1=40000 T2=30000 T3=15000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.b120);
@@ -218,13 +227,13 @@ const validateUi = async () => {
   });
   assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
   await installment.selectOption("T1");
-  await assertValueCard(form, "Tarif de référence", /60[ .]?000 FCFA/);
-  await assertValueCard(form, "Bourse / réduction applicable", /- 6[ .]?000 FCFA/);
-  await assertValueCard(form, "Montant réellement dû", /54[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 60_000);
+  await assertCurrencyCard(form, "Bourse / réduction applicable", -6_000);
+  await assertCurrencyCard(form, "Montant réellement dû", 54_000);
   await installment.selectOption("T2");
-  await assertValueCard(form, "Tarif de référence", /40[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 40_000);
   await installment.selectOption("T3");
-  await assertValueCard(form, "Tarif de référence", /20[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 20_000);
   console.log("UI_120K_INSTALLMENTS PASS T1=60000 T2=40000 T3=20000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.c2);
@@ -234,9 +243,9 @@ const validateUi = async () => {
   });
   assert.deepEqual(await optionValues(), ["T1", "T2"]);
   await installment.selectOption("T1");
-  await assertValueCard(form, "Tarif de référence", /50[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 50_000);
   await installment.selectOption("T2");
-  await assertValueCard(form, "Tarif de référence", /35[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Tarif de référence", 35_000);
   console.log("UI_TWO_INSTALLMENT PASS T1 T2 ONLY");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.main);
@@ -246,15 +255,15 @@ const validateUi = async () => {
   });
   assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
   await installment.selectOption("T1");
-  await assertValueCard(form, "Tarif de référence", /40[ .]?000 FCFA/);
-  await assertValueCard(
+  await assertCurrencyCard(form, "Tarif de référence", 40_000);
+  await assertCurrencyCard(
     form,
     "Bourse / réduction applicable",
-    /- 5[ .]?000 FCFA/,
+    -5_000,
   );
-  await assertValueCard(form, "Montant réellement dû", /35[ .]?000 FCFA/);
-  await assertValueCard(form, "Sommes déjà versées", /10[ .]?000 FCFA/);
-  await assertValueCard(form, "Reste à payer", /25[ .]?000 FCFA/);
+  await assertCurrencyCard(form, "Montant réellement dû", 35_000);
+  await assertCurrencyCard(form, "Sommes déjà versées", 10_000);
+  await assertCurrencyCard(form, "Reste à payer", 25_000);
   await assertValueCard(form, "Échéance initiale", /15\/09\/2026/);
   await assertValueCard(form, "Échéance effective", /15\/12\/2026/);
   await assertValueCard(form, "Moratoire", /ACTIF — dette inchangée/);

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { deleteOwnedFixtureAudits, isOwnedFixtureAudit } from '../../scripts/payment-forward-recovery-cleanup.mjs';
+import { assertFrenchCurrencyAmount, normalizeFrenchNumberText } from '../../scripts/payment-forward-recovery-currency.mjs';
 import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
 import { validateExactDeploymentRun } from '../../scripts/verify-exact-deployment-run.mjs';
 import {
@@ -258,6 +259,20 @@ test('tuition amounts and adjustments remain server-authoritative in the UI', ()
     assert.match(paymentsUi, new RegExp(`collectionQuote\\.${field}`));
   }
   assert.doesNotMatch(paymentsUi, /Montant attendu/);
+});
+
+test('French currency assertions normalize separators but keep the numeric value strict', () => {
+  const equivalents = [
+    "40\u202f000 FCFA",
+    "40\u00a0000 FCFA",
+    "40 000 FCFA",
+    "40000 FCFA",
+  ];
+  for (const value of equivalents) {
+    assert.equal(normalizeFrenchNumberText(value), '40000FCFA');
+    assert.doesNotThrow(() => assertFrenchCurrencyAmount(value, 40_000));
+  }
+  assert.throws(() => assertFrenchCurrencyAmount("41\u202f000 FCFA", 40_000));
 });
 
 test('audit ownership requires the exact run, school, actor, target, and fixture marker', () => {
