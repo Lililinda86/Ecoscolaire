@@ -32,6 +32,11 @@ import {
   getStudentStatusErrorMessage,
   validateRequiredStudentFields
 } from '../services/studentManagementPolicy';
+import {
+  getTransportEnrollmentStatusLabel,
+  isValidTransportZonePk,
+  resolveTransportEnrollmentStatus
+} from '../services/studentTransportEnrollment';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -567,9 +572,9 @@ const Students: React.FC = () => {
     }
 
     if (currentStudent.usesTransport === true
-        && (!Number.isSafeInteger(currentStudent.transportZonePk)
-          || Number(currentStudent.transportZonePk) < 14 || Number(currentStudent.transportZonePk) > 42)) {
-      setStepValidationError('Le PK transport structuré doit être un entier de PK14 à PK42.');
+        && currentStudent.transportZonePk !== undefined
+        && !isValidTransportZonePk(currentStudent.transportZonePk)) {
+      setStepValidationError('Lorsqu’il est renseigné, le PK transport doit être un entier de PK14 à PK42.');
       setCurrentStep(4);
       return;
     }
@@ -583,12 +588,18 @@ const Students: React.FC = () => {
       const computedName = buildStudentDisplayName(currentStudent.studentLastName, currentStudent.studentFirstName);
       const finalName = computedName || currentStudent.name || '';
 
+      const transportStatus = resolveTransportEnrollmentStatus({
+        usesTransport: currentStudent.usesTransport === true,
+        transportZonePk: currentStudent.transportZonePk,
+        classData: selectedClassItem
+      });
       const finalStudent = {
         ...currentStudent,
         name: finalName,
         parentEmails: normalizedEmails,
         parentPhone,
-        matricule
+        matricule,
+        transportStatus
       } as Student;
       if (!finalStudent.schoolId && currentSchool) {
         finalStudent.schoolId = currentSchool.id;
@@ -646,7 +657,14 @@ const Students: React.FC = () => {
           studentStatus: getPatchValue('studentStatus', 'nouveau'),
           registrationYear: getPatchValue('registrationYear', '2026-2027')
         };
-        const patchData = Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined));
+        const patchData = {
+          ...Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined)),
+          usesTransport: finalStudent.usesTransport === true,
+          transportStatus: finalStudent.transportStatus,
+          transportZonePk: finalStudent.transportZonePk,
+          transportNeighborhood: finalStudent.transportNeighborhood ?? '',
+          transportPickupPoint: finalStudent.transportPickupPoint ?? ''
+        };
         await updateStudentSeparatedData({
           firestore: firestoreDb,
           studentId: finalStudent.id,
@@ -2473,6 +2491,47 @@ const Students: React.FC = () => {
                         placeholder="14 à 42"
                       />
                     </label>
+                    <label>Quartier
+                      <input
+                        data-testid="student-transport-neighborhood"
+                        type="text"
+                        disabled={isSaving || currentStudent.usesTransport !== true}
+                        value={currentStudent.transportNeighborhood ?? ''}
+                        onChange={event => setCurrentStudent(previous => ({
+                          ...previous,
+                          transportNeighborhood: event.target.value
+                        }))}
+                        placeholder="Quartier"
+                      />
+                    </label>
+                    <label>Point de ramassage
+                      <input
+                        data-testid="student-transport-pickup-point"
+                        type="text"
+                        disabled={isSaving || currentStudent.usesTransport !== true}
+                        value={currentStudent.transportPickupPoint ?? ''}
+                        onChange={event => setCurrentStudent(previous => ({
+                          ...previous,
+                          transportPickupPoint: event.target.value
+                        }))}
+                        placeholder="Point de ramassage"
+                      />
+                    </label>
+                  </div>
+                  <div data-testid="student-transport-summary" style={{ marginTop: '.75rem', color: '#1e3a8a', fontSize: '.85rem' }}>
+                    <div>Transport : <strong>{currentStudent.usesTransport ? 'Oui' : 'Non'}</strong></div>
+                    {currentStudent.usesTransport === true && (
+                      <>
+                        <div>Zone / PK : <strong>{currentStudent.transportZonePk ?? 'À compléter'}</strong></div>
+                        <div>Quartier : <strong>{currentStudent.transportNeighborhood || 'À compléter'}</strong></div>
+                        <div>Point de ramassage : <strong>{currentStudent.transportPickupPoint || 'À compléter'}</strong></div>
+                        <div>Statut Transport : <strong>{getTransportEnrollmentStatusLabel(resolveTransportEnrollmentStatus({
+                          usesTransport: true,
+                          transportZonePk: currentStudent.transportZonePk,
+                          classData: db.classes.find(c => c.id === currentStudent.classId)
+                        }))}</strong></div>
+                      </>
+                    )}
                   </div>
                 </div>
 
