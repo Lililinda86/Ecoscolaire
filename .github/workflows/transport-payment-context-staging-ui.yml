@@ -1,0 +1,107 @@
+name: Transport Payment Context Staging UI
+
+on:
+  workflow_call:
+    inputs:
+      expected_sha:
+        description: Exact deployed Staging SHA
+        required: true
+        type: string
+      app_url:
+        description: Immutable Vercel Staging URL for the exact SHA
+        required: true
+        type: string
+      confirmation:
+        description: Exact confirmation RUN_LOT3_TRANSPORT_PAYMENT_UI
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  lot3-transport-payment-ui:
+    if: >-
+      github.ref == 'refs/heads/staging' &&
+      inputs.confirmation == 'RUN_LOT3_TRANSPORT_PAYMENT_UI'
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 30
+    concurrency:
+      group: transport-payment-context-staging-ui
+      cancel-in-progress: false
+    env:
+      EXPECTED_STAGING_SHA: ${{ inputs.expected_sha }}
+      STAGING_APP_URL: ${{ inputs.app_url }}
+      LOT3_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      GOOGLE_CLOUD_PROJECT: ecoscolaire-staging
+      VITE_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Verify exact deployed Staging SHA and immutable URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/staging'
+          test "$VITE_FIREBASE_PROJECT_ID" = 'ecoscolaire-staging'
+          test "$GITHUB_SHA" = "$EXPECTED_STAGING_SHA"
+          printf '%s' "$STAGING_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$'
+          runs_json="$(mktemp)"
+          deployments_json="$(mktemp)"
+          statuses_json="$(mktemp)"
+          trap 'rm -f "$runs_json" "$deployments_json" "$statuses_json"' EXIT
+          gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-staging.yml/runs" \
+            -f head_sha="$EXPECTED_STAGING_SHA" -f branch=staging -f event=push -f per_page=100 > "$runs_json"
+          node scripts/verify-exact-deployment-run.mjs \
+            "$runs_json" "$EXPECTED_STAGING_SHA" '.github/workflows/deploy-staging.yml' staging
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments" \
+            -f sha="$EXPECTED_STAGING_SHA" -f environment=Preview -f per_page=100 > "$deployments_json"
+          deployment_id="$(jq -er 'map(select(.sha == env.EXPECTED_STAGING_SHA and .environment == "Preview")) | first | .id' "$deployments_json")"
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" > "$statuses_json"
+          jq -e --arg url "$STAGING_APP_URL" \
+            'map(select(.state == "success" and .environment_url == $url)) | length == 1' "$statuses_json"
+          echo 'TARGET_DEPLOYMENT_VERIFIED=true' >> "$GITHUB_ENV"
+      - name: Authenticate to Staging fixture identity
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/411364288790/locations/global/workloadIdentityPools/italo-transport-staging/providers/github-ecoscolaire-staging
+          service_account: italo-transport-runner-staging@ecoscolaire-staging.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Guard Staging target and exact fixture lifecycle permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gcloud config get-value project)" = 'ecoscolaire-staging'
+          test "$LOT3_TEST_RUN_ID" = "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          token="$(gcloud auth print-access-token)"
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \
+            'https://cloudresourcemanager.googleapis.com/v1/projects/ecoscolaire-staging:testIamPermissions')"
+          for permission in \
+            datastore.entities.create datastore.entities.get datastore.entities.list \
+            datastore.entities.update datastore.entities.delete \
+            firebaseauth.users.create firebaseauth.users.get firebaseauth.users.delete; do
+            printf '%s' "$response" | jq -e --arg permission "$permission" '.permissions | index($permission) != null' >/dev/null
+          done
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run the single isolated LOT 3 Transport payment UI validation
+        run: node scripts/test-transport-payment-context-staging.mjs

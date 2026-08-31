@@ -850,6 +850,15 @@ export interface ReceiptLike {
   previousPaid?: number;
   newPaid?: number;
   remainingBalance?: number;
+  transportContext?: {
+    zonePk: number | null;
+    neighborhood: string;
+    pickupPoint: string;
+    feePolicyId: string;
+    monthlyGrossAmount: number;
+    transportState: 'FREE_SECONDARY' | 'NOT_SUBSCRIBED' | 'BILLABLE';
+    billingPeriods: string[];
+  };
   collectedByUserId?: string;
   collectedByName?: string;
   createdAt?: DateLike;

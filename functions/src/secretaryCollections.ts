@@ -1314,7 +1314,7 @@ const readQuoteContext = async (
 ): Promise<{
   user: Data; school: Data; student: Data; finance: Data; benefits: Data[]; payments: Data[];
   moratoriums: Data[]; allocations: Data[];
-  quote: CollectionQuote; classData: Data; financeRef: admin.firestore.DocumentReference;
+  quote: CollectionQuote; classData: Data; privateData: Data; financeRef: admin.firestore.DocumentReference;
   financeSnap: admin.firestore.DocumentSnapshot;
 }> => {
   const userRef = db.collection('users').doc(uid);
@@ -1345,6 +1345,7 @@ const readQuoteContext = async (
   );
   const scheduleSchool = withAcademicYearTuitionDeadlines(school, academicYearConfig);
   const finance = resolveStudentFinanceData(student, financeSnap);
+  const privateData = privateSnap.exists ? privateSnap.data() || {} : {};
   let bus: Data | null = null;
   if (input.type === 'transport' && typeof student.busId === 'string' && student.busId) {
     const busSnap = await transaction.get(db.collection('buses').doc(student.busId));
@@ -1380,7 +1381,7 @@ const readQuoteContext = async (
     .filter(item => item.schoolId === input.schoolId && item.studentId === input.studentId);
   let quote: CollectionQuote;
   if (input.type === 'transport') {
-    const fee = resolveTransportFee(student, privateSnap.exists ? privateSnap.data() || {} : {}, classData);
+    const fee = resolveTransportFee(student, privateData, classData);
     if (fee.state !== 'BILLABLE') {
       quote = zeroTransportQuote(fee.state);
     } else if (!input.period) {
@@ -1408,7 +1409,7 @@ const readQuoteContext = async (
   }
   return {
     user, school: scheduleSchool, student, finance, benefits, payments, moratoriums, allocations,
-    quote, classData, financeRef, financeSnap
+    quote, classData, privateData, financeRef, financeSnap
   };
 };
 
@@ -1611,7 +1612,7 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     const contextData = await readQuoteContext(transaction, db, uid, input);
     const {
       user, school, student, finance, benefits, payments, moratoriums,
-      quote, classData, financeRef, financeSnap
+      quote, classData, privateData, financeRef, financeSnap
     } = contextData;
     const date = getDoualaDate();
     const cashLedgerId = makeCashLedgerDayId(input.schoolId, date);
@@ -1675,6 +1676,17 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       && /^[A-Za-z0-9_-]{1,128}$/.test(student.testRunId)
       ? { testFixture: true, testRunId: student.testRunId }
       : {};
+    const transportContext = transportQuote ? {
+      zonePk: transportQuote.zonePk,
+      neighborhood: typeof privateData.transportNeighborhood === 'string'
+        ? privateData.transportNeighborhood.trim() : '',
+      pickupPoint: typeof privateData.transportPickupPoint === 'string'
+        ? privateData.transportPickupPoint.trim() : '',
+      feePolicyId: transportQuote.feePolicyId,
+      monthlyGrossAmount: transportQuote.monthlyGrossAmount,
+      transportState: transportQuote.transportState,
+      billingPeriods: transportQuote.installments.map(item => item.period)
+    } : null;
     const commonSnapshot = {
       grossExpectedAmount: quote.grossExpectedAmount,
       discountAmount: quote.discountAmount,
@@ -1717,6 +1729,7 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       ...(input.period ? { period: input.period, month: input.period } : {}),
       method: 'cash', paymentMethod: 'cash', date, paymentDate: date, amount,
       collectedByUserId: uid, collectedByName: user.name || user.displayName || user.email || uid,
+      ...(transportContext ? { transportContext } : {}),
       ...(allocationPlan ? { allocationSummary: allocationPlan.allocations } : {}),
       createdAt: FieldValue.serverTimestamp(), ...commonSnapshot
     };
@@ -2096,6 +2109,8 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
       kind: 'PAYMENT_REVERSAL',
       correctedByUserId: uid,
       correctedByRole: user.role,
+      ...(canonicalTransport && originalReceipt.transportContext
+        ? { transportContext: originalReceipt.transportContext } : {}),
       createdAt: FieldValue.serverTimestamp(),
       grossExpectedAmount: quote.grossExpectedAmount,
       discountAmount: quote.discountAmount,

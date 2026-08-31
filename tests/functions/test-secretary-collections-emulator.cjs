@@ -345,7 +345,9 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
         usesTransport: true, testFixture: true, testRunId: suffix
       }),
       db.collection('studentPrivate').doc(id).set({
-        id, studentId: id, schoolId, transportZonePk: zonePk, testFixture: true, testRunId: suffix
+        id, studentId: id, schoolId, transportZonePk: zonePk,
+        transportNeighborhood: `Quartier ${label}`, transportPickupPoint: `Point ${label}`,
+        testFixture: true, testRunId: suffix
       }),
       db.collection('studentFinance').doc(id).set({
         id, studentId: id, schoolId, feeT1: 70000, feeT2: 70000, feeT3: 70000
@@ -368,6 +370,16 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     { kind: 'INSTALLMENT', period: '2026-10', amount: 4000 },
     { kind: 'INSTALLMENT', period: '2026-11', amount: 2000 }
   ]);
+  const allocatedReceipt = (await db.collection('receipts').doc(allocatedPayment.receiptId).get()).data();
+  assert.deepEqual(allocatedReceipt.transportContext, {
+    zonePk: 14,
+    neighborhood: 'Quartier allocation-4000',
+    pickupPoint: 'Point allocation-4000',
+    feePolicyId: 'ITALO_PK_2026',
+    monthlyGrossAmount: 4000,
+    transportState: 'BILLABLE',
+    billingPeriods: ['2026-09', '2026-10', '2026-11']
+  }, 'new Transport receipts must freeze the payment context');
   assert.equal(allocatedPayment.remainingBalance, 2000);
   const allocationDocs = await db.collection('transportPaymentAllocations')
     .where('paymentId', '==', allocatedPayment.paymentId).get();
