@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { validateExactDeploymentRun } from "../../scripts/verify-exact-deployment-run.mjs";
 
 const read = (path) => readFile(new URL("../../" + path, import.meta.url), "utf8");
 const callerPath = ".github/workflows/transport-payments-release-runner.yml";
@@ -12,6 +13,23 @@ const [caller, reusable, harness, ci, paymentsUi] = await Promise.all([
   read(".github/workflows/ci.yml"),
   read("src/pages/Payments.tsx"),
 ]);
+
+const stagingSha = "b4337bc11a33c025966c78ee73fb8576d3d14b98";
+const immutableUrl = "https://ecoscolaire-qsbj1rm7s-linda-lemofouet-s-projects.vercel.app";
+const deploymentPayload = ({ conclusion = "success", sha = stagingSha, status = "completed" } = {}) => ({
+  workflow_runs: [{
+    conclusion,
+    event: "push",
+    head_branch: "staging",
+    head_sha: sha,
+    id: 33387217600,
+    path: ".github/workflows/deploy-staging.yml",
+    status,
+  }],
+});
+const hasExactSuccessfulImmutableUrl = (statuses, expectedUrl) => statuses.filter(
+  (entry) => entry?.state === "success" && entry?.environment_url === expectedUrl,
+).length === 1;
 
 test("LOT 2 operation routes only to the reusable student Transport UI workflow", () => {
   assert.match(caller, /options: \[transport, lot1_tuition_ui, lot2_transport_student\]/);
@@ -61,6 +79,59 @@ test("authorized caller identity, Staging environment and OIDC remain strict", (
   );
   assert.doesNotMatch(caller + reusable, /credentials_json/);
   assert.doesNotMatch(caller + reusable, /gcloud iam|add-iam-policy-binding|providers (?:create|update)/);
+});
+
+test("LOT 2 preflight reuses the working exact-SHA and immutable-URL command shape", () => {
+  assert.match(reusable, /gh api --method GET \\\r?\n\s+"repos\/\$\{GITHUB_REPOSITORY\}\/actions\/workflows\/deploy-staging\.yml\/runs" \\\r?\n\s+-f head_sha="\$EXPECTED_STAGING_SHA"/);
+  assert.match(reusable, /node scripts\/verify-exact-deployment-run\.mjs \\\r?\n\s+"\$runs_json" "\$EXPECTED_STAGING_SHA" '\.github\/workflows\/deploy-staging\.yml' staging/);
+  assert.match(reusable, /gh api --method GET \\\r?\n\s+"repos\/\$\{GITHUB_REPOSITORY\}\/deployments" \\\r?\n\s+-f sha="\$EXPECTED_STAGING_SHA" -f environment=Preview/);
+  assert.match(reusable, /map\(select\(\.state == "success" and \.environment_url == \$url\)\) \| length == 1/);
+  assert.doesNotMatch(reusable, /gh api --method GET \+/);
+});
+
+test("exact Staging SHA passes while wrong, missing, pending and failed deployments fail closed", () => {
+  assert.equal(validateExactDeploymentRun(deploymentPayload(), {
+    expectedBranch: "staging",
+    expectedSha: stagingSha,
+    expectedWorkflowPath: ".github/workflows/deploy-staging.yml",
+  }).id, 33387217600);
+
+  for (const payload of [
+    deploymentPayload({ sha: "0".repeat(40) }),
+    deploymentPayload({ status: "in_progress", conclusion: null }),
+    deploymentPayload({ conclusion: "failure" }),
+    { workflow_runs: [] },
+  ]) {
+    assert.throws(() => validateExactDeploymentRun(payload, {
+      expectedBranch: "staging",
+      expectedSha: stagingSha,
+      expectedWorkflowPath: ".github/workflows/deploy-staging.yml",
+    }));
+  }
+});
+
+test("immutable deployment URL must be the one exact successful status", () => {
+  assert.equal(hasExactSuccessfulImmutableUrl([
+    { state: "success", environment_url: immutableUrl },
+  ], immutableUrl), true);
+  assert.equal(hasExactSuccessfulImmutableUrl([
+    { state: "success", environment_url: "https://wrong.example" },
+  ], immutableUrl), false);
+  assert.equal(hasExactSuccessfulImmutableUrl([
+    { state: "success" },
+  ], immutableUrl), false);
+  assert.equal(hasExactSuccessfulImmutableUrl([
+    { state: "failure", environment_url: immutableUrl },
+  ], immutableUrl), false);
+});
+
+test("WIF authentication is reachable only after the deployment preflight succeeds", () => {
+  const preflightIndex = reusable.indexOf("- name: Verify exact deployed Staging SHA and immutable URL");
+  const verifiedIndex = reusable.indexOf("echo 'TARGET_DEPLOYMENT_VERIFIED=true'");
+  const authIndex = reusable.indexOf("- name: Authenticate to Staging fixture identity");
+  assert.ok(preflightIndex >= 0);
+  assert.ok(verifiedIndex > preflightIndex);
+  assert.ok(authIndex > verifiedIndex);
 });
 
 test("LOT 2 runner requests only the existing eight fixture lifecycle permissions", () => {

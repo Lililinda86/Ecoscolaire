@@ -64,12 +64,19 @@ jobs:
           deployments_json="$(mktemp)"
           statuses_json="$(mktemp)"
           trap 'rm -f "$runs_json" "$deployments_json" "$statuses_json"' EXIT
-          gh api --method GET +            "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-staging.yml/runs" +            -f head_sha="$EXPECTED_STAGING_SHA" -f branch=staging -f event=push -f per_page=100 > "$runs_json"
-          node scripts/verify-exact-deployment-run.mjs +            "$runs_json" "$EXPECTED_STAGING_SHA" '.github/workflows/deploy-staging.yml' staging
-          gh api --method GET +            "repos/${GITHUB_REPOSITORY}/deployments" +            -f sha="$EXPECTED_STAGING_SHA" -f environment=Preview -f per_page=100 > "$deployments_json"
+          gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-staging.yml/runs" \
+            -f head_sha="$EXPECTED_STAGING_SHA" -f branch=staging -f event=push -f per_page=100 > "$runs_json"
+          node scripts/verify-exact-deployment-run.mjs \
+            "$runs_json" "$EXPECTED_STAGING_SHA" '.github/workflows/deploy-staging.yml' staging
+          gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/deployments" \
+            -f sha="$EXPECTED_STAGING_SHA" -f environment=Preview -f per_page=100 > "$deployments_json"
           deployment_id="$(jq -er 'map(select(.sha == env.EXPECTED_STAGING_SHA and .environment == "Preview")) | first | .id' "$deployments_json")"
-          gh api --method GET +            "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" > "$statuses_json"
-          jq -e --arg url "$STAGING_APP_URL" +            'map(select(.state == "success" and .environment_url == $url)) | length == 1' "$statuses_json"
+          gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" > "$statuses_json"
+          jq -e --arg url "$STAGING_APP_URL" \
+            'map(select(.state == "success" and .environment_url == $url)) | length == 1' "$statuses_json"
           echo 'TARGET_DEPLOYMENT_VERIFIED=true' >> "$GITHUB_ENV"
       - name: Authenticate to Staging fixture identity
         uses: google-github-actions/auth@v2
