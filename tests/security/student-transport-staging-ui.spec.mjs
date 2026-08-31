@@ -89,6 +89,50 @@ test("LOT 2 preflight reuses the working exact-SHA and immutable-URL command sha
   assert.doesNotMatch(reusable, /gh api --method GET \+/);
 });
 
+test("LOT 2 workflow rejects template plus artifacts across every shell command family", () => {
+  assert.doesNotMatch(reusable, /\+\s*https?:\/\//);
+  assert.doesNotMatch(reusable, /\+\s*['"]https?:\/\//);
+  assert.doesNotMatch(reusable, /['"]https?:\/\/[^'"\r\n]+['"]\s*\+\s{2,}/);
+  assert.doesNotMatch(
+    reusable,
+    /(?:gh api|curl|gcloud|node scripts\/verify-exact-deployment-run\.mjs)[^\r\n]*\+\s{2,}/,
+  );
+  assert.doesNotMatch(reusable, /for permission in[^\r\n]*\+\s{2,}/);
+  for (const command of [
+    "gh api --method GET",
+    "curl --fail --silent --show-error",
+    "gcloud config get-value project",
+    "gcloud auth print-access-token",
+    "node scripts/verify-exact-deployment-run.mjs",
+  ]) assert.match(reusable, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("IAM guard keeps the exact identity and permissions and runs before Chromium or fixtures", () => {
+  assert.match(
+    reusable,
+    /workload_identity_provider: projects\/411364288790\/locations\/global\/workloadIdentityPools\/italo-transport-staging\/providers\/github-ecoscolaire-staging/,
+  );
+  assert.match(
+    reusable,
+    /service_account: italo-transport-runner-staging@ecoscolaire-staging\.iam\.gserviceaccount\.com/,
+  );
+  assert.doesNotMatch(reusable, /credentials_json/);
+  assert.match(reusable, /response="\$\(curl --fail --silent --show-error \\r?\n/);
+  assert.match(reusable, /cloudresourcemanager\.googleapis\.com\/v1\/projects\/ecoscolaire-staging:testIamPermissions/);
+  for (const permission of [
+    "datastore.entities.create", "datastore.entities.get", "datastore.entities.list",
+    "datastore.entities.update", "datastore.entities.delete", "firebaseauth.users.create",
+    "firebaseauth.users.get", "firebaseauth.users.delete",
+  ]) assert.match(reusable, new RegExp(permission.replaceAll(".", "\\.")));
+  assert.doesNotMatch(reusable, /firebaseauth\.users\.update|firebaseauth\.users\.list|roles\/|Owner|Editor|Admin/);
+  const guardIndex = reusable.indexOf("- name: Guard Staging target and exact fixture lifecycle permissions");
+  const chromiumIndex = reusable.indexOf("- name: Install Chromium");
+  const fixtureIndex = reusable.indexOf("- name: Run the single isolated LOT 2 student Transport UI validation");
+  assert.ok(guardIndex >= 0 && chromiumIndex > guardIndex && fixtureIndex > chromiumIndex);
+  assert.match(reusable, /set -euo pipefail/);
+  assert.match(reusable, /jq -e --arg permission/);
+});
+
 test("exact Staging SHA passes while wrong, missing, pending and failed deployments fail closed", () => {
   assert.equal(validateExactDeploymentRun(deploymentPayload(), {
     expectedBranch: "staging",

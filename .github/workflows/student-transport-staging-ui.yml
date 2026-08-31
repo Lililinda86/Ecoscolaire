@@ -91,8 +91,14 @@ jobs:
           test "$(gcloud config get-value project)" = 'ecoscolaire-staging'
           test "$LOT2_TEST_RUN_ID" = "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           token="$(gcloud auth print-access-token)"
-          response="$(curl --fail --silent --show-error +            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' +            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' +            'https://cloudresourcemanager.googleapis.com/v1/projects/ecoscolaire-staging:testIamPermissions')"
-          for permission in +            datastore.entities.create datastore.entities.get datastore.entities.list +            datastore.entities.update datastore.entities.delete +            firebaseauth.users.create firebaseauth.users.get firebaseauth.users.delete; do
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \
+            'https://cloudresourcemanager.googleapis.com/v1/projects/ecoscolaire-staging:testIamPermissions')"
+          for permission in \
+            datastore.entities.create datastore.entities.get datastore.entities.list \
+            datastore.entities.update datastore.entities.delete \
+            firebaseauth.users.create firebaseauth.users.get firebaseauth.users.delete; do
             printf '%s' "$response" | jq -e --arg permission "$permission" '.permissions | index($permission) != null' >/dev/null
           done
       - name: Install dependencies
