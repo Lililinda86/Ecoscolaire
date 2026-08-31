@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { deleteOwnedFixtureAudits, isOwnedFixtureAudit } from '../../scripts/payment-forward-recovery-cleanup.mjs';
 import { expectedTransportReleaseRef, validateTransportReleaseRef, validateTransportRunnerConfig } from '../../scripts/transport-release-runner-contract.mjs';
 import { validateExactDeploymentRun } from '../../scripts/verify-exact-deployment-run.mjs';
 import {
@@ -14,6 +15,7 @@ const tuitionUiWorkflowPath = '.github/workflows/payment-forward-recovery-stagin
 const workflow = await readText(transportWorkflowPath);
 const tuitionUiWorkflow = await readText(tuitionUiWorkflowPath);
 const tuitionUiHarness = await readText('scripts/test-payment-forward-recovery-staging.mjs');
+const paymentsUi = await readText('src/pages/Payments.tsx');
 const runner = await readText('scripts/test-transport-payments-production.mjs');
 const stagingWorkflow = await readText('.github/workflows/run-seed.yml');
 const stagingDeploymentWorkflow = await readText('.github/workflows/deploy-staging.yml');
@@ -221,6 +223,107 @@ test('tuition quote resolves secretary role and school from users uid document',
   assert.match(backend, /user\.schoolId !== schoolId/);
   assert.match(backend, /Cross-school operation denied\.', 'CROSS_SCHOOL_DENIED'/);
   assert.doesNotMatch(backend, /context\.auth(?:\?\.)?\.token\.(?:role|schoolId)/);
+});
+
+test('tuition UI discovers installments from the selected class classFees only', () => {
+  assert.match(paymentsUi, /selectedPaymentClass = db\.classes\.find\([\s\S]*?selectedPaymentStudent\?\.classId\)/);
+  assert.match(paymentsUi, /db\.school\?\.classFees\?\.\[selectedPaymentClass\.name\]/);
+  assert.match(paymentsUi, /feeT1: selectedPaymentClassFees\?\.t1/);
+  assert.match(paymentsUi, /feeT2: selectedPaymentClassFees\?\.t2/);
+  assert.match(paymentsUi, /feeT3: selectedPaymentClassFees\?\.t3/);
+  assert.doesNotMatch(paymentsUi, /getConfiguredTuitionInstallments\(selectedPaymentStudent\)/);
+  assert.match(tuitionUiHarness, /studentFinance[\s\S]*?feeT1: 0,[\s\S]*?feeT2: 0,[\s\S]*?feeT3: 0/);
+  assert.match(tuitionUiHarness, /"LOT1 Classe 2 tranches"[\s\S]*?t1: 50_000,[\s\S]*?t2: 35_000,[\s\S]*?t3: 0/);
+});
+
+test('tuition installment Playwright locator is accessible, stable, and form-scoped', () => {
+  assert.match(paymentsUi, /<label htmlFor="tuition-installment-select">Choix de la Tranche<\/label>/);
+  assert.match(paymentsUi, /id="tuition-installment-select"/);
+  assert.match(paymentsUi, /data-testid="tuition-installment-select"/);
+  assert.match(tuitionUiHarness, /const form = page[\s\S]*?\.locator\("form"\)[\s\S]*?cash-payment-student/);
+  assert.match(tuitionUiHarness, /form\.getByTestId\("tuition-installment-select"\)/);
+  assert.match(tuitionUiHarness, /form\.getByLabel\("Choix de la Tranche"\)/);
+  assert.match(tuitionUiHarness, /form\.getByRole\("combobox", \{ name: "Choix de la Tranche" \}\)/);
+  assert.match(tuitionUiHarness, /options\.map\(\(option\) => option\.value\)[\s\S]*?\["T1", "T2", "T3"\]/);
+  assert.doesNotMatch(tuitionUiHarness, /page\.getByLabel\("Choix de la Tranche"\)/);
+});
+
+test('tuition amounts and adjustments remain server-authoritative in the UI', () => {
+  assert.match(paymentsUi, /httpsCallable<Record<string, unknown>, CollectionQuote>\(functions, 'getCollectionQuote'\)/);
+  assert.match(paymentsUi, /setCollectionQuote\(result\.data\)/);
+  for (const field of [
+    'grossExpectedAmount', 'discountAmount', 'netExpectedAmount', 'previousPaid',
+    'remainingBalance', 'originalDueDate', 'effectiveDueDate', 'moratoriumStatus',
+  ]) {
+    assert.match(paymentsUi, new RegExp(`collectionQuote\\.${field}`));
+  }
+  assert.doesNotMatch(paymentsUi, /Montant attendu/);
+});
+
+test('audit ownership requires the exact run, school, actor, target, and fixture marker', () => {
+  const ownership = {
+    testRunId: 'lot1-owned',
+    schoolIds: new Set(['school-owned']),
+    actorUids: new Set(['actor-owned']),
+    targetIds: new Set(['target-owned']),
+  };
+  const owned = {
+    testFixture: true,
+    testRunId: 'lot1-owned',
+    schoolId: 'school-owned',
+    actorUid: 'actor-owned',
+    targetId: 'target-owned',
+  };
+  assert.equal(isOwnedFixtureAudit(owned, ownership), true);
+  for (const mutation of [
+    { testFixture: false },
+    { testRunId: 'lot1-foreign' },
+    { schoolId: 'school-foreign' },
+    { actorUid: 'actor-foreign' },
+    { targetId: 'target-foreign' },
+  ]) {
+    assert.equal(isOwnedFixtureAudit({ ...owned, ...mutation }, ownership), false);
+  }
+});
+
+test('audit cleanup is exact, idempotent, and preserves unrelated audits', async () => {
+  const records = [
+    { id: 'owned-login', data: { testFixture: true, testRunId: 'lot1-owned', schoolId: 'school-owned', actorUid: 'actor-owned', targetId: 'actor-owned' } },
+    { id: 'foreign-target', data: { testFixture: true, testRunId: 'lot1-owned', schoolId: 'school-owned', actorUid: 'actor-owned', targetId: 'target-foreign' } },
+    { id: 'foreign-run', data: { testFixture: true, testRunId: 'lot1-foreign', schoolId: 'school-owned', actorUid: 'actor-owned', targetId: 'actor-owned' } },
+  ].map(record => ({ ...record, deleted: false }));
+  const db = {
+    collection: (name) => {
+      assert.equal(name, 'audit_logs');
+      return {
+        where: (field, operator, value) => {
+          assert.deepEqual([field, operator], ['testRunId', '==']);
+          return {
+            get: async () => ({
+              docs: records
+                .filter(record => !record.deleted && record.data.testRunId === value)
+                .map(record => ({
+                  data: () => record.data,
+                  ref: { delete: async () => { record.deleted = true; } },
+                })),
+            }),
+          };
+        },
+      };
+    },
+  };
+  const cleanup = () => deleteOwnedFixtureAudits({
+    db,
+    testRunId: 'lot1-owned',
+    schoolIds: ['school-owned'],
+    actorUids: ['actor-owned'],
+    targetIds: ['actor-owned'],
+  });
+  assert.equal(await cleanup(), 1);
+  assert.equal(await cleanup(), 0);
+  assert.equal(records.find(record => record.id === 'owned-login').deleted, true);
+  assert.equal(records.find(record => record.id === 'foreign-target').deleted, false);
+  assert.equal(records.find(record => record.id === 'foreign-run').deleted, false);
 });
 
 test('IAM preflight curl uses single-backslash line continuation and keeps its full contract', () => {

@@ -11,6 +11,7 @@ import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { chromium } from "@playwright/test";
 import dotenv from "dotenv";
+import { deleteOwnedFixtureAudits } from "./payment-forward-recovery-cleanup.mjs";
 
 dotenv.config({ path: ".env.staging" });
 
@@ -107,6 +108,7 @@ const normalizedText = (value) =>
 const assertValueCard = async (form, label, expected) => {
   const card = form.locator("small", { hasText: label }).last().locator("..");
   await card.waitFor({ state: "visible", timeout: 20_000 });
+  await card.getByText(expected).waitFor({ state: "visible", timeout: 20_000 });
   assert.match(normalizedText(await card.textContent()), expected);
 };
 
@@ -174,12 +176,76 @@ const validateUi = async () => {
     .filter({ has: page.getByTestId("cash-payment-student") });
   await page.getByTestId("cash-payment-student").selectOption(studentIds.main);
   await page.getByTestId("cash-payment-type").selectOption("tuition");
-  const installment = form.getByLabel("Choix de la Tranche");
+  const installment = form.getByTestId("tuition-installment-select");
+  const labeledInstallment = form.getByLabel("Choix de la Tranche");
+  await labeledInstallment.waitFor({ state: "visible", timeout: 20_000 });
+  assert.equal(
+    await labeledInstallment.getAttribute("data-testid"),
+    "tuition-installment-select",
+  );
+  await assert.doesNotReject(() =>
+    form.getByRole("combobox", { name: "Choix de la Tranche" }).waitFor({
+      state: "visible",
+      timeout: 20_000,
+    }),
+  );
+  assert.deepEqual(
+    await installment.locator("option").evaluateAll((options) =>
+      options.map((option) => option.value),
+    ),
+    ["T1", "T2", "T3"],
+  );
   await installment.selectOption("T1");
   assert.equal(await installment.inputValue(), "T1");
+  const optionValues = () => installment.locator("option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
   await form
     .getByText("Situation financière calculée par le serveur")
     .waitFor({ timeout: 20_000 });
+  await assertValueCard(form, "Tarif de référence", /40[ .]?000 FCFA/);
+
+  await installment.selectOption("T2");
+  await assertValueCard(form, "Tarif de référence", /30[ .]?000 FCFA/);
+  await installment.selectOption("T3");
+  await assertValueCard(form, "Tarif de référence", /15[ .]?000 FCFA/);
+  console.log("UI_85K_INSTALLMENTS PASS T1=40000 T2=30000 T3=15000");
+
+  await page.getByTestId("cash-payment-student").selectOption(studentIds.b120);
+  await installment.locator('option[value="T3"]').waitFor({
+    state: "attached",
+    timeout: 20_000,
+  });
+  assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
+  await installment.selectOption("T1");
+  await assertValueCard(form, "Tarif de référence", /60[ .]?000 FCFA/);
+  await assertValueCard(form, "Bourse / réduction applicable", /- 6[ .]?000 FCFA/);
+  await assertValueCard(form, "Montant réellement dû", /54[ .]?000 FCFA/);
+  await installment.selectOption("T2");
+  await assertValueCard(form, "Tarif de référence", /40[ .]?000 FCFA/);
+  await installment.selectOption("T3");
+  await assertValueCard(form, "Tarif de référence", /20[ .]?000 FCFA/);
+  console.log("UI_120K_INSTALLMENTS PASS T1=60000 T2=40000 T3=20000");
+
+  await page.getByTestId("cash-payment-student").selectOption(studentIds.c2);
+  await installment.locator('option[value="T3"]').waitFor({
+    state: "detached",
+    timeout: 20_000,
+  });
+  assert.deepEqual(await optionValues(), ["T1", "T2"]);
+  await installment.selectOption("T1");
+  await assertValueCard(form, "Tarif de référence", /50[ .]?000 FCFA/);
+  await installment.selectOption("T2");
+  await assertValueCard(form, "Tarif de référence", /35[ .]?000 FCFA/);
+  console.log("UI_TWO_INSTALLMENT PASS T1 T2 ONLY");
+
+  await page.getByTestId("cash-payment-student").selectOption(studentIds.main);
+  await installment.locator('option[value="T3"]').waitFor({
+    state: "attached",
+    timeout: 20_000,
+  });
+  assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
+  await installment.selectOption("T1");
   await assertValueCard(form, "Tarif de référence", /40[ .]?000 FCFA/);
   await assertValueCard(
     form,
@@ -229,6 +295,18 @@ const cleanup = async () => {
   if (cleanupStarted) return;
   cleanupStarted = true;
   try {
+    await deleteOwnedFixtureAudits({
+      db,
+      testRunId: suffix,
+      schoolIds: [schoolId, otherSchoolId],
+      actorUids: [...createdAuthUids],
+      targetIds: [
+        ...new Set([
+          ...createdAuthUids,
+          ...tracked.map(({ id }) => id),
+        ]),
+      ],
+    });
     for (const item of [...tracked].reverse()) {
       await db.collection(item.collection).doc(item.id).delete();
     }
