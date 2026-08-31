@@ -118,7 +118,34 @@ const assertCurrencyCard = async (form, label, expectedAmount) => {
   await card.waitFor({ state: "visible", timeout: 20_000 });
   const value = card.locator("strong");
   await value.waitFor({ state: "visible", timeout: 20_000 });
-  assertFrenchCurrencyAmount(await value.textContent(), expectedAmount);
+  const deadline = Date.now() + 20_000;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      assertFrenchCurrencyAmount(await value.textContent(), expectedAmount);
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  throw lastError;
+};
+
+const awaitCurrentQuote = async (form, expectedAmount) => {
+  const loading = form.getByTestId("collection-quote-loading");
+  await loading.waitFor({ state: "visible", timeout: 20_000 });
+  assert.equal(await form.getByTestId("collection-quote-current").count(), 0);
+  assert.equal(await form.getByTestId("collection-quote-gross").count(), 0);
+  await loading.waitFor({ state: "hidden", timeout: 20_000 });
+  await assertCurrencyCard(form, "Tarif de référence", expectedAmount);
+};
+
+const selectInstallmentAndAwaitQuote = async (form, installment, expectedAmount) => {
+  const select = form.getByTestId("tuition-installment-select");
+  await select.selectOption(installment);
+  assert.equal(await select.inputValue(), installment);
+  await awaitCurrentQuote(form, expectedAmount);
 };
 
 const validateUi = async () => {
@@ -214,48 +241,43 @@ const validateUi = async () => {
     .waitFor({ timeout: 20_000 });
   await assertCurrencyCard(form, "Tarif de référence", 40_000);
 
-  await installment.selectOption("T2");
-  await assertCurrencyCard(form, "Tarif de référence", 30_000);
-  await installment.selectOption("T3");
-  await assertCurrencyCard(form, "Tarif de référence", 15_000);
+  await selectInstallmentAndAwaitQuote(form, "T2", 30_000);
+  await selectInstallmentAndAwaitQuote(form, "T3", 15_000);
   console.log("UI_85K_INSTALLMENTS PASS T1=40000 T2=30000 T3=15000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.b120);
+  await awaitCurrentQuote(form, 20_000);
   await installment.locator('option[value="T3"]').waitFor({
     state: "attached",
     timeout: 20_000,
   });
   assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
-  await installment.selectOption("T1");
-  await assertCurrencyCard(form, "Tarif de référence", 60_000);
+  await selectInstallmentAndAwaitQuote(form, "T1", 60_000);
   await assertCurrencyCard(form, "Bourse / réduction applicable", -6_000);
   await assertCurrencyCard(form, "Montant réellement dû", 54_000);
-  await installment.selectOption("T2");
-  await assertCurrencyCard(form, "Tarif de référence", 40_000);
-  await installment.selectOption("T3");
-  await assertCurrencyCard(form, "Tarif de référence", 20_000);
+  await selectInstallmentAndAwaitQuote(form, "T2", 40_000);
+  await selectInstallmentAndAwaitQuote(form, "T3", 20_000);
   console.log("UI_120K_INSTALLMENTS PASS T1=60000 T2=40000 T3=20000");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.c2);
+  await awaitCurrentQuote(form, 50_000);
   await installment.locator('option[value="T3"]').waitFor({
     state: "detached",
     timeout: 20_000,
   });
   assert.deepEqual(await optionValues(), ["T1", "T2"]);
-  await installment.selectOption("T1");
-  await assertCurrencyCard(form, "Tarif de référence", 50_000);
-  await installment.selectOption("T2");
-  await assertCurrencyCard(form, "Tarif de référence", 35_000);
+  await selectInstallmentAndAwaitQuote(form, "T1", 50_000);
+  await selectInstallmentAndAwaitQuote(form, "T2", 35_000);
   console.log("UI_TWO_INSTALLMENT PASS T1 T2 ONLY");
 
   await page.getByTestId("cash-payment-student").selectOption(studentIds.main);
+  await awaitCurrentQuote(form, 30_000);
   await installment.locator('option[value="T3"]').waitFor({
     state: "attached",
     timeout: 20_000,
   });
   assert.deepEqual(await optionValues(), ["T1", "T2", "T3"]);
-  await installment.selectOption("T1");
-  await assertCurrencyCard(form, "Tarif de référence", 40_000);
+  await selectInstallmentAndAwaitQuote(form, "T1", 40_000);
   await assertCurrencyCard(
     form,
     "Bourse / réduction applicable",
@@ -298,6 +320,15 @@ const validateUi = async () => {
   console.log("UI_PREVIOUS_PAID PASS 10000");
   console.log("UI_REMAINING PASS 25000");
   console.log("LEGACY_FORM_DETECTED NO");
+
+  await page.getByTestId("cash-payment-type").selectOption("other");
+  await form.getByTestId("collection-quote-current").waitFor({
+    state: "hidden",
+    timeout: 20_000,
+  });
+  assert.equal(await form.getByTestId("collection-quote-loading").count(), 0);
+  assert.equal(await form.getByTestId("collection-quote-gross").count(), 0);
+  console.log("UI_QUOTE_INVALIDATION PASS tuition_to_other");
 };
 
 const cleanup = async () => {
