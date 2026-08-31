@@ -8,6 +8,7 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { chromium } from "@playwright/test";
 import { deleteOwnedFixtureAudits } from "./payment-forward-recovery-cleanup.mjs";
+import { selectStudentClassOption } from "./select-student-class-option.mjs";
 
 const PROJECT = "ecoscolaire-staging";
 const ACADEMIC_YEAR = "2026-2027";
@@ -92,19 +93,14 @@ const readStudentContext = async (studentId) => {
 const studentForm = (page) =>
   page.locator("form").filter({ has: page.getByText(/Étape [1-4] sur 4/) }).last();
 
-const classSelect = (form, classId) =>
-  form.locator("select").filter({
-    has: form.locator('option[value="' + classId + '"]'),
-  });
-
-const fillRequiredSteps = async ({ page, matricule, lastName, firstName, classId }) => {
+const fillRequiredSteps = async ({ page, matricule, lastName, firstName, classId, className }) => {
   const form = studentForm(page);
   await form.locator('input[placeholder="Laisser vide pour générer automatiquement"]').fill(matricule);
   await form.locator('input[placeholder="Ex: N’GONO"]').fill(lastName);
   await form.locator('input[placeholder="Ex: Mballa Élise"]').fill(firstName);
   await form.locator('input[type="date"]').fill("2015-02-10");
   await form.getByRole("button", { name: "Suivant" }).click();
-  await classSelect(form, classId).selectOption(classId);
+  await selectStudentClassOption({ form, classId, expectedLabel: className });
   await form.getByRole("button", { name: "Suivant" }).click();
   const required = form.locator("input[required]");
   await required.nth(0).fill("Responsable " + lastName);
@@ -224,6 +220,7 @@ const validateUi = async () => {
     lastName: "LOT2 COMPLETE",
     firstName: "Fixture",
     classId: classIds.primary,
+    className: "LOT2 Primaire",
     transport: { enabled: true, pk: 28, neighborhood: "Quartier A", pickup: "Point A" },
     expectedSummary: /Transport : Oui.*Zone \/ PK : 28.*Quartier : Quartier A.*Point de ramassage : Point A.*Statut Transport : Configuré/,
   });
@@ -302,6 +299,7 @@ const validateUi = async () => {
     lastName: "LOT2 INCOMPLETE",
     firstName: "Fixture",
     classId: classIds.primary,
+    className: "LOT2 Primaire",
     transport: { enabled: true },
     expectedSummary: /Transport : Oui.*Zone \/ PK : À compléter.*Quartier : À compléter.*Point de ramassage : À compléter.*Statut Transport : À compléter/,
   });
@@ -317,6 +315,7 @@ const validateUi = async () => {
     lastName: "LOT2 SECONDARY",
     firstName: "Fixture",
     classId: classIds.secondary,
+    className: "LOT2 Secondaire FREE",
     transport: { enabled: true },
     expectedSummary: /Transport : Oui.*Zone \/ PK : À compléter.*Statut Transport : Configuré/,
   });

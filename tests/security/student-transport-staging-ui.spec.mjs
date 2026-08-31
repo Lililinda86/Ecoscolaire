@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { selectStudentClassOption } from "../../scripts/select-student-class-option.mjs";
 import { validateExactDeploymentRun } from "../../scripts/verify-exact-deployment-run.mjs";
 
 const read = (path) => readFile(new URL("../../" + path, import.meta.url), "utf8");
@@ -31,6 +32,126 @@ const hasExactSuccessfulImmutableUrl = (statuses, expectedUrl) => statuses.filte
   (entry) => entry?.state === "success" && entry?.environment_url === expectedUrl,
 ).length === 1;
 
+
+const fakeClassForm = (definitions) => {
+  const selects = definitions.map((options) => ({ options, selectedValue: "" }));
+  const optionLocator = (matches) => ({
+    waitFor: async () => {
+      if (matches.length === 0) throw new Error("class option not attached");
+    },
+    count: async () => matches.length,
+    getAttribute: async (name) => (name === "value" ? matches[0]?.option.value ?? null : null),
+    textContent: async () => matches[0]?.option.label ?? null,
+    locator: (selector) => {
+      assert.equal(selector, "xpath=parent::select");
+      const parents = [...new Set(matches.map(({ select }) => select))];
+      return {
+        count: async () => parents.length,
+        selectOption: async ({ value }) => {
+          const select = parents[0];
+          if (!select?.options.some((option) => option.value === value)) {
+            throw new Error("option value not found in resolved select");
+          }
+          select.selectedValue = value;
+        },
+        inputValue: async () => parents[0]?.selectedValue ?? "",
+        locator: (childSelector) => {
+          assert.equal(childSelector, "option:checked");
+          return {
+            textContent: async () => parents[0]?.options.find(
+              (option) => option.value === parents[0].selectedValue,
+            )?.label ?? null,
+          };
+        },
+      };
+    },
+  });
+
+  return {
+    selects,
+    locator: (selector) => {
+      const match = selector.match(/^option\[value="([A-Za-z0-9_-]+)"\]$/);
+      assert.ok(match, `unexpected locator: ${selector}`);
+      const value = match[1];
+      return optionLocator(selects.flatMap((select) => select.options
+        .filter((option) => option.value === value)
+        .map((option) => ({ option, select }))));
+    },
+  };
+};
+
+test("class option resolves its exact select parent among multiple selects", async () => {
+  const form = fakeClassForm([
+    [{ value: "unrelated", label: "Autre contrôle" }],
+    [{ value: "lot2-primary-123-1", label: "LOT2 Primaire" }],
+  ]);
+  const select = await selectStudentClassOption({
+    form,
+    classId: "lot2-primary-123-1",
+    expectedLabel: "LOT2 Primaire",
+  });
+  assert.equal(await select.inputValue(), "lot2-primary-123-1");
+  assert.equal(form.selects[0].selectedValue, "");
+});
+
+test("class selection fails closed when the exact option is absent", async () => {
+  const form = fakeClassForm([[{ value: "another-class", label: "Autre classe" }]]);
+  await assert.rejects(
+    selectStudentClassOption({
+      form,
+      classId: "lot2-primary-123-1",
+      expectedLabel: "LOT2 Primaire",
+    }),
+    /class option not attached/,
+  );
+});
+
+test("class selection rejects the right value with the wrong label", async () => {
+  const form = fakeClassForm([[
+    { value: "lot2-primary-123-1", label: "Mauvaise classe" },
+  ]]);
+  await assert.rejects(
+    selectStudentClassOption({
+      form,
+      classId: "lot2-primary-123-1",
+      expectedLabel: "LOT2 Primaire",
+    }),
+  );
+});
+
+test("class selection rejects the right label with the wrong value", async () => {
+  const form = fakeClassForm([[
+    { value: "wrong-primary-123-1", label: "LOT2 Primaire" },
+  ]]);
+  await assert.rejects(
+    selectStudentClassOption({
+      form,
+      classId: "lot2-primary-123-1",
+      expectedLabel: "LOT2 Primaire",
+    }),
+    /class option not attached/,
+  );
+});
+
+test("class selection supports the secondary fixture without primary hardcoding", async () => {
+  const form = fakeClassForm([[
+    { value: "lot2-primary-123-1", label: "LOT2 Primaire" },
+    { value: "lot2-secondary-123-1", label: "LOT2 Secondaire FREE" },
+  ]]);
+  const select = await selectStudentClassOption({
+    form,
+    classId: "lot2-secondary-123-1",
+    expectedLabel: "LOT2 Secondaire FREE",
+  });
+  assert.equal(await select.inputValue(), "lot2-secondary-123-1");
+});
+
+test("LOT 2 harness uses exact option-parent class selection and exact labels", () => {
+  assert.match(harness, /selectStudentClassOption\(\{ form, classId, expectedLabel: className \}\)/);
+  assert.doesNotMatch(harness, /has: form\.locator\('option\[value=/);
+  assert.match(harness, /className: "LOT2 Primaire"/);
+  assert.match(harness, /className: "LOT2 Secondaire FREE"/);
+});
 test("LOT 2 operation routes only to the reusable student Transport UI workflow", () => {
   assert.match(caller, /options: \[transport, lot1_tuition_ui, lot2_transport_student\]/);
   const transportJob = caller.match(
