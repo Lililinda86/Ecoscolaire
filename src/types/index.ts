@@ -239,7 +239,7 @@ export interface Student {
   transportMonthlyFee?: number;
   transportZonePk?: number;
   transportFleet?: string;
-  transportStatus?: 'none' | 'active' | 'suspended';
+  transportStatus?: 'none' | 'active' | 'needs_configuration' | 'suspended';
   transportPaid?: number;
   tuitionExpectedGross?: number;
   tuitionDiscountTotal?: number;

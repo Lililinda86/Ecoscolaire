@@ -98,10 +98,20 @@ describe('student privacy separation', () => {
       id: student.id,
       studentId: student.id,
       schoolId: student.schoolId || '',
-      parentPhone: student.parentPhone
+      parentPhone: student.parentPhone,
+      transportZonePk: 35,
+      transportNeighborhood: 'Quartier B',
+      transportPickupPoint: 'Point B'
     };
     expect(mergeStudentRestrictedData([schoolOnly], [], [])[0].parentPhone).toBeUndefined();
-    expect(mergeStudentRestrictedData([schoolOnly], [privateRecord], [])[0].parentPhone).toBe(student.parentPhone);
+    const reloaded = mergeStudentRestrictedData([schoolOnly], [privateRecord], [])[0];
+    expect(reloaded).toMatchObject({
+      parentPhone: student.parentPhone,
+      usesTransport: true,
+      transportZonePk: 35,
+      transportNeighborhood: 'Quartier B',
+      transportPickupPoint: 'Point B'
+    });
   });
 
   it('refreshes post-payment finance from the canonical projection', () => {

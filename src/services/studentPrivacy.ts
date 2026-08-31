@@ -1,5 +1,5 @@
 import type { Student } from '../types';
-import { doc, runTransaction, serverTimestamp, type Firestore } from 'firebase/firestore';
+import { deleteField, doc, runTransaction, serverTimestamp, type Firestore } from 'firebase/firestore';
 
 export type StudentPrivate = Pick<Student,
   | 'dob'
@@ -240,7 +240,17 @@ export const updateStudentSeparatedData = async ({
     Object.entries(record).filter(([key]) => !['id', 'schoolId', 'studentId'].includes(key))
   );
   const schoolPatch = withoutIdentity(schoolData);
-  const privatePatch = withoutIdentity(privateData as unknown as Record<string, unknown>);
+  const privateCreatePatch = withoutIdentity(privateData as unknown as Record<string, unknown>);
+  const privatePatch: Record<string, unknown> = { ...privateCreatePatch };
+  const transportPrivateKeys = [
+    'transportNeighborhood', 'transportPickupPoint', 'transportZonePk'
+  ] as const;
+  for (const key of transportPrivateKeys) {
+    if (key in patch) {
+      const value = patch[key];
+      privatePatch[key] = value === undefined || value === '' ? deleteField() : value;
+    }
+  }
   const projectedFinanceKeys = new Set(['feeT1', 'feeT2', 'feeT3', 'financialBypass']);
   const financePatch = Object.fromEntries(
     Object.entries(withoutIdentity(financeData as unknown as Record<string, unknown>))
@@ -263,7 +273,9 @@ export const updateStudentSeparatedData = async ({
   if (Object.keys(schoolPatch).length > 0) transaction.update(studentRef, schoolPatch);
   if (Object.keys(privatePatch).length > 0) {
     if (privateSnapshot.exists()) transaction.update(privateRef, { ...privatePatch, ...auditPatch });
-    else transaction.set(privateRef, { id: studentId, studentId, schoolId, ...privatePatch, ...creationAuditPatch });
+    else if (Object.keys(privateCreatePatch).length > 0) {
+      transaction.set(privateRef, { id: studentId, studentId, schoolId, ...privateCreatePatch, ...creationAuditPatch });
+    }
   }
   if (Object.keys(financePatch).length > 0) {
     if (financeSnapshot.exists()) transaction.update(financeRef, { ...financePatch, ...auditPatch });
