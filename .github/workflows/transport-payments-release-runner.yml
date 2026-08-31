@@ -8,7 +8,7 @@ on:
         required: true
         default: transport
         type: choice
-        options: [transport, lot1_tuition_ui, lot2_transport_student]
+        options: [transport, lot1_tuition_ui, lot2_transport_student, lot3_transport_payment_ui]
       mode:
         description: Exact isolated target
         required: true
@@ -230,6 +230,22 @@ jobs:
       contents: read
       id-token: write
     uses: ./.github/workflows/student-transport-staging-ui.yml
+    with:
+      expected_sha: ${{ inputs.expected_sha }}
+      app_url: ${{ inputs.app_url }}
+      confirmation: ${{ inputs.confirmation }}
+    secrets: inherit
+  lot3-transport-payment-ui:
+    if: >-
+      inputs.operation == 'lot3_transport_payment_ui' &&
+      inputs.mode == 'staging' &&
+      github.ref == 'refs/heads/staging' &&
+      inputs.confirmation == 'RUN_LOT3_TRANSPORT_PAYMENT_UI'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/transport-payment-context-staging-ui.yml
     with:
       expected_sha: ${{ inputs.expected_sha }}
       app_url: ${{ inputs.app_url }}

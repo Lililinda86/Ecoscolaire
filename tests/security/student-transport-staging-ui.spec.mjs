@@ -219,14 +219,14 @@ test("LOT 2 harness uses a form-scoped grouped-option locator and exact labels",
   assert.match(harness, /className: "LOT2 Secondaire FREE"/);
 });
 test("LOT 2 operation routes only to the reusable student Transport UI workflow", () => {
-  assert.match(caller, /options: \[transport, lot1_tuition_ui, lot2_transport_student\]/);
+  assert.match(caller, /options: \[transport, lot1_tuition_ui, lot2_transport_student, lot3_transport_payment_ui\]/);
   const transportJob = caller.match(
     /  isolated-transport-release:\r?\n[\s\S]*?(?=\r?\n  lot1-tuition-ui:)/,
   )?.[0];
   const lot1Job = caller.match(
     /  lot1-tuition-ui:\r?\n[\s\S]*?(?=\r?\n  lot2-transport-student-ui:)/,
   )?.[0];
-  const lot2Job = caller.match(/  lot2-transport-student-ui:\r?\n[\s\S]*$/)?.[0];
+  const lot2Job = caller.match(/  lot2-transport-student-ui:\r?\n[\s\S]*?(?=\r?\n  lot3-transport-payment-ui:)/)?.[0];
   assert.ok(transportJob);
   assert.ok(lot1Job);
   assert.ok(lot2Job);

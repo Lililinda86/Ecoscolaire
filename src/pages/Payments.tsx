@@ -21,6 +21,7 @@ import FinancialBenefitsPanel from '../components/FinancialBenefitsPanel';
 import { getConfiguredTuitionInstallments } from '../utils/tuitionDeadlines';
 import { createExpense, reverseExpense } from '../services/expenses';
 import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from '../utils/expenseLedger';
+import { buildTransportPaymentPreview } from '../utils/transportPaymentPreview';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -368,6 +369,18 @@ const Payments: React.FC = () => {
   const mobileMoneyEnabled = isOperationalMobileMoneyProvider(db.school?.paymentSettings?.activeProvider);
   const selectedPaymentStudent = db.students.find(student => student.id === currentPayment.studentId);
   const selectedPaymentClass = db.classes.find(classSection => classSection.id === selectedPaymentStudent?.classId);
+  const selectedPaymentClassCycle = selectedPaymentClass?.cycle
+    ?? (selectedPaymentClass?.level === 'secondaire' ? 'secondary'
+      : selectedPaymentClass?.level === 'primaire' ? 'primary'
+        : selectedPaymentClass?.level === 'maternelle' ? 'nursery' : undefined);
+  const transportConfigurationIncomplete = currentPayment.type === 'transport'
+    && selectedPaymentStudent?.usesTransport === true
+    && selectedPaymentClassCycle !== 'secondary'
+    && (!Number.isSafeInteger(selectedPaymentStudent.transportZonePk)
+      || selectedPaymentStudent.transportStatus === 'needs_configuration');
+  const transportStatusLabel = selectedPaymentStudent?.usesTransport !== true
+    ? 'Non utilisé'
+    : transportConfigurationIncomplete ? 'À compléter' : 'Configuré';
   const selectedPaymentClassFees = selectedPaymentClass
     ? db.school?.classFees?.[selectedPaymentClass.name]
     : undefined;
@@ -379,6 +392,24 @@ const Payments: React.FC = () => {
     }),
     [selectedPaymentClassFees]
   );
+  const transportPaymentPreview = React.useMemo(() => {
+    if (currentPayment.type !== 'transport' || collectionQuote?.transportState !== 'BILLABLE'
+        || !collectionQuote.installments) return null;
+    const amount = Number(currentPayment.amount) || 0;
+    if (!Number.isSafeInteger(amount) || amount < 0) return null;
+    try {
+      return buildTransportPaymentPreview(
+        collectionQuote.installments.map(item => ({
+          period: item.period,
+          remainingBalance: item.remainingBalance
+        })),
+        amount,
+        collectionQuote.transportCredit || 0
+      );
+    } catch {
+      return null;
+    }
+  }, [collectionQuote, currentPayment.amount, currentPayment.type]);
 
   useEffect(() => {
     if (currentPayment.type !== 'tuition' || configuredTuitionInstallments.length === 0) return;
@@ -2278,6 +2309,30 @@ const Payments: React.FC = () => {
               <strong>Classe :</strong> {selectedPaymentClass?.name || 'Non renseignée'}
             </div>
           )}
+          {selectedPaymentStudent && currentPayment.type === 'transport' && (
+            <section
+              data-testid="transport-student-context"
+              aria-label="Transport de l’élève"
+              style={{ marginBottom: '1rem', padding: '.85rem', border: '1px solid var(--border-color)', borderRadius: 6, background: '#f8fafc' }}
+            >
+              <strong>Transport de l'élève</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '.55rem', marginTop: '.65rem' }}>
+                <div><small>Classe</small><br/><span data-testid="transport-student-class">{selectedPaymentClass?.name || 'Non renseignée'}</span></div>
+                <div><small>Zone / PK</small><br/><span data-testid="transport-zone-pk">{Number.isSafeInteger(selectedPaymentStudent.transportZonePk) ? `PK${selectedPaymentStudent.transportZonePk}` : 'Non renseigné'}</span></div>
+                <div><small>Quartier</small><br/><span data-testid="transport-neighborhood">{selectedPaymentStudent.transportNeighborhood || 'Non renseigné'}</span></div>
+                <div><small>Point de ramassage</small><br/><span data-testid="transport-pickup">{selectedPaymentStudent.transportPickupPoint || 'Non renseigné'}</span></div>
+                <div><small>Statut</small><br/><span data-testid="transport-status">{transportStatusLabel}</span></div>
+              </div>
+              <div style={{ marginTop: '.65rem', color: 'var(--text-secondary)', fontSize: '.82rem' }}>
+                Le point de ramassage est informatif ; le tarif est déterminé par le PK selon la politique serveur.
+              </div>
+              {transportConfigurationIncomplete && (
+                <div data-testid="transport-configuration-incomplete" role="alert" style={{ marginTop: '.65rem', padding: '.65rem', background: '#fef2f2', color: '#991b1b', borderRadius: 4 }}>
+                  Configuration Transport à compléter — renseignez le PK dans la fiche élève avant tout encaissement Transport.
+                </div>
+              )}
+            </section>
+          )}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
              <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
               <label>Nature du Versement</label>
@@ -2371,6 +2426,12 @@ const Payments: React.FC = () => {
               )}
               {!quoteLoading && collectionQuote && (
                 <div data-testid="collection-quote-current" style={{ padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
+                  {currentPayment.type === 'transport' && collectionQuote.transportState && (
+                    <div style={{ marginBottom: '.75rem', padding: '.65rem', border: '1px solid #bfdbfe', borderRadius: 4, background: '#eff6ff' }}>
+                      <div data-testid="transport-policy"><strong>Politique tarifaire :</strong> {collectionQuote.feePolicyId === 'ITALO_PK_2026' ? 'ITALO PK' : collectionQuote.feePolicyId || 'Non configurée'}</div>
+                      <div data-testid="transport-rate"><strong>Tarif applicable :</strong> {collectionQuote.transportState === 'FREE_SECONDARY' ? 'Gratuit — Secondaire' : collectionQuote.transportState === 'BILLABLE' ? `${formatCurrency(collectionQuote.monthlyGrossAmount || 0)} / période` : 'Non applicable'}</div>
+                    </div>
+                  )}
                   {collectionQuote.transportState === 'FREE_SECONDARY' && (
                     <div data-testid="transport-free-secondary" style={{ padding: '.8rem', marginBottom: '.75rem', background: '#ecfdf5', color: '#065f46', fontWeight: 700, borderRadius: 6 }}>
                       TRANSPORT GRATUIT — montant mensuel 0 FCFA — reste dû 0 FCFA
@@ -2402,7 +2463,7 @@ const Payments: React.FC = () => {
                     </strong></div>
                   </div>
                   {collectionQuote.installments && collectionQuote.installments.length > 0 && (
-                    <div data-testid="transport-installments-scroll" style={{ marginTop: '.85rem', maxWidth: '100%', overflowX: 'auto', overscrollBehaviorInline: 'contain' }}>
+                    <div data-testid="transport-installments-scroll" data-period-source="server-quote" style={{ marginTop: '.85rem', maxWidth: '100%', overflowX: 'auto', overscrollBehaviorInline: 'contain' }}>
                       <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse', fontSize: '.82rem' }}>
                         <thead><tr>
                           <th>Mois</th><th>Brut</th><th>Aide</th><th>Dû net</th><th>Payé</th><th>Reste</th><th>Échéance</th><th>Statut</th>
@@ -2464,11 +2525,25 @@ const Payments: React.FC = () => {
               onWheel={(e) => e.currentTarget.blur()}
             />
 
-            {collectionQuote && currentPayment.type !== 'other' && (() => {
+            {collectionQuote && currentPayment.type === 'transport' && transportPaymentPreview && (
+              <div data-testid="transport-payment-preview" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#eff6ff', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
+                <div><strong>Ventilation prévisionnelle (devis serveur)</strong></div>
+                {transportPaymentPreview.allocations.length > 0 ? transportPaymentPreview.allocations.map((allocation, index) => (
+                  <div data-testid="transport-preview-allocation" key={`${allocation.kind}-${allocation.period || 'credit'}-${index}`}>
+                    • {allocation.kind === 'CREDIT' ? 'Crédit généré' : `Période ${allocation.period}`} : {formatCurrency(allocation.amount)}
+                  </div>
+                )) : <div>• Aucun montant saisi.</div>}
+                <div data-testid="transport-existing-credit">Crédit existant : {formatCurrency(transportPaymentPreview.existingCredit)}</div>
+                <div data-testid="transport-generated-credit">Crédit généré : {formatCurrency(transportPaymentPreview.generatedCredit)}</div>
+                <div data-testid="transport-final-credit"><strong>Crédit final prévu : {formatCurrency(transportPaymentPreview.finalCredit)}</strong></div>
+                <small>Prévisualisation informative : le serveur recalcule et valide la ventilation lors de l’enregistrement.</small>
+              </div>
+            )}
+
+            {collectionQuote && currentPayment.type !== 'other' && currentPayment.type !== 'transport' && (() => {
                const resteAvant = collectionQuote.remainingBalance;
                const saisi = Number(currentPayment.amount) || 0;
                const resteApres = Math.max(0, resteAvant - saisi);
-               const creditApres = currentPayment.type === 'transport' ? Math.max(0, saisi - resteAvant) : 0;
                return (
                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f3f4f6', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
                    <div>• <strong>Reste avant versement :</strong> {resteAvant.toLocaleString('fr-FR')} FCFA</div>
@@ -2476,9 +2551,7 @@ const Payments: React.FC = () => {
                    <div style={{ color: resteApres > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold', marginTop: '0.25rem' }}>
                      → Nouveau reste prévisionnel : {resteApres.toLocaleString('fr-FR')} FCFA
                    </div>
-                    {creditApres > 0 && <div style={{ color: '#0369a1', fontWeight: 600 }}>
-                      → Crédit transport prévisionnel : {creditApres.toLocaleString('fr-FR')} FCFA
-                    </div>}
+
                  </div>
                );
             })()}
@@ -2554,6 +2627,7 @@ const Payments: React.FC = () => {
               type="submit"
               data-testid="cash-payment-submit"
               disabled={isProcessingMoMo || momoSuccess || isSaving
+                || transportConfigurationIncomplete
                 || (paymentMethod === 'cash' && (!collectionQuote || collectionQuote.remainingBalance <= 0))}
               style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)', minHeight: 44 }}
             >

@@ -483,6 +483,18 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                               <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: '.75rem' }}>
                                 Ventilation du versement Transport
                               </div>
+                              {displayModel.transportContext && (
+                                <div data-testid={`transport-receipt-context-${displayModel.id}`} style={{ marginBottom: '.75rem', lineHeight: 1.5 }}>
+                                  <strong>Contexte au paiement :</strong>{' '}
+                                  {displayModel.transportContext.zonePk === null ? 'Secondaire gratuit' : `PK${displayModel.transportContext.zonePk}`} ·
+                                  {' '}{displayModel.transportContext.neighborhood || 'Quartier non renseigné'} ·
+                                  {' '}{displayModel.transportContext.pickupPoint || 'Point non renseigné'}<br />
+                                  Politique {displayModel.transportContext.feePolicyId === 'ITALO_PK_2026' ? 'ITALO PK' : displayModel.transportContext.feePolicyId} ·
+                                  {' '}{displayModel.transportContext.transportState === 'FREE_SECONDARY'
+                                    ? 'Gratuit — Secondaire'
+                                    : `${displayModel.transportContext.monthlyGrossAmount.toLocaleString('fr-FR')} FCFA / période`}
+                                </div>
+                              )}
                               {displayModel.allocations.length > 0 ? displayModel.allocations.map((allocation, index) => (
                                 <div
                                   key={`${allocation.kind}-${allocation.period || 'credit'}-${index}`}

@@ -5,6 +5,15 @@ export interface ClassLike {
   name: string;
 }
 
+export interface TransportReceiptContextSnapshot {
+  zonePk: number | null;
+  neighborhood: string;
+  pickupPoint: string;
+  feePolicyId: string;
+  monthlyGrossAmount: number;
+  transportState: 'FREE_SECONDARY' | 'NOT_SUBSCRIBED' | 'BILLABLE';
+  billingPeriods: string[];
+}
 export interface ReceiptDisplayModel {
   id: string;
   receiptNumber: string;
@@ -39,6 +48,7 @@ export interface ReceiptDisplayModel {
   allocations: Array<{ kind: 'INSTALLMENT' | 'CREDIT'; period: string | null; amount: number }>;
   transportCredit: number;
   formattedTransportCredit: string;
+  transportContext: TransportReceiptContextSnapshot | null;
   formattedGrossExpectedAmount: string;
   formattedDiscountAmount: string;
   formattedNetExpectedAmount: string;
@@ -169,6 +179,34 @@ export const buildReceiptDisplayModel = (
   const transportCredit = typeof rawTransportCredit === 'number' && Number.isSafeInteger(rawTransportCredit)
     ? rawTransportCredit
     : 0;
+  const rawTransportContext = receipt.transportContext;
+  const transportContext = rawTransportContext && typeof rawTransportContext === 'object'
+    && !Array.isArray(rawTransportContext)
+    ? rawTransportContext as Record<string, unknown>
+    : null;
+  const transportContextSnapshot: TransportReceiptContextSnapshot | null = transportContext
+    && (transportContext.transportState === 'FREE_SECONDARY'
+      || transportContext.transportState === 'NOT_SUBSCRIBED'
+      || transportContext.transportState === 'BILLABLE')
+    && (transportContext.zonePk === null
+      || (typeof transportContext.zonePk === 'number' && Number.isSafeInteger(transportContext.zonePk)))
+    && typeof transportContext.neighborhood === 'string'
+    && typeof transportContext.pickupPoint === 'string'
+    && typeof transportContext.feePolicyId === 'string'
+    && typeof transportContext.monthlyGrossAmount === 'number'
+    && Number.isSafeInteger(transportContext.monthlyGrossAmount)
+    && Array.isArray(transportContext.billingPeriods)
+    && transportContext.billingPeriods.every(period => typeof period === 'string')
+      ? {
+          zonePk: transportContext.zonePk as number | null,
+          neighborhood: transportContext.neighborhood,
+          pickupPoint: transportContext.pickupPoint,
+          feePolicyId: transportContext.feePolicyId,
+          monthlyGrossAmount: transportContext.monthlyGrossAmount,
+          transportState: transportContext.transportState,
+          billingPeriods: [...transportContext.billingPeriods] as string[]
+        }
+      : null;
 
   return {
     id: receipt.id || receipt.paymentId || '',
@@ -208,6 +246,7 @@ export const buildReceiptDisplayModel = (
     allocations,
     transportCredit,
     formattedTransportCredit: formatCurrency(transportCredit),
+    transportContext: transportContextSnapshot,
     formattedGrossExpectedAmount: formatCurrency(receipt.grossExpectedAmount as number | undefined),
     formattedDiscountAmount: formatCurrency(receipt.discountAmount as number | undefined),
     formattedNetExpectedAmount: formatCurrency(receipt.netExpectedAmount as number | undefined),
