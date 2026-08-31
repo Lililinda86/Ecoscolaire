@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {
+  assertLabelledFrenchCurrencyAmount,
+  parseLabelledFrenchCurrencyAmount,
+} from "../../scripts/payment-forward-recovery-currency.mjs";
 
 const caller = await readFile(".github/workflows/transport-payments-release-runner.yml", "utf8");
 const reusable = await readFile(".github/workflows/transport-payment-context-staging-ui.yml", "utf8");
@@ -40,6 +44,8 @@ test("lot3 harness is run-scoped, never targets italo-gsb and cleans every fixtu
     "audit_logs", "cashClosures", "cashLedgerDays",
   ]) assert.match(harness, new RegExp(`"${collection}"`));
   assert.match(harness, /testFixture: true, testRunId/);
+  assert.match(harness, /residualCounts\.counters/);
+  assert.match(harness, /const orphans = Object\.values\(residualCounts\)\.reduce/);
   assert.match(harness, /CLEANUP PASS/);
 });
 
@@ -50,8 +56,11 @@ test("lot3 UI proves context, server tariffs, periods, preview, free and incompl
     "transport-installments-scroll", "transport-payment-preview",
     "transport-existing-credit", "transport-generated-credit", "transport-final-credit",
   ]) assert.match(payments, new RegExp(`data-testid="${testId}"`));
-  assert.match(harness, /parseFrenchCurrencyAmount[\s\S]*?4000/);
-  assert.match(harness, /parseFrenchCurrencyAmount[\s\S]*?5000/);
+  assert.match(harness, /label: "Tarif applicable", expected: 4000, suffix: "\/ période"/);
+  assert.match(harness, /label: "Tarif applicable", expected: 5000, suffix: "\/ période"/);
+  for (const creditLabel of ["Crédit existant", "Crédit généré", "Crédit final prévu"]) {
+    assert.match(harness, new RegExp(`label: "${creditLabel}"`));
+  }
   assert.match(harness, /transport-free-secondary/);
   assert.match(harness, /transport-configuration-incomplete/);
   assert.match(harness, /Mois \(Transport\)/);
@@ -63,4 +72,52 @@ test("historical policy remains unchanged and client never derives a rate from a
   assert.doesNotMatch(payments, /transportNeighborhood[\s\S]{0,180}(?:4000|5000)/);
   assert.doesNotMatch(payments, /transportPickupPoint[\s\S]{0,180}(?:4000|5000)/);
   assert.match(payments, /collectionQuote\.monthlyGrossAmount/);
+});
+
+test("labelled transport tariff parsing is strict, Unicode-safe and period-scoped", () => {
+  for (const text of [
+    "Tarif applicable : 4 000 FCFA / période",
+    "Tarif applicable : 4\u202f000 FCFA / période",
+    "Tarif applicable : 4\u00a0000 FCFA / période",
+    "Tarif applicable : 4000 FCFA / période",
+  ]) {
+    assert.equal(parseLabelledFrenchCurrencyAmount(text, {
+      label: "Tarif applicable", suffix: "/ période",
+    }), 4000);
+    assert.doesNotThrow(() => assertLabelledFrenchCurrencyAmount(text, {
+      label: "Tarif applicable", expected: 4000, suffix: "/ période",
+    }));
+  }
+  for (const wrongText of [
+    "Tarif applicable : 5 000 FCFA / période",
+    "Tarif applicable : 40 000 FCFA / période",
+  ]) {
+    assert.throws(() => assertLabelledFrenchCurrencyAmount(wrongText, {
+      label: "Tarif applicable", expected: 4000, suffix: "/ période",
+    }));
+  }
+  assert.throws(() => assertLabelledFrenchCurrencyAmount("Tarif applicable : 4 000 FCFA", {
+    label: "Tarif applicable", expected: 4000, suffix: "/ période",
+  }));
+  assert.throws(() => assertLabelledFrenchCurrencyAmount(
+    "Autre montant : 4 000 FCFA / période Tarif applicable : 5 000 FCFA / période",
+    { label: "Tarif applicable", expected: 4000, suffix: "/ période" },
+  ));
+});
+
+test("remaining labelled Lot 3 credit assertions use the same strict parser", () => {
+  for (const [label, expected] of [
+    ["Crédit existant", 500],
+    ["Crédit généré", 1000],
+    ["Crédit final prévu", 1500],
+  ]) {
+    assert.doesNotThrow(() => assertLabelledFrenchCurrencyAmount(
+      `${label} : ${expected.toLocaleString("fr-FR")} FCFA`,
+      { label, expected },
+    ));
+    assert.throws(() => assertLabelledFrenchCurrencyAmount(
+      `${label} : ${expected + 1} FCFA`,
+      { label, expected },
+    ));
+  }
 });

@@ -5,7 +5,10 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { chromium } from "@playwright/test";
 import dotenv from "dotenv";
 import { deleteOwnedStudentFinanceFinal } from "./payment-forward-recovery-cleanup.mjs";
-import { parseFrenchCurrencyAmount } from "./payment-forward-recovery-currency.mjs";
+import {
+  assertLabelledFrenchCurrencyAmount,
+  parseFrenchCurrencyAmount,
+} from "./payment-forward-recovery-currency.mjs";
 
 dotenv.config({ path: ".env.staging" });
 
@@ -136,11 +139,13 @@ const cleanup = async () => {
     const value = field === "schoolId" ? schoolId : testRunId;
     residualCounts[collection] = (await db.collection(collection).where(field, "==", value).get()).size;
   }
-  for (const count of Object.values(residualCounts)) assert.equal(count, 0);
+  residualCounts.counters = Number((await db.collection("counters").doc(`receipts_${schoolId}`).get()).exists);
+  const orphans = Object.values(residualCounts).reduce((total, count) => total + count, 0);
+  assert.equal(orphans, 0);
   for (const uid of createdAuthUids) {
     await assert.rejects(adminAuth.getUser(uid), error => error?.code === "auth/user-not-found");
   }
-  console.log(`CLEANUP PASS ${JSON.stringify(residualCounts)} Auth=0 orphans=0`);
+  console.log(`CLEANUP PASS ${JSON.stringify(residualCounts)} Auth=0 orphans=${orphans}`);
 };
 
 try {
@@ -252,21 +257,31 @@ try {
   assert.equal(normalized(await form.getByTestId("transport-neighborhood").textContent()), "Quartier A");
   assert.equal(normalized(await form.getByTestId("transport-pickup").textContent()), "Point A");
   assert.match(normalized(await form.getByTestId("transport-policy").textContent()), /ITALO PK/);
-  assert.equal(parseFrenchCurrencyAmount(await form.getByTestId("transport-rate").textContent()), 4000);
+  assertLabelledFrenchCurrencyAmount(await form.getByTestId("transport-rate").textContent(), {
+    label: "Tarif applicable", expected: 4000, suffix: "/ période",
+  });
   assert.equal(await form.getByTestId("transport-installments-scroll").locator("tbody tr").count(), 3);
   await form.getByText("LOT3-BON-1000", { exact: false }).waitFor();
   await form.getByText(/ACTIF — dette inchangée/).waitFor();
-  assert.equal(parseFrenchCurrencyAmount(await form.getByTestId("transport-existing-credit").textContent()), 500);
+  assertLabelledFrenchCurrencyAmount(await form.getByTestId("transport-existing-credit").textContent(), {
+    label: "Crédit existant", expected: 500,
+  });
   assert.equal(await form.getByText("Mois (Transport)", { exact: false }).count(), 0);
 
   await form.getByTestId("cash-payment-amount").fill("11000");
   await form.getByTestId("transport-payment-preview").waitFor({ state: "visible" });
-  assert.equal(parseFrenchCurrencyAmount(await form.getByTestId("transport-generated-credit").textContent()), 1000);
-  assert.equal(parseFrenchCurrencyAmount(await form.getByTestId("transport-final-credit").textContent()), 1500);
+  assertLabelledFrenchCurrencyAmount(await form.getByTestId("transport-generated-credit").textContent(), {
+    label: "Crédit généré", expected: 1000,
+  });
+  assertLabelledFrenchCurrencyAmount(await form.getByTestId("transport-final-credit").textContent(), {
+    label: "Crédit final prévu", expected: 1500,
+  });
 
   await form.getByTestId("cash-payment-student").selectOption(studentIds.pk35);
   await waitForQuote(form, 15_000);
-  assert.equal(parseFrenchCurrencyAmount(await form.getByTestId("transport-rate").textContent()), 5000);
+  assertLabelledFrenchCurrencyAmount(await form.getByTestId("transport-rate").textContent(), {
+    label: "Tarif applicable", expected: 5000, suffix: "/ période",
+  });
   await form.getByTestId("cash-payment-student").selectOption(studentIds.secondary);
   await form.getByTestId("transport-free-secondary").waitFor({ state: "visible" });
   assert.match(normalized(await form.getByTestId("transport-rate").textContent()), /Gratuit — Secondaire/);
