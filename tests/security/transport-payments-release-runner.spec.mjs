@@ -167,7 +167,7 @@ test('workflow is manual, branch-bound, keyless in Staging and Production, and v
 });
 
 test('lot1 tuition UI operation routes only through the WIF-authorized Transport caller', () => {
-  assert.match(workflow, /operation:\n\s+description: Exact isolated operation\n\s+required: true\n\s+default: transport\n\s+type: choice\n\s+options: \[transport, lot1_tuition_ui\]/);
+  assert.match(workflow, /operation:\n\s+description: Exact isolated operation\n\s+required: true\n\s+default: transport\n\s+type: choice\n\s+options: \[transport, lot1_tuition_ui, lot2_transport_student\]/);
   const transportJob = workflow.match(/  isolated-transport-release:\n[\s\S]*?(?=\n  lot1-tuition-ui:)/)?.[0];
   const tuitionUiJob = workflow.match(/  lot1-tuition-ui:\n[\s\S]*$/)?.[0];
   assert.ok(transportJob, 'Transport job not found');
