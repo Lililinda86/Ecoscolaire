@@ -13,6 +13,7 @@ vi.mock('firebase/firestore', () => ({
     update: transactionUpdate,
     set: transactionSet
   })),
+  deleteField: vi.fn(() => ({ __deleteField: true })),
   serverTimestamp: vi.fn(() => ({ __serverTimestamp: true }))
 }));
 
@@ -123,5 +124,146 @@ describe('student separated finance persistence', () => {
       expect.objectContaining({ schoolId: 'school-1', studentId: 'student-1', feeT1: 1100 })
     );
     expect(transactionUpdate).toHaveBeenCalledWith('students/student-1', { name: 'Élève legacy' });
+  });
+
+  it('persists transport activation in students and studentPrivate without finance writes', async () => {
+    await updateStudentSeparatedData({
+      firestore: {} as Firestore,
+      studentId: 'student-1',
+      schoolId: 'school-1',
+      actorId: 'secretary-1',
+      patch: {
+        usesTransport: true,
+        transportStatus: 'active',
+        transportZonePk: 28,
+        transportNeighborhood: 'Quartier A',
+        transportPickupPoint: 'Point A'
+      }
+    });
+
+    expect(transactionUpdate).toHaveBeenCalledWith('students/student-1', {
+      usesTransport: true,
+      transportStatus: 'active'
+    });
+    expect(transactionUpdate).toHaveBeenCalledWith(
+      'studentPrivate/student-1',
+      expect.objectContaining({
+        transportZonePk: 28,
+        transportNeighborhood: 'Quartier A',
+        transportPickupPoint: 'Point A'
+      })
+    );
+    expect(transactionUpdate.mock.calls.some(([reference]) => reference === 'studentFinance/student-1')).toBe(false);
+    expect(transactionUpdate.mock.calls.some(([reference]) => reference === 'studentParentFinance/student-1')).toBe(false);
+  });
+
+  it('replaces every edited transport value without retaining the old values', async () => {
+    await updateStudentSeparatedData({
+      firestore: {} as Firestore,
+      studentId: 'student-1',
+      schoolId: 'school-1',
+      actorId: 'secretary-1',
+      patch: {
+        usesTransport: true,
+        transportStatus: 'active',
+        transportZonePk: 35,
+        transportNeighborhood: 'Quartier B',
+        transportPickupPoint: 'Point B'
+      }
+    });
+
+    expect(transactionUpdate).toHaveBeenCalledWith(
+      'studentPrivate/student-1',
+      expect.objectContaining({
+        transportZonePk: 35,
+        transportNeighborhood: 'Quartier B',
+        transportPickupPoint: 'Point B'
+      })
+    );
+    expect(JSON.stringify(transactionUpdate.mock.calls)).not.toMatch(/Quartier A|Point A/);
+  });
+
+  it('securely creates a missing studentPrivate record during transport enrollment', async () => {
+    transactionGet.mockImplementation(async (reference: string) => ({
+      exists: () => reference !== 'studentPrivate/student-1'
+    }));
+
+    await updateStudentSeparatedData({
+      firestore: {} as Firestore,
+      studentId: 'student-1',
+      schoolId: 'school-1',
+      actorId: 'secretary-1',
+      patch: {
+        usesTransport: true,
+        transportStatus: 'active',
+        transportZonePk: 28,
+        transportNeighborhood: 'Quartier A',
+        transportPickupPoint: 'Point A'
+      }
+    });
+
+    expect(transactionSet).toHaveBeenCalledWith(
+      'studentPrivate/student-1',
+      expect.objectContaining({
+        id: 'student-1',
+        studentId: 'student-1',
+        schoolId: 'school-1',
+        transportZonePk: 28,
+        transportNeighborhood: 'Quartier A',
+        transportPickupPoint: 'Point A'
+      })
+    );
+  });
+
+  it('deactivates transport while preserving existing private pickup history', async () => {
+    await updateStudentSeparatedData({
+      firestore: {} as Firestore,
+      studentId: 'student-1',
+      schoolId: 'school-1',
+      actorId: 'secretary-1',
+      patch: {
+        usesTransport: false,
+        transportStatus: 'none',
+        transportZonePk: 28,
+        transportNeighborhood: 'Quartier A',
+        transportPickupPoint: 'Point A'
+      }
+    });
+
+    expect(transactionUpdate).toHaveBeenCalledWith('students/student-1', {
+      usesTransport: false,
+      transportStatus: 'none'
+    });
+    expect(transactionUpdate).toHaveBeenCalledWith(
+      'studentPrivate/student-1',
+      expect.objectContaining({
+        transportZonePk: 28,
+        transportNeighborhood: 'Quartier A',
+        transportPickupPoint: 'Point A'
+      })
+    );
+  });
+
+  it('removes only explicitly cleared private transport fields', async () => {
+    await updateStudentSeparatedData({
+      firestore: {} as Firestore,
+      studentId: 'student-1',
+      schoolId: 'school-1',
+      actorId: 'secretary-1',
+      patch: {
+        transportZonePk: undefined,
+        transportNeighborhood: '',
+        transportPickupPoint: ''
+      }
+    });
+
+    expect(transactionUpdate).toHaveBeenCalledWith(
+      'studentPrivate/student-1',
+      expect.objectContaining({
+        transportZonePk: { __deleteField: true },
+        transportNeighborhood: { __deleteField: true },
+        transportPickupPoint: { __deleteField: true }
+      })
+    );
   });
 });

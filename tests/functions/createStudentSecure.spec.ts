@@ -326,15 +326,41 @@ describe('createStudentSecure callable', () => {
     });
   }
 
-  it('persists a valid structured transport zone PK', async () => {
+  it('persists an explicit enrollment without transport', async () => {
     const fixture = await seed();
     const basePayload = input(fixture.classId);
     const payload = input(fixture.classId, {
-      studentData: { ...basePayload.studentData, usesTransport: true },
-      privateData: { ...basePayload.privateData, transportZonePk: 14 }
+      studentData: { ...basePayload.studentData, usesTransport: false, transportStatus: 'none' }
     });
     const result = await call(fixture.uid, payload);
-    expect((await db.collection('studentPrivate').doc(result.studentId).get()).data()?.transportZonePk).toBe(14);
+    const publicDocument = (await db.collection('students').doc(result.studentId).get()).data();
+    const privateDocument = (await db.collection('studentPrivate').doc(result.studentId).get()).data();
+    expect(publicDocument).toMatchObject({ usesTransport: false, transportStatus: 'none' });
+    expect(privateDocument).not.toHaveProperty('transportZonePk');
+    expect(privateDocument).not.toHaveProperty('transportNeighborhood');
+    expect(privateDocument).not.toHaveProperty('transportPickupPoint');
+  });
+  it('persists the complete transport enrollment contract', async () => {
+    const fixture = await seed();
+    const basePayload = input(fixture.classId);
+    const payload = input(fixture.classId, {
+      studentData: { ...basePayload.studentData, usesTransport: true, transportStatus: 'active' },
+      privateData: {
+        ...basePayload.privateData,
+        transportZonePk: 14,
+        transportNeighborhood: 'Quartier A',
+        transportPickupPoint: 'Point A'
+      }
+    });
+    const result = await call(fixture.uid, payload);
+    const publicDocument = (await db.collection('students').doc(result.studentId).get()).data();
+    const privateDocument = (await db.collection('studentPrivate').doc(result.studentId).get()).data();
+    expect(publicDocument).toMatchObject({ usesTransport: true, transportStatus: 'active' });
+    expect(privateDocument).toMatchObject({
+      transportZonePk: 14,
+      transportNeighborhood: 'Quartier A',
+      transportPickupPoint: 'Point A'
+    });
   });
 
   for (const invalidTransportZonePk of [13, 42.5, 43]) {

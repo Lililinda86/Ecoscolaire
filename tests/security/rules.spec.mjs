@@ -1418,6 +1418,61 @@ describe('Student Privacy Security Rules', () => {
     return getDoc(doc(context.firestore(), collectionName, STUDENT_ID));
   };
 
+  it('allows a same-school secretary to persist transport enrollment across public and private records', async () => {
+    const context = testEnv.authenticatedContext('privacy-secretary');
+    const db = context.firestore();
+    await assertSucceeds(updateDoc(doc(db, 'students', STUDENT_ID), {
+      usesTransport: true,
+      transportStatus: 'active'
+    }));
+    await assertSucceeds(updateDoc(doc(db, 'studentPrivate', STUDENT_ID), {
+      transportZonePk: 35,
+      transportNeighborhood: 'Quartier B',
+      transportPickupPoint: 'Point B',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-secretary'
+    }));
+  });
+
+  it('allows a same-school secretary to create missing private transport data for a legacy student', async () => {
+    const context = testEnv.authenticatedContext('privacy-secretary');
+    const db = context.firestore();
+    await assertSucceeds(setDoc(doc(db, 'studentPrivate', LEGACY_STUDENT_ID), {
+      id: LEGACY_STUDENT_ID,
+      studentId: LEGACY_STUDENT_ID,
+      schoolId: SCHOOL_ID,
+      transportZonePk: 28,
+      transportNeighborhood: 'Quartier A',
+      transportPickupPoint: 'Point A',
+      createdAt: serverTimestamp(),
+      createdBy: 'privacy-secretary',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-secretary'
+    }));
+  });
+
+  it('denies transport enrollment writes from a cross-school secretary', async () => {
+    const context = testEnv.authenticatedContext('privacy-other-secretary');
+    const db = context.firestore();
+    await assertFails(updateDoc(doc(db, 'students', STUDENT_ID), { usesTransport: true }));
+    await assertFails(updateDoc(doc(db, 'studentPrivate', STUDENT_ID), {
+      transportZonePk: 35,
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-other-secretary'
+    }));
+  });
+
+  it('denies transport enrollment writes from a linked parent', async () => {
+    const context = testEnv.authenticatedContext('privacy-parent');
+    const db = context.firestore();
+    await assertFails(updateDoc(doc(db, 'students', STUDENT_ID), { usesTransport: true }));
+    await assertFails(updateDoc(doc(db, 'studentPrivate', STUDENT_ID), {
+      transportPickupPoint: 'Point parent interdit',
+      updatedAt: serverTimestamp(),
+      updatedBy: 'privacy-parent'
+    }));
+  });
+
   it('allows owner to read school and private student data in the same school', async () => {
     await assertSucceeds(readAs('privacy-owner', 'students'));
     await assertSucceeds(readAs('privacy-owner', 'studentPrivate'));
