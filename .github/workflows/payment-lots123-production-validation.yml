@@ -35,6 +35,7 @@ jobs:
       cancel-in-progress: false
     env:
       PAYMENT_LOTS123_PROJECT_ID: ecoscolaire-c5861
+      PRODUCTION_FIREBASE_PROJECT_ID: ecoscolaire-c5861
       PAYMENT_LOTS123_APP_URL: https://ecoscolaire.vercel.app
       PAYMENT_LOTS123_EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
       PAYMENT_LOTS123_CONFIRMATION: ${{ inputs.confirmation }}
