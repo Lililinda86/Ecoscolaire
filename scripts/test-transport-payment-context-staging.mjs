@@ -14,6 +14,8 @@ import {
   parseFrenchCurrencyAmount,
 } from "./payment-forward-recovery-currency.mjs";
 import {
+  assertScopedReceiptLabelledCurrency,
+  assertScopedReceiptSiblingCurrency,
   assertStructuredReceiptAllocationRows,
   assertTransportBenefitAppliedToQuote,
   exactReceiptRowSelector,
@@ -440,12 +442,12 @@ try {
     receiptAllocation.locator(".receipt-history-allocation-row"),
     expectedAllocations,
   );
-  const receiptCredit = receiptDetail.getByText("Crédit disponible", { exact: false });
-  assert.equal(await receiptCredit.count(), 1);
-  assert.equal(parseFrenchCurrencyAmount(await receiptCredit.textContent()), 1500);
-  const receiptRemaining = receiptDetail.getByText("Reste à payer", { exact: true })
-    .locator("xpath=following-sibling::div[1]");
-  assert.equal(parseFrenchCurrencyAmount(await receiptRemaining.textContent()), 0);
+  await assertScopedReceiptLabelledCurrency(receiptDetail, {
+    label: "Crédit disponible", expected: 1500,
+  });
+  await assertScopedReceiptSiblingCurrency(receiptDetail, {
+    label: "Reste à payer", expected: 0,
+  });
   console.log(`LOT3_UI PASS staging_sha=${process.env.EXPECTED_STAGING_SHA} receipt=${receipt.receiptNumber}`);
 } finally {
   await cleanup();

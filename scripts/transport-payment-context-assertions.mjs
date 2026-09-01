@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { parseFrenchCurrencyAmount } from "./payment-forward-recovery-currency.mjs";
+import {
+  assertLabelledFrenchCurrencyAmount,
+  parseFrenchCurrencyAmount,
+} from "./payment-forward-recovery-currency.mjs";
 
 const normalized = (value) => String(value || "").replace(/[\s\u00a0\u202f]+/g, " ").trim();
 const escaped = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -62,4 +65,24 @@ export const assertStructuredReceiptAllocationRows = async (
     assert.equal(parseFrenchCurrencyAmount(await amountElement.textContent()), item.amount,
       `Unexpected receipt allocation amount at index ${index}.`);
   }
+};
+
+export const assertScopedReceiptLabelledCurrency = async (
+  receiptDetail,
+  { label, expected },
+) => {
+  const field = receiptDetail.getByText(label, { exact: false });
+  assert.equal(await field.count(), 1, `Expected one "${label}" field in the exact receipt detail.`);
+  assertLabelledFrenchCurrencyAmount(await field.textContent(), { label, expected });
+};
+
+export const assertScopedReceiptSiblingCurrency = async (
+  receiptDetail,
+  { label, expected },
+) => {
+  const labelElement = receiptDetail.getByText(label, { exact: true });
+  assert.equal(await labelElement.count(), 1, `Expected one "${label}" label in the exact receipt detail.`);
+  const amountElement = labelElement.locator("xpath=following-sibling::div[1]");
+  assert.equal(await amountElement.count(), 1, `Expected one amount associated with "${label}".`);
+  assert.equal(parseFrenchCurrencyAmount(await amountElement.textContent()), expected);
 };

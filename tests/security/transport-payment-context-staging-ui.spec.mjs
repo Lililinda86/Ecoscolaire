@@ -6,6 +6,8 @@ import {
   parseLabelledFrenchCurrencyAmount,
 } from "../../scripts/payment-forward-recovery-currency.mjs";
 import {
+  assertScopedReceiptLabelledCurrency,
+  assertScopedReceiptSiblingCurrency,
   assertStructuredReceiptAllocationRows,
   assertTransportBenefitAppliedToQuote,
   exactReceiptRowSelector,
@@ -14,6 +16,7 @@ import {
 const caller = await readFile(".github/workflows/transport-payments-release-runner.yml", "utf8");
 const reusable = await readFile(".github/workflows/transport-payment-context-staging-ui.yml", "utf8");
 const harness = await readFile("scripts/test-transport-payment-context-staging.mjs", "utf8");
+const transportAssertions = await readFile("scripts/transport-payment-context-assertions.mjs", "utf8");
 const payments = await readFile("src/pages/Payments.tsx", "utf8");
 const receiptHistory = await readFile("src/components/ReceiptHistory.tsx", "utf8");
 
@@ -107,7 +110,9 @@ test("lot3 receipt UI proves class, allocations and remaining balance", () => {
   assert.match(receiptHistory, />Reste à payer<[\s\S]*?formattedRemainingBalance/);
   assert.match(harness, /receiptDetail\.getByText\("LOT3 Primaire", \{ exact: true \}\)/);
   assert.match(harness, /receiptAllocation\.locator\("\.receipt-history-allocation-row"\)/);
-  assert.match(harness, /receiptRemaining[\s\S]*?parseFrenchCurrencyAmount[\s\S]*?, 0\)/);
+  assert.match(harness, /assertScopedReceiptLabelledCurrency\(receiptDetail,[\s\S]*?Crédit disponible[\s\S]*?1500/);
+  assert.match(harness, /assertScopedReceiptSiblingCurrency\(receiptDetail,[\s\S]*?Reste à payer[\s\S]*?0/);
+  assert.doesNotMatch(harness, /parseFrenchCurrencyAmount\(await receiptCredit\.textContent\(\)\)/);
   assert.match(harness, /page\.locator\(exactReceiptRowSelector\(receipt\.receiptNumber\)\)/);
   assert.match(harness, /receiptDetail\.getByTestId\(`transport-receipt-context-/);
   assert.doesNotMatch(harness, /page\.getByText\(receipt\.receiptNumber/);
@@ -183,6 +188,75 @@ test("structured receipt allocations reject any unexpected fifth row", async () 
   ));
 });
 
+const textLocator = (texts, siblingTexts = []) => ({
+  count: async () => texts.length,
+  textContent: async () => texts[0] ?? null,
+  locator: selector => {
+    assert.equal(selector, "xpath=following-sibling::div[1]");
+    return textLocator(siblingTexts);
+  },
+});
+
+const receiptDetailFixture = ({
+  creditTexts = ["Crédit disponible : 1 500 FCFA"],
+  remainingLabels = ["Reste à payer"],
+  remainingAmounts = ["0 FCFA"],
+} = {}) => ({
+  getByText: (label, { exact }) => {
+    if (label === "Crédit disponible") {
+      assert.equal(exact, false);
+      return textLocator(creditTexts);
+    }
+    if (label === "Reste à payer") {
+      assert.equal(exact, true);
+      return textLocator(remainingLabels, remainingAmounts);
+    }
+    return textLocator([]);
+  },
+});
+
+test("receipt final credit is Unicode-safe, value-strict and receipt-scoped", async () => {
+  for (const creditText of [
+    "Crédit disponible : 1 500 FCFA",
+    "Crédit disponible : 1\u00a0500 FCFA",
+    "Crédit disponible : 1\u202f500 FCFA",
+    "Crédit disponible : 1500 FCFA",
+  ]) {
+    await assert.doesNotReject(assertScopedReceiptLabelledCurrency(
+      receiptDetailFixture({ creditTexts: [creditText] }),
+      { label: "Crédit disponible", expected: 1500 },
+    ));
+  }
+
+  for (const wrongCredit of [
+    "Crédit disponible : 500 FCFA",
+    "Crédit disponible : 15 000 FCFA",
+  ]) {
+    await assert.rejects(assertScopedReceiptLabelledCurrency(
+      receiptDetailFixture({ creditTexts: [wrongCredit] }),
+      { label: "Crédit disponible", expected: 1500 },
+    ));
+  }
+
+  const unrelatedPageText = "Crédit disponible : 1 500 FCFA";
+  assert.match(unrelatedPageText, /1 500 FCFA/);
+  await assert.rejects(assertScopedReceiptLabelledCurrency(
+    receiptDetailFixture({ creditTexts: ["Crédit disponible : 500 FCFA"] }),
+    { label: "Crédit disponible", expected: 1500 },
+  ));
+});
+
+test("receipt remaining reads the exact sibling amount and rejects a wrong balance", async () => {
+  await assert.doesNotReject(assertScopedReceiptSiblingCurrency(
+    receiptDetailFixture(),
+    { label: "Reste à payer", expected: 0 },
+  ));
+  await assert.rejects(assertScopedReceiptSiblingCurrency(
+    receiptDetailFixture({ remainingAmounts: ["1 500 FCFA"] }),
+    { label: "Reste à payer", expected: 0 },
+  ));
+});
+
 test("transport benefit assertion is quote-scoped, amount-strict and Tuition-isolated", () => {
   const base = {
     quoteText: "DISCOUNT_VOUCHER (LOT3-BON-1000) : - 1 000 FCFA",
@@ -236,8 +310,10 @@ test("known Lot 3 text assertions are scoped to their semantic payment contexts"
   assert.doesNotMatch(harness, /form\.getByText\("LOT3-TUITION-ISOLATED"/);
   assert.match(harness, /quote\.getByText\(\/ACTIF — dette inchangée\//);
   assert.match(harness, /receiptDetail\.getByText\("LOT3 Primaire"/);
-  assert.match(harness, /receiptDetail\.getByText\("Crédit disponible"/);
-  assert.match(harness, /receiptDetail\.getByText\("Reste à payer"/);
+  assert.match(harness, /assertScopedReceiptLabelledCurrency\(receiptDetail/);
+  assert.match(harness, /assertScopedReceiptSiblingCurrency\(receiptDetail/);
+  assert.match(transportAssertions, /receiptDetail\.getByText\(label, \{ exact: false \}\)/);
+  assert.match(transportAssertions, /receiptDetail\.getByText\(label, \{ exact: true \}\)/);
   assert.doesNotMatch(harness, /\.nth\(0\)/);
   assert.match(harness, /assert\.equal\(await rows\.count\(\), 1[\s\S]*?rows\.first\(\)/);
 });
