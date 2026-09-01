@@ -1,0 +1,126 @@
+name: Production Lots 1-3 Secretary Payment Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact deployed main SHA
+        required: true
+        type: string
+      confirmation:
+        description: Exact confirmation RUN_PAYMENT_LOTS123_PRODUCTION
+        required: true
+        type: string
+      backup_max_age_hours:
+        description: Maximum accepted Firestore export age
+        required: true
+        default: "24"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  payment-lots123-production:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      inputs.confirmation == 'RUN_PAYMENT_LOTS123_PRODUCTION'
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 60
+    concurrency:
+      group: payment-lots123-production-validation
+      cancel-in-progress: false
+    env:
+      PAYMENT_LOTS123_PROJECT_ID: ecoscolaire-c5861
+      PAYMENT_LOTS123_APP_URL: https://ecoscolaire.vercel.app
+      PAYMENT_LOTS123_EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      PAYMENT_LOTS123_CONFIRMATION: ${{ inputs.confirmation }}
+      PAYMENT_LOTS123_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      PAYMENT_LOTS123_FIXTURE_SCHOOL_ID: payment-lots123-production-${{ github.run_id }}-${{ github.run_attempt }}
+      GOOGLE_CLOUD_PROJECT: ecoscolaire-c5861
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Fail-closed exact main, Firebase and Vercel SHA gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_SHA" = "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA"
+          test "$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')" = "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA"
+          runs_json="$(mktemp)"
+          deployments_json="$(mktemp)"
+          statuses_json="$(mktemp)"
+          trap 'rm -f "$runs_json" "$deployments_json" "$statuses_json"' EXIT
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/firebase-deploy.yml/runs" \
+            -f head_sha="$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" -f branch=main -f event=push -f per_page=100 > "$runs_json"
+          node scripts/verify-exact-deployment-run.mjs \
+            "$runs_json" "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" '.github/workflows/firebase-deploy.yml' main
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments" \
+            -f sha="$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" -f environment=Production -f per_page=100 > "$deployments_json"
+          deployment_id="$(jq -er --arg sha "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" \
+            'map(select(.sha == $sha and .environment == "Production")) | first | .id' "$deployments_json")"
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" > "$statuses_json"
+          jq -e 'map(select(.state == "success" and (.environment_url | type == "string") and (.environment_url | startswith("https://")))) | length >= 1' "$statuses_json"
+          echo 'PAYMENT_LOTS123_DEPLOYMENT_VERIFIED=true' >> "$GITHUB_ENV"
+
+      - name: Authenticate to approved Production identity
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Detect latest existing Firestore backup
+        shell: bash
+        run: gcloud firestore operations list --project "$PAYMENT_LOTS123_PROJECT_ID" --format=json > "$RUNNER_TEMP/firestore-operations.json"
+
+      - name: Fail-closed Production backup gate before fixtures
+        env:
+          PRODUCTION_BACKUP_OPERATIONS_PATH: ${{ runner.temp }}/firestore-operations.json
+          PRODUCTION_BACKUP_RECEIPT_PATH: ${{ runner.temp }}/production-backup-receipt.json
+          PRODUCTION_BACKUP_MAX_AGE_HOURS: ${{ inputs.backup_max_age_hours }}
+        run: node scripts/verify-production-backup-gate.mjs
+
+      - name: Guard exact fixture lifecycle permissions before Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gcloud config get-value project)" = 'ecoscolaire-c5861'
+          test "$PAYMENT_LOTS123_FIXTURE_SCHOOL_ID" = "payment-lots123-production-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test "$PAYMENT_LOTS123_FIXTURE_SCHOOL_ID" != 'italo-gsb'
+          token="$(gcloud auth print-access-token)"
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"permissions":["datastore.entities.create","datastore.entities.get","datastore.entities.list","datastore.entities.update","datastore.entities.delete","firebaseauth.users.create","firebaseauth.users.get","firebaseauth.users.delete"]}' \
+            'https://cloudresourcemanager.googleapis.com/v1/projects/ecoscolaire-c5861:testIamPermissions')"
+          for permission in datastore.entities.create datastore.entities.get datastore.entities.list \
+            datastore.entities.update datastore.entities.delete firebaseauth.users.create \
+            firebaseauth.users.get firebaseauth.users.delete; do
+            printf '%s' "$response" | jq -e --arg permission "$permission" '.permissions | index($permission) != null' >/dev/null
+          done
+          echo 'PAYMENT_LOTS123_CLEANUP_CAPABILITY_VERIFIED=true' >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run one isolated Production Lots 1-3 validation
+        env:
+          PRODUCTION_BACKUP_RECEIPT_PATH: ${{ runner.temp }}/production-backup-receipt.json
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: node scripts/test-payment-lots123-production.mjs
