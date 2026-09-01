@@ -14,6 +14,7 @@ import {
   parseFrenchCurrencyAmount,
 } from "./payment-forward-recovery-currency.mjs";
 import {
+  assertStructuredReceiptAllocationRows,
   assertTransportBenefitAppliedToQuote,
   exactReceiptRowSelector,
 } from "./transport-payment-context-assertions.mjs";
@@ -435,8 +436,10 @@ try {
   assert.match(normalized(await receiptContext.textContent()), /PK28.*Quartier A.*Point A.*ITALO PK.*4 000 FCFA/s);
   await receiptDetail.getByText("LOT3 Primaire", { exact: true }).waitFor();
   const receiptAllocation = receiptDetail.getByTestId(`transport-receipt-allocation-${receiptDocument.id}`);
-  await assertAllocationRows(receiptAllocation.locator(".receipt-history-allocation-row"),
-    expectedAllocations, { creditLabel: "Crédit Transport" });
+  await assertStructuredReceiptAllocationRows(
+    receiptAllocation.locator(".receipt-history-allocation-row"),
+    expectedAllocations,
+  );
   const receiptCredit = receiptDetail.getByText("Crédit disponible", { exact: false });
   assert.equal(await receiptCredit.count(), 1);
   assert.equal(parseFrenchCurrencyAmount(await receiptCredit.textContent()), 1500);
