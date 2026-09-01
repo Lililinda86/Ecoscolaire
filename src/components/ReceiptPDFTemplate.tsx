@@ -130,6 +130,18 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
             <h3 style={{ margin: '0 0 .75rem 0', fontSize: '11pt', color: '#1e40af', textTransform: 'uppercase' }}>
               Ventilation du versement Transport
             </h3>
+            {displayModel.transportContext && (
+              <div data-testid="transport-receipt-context" style={{ marginBottom: '.85rem', fontSize: '10pt', lineHeight: 1.5 }}>
+                <strong>Contexte Transport au moment du paiement</strong><br />
+                Zone : {displayModel.transportContext.zonePk === null ? 'Secondaire gratuit' : `PK${displayModel.transportContext.zonePk}`} ·
+                {' '}Quartier : {displayModel.transportContext.neighborhood || 'Non renseigné'} ·
+                {' '}Point de ramassage : {displayModel.transportContext.pickupPoint || 'Non renseigné'}<br />
+                Politique : {displayModel.transportContext.feePolicyId === 'ITALO_PK_2026' ? 'ITALO PK' : displayModel.transportContext.feePolicyId} ·
+                {' '}Tarif : {displayModel.transportContext.transportState === 'FREE_SECONDARY'
+                  ? 'Gratuit — Secondaire'
+                  : `${displayModel.transportContext.monthlyGrossAmount.toLocaleString('fr-FR')} FCFA / période`}
+              </div>
+            )}
             {displayModel.allocations.length > 0 ? (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt' }}>
                 <tbody>

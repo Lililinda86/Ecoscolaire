@@ -20,6 +20,7 @@ import {
 import FinancialBenefitsPanel from '../components/FinancialBenefitsPanel';
 import { createExpense, reverseExpense } from '../services/expenses';
 import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from '../utils/expenseLedger';
+import { buildTransportPaymentPreview } from '../utils/transportPaymentPreview';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -37,6 +38,17 @@ const getErrorMessage = (error: unknown): string => {
 
   return String(error);
 };
+
+type TuitionInstallment = 'T1' | 'T2' | 'T3';
+
+const getConfiguredClassFeeInstallments = (fees: {
+  feeT1?: number;
+  feeT2?: number;
+  feeT3?: number;
+}): TuitionInstallment[] => (['T1', 'T2', 'T3'] as TuitionInstallment[]).filter(installment => {
+  const amount = fees[`fee${installment}` as 'feeT1' | 'feeT2' | 'feeT3'];
+  return typeof amount === 'number' && Number.isSafeInteger(amount) && amount > 0;
+});
 
 const formatIsoDateFr = (value: string) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -297,6 +309,7 @@ const Payments: React.FC = () => {
   const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({ date: new Date().toISOString().split('T')[0], type: 'tuition', amount: '' as unknown as number });
   const [collectionQuote, setCollectionQuote] = useState<CollectionQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [quoteRefresh, setQuoteRefresh] = useState(0);
   const [isConfirmingTx, setIsConfirmingTx] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -364,6 +377,57 @@ const Payments: React.FC = () => {
   };
 
   const mobileMoneyEnabled = isOperationalMobileMoneyProvider(db.school?.paymentSettings?.activeProvider);
+  const selectedPaymentStudent = db.students.find(student => student.id === currentPayment.studentId);
+  const selectedPaymentClass = db.classes.find(classSection => classSection.id === selectedPaymentStudent?.classId);
+  const selectedPaymentClassCycle = selectedPaymentClass?.cycle
+    ?? (selectedPaymentClass?.level === 'secondaire' ? 'secondary'
+      : selectedPaymentClass?.level === 'primaire' ? 'primary'
+        : selectedPaymentClass?.level === 'maternelle' ? 'nursery' : undefined);
+  const transportConfigurationIncomplete = currentPayment.type === 'transport'
+    && selectedPaymentStudent?.usesTransport === true
+    && selectedPaymentClassCycle !== 'secondary'
+    && (!Number.isSafeInteger(selectedPaymentStudent.transportZonePk)
+      || selectedPaymentStudent.transportStatus === 'needs_configuration');
+  const transportStatusLabel = selectedPaymentStudent?.usesTransport !== true
+    ? 'Non utilisé'
+    : transportConfigurationIncomplete ? 'À compléter' : 'Configuré';
+  const selectedPaymentClassFees = selectedPaymentClass
+    ? db.school?.classFees?.[selectedPaymentClass.name]
+    : undefined;
+  const configuredTuitionInstallments = React.useMemo(
+    () => getConfiguredClassFeeInstallments({
+      feeT1: selectedPaymentClassFees?.t1,
+      feeT2: selectedPaymentClassFees?.t2,
+      feeT3: selectedPaymentClassFees?.t3
+    }),
+    [selectedPaymentClassFees]
+  );
+  const transportPaymentPreview = React.useMemo(() => {
+    if (currentPayment.type !== 'transport' || collectionQuote?.transportState !== 'BILLABLE'
+        || !collectionQuote.installments) return null;
+    const amount = Number(currentPayment.amount) || 0;
+    if (!Number.isSafeInteger(amount) || amount < 0) return null;
+    try {
+      return buildTransportPaymentPreview(
+        collectionQuote.installments.map(item => ({
+          period: item.period,
+          remainingBalance: item.remainingBalance
+        })),
+        amount,
+        collectionQuote.transportCredit || 0
+      );
+    } catch {
+      return null;
+    }
+  }, [collectionQuote, currentPayment.amount, currentPayment.type]);
+
+  useEffect(() => {
+    if (currentPayment.type !== 'tuition' || configuredTuitionInstallments.length === 0) return;
+    if (!currentPayment.installment
+        || !configuredTuitionInstallments.includes(currentPayment.installment)) {
+      setCurrentPayment(previous => ({ ...previous, installment: configuredTuitionInstallments[0] }));
+    }
+  }, [currentPayment.type, currentPayment.installment, configuredTuitionInstallments]);
 
   useEffect(() => {
     if (!mobileMoneyEnabled) {
@@ -496,6 +560,21 @@ const Payments: React.FC = () => {
     setCurrentPayment(prev => ({ ...prev, amount: '' as unknown as number }));
   }, [currentPayment.studentId, currentPayment.type, currentPayment.installment, currentPayment.period]);
 
+  // Invalidate the previous quote before painting a newly selected target.
+  React.useLayoutEffect(() => {
+    const supported = currentPayment.type === 'tuition'
+      || currentPayment.type === 'transport'
+      || currentPayment.type === 'registration_fee';
+    const targetReady = Boolean(isModalOpen && supported && currentPayment.studentId
+      && currentSchool?.id && currentSchool.academicYear);
+    setCollectionQuote(null);
+    setQuoteError(null);
+    setQuoteLoading(targetReady);
+  }, [
+    currentPayment.studentId, currentPayment.type, currentPayment.installment, currentPayment.period,
+    currentSchool?.academicYear, currentSchool?.id, isModalOpen, quoteRefresh
+  ]);
+
   // Fetch a server-side quote. The browser displays it but never authorizes the amount.
   React.useEffect(() => {
     let cancelled = false;
@@ -505,10 +584,14 @@ const Payments: React.FC = () => {
     const targetReady = true;
     if (!isModalOpen || !supported || !targetReady || !currentPayment.studentId
         || !currentSchool?.id || !currentSchool.academicYear) {
+      setQuoteLoading(false);
       setCollectionQuote(null);
+      setQuoteError(null);
       return () => { cancelled = true; };
     }
     setQuoteLoading(true);
+    setCollectionQuote(null);
+    setQuoteError(null);
     const getQuote = httpsCallable<Record<string, unknown>, CollectionQuote>(functions, 'getCollectionQuote');
     getQuote({
       schoolId: currentSchool.id,
@@ -521,7 +604,10 @@ const Payments: React.FC = () => {
       if (!cancelled) setCollectionQuote(result.data);
     }).catch(error => {
       console.warn('Unable to calculate collection quote', error);
-      if (!cancelled) setCollectionQuote(null);
+      if (!cancelled) {
+        setCollectionQuote(null);
+        setQuoteError('Impossible de calculer le devis actuel. Vérifiez la configuration puis réessayez.');
+      }
     }).finally(() => {
       if (!cancelled) setQuoteLoading(false);
     });
@@ -2224,6 +2310,39 @@ const Payments: React.FC = () => {
               {db.students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.section})</option>)}
             </select>
           </div>
+          {selectedPaymentStudent && (
+            <div
+              data-testid="payment-student-class"
+              aria-live="polite"
+              style={{ marginTop: '-.35rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}
+            >
+              <strong>Classe :</strong> {selectedPaymentClass?.name || 'Non renseignée'}
+            </div>
+          )}
+          {selectedPaymentStudent && currentPayment.type === 'transport' && (
+            <section
+              data-testid="transport-student-context"
+              aria-label="Transport de l’élève"
+              style={{ marginBottom: '1rem', padding: '.85rem', border: '1px solid var(--border-color)', borderRadius: 6, background: '#f8fafc' }}
+            >
+              <strong>Transport de l'élève</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '.55rem', marginTop: '.65rem' }}>
+                <div><small>Classe</small><br/><span data-testid="transport-student-class">{selectedPaymentClass?.name || 'Non renseignée'}</span></div>
+                <div><small>Zone / PK</small><br/><span data-testid="transport-zone-pk">{Number.isSafeInteger(selectedPaymentStudent.transportZonePk) ? `PK${selectedPaymentStudent.transportZonePk}` : 'Non renseigné'}</span></div>
+                <div><small>Quartier</small><br/><span data-testid="transport-neighborhood">{selectedPaymentStudent.transportNeighborhood || 'Non renseigné'}</span></div>
+                <div><small>Point de ramassage</small><br/><span data-testid="transport-pickup">{selectedPaymentStudent.transportPickupPoint || 'Non renseigné'}</span></div>
+                <div><small>Statut</small><br/><span data-testid="transport-status">{transportStatusLabel}</span></div>
+              </div>
+              <div style={{ marginTop: '.65rem', color: 'var(--text-secondary)', fontSize: '.82rem' }}>
+                Le point de ramassage est informatif ; le tarif est déterminé par le PK selon la politique serveur.
+              </div>
+              {transportConfigurationIncomplete && (
+                <div data-testid="transport-configuration-incomplete" role="alert" style={{ marginTop: '.65rem', padding: '.65rem', background: '#fef2f2', color: '#991b1b', borderRadius: 4 }}>
+                  Configuration Transport à compléter — renseignez le PK dans la fiche élève avant tout encaissement Transport.
+                </div>
+              )}
+            </section>
+          )}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
              <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
               <label>Nature du Versement</label>
@@ -2272,11 +2391,19 @@ const Payments: React.FC = () => {
             </div>
             {currentPayment.type === 'tuition' && (
               <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
-                <label>Choix de la Tranche</label>
-                <select required value={currentPayment.installment || 'T1'} onChange={e => setCurrentPayment({...currentPayment, installment: e.target.value as 'T1' | 'T2' | 'T3'})}>
-                  <option value="T1">Tranche 1</option>
-                  <option value="T2">Tranche 2</option>
-                  <option value="T3">Tranche 3</option>
+                <label htmlFor="tuition-installment-select">Choix de la Tranche</label>
+                <select
+                  id="tuition-installment-select"
+                  data-testid="tuition-installment-select"
+                  required
+                  value={currentPayment.installment || 'T1'}
+                  onChange={e => setCurrentPayment({...currentPayment, installment: e.target.value as 'T1' | 'T2' | 'T3'})}
+                >
+                  {configuredTuitionInstallments.map(installment => (
+                    <option key={installment} value={installment}>
+                      Tranche {installment.slice(1)}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -2296,14 +2423,25 @@ const Payments: React.FC = () => {
           {currentPayment.type !== 'other' && (
             <div className="form-group" aria-live="polite">
               <label>Situation financière calculée par le serveur</label>
-              {quoteLoading && <div style={{ padding: '.75rem', background: '#f8fafc' }}>Calcul en cours…</div>}
-              {!quoteLoading && !collectionQuote && (
+              {quoteLoading && <div data-testid="collection-quote-loading" style={{ padding: '.75rem', background: '#f8fafc' }}>Calcul en cours…</div>}
+              {!quoteLoading && quoteError && (
+                <div data-testid="collection-quote-error" role="alert" style={{ padding: '.75rem', background: '#fef2f2', color: '#991b1b' }}>
+                  {quoteError}
+                </div>
+              )}
+              {!quoteLoading && !quoteError && !collectionQuote && (
                 <div role="alert" style={{ padding: '.75rem', background: '#fef2f2', color: '#991b1b' }}>
                   Sélectionnez un élève et une échéance disposant d’un tarif configuré.
                 </div>
               )}
-              {collectionQuote && (
-                <div style={{ padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
+              {!quoteLoading && collectionQuote && (
+                <div data-testid="collection-quote-current" style={{ padding: '.75rem', background: '#f8fafc', borderRadius: 6 }}>
+                  {currentPayment.type === 'transport' && collectionQuote.transportState && (
+                    <div style={{ marginBottom: '.75rem', padding: '.65rem', border: '1px solid #bfdbfe', borderRadius: 4, background: '#eff6ff' }}>
+                      <div data-testid="transport-policy"><strong>Politique tarifaire :</strong> {collectionQuote.feePolicyId === 'ITALO_PK_2026' ? 'ITALO PK' : collectionQuote.feePolicyId || 'Non configurée'}</div>
+                      <div data-testid="transport-rate"><strong>Tarif applicable :</strong> {collectionQuote.transportState === 'FREE_SECONDARY' ? 'Gratuit — Secondaire' : collectionQuote.transportState === 'BILLABLE' ? `${formatCurrency(collectionQuote.monthlyGrossAmount || 0)} / période` : 'Non applicable'}</div>
+                    </div>
+                  )}
                   {collectionQuote.transportState === 'FREE_SECONDARY' && (
                     <div data-testid="transport-free-secondary" style={{ padding: '.8rem', marginBottom: '.75rem', background: '#ecfdf5', color: '#065f46', fontWeight: 700, borderRadius: 6 }}>
                       TRANSPORT GRATUIT — montant mensuel 0 FCFA — reste dû 0 FCFA
@@ -2320,11 +2458,11 @@ const Payments: React.FC = () => {
                     </div>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '.75rem' }}>
-                    <div><small>Tarif de référence</small><br/><strong>{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
+                    <div><small>Tarif de référence</small><br/><strong data-testid="collection-quote-gross">{formatCurrency(collectionQuote.grossExpectedAmount)}</strong></div>
                     <div><small>Bourse / réduction applicable</small><br/><strong>- {formatCurrency(collectionQuote.discountAmount)}</strong></div>
-                    <div><small>Montant réellement dû</small><br/><strong>{formatCurrency(collectionQuote.netExpectedAmount)}</strong></div>
+                    <div><small>Montant réellement dû</small><br/><strong data-testid="collection-quote-net">{formatCurrency(collectionQuote.netExpectedAmount)}</strong></div>
                     <div><small>Sommes déjà versées</small><br/><strong>{formatCurrency(collectionQuote.previousPaid)}</strong></div>
-                    <div><small>Reste à payer</small><br/><strong>{formatCurrency(collectionQuote.remainingBalance)}</strong></div>
+                    <div><small>Reste à payer</small><br/><strong data-testid="collection-quote-remaining">{formatCurrency(collectionQuote.remainingBalance)}</strong></div>
                     <div><small>Statut de paiement</small><br/><strong>{collectionQuote.status === 'PAID' ? 'SOLDÉ' : collectionQuote.status === 'PARTIAL' ? 'PARTIEL' : 'NON PAYÉ'}</strong></div>
                     <div><small>Échéance initiale</small><br/><strong>{collectionQuote.originalDueDate ? formatIsoDateFr(collectionQuote.originalDueDate) : 'Non configurée'}</strong></div>
                     <div><small>Échéance effective</small><br/><strong>{collectionQuote.effectiveDueDate ? formatIsoDateFr(collectionQuote.effectiveDueDate) : 'Non configurée'}</strong></div>
@@ -2335,7 +2473,7 @@ const Payments: React.FC = () => {
                     </strong></div>
                   </div>
                   {collectionQuote.installments && collectionQuote.installments.length > 0 && (
-                    <div data-testid="transport-installments-scroll" style={{ marginTop: '.85rem', maxWidth: '100%', overflowX: 'auto', overscrollBehaviorInline: 'contain' }}>
+                    <div data-testid="transport-installments-scroll" data-period-source="server-quote" style={{ marginTop: '.85rem', maxWidth: '100%', overflowX: 'auto', overscrollBehaviorInline: 'contain' }}>
                       <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse', fontSize: '.82rem' }}>
                         <thead><tr>
                           <th>Mois</th><th>Brut</th><th>Aide</th><th>Dû net</th><th>Payé</th><th>Reste</th><th>Échéance</th><th>Statut</th>
@@ -2397,11 +2535,25 @@ const Payments: React.FC = () => {
               onWheel={(e) => e.currentTarget.blur()}
             />
 
-            {collectionQuote && currentPayment.type !== 'other' && (() => {
+            {collectionQuote && currentPayment.type === 'transport' && transportPaymentPreview && (
+              <div data-testid="transport-payment-preview" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#eff6ff', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
+                <div><strong>Ventilation prévisionnelle (devis serveur)</strong></div>
+                {transportPaymentPreview.allocations.length > 0 ? transportPaymentPreview.allocations.map((allocation, index) => (
+                  <div data-testid="transport-preview-allocation" key={`${allocation.kind}-${allocation.period || 'credit'}-${index}`}>
+                    • {allocation.kind === 'CREDIT' ? 'Crédit généré' : `Période ${allocation.period}`} : {formatCurrency(allocation.amount)}
+                  </div>
+                )) : <div>• Aucun montant saisi.</div>}
+                <div data-testid="transport-existing-credit">Crédit existant : {formatCurrency(transportPaymentPreview.existingCredit)}</div>
+                <div data-testid="transport-generated-credit">Crédit généré : {formatCurrency(transportPaymentPreview.generatedCredit)}</div>
+                <div data-testid="transport-final-credit"><strong>Crédit final prévu : {formatCurrency(transportPaymentPreview.finalCredit)}</strong></div>
+                <small>Prévisualisation informative : le serveur recalcule et valide la ventilation lors de l’enregistrement.</small>
+              </div>
+            )}
+
+            {collectionQuote && currentPayment.type !== 'other' && currentPayment.type !== 'transport' && (() => {
                const resteAvant = collectionQuote.remainingBalance;
                const saisi = Number(currentPayment.amount) || 0;
                const resteApres = Math.max(0, resteAvant - saisi);
-               const creditApres = currentPayment.type === 'transport' ? Math.max(0, saisi - resteAvant) : 0;
                return (
                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f3f4f6', padding: '0.75rem', borderRadius: '4px', lineHeight: '1.5' }}>
                    <div>• <strong>Reste avant versement :</strong> {resteAvant.toLocaleString('fr-FR')} FCFA</div>
@@ -2409,9 +2561,7 @@ const Payments: React.FC = () => {
                    <div style={{ color: resteApres > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 'bold', marginTop: '0.25rem' }}>
                      → Nouveau reste prévisionnel : {resteApres.toLocaleString('fr-FR')} FCFA
                    </div>
-                    {creditApres > 0 && <div style={{ color: '#0369a1', fontWeight: 600 }}>
-                      → Crédit transport prévisionnel : {creditApres.toLocaleString('fr-FR')} FCFA
-                    </div>}
+
                  </div>
                );
             })()}
@@ -2487,6 +2637,7 @@ const Payments: React.FC = () => {
               type="submit"
               data-testid="cash-payment-submit"
               disabled={isProcessingMoMo || momoSuccess || isSaving
+                || transportConfigurationIncomplete
                 || (paymentMethod === 'cash' && (!collectionQuote || collectionQuote.remainingBalance <= 0))}
               style={{ background: paymentMethod === 'mobile_money' ? '#ea580c' : 'var(--primary-color)', minHeight: 44 }}
             >
