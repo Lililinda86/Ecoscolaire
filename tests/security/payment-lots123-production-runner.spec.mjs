@@ -106,7 +106,7 @@ test('financial fingerprints fail closed on every protected change', () => {
 });
 
 test('workflow is dispatch-only, Production-scoped and backup-gated before fixtures', () => {
-  assert.match(workflow, /^on:\n  workflow_dispatch:/m);
+  assert.match(workflow, /^on:\r?\n  workflow_dispatch:/m);
   assert.doesNotMatch(workflow, /\npush:/);
   assert.match(workflow, /environment: Production/);
   assert.match(workflow, /id-token: write/);
@@ -115,8 +115,19 @@ test('workflow is dispatch-only, Production-scoped and backup-gated before fixtu
     < workflow.indexOf('Run one isolated Production Lots 1-3 validation'));
   assert.ok(workflow.indexOf('Fail-closed exact main, Firebase and Vercel SHA gate')
     < workflow.indexOf('Run one isolated Production Lots 1-3 validation'));
+  assert.ok(workflow.indexOf('verify-exact-deployment-run.mjs')
+    < workflow.indexOf('vercel-production-deployment-gate.mjs'));
+  assert.ok(workflow.indexOf('vercel-production-deployment-gate.mjs')
+    < workflow.indexOf('Authenticate to approved Production identity'));
+  assert.ok(workflow.indexOf('Authenticate to approved Production identity')
+    < workflow.indexOf('verify-production-backup-gate.mjs'));
+  assert.ok(workflow.indexOf('verify-production-backup-gate.mjs')
+    < workflow.indexOf('Guard exact fixture lifecycle permissions before Chromium'));
+  assert.ok(workflow.indexOf('Guard exact fixture lifecycle permissions before Chromium')
+    < workflow.indexOf('Run one isolated Production Lots 1-3 validation'));
   assert.ok(workflow.indexOf('Guard exact fixture lifecycle permissions before Chromium')
     < workflow.indexOf('Install Chromium'));
+  assert.doesNotMatch(workflow, /map\(select\(\.sha[\s\S]*\| first \| \.id/);
 });
 
 test('workflow preserves exact project, fixture, counter and WIF contracts', () => {
@@ -157,7 +168,9 @@ test('PR CI installs canonical root dependencies before mandatory runner safety'
   assert.ok(installIndex >= 0 && npmCiIndex > installIndex, 'Canonical npm ci step is required.');
   assert.ok(npmCiIndex < runnerSafetyIndex, 'Root dependencies must be installed before runner safety.');
   assert.match(ci.slice(runnerSafetyIndex),
-    /run: node --check scripts\/test-payment-lots123-production\.mjs && node --test tests\/security\/payment-lots123-production-runner\.spec\.mjs/);
+    /node --check scripts\/vercel-production-deployment-gate\.mjs/);
+  assert.match(ci.slice(runnerSafetyIndex),
+    /tests\/security\/vercel-production-deployment-gate\.spec\.mjs/);
   assert.doesNotMatch(ci.slice(runnerSafetyIndex), /test-payment-lots123-production\.mjs\s*(?:--execute|--run)?\s*$/m);
   assert.doesNotMatch(ci, /continue-on-error|\|\| true/);
 });
