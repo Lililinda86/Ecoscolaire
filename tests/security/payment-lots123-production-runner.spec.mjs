@@ -149,3 +149,15 @@ test('PR CI exposes the Production Lots 1-3 runner safety gate without continue-
   assert.match(ci, /payment-lots123-production-runner\.spec\.mjs/);
   assert.doesNotMatch(ci, /continue-on-error/);
 });
+
+test('PR CI installs canonical root dependencies before mandatory runner safety', () => {
+  const installIndex = ci.indexOf('name: Install root dependencies');
+  const npmCiIndex = ci.indexOf('run: npm ci', installIndex);
+  const runnerSafetyIndex = ci.indexOf('name: Production Lots 1-3 runner safety');
+  assert.ok(installIndex >= 0 && npmCiIndex > installIndex, 'Canonical npm ci step is required.');
+  assert.ok(npmCiIndex < runnerSafetyIndex, 'Root dependencies must be installed before runner safety.');
+  assert.match(ci.slice(runnerSafetyIndex),
+    /run: node --check scripts\/test-payment-lots123-production\.mjs && node --test tests\/security\/payment-lots123-production-runner\.spec\.mjs/);
+  assert.doesNotMatch(ci.slice(runnerSafetyIndex), /test-payment-lots123-production\.mjs\s*(?:--execute|--run)?\s*$/m);
+  assert.doesNotMatch(ci, /continue-on-error|\|\| true/);
+});
