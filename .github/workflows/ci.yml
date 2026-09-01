@@ -49,7 +49,7 @@ jobs:
         run: node --check scripts/test-transport-payments-production.mjs && node --test tests/security/transport-payments-release-runner.spec.mjs
 
       - name: Production Lots 1-3 runner safety
-        run: node --check scripts/test-payment-lots123-production.mjs && node --test tests/security/payment-lots123-production-runner.spec.mjs
+        run: node --check scripts/test-payment-lots123-production.mjs && node --check scripts/vercel-production-deployment-gate.mjs && node --test tests/security/payment-lots123-production-runner.spec.mjs tests/security/vercel-production-deployment-gate.spec.mjs
 
 
       - name: Validate Production Staff E2E safety contract

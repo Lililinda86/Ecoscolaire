@@ -58,19 +58,12 @@ jobs:
           test "$GITHUB_SHA" = "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA"
           test "$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')" = "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA"
           runs_json="$(mktemp)"
-          deployments_json="$(mktemp)"
-          statuses_json="$(mktemp)"
-          trap 'rm -f "$runs_json" "$deployments_json" "$statuses_json"' EXIT
+          trap 'rm -f "$runs_json"' EXIT
           gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/firebase-deploy.yml/runs" \
             -f head_sha="$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" -f branch=main -f event=push -f per_page=100 > "$runs_json"
           node scripts/verify-exact-deployment-run.mjs \
             "$runs_json" "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" '.github/workflows/firebase-deploy.yml' main
-          gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments" \
-            -f sha="$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" -f environment=Production -f per_page=100 > "$deployments_json"
-          deployment_id="$(jq -er --arg sha "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" \
-            'map(select(.sha == $sha and .environment == "Production")) | first | .id' "$deployments_json")"
-          gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" > "$statuses_json"
-          jq -e 'map(select(.state == "success" and (.environment_url | type == "string") and (.environment_url | startswith("https://")))) | length >= 1' "$statuses_json"
+          node scripts/vercel-production-deployment-gate.mjs --repository "$GITHUB_REPOSITORY" --expected-sha "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" --timeout-ms 120000 --interval-ms 5000
           echo 'PAYMENT_LOTS123_DEPLOYMENT_VERIFIED=true' >> "$GITHUB_ENV"
 
       - name: Authenticate to approved Production identity
