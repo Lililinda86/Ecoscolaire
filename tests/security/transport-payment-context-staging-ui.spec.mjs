@@ -6,6 +6,7 @@ import {
   parseLabelledFrenchCurrencyAmount,
 } from "../../scripts/payment-forward-recovery-currency.mjs";
 import {
+  assertStructuredReceiptAllocationRows,
   assertTransportBenefitAppliedToQuote,
   exactReceiptRowSelector,
 } from "../../scripts/transport-payment-context-assertions.mjs";
@@ -110,6 +111,76 @@ test("lot3 receipt UI proves class, allocations and remaining balance", () => {
   assert.match(harness, /page\.locator\(exactReceiptRowSelector\(receipt\.receiptNumber\)\)/);
   assert.match(harness, /receiptDetail\.getByTestId\(`transport-receipt-context-/);
   assert.doesNotMatch(harness, /page\.getByText\(receipt\.receiptNumber/);
+});
+
+const structuredAllocationRows = (items) => ({
+  count: async () => items.length,
+  nth: index => ({
+    locator: selector => {
+      const key = selector === ":scope > span"
+        ? "labels"
+        : selector === ":scope > strong" ? "amounts" : null;
+      assert.ok(key, `Unexpected structured allocation selector: ${selector}`);
+      const values = items[index]?.[key] || [];
+      return {
+        count: async () => values.length,
+        textContent: async () => values[0] ?? null,
+      };
+    },
+  }),
+});
+
+const receiptAllocations = [
+  { kind: "INSTALLMENT", period: "2026-09", amount: 2000 },
+  { kind: "INSTALLMENT", period: "2026-10", amount: 4000 },
+  { kind: "INSTALLMENT", period: "2026-11", amount: 4000 },
+  { kind: "CREDIT", period: null, amount: 1000 },
+];
+
+const receiptAllocationDom = [
+  { labels: ["Période 2026-09"], amounts: ["2 000 FCFA"] },
+  { labels: ["Période 2026-10"], amounts: ["4\u00a0000 FCFA"] },
+  { labels: ["Période 2026-11"], amounts: ["4\u202f000 FCFA"] },
+  { labels: ["Crédit Transport"], amounts: ["1000 FCFA"] },
+];
+
+test("structured receipt allocations read split labels and amounts in strict order", async () => {
+  await assert.doesNotReject(assertStructuredReceiptAllocationRows(
+    structuredAllocationRows(receiptAllocationDom), receiptAllocations,
+  ));
+});
+
+test("structured receipt allocations reject wrong amounts and labels", async () => {
+  const wrongAmount = structuredClone(receiptAllocationDom);
+  wrongAmount[1].amounts = ["5 000 FCFA"];
+  await assert.rejects(assertStructuredReceiptAllocationRows(
+    structuredAllocationRows(wrongAmount), receiptAllocations,
+  ));
+
+  const wrongLabel = structuredClone(receiptAllocationDom);
+  wrongLabel[0].labels = ["Période septembre 2026"];
+  await assert.rejects(assertStructuredReceiptAllocationRows(
+    structuredAllocationRows(wrongLabel), receiptAllocations,
+  ));
+});
+
+test("structured receipt allocations reject permutations and missing credit", async () => {
+  const permuted = [receiptAllocationDom[1], receiptAllocationDom[0],
+    receiptAllocationDom[2], receiptAllocationDom[3]];
+  await assert.rejects(assertStructuredReceiptAllocationRows(
+    structuredAllocationRows(permuted), receiptAllocations,
+  ));
+  await assert.rejects(assertStructuredReceiptAllocationRows(
+    structuredAllocationRows(receiptAllocationDom.slice(0, 3)), receiptAllocations,
+  ));
+});
+
+test("structured receipt allocations reject any unexpected fifth row", async () => {
+  const extraRow = [...receiptAllocationDom,
+    { labels: ["Crédit Transport"], amounts: ["1 FCFA"] }];
+  await assert.rejects(assertStructuredReceiptAllocationRows(
+    structuredAllocationRows(extraRow), receiptAllocations,
+  ));
 });
 
 test("transport benefit assertion is quote-scoped, amount-strict and Tuition-isolated", () => {

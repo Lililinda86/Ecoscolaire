@@ -36,3 +36,30 @@ export const exactReceiptRowSelector = (receiptNumber) => {
   assert.ok(receiptNumber.trim(), "Receipt number is required.");
   return `[data-receipt-row="true"][data-receipt-number=${JSON.stringify(receiptNumber)}]:visible`;
 };
+
+export const assertStructuredReceiptAllocationRows = async (
+  rows,
+  expected,
+  { creditLabel = "Crédit Transport" } = {},
+) => {
+  const rowCount = await rows.count();
+  assert.equal(rowCount, expected.length, "Receipt allocation row count must be exact.");
+
+  for (const [index, item] of expected.entries()) {
+    const row = rows.nth(index);
+    const labelElement = row.locator(":scope > span");
+    const amountElement = row.locator(":scope > strong");
+    assert.equal(await labelElement.count(), 1,
+      `Receipt allocation ${index} must have exactly one direct label.`);
+    assert.equal(await amountElement.count(), 1,
+      `Receipt allocation ${index} must have exactly one direct amount.`);
+
+    const expectedLabel = item.kind === "CREDIT"
+      ? creditLabel
+      : `Période ${item.period}`;
+    assert.equal(normalized(await labelElement.textContent()), expectedLabel,
+      `Unexpected receipt allocation label at index ${index}.`);
+    assert.equal(parseFrenchCurrencyAmount(await amountElement.textContent()), item.amount,
+      `Unexpected receipt allocation amount at index ${index}.`);
+  }
+};
