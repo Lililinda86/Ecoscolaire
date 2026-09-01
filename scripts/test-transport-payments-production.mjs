@@ -25,15 +25,15 @@ const REQUIRED_FUNCTIONS = [
   'createFinancialBenefit', 'approveFinancialBenefit', 'closeCashDrawer',
 ];
 const BASELINE_COLLECTIONS = [
-  'students', 'classes', 'payments', 'receipts', 'financialBenefits', 'paymentDeadlines',
+  'schools', 'students', 'studentFinance', 'classes', 'payments', 'receipts', 'financialBenefits', 'paymentDeadlines',
   'paymentMoratoriums', 'transportPaymentAllocations', 'cashClosures',
 ];
 const FIXTURE_COLLECTIONS = [
-  'payments', 'receipts', 'transportPaymentAllocations', 'financialBenefits',
+  'payments', 'transportPaymentAllocations', 'receipts', 'financialBenefits',
   'financialBenefitReferences', 'paymentDeadlines', 'paymentMoratoriums', 'cashClosures',
   'audit_logs', 'students', 'studentPrivate', 'studentFinance', 'studentParentPrivate',
   'studentParentFinance', 'studentMatriculeReservations', 'studentDuplicateReservations',
-  'classes', 'academicYears', 'users', 'schools',
+  'classes', 'academicYears', 'users', 'schools', 'cashLedgerDays',
 ];
 const hashId = (prefix, values) => `${prefix}_${crypto.createHash('sha256')
   .update(JSON.stringify(values), 'utf8').digest('hex')}`;
@@ -173,11 +173,19 @@ const main = async () => {
     const yearId = mark('academicYears', `transport-year-${cfg.testRunId}`);
     const primaryClassId = mark('classes', `transport-primary-${cfg.testRunId}`);
     const secondaryClassId = mark('classes', `transport-secondary-${cfg.testRunId}`);
+    const class120Id = cfg.isPaymentLots123 ? mark('classes', `lots123-120-${cfg.testRunId}`) : null;
+    const class2Id = cfg.isPaymentLots123 ? mark('classes', `lots123-2-${cfg.testRunId}`) : null;
     await createMarked('schools', cfg.fixtureSchoolId, {
       id: cfg.fixtureSchoolId, name: `Transport release fixture ${cfg.testRunId}`, code: 'TR-FIX',
       academicYear, activeAcademicYearId: yearId, studentsCount: 0, active: true, isActive: true,
       paymentSettings: { activeProvider: 'none' },
+      ...(cfg.isPaymentLots123 ? { classFees: {
+        'LOT123 Class 85K': { annual: 85_000, t1: 40_000, t2: 30_000, t3: 15_000 },
+        'LOT123 Class 120K': { annual: 120_000, t1: 60_000, t2: 40_000, t3: 20_000 },
+        'LOT123 Class 2 installments': { annual: 85_000, t1: 50_000, t2: 35_000, t3: 0 },
+      } } : {}),
       transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: periods },
+      tuitionDeadlines: { T1: '2026-09-15', T2: '2026-12-15', T3: '2027-03-15' },
       paymentDeadlines: { transport: {
         '2025-09': '2025-09-10', '2025-10': '2025-10-10', '2025-11': '2025-11-10',
         '2025-12': '2025-12-10', '2026-01': '2026-01-10',
@@ -192,13 +200,24 @@ const main = async () => {
       id: yearId, schoolId: cfg.fixtureSchoolId, name: academicYear, status: 'active', active: true,
     });
     await createMarked('classes', primaryClassId, {
-      id: primaryClassId, schoolId: cfg.fixtureSchoolId, name: 'CM1 Fixture', cycle: 'primary',
+      id: primaryClassId, schoolId: cfg.fixtureSchoolId,
+      name: cfg.isPaymentLots123 ? 'LOT123 Class 85K' : 'CM1 Fixture', cycle: 'primary',
       section: 'francophone', isActive: true, academicYearId: yearId,
     });
     await createMarked('classes', secondaryClassId, {
       id: secondaryClassId, schoolId: cfg.fixtureSchoolId, name: '6e Fixture', cycle: 'secondary',
       section: 'francophone', isActive: true, academicYearId: yearId,
     });
+    if (cfg.isPaymentLots123) {
+      await createMarked('classes', class120Id, {
+        id: class120Id, schoolId: cfg.fixtureSchoolId, name: 'LOT123 Class 120K', cycle: 'primary',
+        section: 'francophone', isActive: true, academicYearId: yearId,
+      });
+      await createMarked('classes', class2Id, {
+        id: class2Id, schoolId: cfg.fixtureSchoolId, name: 'LOT123 Class 2 installments', cycle: 'primary',
+        section: 'francophone', isActive: true, academicYearId: yearId,
+      });
+    }
     for (const role of ['owner', 'secretary', 'accountant', 'director']) await createFixtureUser(role);
     await createFixtureUser('parent');
     await createFixtureUser('owner', otherSchoolId);
@@ -247,6 +266,65 @@ const main = async () => {
     const pk42 = await createStudent('pk42', 42);
     const secondary = await createStudent('secondary', 14, { classId: secondaryClassId });
     const invalid = await createStudent('invalid', undefined);
+    if (cfg.isPaymentLots123) {
+      const class120Student = await createStudent('class120', 28, { classId: class120Id });
+      const class2Student = await createStudent('class2', 28, { classId: class2Id });
+      for (const studentId of [pk14, class120Student, class2Student]) {
+        await db.collection('studentFinance').doc(studentId).update({ feeT1: 0, feeT2: 0, feeT3: 0 });
+      }
+      const tuition85 = await Promise.all(['T1', 'T2', 'T3'].map((installment) =>
+        quote(secretary, pk14, 'tuition', { installment })));
+      assert.deepEqual(tuition85.map((item) => item.grossExpectedAmount), [40_000, 30_000, 15_000]);
+      const tuition120 = await Promise.all(['T1', 'T2', 'T3'].map((installment) =>
+        quote(secretary, class120Student, 'tuition', { installment })));
+      assert.deepEqual(tuition120.map((item) => item.grossExpectedAmount), [60_000, 40_000, 20_000]);
+      assert.deepEqual((await Promise.all(['T1', 'T2'].map((installment) =>
+        quote(secretary, class2Student, 'tuition', { installment })))).map((item) => item.grossExpectedAmount),
+      [50_000, 35_000]);
+      await expectFailure(() => quote(secretary, class2Student, 'tuition', { installment: 'T3' }),
+        ['GROSS_AMOUNT_NOT_CONFIGURED']);
+
+      const tuitionPercentId = `lots123-tuition-percent-${cfg.testRunId}`.slice(0, 125);
+      await createMarked('financialBenefits', tuitionPercentId, {
+        id: tuitionPercentId, schoolId: cfg.fixtureSchoolId, studentId: class120Student, academicYear,
+        requestId: tuitionPercentId, benefitType: 'SCHOLARSHIP', paymentType: 'TUITION', installment: 'T1',
+        mode: 'PERCENTAGE', value: 10, status: 'approved', reason: 'Lots123 percentage fixture',
+        stackable: true, usageCount: 0, maximumUses: 3, singleUse: false, appliedTargets: [],
+        createdBy: credentials.get('owner').uid, approvedBy: credentials.get('owner').uid,
+      });
+      const discounted = await quote(secretary, class120Student, 'tuition', { installment: 'T1' });
+      assert.deepEqual([discounted.grossExpectedAmount, discounted.discountAmount, discounted.netExpectedAmount],
+        [60_000, 6_000, 54_000]);
+      const tuitionMoratoriumId = `lots123-tuition-moratorium-${cfg.testRunId}`.slice(0, 125);
+      await createMarked('paymentMoratoriums', tuitionMoratoriumId, {
+        id: tuitionMoratoriumId, schoolId: cfg.fixtureSchoolId, studentId: pk14, academicYear,
+        type: 'tuition', installment: 'T1', status: 'approved', effectiveDueDate: '2026-12-15',
+        reason: 'Lots123 tuition moratorium', createdBy: credentials.get('owner').uid,
+      });
+      const delayed = await quote(secretary, pk14, 'tuition', { installment: 'T1' });
+      assert.deepEqual([delayed.grossExpectedAmount, delayed.originalDueDate, delayed.effectiveDueDate],
+        [40_000, '2026-09-15', '2026-12-15']);
+      await pay(secretary, pk14, `lots123-tuition-partial-${cfg.testRunId}`, 10_000, 'tuition', { installment: 'T1' });
+      const partialTuition = await quote(secretary, pk14, 'tuition', { installment: 'T1' });
+      assert.deepEqual([partialTuition.previousPaid, partialTuition.remainingBalance], [10_000, 30_000]);
+
+      const editStudent = await createStudent('lot2-edit', 28);
+      const financeBeforeEdit = JSON.stringify((await db.collection('studentFinance').doc(editStudent).get()).data());
+      const paymentsBeforeEdit = (await db.collection('payments').where('studentId', '==', editStudent).get()).size;
+      await updateDoc(doc(secretary.firestore, 'studentPrivate', editStudent), {
+        transportZonePk: 35, transportNeighborhood: 'Quartier B', transportPickupPoint: 'Point B',
+      });
+      await updateDoc(doc(secretary.firestore, 'students', editStudent), { usesTransport: false, transportStatus: 'none' });
+      await updateDoc(doc(secretary.firestore, 'students', editStudent), { usesTransport: true, transportStatus: 'active' });
+      const reloadedPrivate = (await getDoc(doc(secretary.firestore, 'studentPrivate', editStudent))).data();
+      assert.deepEqual([reloadedPrivate.transportZonePk, reloadedPrivate.transportNeighborhood,
+        reloadedPrivate.transportPickupPoint], [35, 'Quartier B', 'Point B']);
+      assert.equal(JSON.stringify((await db.collection('studentFinance').doc(editStudent).get()).data()), financeBeforeEdit);
+      assert.equal((await db.collection('payments').where('studentId', '==', editStudent).get()).size, paymentsBeforeEdit);
+      await expectFailure(() => updateDoc(doc(parent.firestore, 'students', editStudent), { usesTransport: false }),
+        ['permission-denied']);
+      console.log('PAYMENT LOTS123 COVERAGE: PASS lot1=classFees,zeroFallback,twoInstallments,benefits,moratorium,partial lot2=create,edit,reload,deactivate,reactivate,noSideEffects lot3=transport,receipt,security');
+    }
     const assertPaymentBalance = (payment, amount) => {
       const allocated = payment.allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
       assert.equal(allocated + (payment.transportCredit || 0), amount);
@@ -569,7 +647,7 @@ const main = async () => {
     await pay(secretary, tuitionStudent, `tuition-cash-${cfg.testRunId}`, 5_000, 'tuition', { installment: 'T1' });
     assert.equal((await quote(secretary, tuitionStudent)).previousPaid, 0);
     assert.equal((await quote(secretary, benefitStudent, 'tuition', { installment: 'T2' })).discountAmount, 0);
-    assert.equal(tuitionBefore.grossExpectedAmount, 70_000);
+    assert.equal(tuitionBefore.grossExpectedAmount, cfg.isPaymentLots123 ? 40_000 : 70_000);
     const today = todayDouala();
     const paymentsToday = await db.collection('payments').where('schoolId', '==', cfg.fixtureSchoolId)
       .where('date', '==', today).get();
@@ -765,18 +843,37 @@ const main = async () => {
     for (let round = 0; round < 2; round += 1) {
       const refs = [];
       for (const collection of FIXTURE_COLLECTIONS) {
-        const byRun = await db.collection(collection).where('testRunId', '==', cfg.testRunId).get();
-        refs.push(...byRun.docs.map((item) => item.ref));
-        if (['audit_logs', 'cashClosures'].includes(collection)) {
+        const collectionRefs = [];
+        if (cfg.isPaymentLots123) {
           for (const schoolId of fixtureSchoolIds) {
             const bySchool = await db.collection(collection).where('schoolId', '==', schoolId).get();
-            refs.push(...bySchool.docs.map((item) => item.ref));
+            for (const item of bySchool.docs) {
+              assert.equal(item.data().schoolId, schoolId, 'Cleanup school ownership mismatch.');
+              collectionRefs.push(item.ref);
+            }
+          }
+        } else {
+          const byRun = await db.collection(collection).where('testRunId', '==', cfg.testRunId).get();
+          refs.push(...byRun.docs.map((item) => item.ref));
+          if (['audit_logs', 'cashClosures'].includes(collection)) {
+            for (const schoolId of fixtureSchoolIds) {
+              const bySchool = await db.collection(collection).where('schoolId', '==', schoolId).get();
+              refs.push(...bySchool.docs.map((item) => item.ref));
+            }
           }
         }
-        for (const id of manifest[collection] || []) refs.push(db.collection(collection).doc(id));
+        for (const id of manifest[collection] || []) collectionRefs.push(db.collection(collection).doc(id));
+        if (cfg.isPaymentLots123) {
+          await deleteRefs(db, collectionRefs);
+          if (collection === 'transportPaymentAllocations') {
+            await new Promise((resolve) => setTimeout(resolve, 1_500));
+          }
+        } else refs.push(...collectionRefs);
       }
-      refs.push(db.collection('counters').doc(`receipts_${cfg.fixtureSchoolId}`));
-      refs.push(db.collection('counters').doc(`receipts_${otherSchoolId}`));
+      const counterRefs = [db.collection('counters').doc(`receipts_${cfg.fixtureSchoolId}`),
+        db.collection('counters').doc(`receipts_${otherSchoolId}`)];
+      if (cfg.isPaymentLots123) await deleteRefs(db, counterRefs);
+      else refs.push(...counterRefs);
       await deleteRefs(db, refs);
       for (const uid of manifest.authUsers) await adminAuth.deleteUser(uid).catch((error) => {
         if (error?.code !== 'auth/user-not-found') throw error;
@@ -785,13 +882,26 @@ const main = async () => {
     }
     const residuals = {};
     for (const collection of FIXTURE_COLLECTIONS) {
-      const byRun = await db.collection(collection).where('testRunId', '==', cfg.testRunId).get();
-      let count = byRun.size;
-      for (const schoolId of fixtureSchoolIds) {
-        const bySchool = await db.collection(collection).where('schoolId', '==', schoolId).get();
-        count += bySchool.docs.filter((item) => item.data().testRunId !== cfg.testRunId).length;
+      const paths = new Set();
+      if (cfg.isPaymentLots123) {
+        for (const schoolId of fixtureSchoolIds) {
+          const bySchool = await db.collection(collection).where('schoolId', '==', schoolId).get();
+          bySchool.docs.forEach((item) => paths.add(item.ref.path));
+        }
+        for (const id of manifest[collection] || []) {
+          const exact = await db.collection(collection).doc(id).get();
+          if (exact.exists) paths.add(exact.ref.path);
+        }
+      } else {
+        const byRun = await db.collection(collection).where('testRunId', '==', cfg.testRunId).get();
+        byRun.docs.forEach((item) => paths.add(item.ref.path));
+        for (const schoolId of fixtureSchoolIds) {
+          const bySchool = await db.collection(collection).where('schoolId', '==', schoolId).get();
+          bySchool.docs.filter((item) => item.data().testRunId !== cfg.testRunId)
+            .forEach((item) => paths.add(item.ref.path));
+        }
       }
-      residuals[collection] = count;
+      residuals[collection] = paths.size;
     }
     residuals.authUsers = 0;
     for (const uid of manifest.authUsers) {

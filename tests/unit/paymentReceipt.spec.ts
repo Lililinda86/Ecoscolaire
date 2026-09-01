@@ -21,6 +21,11 @@ describe('secure collection receipt display model', () => {
         { kind: 'CREDIT', period: null, amount: 500 }
       ],
       transportCredit: 500,
+      transportContext: {
+        zonePk: 28, neighborhood: 'Quartier A', pickupPoint: 'Point A',
+        feePolicyId: 'ITALO_PK_2026', monthlyGrossAmount: 4000,
+        transportState: 'BILLABLE', billingPeriods: ['2026-09', '2026-10']
+      },
       createdAt: '2026-09-10T12:00:00.000Z'
     }, [], []);
 
@@ -36,6 +41,10 @@ describe('secure collection receipt display model', () => {
     ]);
     expect(model.transportCredit).toBe(500);
     expect(model.formattedTransportCredit).toContain('500');
+    expect(model.transportContext).toEqual(expect.objectContaining({
+      zonePk: 28, neighborhood: 'Quartier A', pickupPoint: 'Point A',
+      feePolicyId: 'ITALO_PK_2026', monthlyGrossAmount: 4000
+    }));
     expect(model.benefits).toEqual([expect.objectContaining({
       benefitType: 'DISCOUNT_VOUCHER', reference: 'BON-TEST-001', discountAmount: 1000
     })]);

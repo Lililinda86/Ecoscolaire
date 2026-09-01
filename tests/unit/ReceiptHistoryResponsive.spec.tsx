@@ -27,6 +27,11 @@ const receipts = [
       { kind: 'CREDIT', period: null, amount: 2_000 },
     ],
     transportCredit: 2_000,
+    transportContext: {
+      zonePk: 28, neighborhood: 'Quartier A', pickupPoint: 'Point A',
+      feePolicyId: 'ITALO_PK_2026', monthlyGrossAmount: 4_000,
+      transportState: 'BILLABLE', billingPeriods: ['2025-12'],
+    },
   },
   {
     id: 'receipt-second',
@@ -91,6 +96,9 @@ describe('ReceiptHistory responsive detail controls', () => {
     expect(within(detail).getByText('Période 2025-12')).not.toBeNull();
     expect(within(detail).getByText('Crédit Transport')).not.toBeNull();
     expect(within(detail).getByText(/Crédit disponible :/)).not.toBeNull();
+    expect(within(detail).getByTestId('transport-receipt-context-receipt-transport-credit')).not.toBeNull();
+    expect(within(detail).getByText(/PK28/)).not.toBeNull();
+    expect(within(detail).getByText(/Quartier A/)).not.toBeNull();
     expect(screen.queryByTestId('receipt-detail-receipt-second')).toBeNull();
 
     await user.click(targetToggle);

@@ -36,7 +36,11 @@ export const validateTransportRunnerConfig = (env = process.env) => {
   const testRunId = safeToken(env.TRANSPORT_TEST_RUN_ID);
   assert.ok(testRunId && testRunId === env.TRANSPORT_TEST_RUN_ID && testRunId.length >= 8, 'Missing or unsafe testRunId.');
   assert.notEqual(env.TRANSPORT_FIXTURE_SCHOOL_ID, REAL_ITALO_SCHOOL, 'Real ITALO school is forbidden.');
-  const expectedSchool = `transport-release-${mode}-${testRunId}`.slice(0, 120);
+  const isPaymentLots123 = env.TRANSPORT_PAYMENT_LOTS123_RUNNER === 'true';
+  if (isPaymentLots123) assert.equal(mode, 'production', 'Payment Lots 1-3 runner is Production-only.');
+  const expectedSchool = isPaymentLots123
+    ? `payment-lots123-production-${testRunId}`
+    : `transport-release-${mode}-${testRunId}`.slice(0, 120);
   assert.equal(env.TRANSPORT_FIXTURE_SCHOOL_ID, expectedSchool, 'Fixture school ID is not exact for this run.');
   for (const name of ['TRANSPORT_APP_URL', ...WEB_ENV]) assert.ok(env[name]?.trim(), `Missing ${name}.`);
   const firebaseClientConfig = {
@@ -61,6 +65,6 @@ export const validateTransportRunnerConfig = (env = process.env) => {
   }
   return {
     mode, expectedProject, testRunId, fixtureSchoolId: expectedSchool, appUrl: url.origin,
-    firebaseClientConfig,
+    firebaseClientConfig, isPaymentLots123,
   };
 };

@@ -239,7 +239,7 @@ export interface Student {
   transportMonthlyFee?: number;
   transportZonePk?: number;
   transportFleet?: string;
-  transportStatus?: 'none' | 'active' | 'suspended';
+  transportStatus?: 'none' | 'active' | 'needs_configuration' | 'suspended';
   transportPaid?: number;
   tuitionExpectedGross?: number;
   tuitionDiscountTotal?: number;
@@ -845,6 +845,15 @@ export interface ReceiptLike {
   previousPaid?: number;
   newPaid?: number;
   remainingBalance?: number;
+  transportContext?: {
+    zonePk: number | null;
+    neighborhood: string;
+    pickupPoint: string;
+    feePolicyId: string;
+    monthlyGrossAmount: number;
+    transportState: 'FREE_SECONDARY' | 'NOT_SUBSCRIBED' | 'BILLABLE';
+    billingPeriods: string[];
+  };
   collectedByUserId?: string;
   collectedByName?: string;
   createdAt?: DateLike;

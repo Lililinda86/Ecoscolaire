@@ -548,14 +548,18 @@ const resolveGross = (
   finance: Data,
   school: Data,
   bus: Data | null,
-  transportFee: TransportFeeResolution | null = null
+  transportFee: TransportFeeResolution | null = null,
+  classData: Data = {}
 ): number => {
   const fees = school.globalFees && typeof school.globalFees === 'object' ? school.globalFees as Data : {};
   let gross: unknown;
   if (type === 'registration_fee') {
     gross = finance.registrationFeeExpected;
   } else if (type === 'tuition') {
-    gross = finance[`fee${installment}`] ?? fees[`fee${installment}`];
+    if (!installment) {
+      throw httpsError('failed-precondition', 'La tranche de scolarité est requise.', 'INVALID_INSTALLMENT');
+    }
+    return resolveTuitionGross(installment, finance, school, classData);
   } else {
     gross = transportFee?.state === 'BILLABLE'
       ? transportFee.monthlyGrossAmount
@@ -572,17 +576,67 @@ const resolveGross = (
   return gross;
 };
 
-const resolveConfiguredTuitionGross = (
+const readTuitionGross = (
   installment: Installment,
   finance: Data,
-  school: Data
+  school: Data,
+  classData: Data
 ): number | null => {
+  const classFeesValue = school.classFees;
+  if (classFeesValue !== undefined && classFeesValue !== null) {
+    if (typeof classFeesValue !== 'object' || Array.isArray(classFeesValue)) {
+      throw httpsError('failed-precondition', 'Le barème des frais par classe est invalide.',
+        'CLASS_FEES_CORRUPTED');
+    }
+    const className = typeof classData.name === 'string' ? classData.name.trim() : '';
+    if (!className) {
+      throw httpsError('failed-precondition', 'La classe exacte de l’élève est requise.', 'INVALID_CLASS');
+    }
+    const classFees = classFeesValue as Data;
+    if (!Object.prototype.hasOwnProperty.call(classFees, className)) {
+      throw httpsError('failed-precondition', 'Aucun barème de scolarité ne correspond à la classe de l’élève.',
+        'CLASS_FEE_NOT_CONFIGURED');
+    }
+    const configured = classFees[className];
+    if (!configured || typeof configured !== 'object' || Array.isArray(configured)) {
+      throw httpsError('failed-precondition', 'Le barème de scolarité de la classe est invalide.',
+        'CLASS_FEE_CORRUPTED');
+    }
+    const gross = (configured as Data)[installment.toLowerCase()];
+    // A missing/zero installment is intentional for a two-installment class; callers either skip it
+    // when building the annual projection or fail closed when that installment is requested.
+    if (gross === undefined || gross === null || gross === 0) return null;
+    if (typeof gross !== 'number' || !Number.isSafeInteger(gross) || gross < 0) {
+      throw httpsError('failed-precondition', 'Le montant de la tranche configurée pour la classe est invalide.',
+        'CLASS_FEE_CORRUPTED');
+    }
+    return gross;
+  }
+
+  // Legacy compatibility only: there is no approved per-student override concept in the model.
+  // A zero projection is treated as uninitialized, then the positive global legacy value may apply.
   const fees = school.globalFees && typeof school.globalFees === 'object' ? school.globalFees as Data : {};
-  const gross = finance[`fee${installment}`] ?? fees[`fee${installment}`];
-  if (gross === undefined || gross === null || gross === 0) return null;
-  if (typeof gross !== 'number' || !Number.isSafeInteger(gross) || gross < 0) {
-    throw httpsError('failed-precondition', 'Le tarif brut attendu est invalide.',
-      'GROSS_AMOUNT_CORRUPTED');
+  for (const gross of [finance[`fee${installment}`], fees[`fee${installment}`]]) {
+    if (gross === undefined || gross === null || gross === 0) continue;
+    if (typeof gross !== 'number' || !Number.isSafeInteger(gross) || gross < 0) {
+      throw httpsError('failed-precondition', 'Le tarif brut attendu est invalide.',
+        'GROSS_AMOUNT_CORRUPTED');
+    }
+    return gross;
+  }
+  return null;
+};
+
+export const resolveTuitionGross = (
+  installment: Installment,
+  finance: Data,
+  school: Data,
+  classData: Data
+): number => {
+  const gross = readTuitionGross(installment, finance, school, classData);
+  if (gross === null) {
+    throw httpsError('failed-precondition', 'Le tarif brut attendu n’est pas configuré.',
+      'GROSS_AMOUNT_NOT_CONFIGURED');
   }
   return gross;
 };
@@ -1105,18 +1159,19 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       }
     }
     let classData: Data = {};
-    if (benefit.paymentType === 'TRANSPORT') {
-      const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
-        ? school.transportPolicy as Data : {};
-      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID) {
-        const classId = typeof student.classId === 'string' ? student.classId : '';
-        if (!classId) throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
-        const classSnap = await transaction.get(db.collection('classes').doc(classId));
-        if (!classSnap.exists || classSnap.data()?.schoolId !== benefit.schoolId) {
-          throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
-        }
-        classData = classSnap.data() || {};
+    const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
+      ? school.transportPolicy as Data : {};
+    const classIsRequired = (benefit.paymentType === 'TUITION'
+      && school.classFees !== undefined && school.classFees !== null)
+      || (benefit.paymentType === 'TRANSPORT' && policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID);
+    if (classIsRequired) {
+      const classId = typeof student.classId === 'string' ? student.classId : '';
+      if (!classId) throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
+      const classSnap = await transaction.get(db.collection('classes').doc(classId));
+      if (!classSnap.exists || classSnap.data()?.schoolId !== benefit.schoolId) {
+        throw httpsError('failed-precondition', 'Student class is invalid.', 'INVALID_CLASS');
       }
+      classData = classSnap.data() || {};
     }
     const finance = resolveStudentFinanceData(studentSnap.data() || {}, financeSnap);
     const targetType = benefit.paymentType === 'TUITION' ? 'tuition' : 'transport';
@@ -1124,12 +1179,12 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       ? benefit.installment as Installment : null;
     const gross = benefit.paymentType === 'TUITION' && benefit.installment === 'ALL_TUITION'
       ? (['T1', 'T2', 'T3'] as Installment[]).reduce((sum, item) => {
-          const configured = resolveConfiguredTuitionGross(item, finance, schoolSnap.data() || {});
+          const configured = readTuitionGross(item, finance, school, classData);
           return configured === null ? sum : safeAdd(sum, configured, 'grossExpectedAmount');
         }, 0)
       : targetType === 'transport'
         ? resolveTransportBenefitGross({ student, privateData: privateSnap.data() || {}, classData, finance, school, bus })
-        : resolveGross(targetType, targetInstallment, finance, school, bus);
+        : resolveGross(targetType, targetInstallment, finance, school, bus, null, classData);
     calculateBenefitAmount(gross, benefit.mode as BenefitMode, benefit.value as number);
     let referenceRef: admin.firestore.DocumentReference | null = null;
     if (typeof benefit.reference === 'string') {
@@ -1259,7 +1314,7 @@ const readQuoteContext = async (
 ): Promise<{
   user: Data; school: Data; student: Data; finance: Data; benefits: Data[]; payments: Data[];
   moratoriums: Data[]; allocations: Data[];
-  quote: CollectionQuote; classData: Data; financeRef: admin.firestore.DocumentReference;
+  quote: CollectionQuote; classData: Data; privateData: Data; financeRef: admin.firestore.DocumentReference;
   financeSnap: admin.firestore.DocumentSnapshot;
 }> => {
   const userRef = db.collection('users').doc(uid);
@@ -1290,6 +1345,7 @@ const readQuoteContext = async (
   );
   const scheduleSchool = withAcademicYearTuitionDeadlines(school, academicYearConfig);
   const finance = resolveStudentFinanceData(student, financeSnap);
+  const privateData = privateSnap.exists ? privateSnap.data() || {} : {};
   let bus: Data | null = null;
   if (input.type === 'transport' && typeof student.busId === 'string' && student.busId) {
     const busSnap = await transaction.get(db.collection('buses').doc(student.busId));
@@ -1325,7 +1381,7 @@ const readQuoteContext = async (
     .filter(item => item.schoolId === input.schoolId && item.studentId === input.studentId);
   let quote: CollectionQuote;
   if (input.type === 'transport') {
-    const fee = resolveTransportFee(student, privateSnap.exists ? privateSnap.data() || {} : {}, classData);
+    const fee = resolveTransportFee(student, privateData, classData);
     if (fee.state !== 'BILLABLE') {
       quote = zeroTransportQuote(fee.state);
     } else if (!input.period) {
@@ -1347,13 +1403,13 @@ const readQuoteContext = async (
         type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
     }
   } else {
-    quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus),
+    quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, null, classData),
       benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
       type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
   }
   return {
     user, school: scheduleSchool, student, finance, benefits, payments, moratoriums, allocations,
-    quote, classData, financeRef, financeSnap
+    quote, classData, privateData, financeRef, financeSnap
   };
 };
 
@@ -1370,6 +1426,7 @@ export const getCollectionQuote = functions.https.onCall(async (raw, context) =>
 const buildTuitionProjection = (
   finance: Data,
   school: Data,
+  classData: Data,
   benefits: Data[],
   payments: Data[],
   moratoriums: Data[],
@@ -1384,7 +1441,7 @@ const buildTuitionProjection = (
   let netTotal = 0;
   let paidTotal = 0;
   for (const installment of ['T1', 'T2', 'T3'] as Installment[]) {
-    const gross = resolveConfiguredTuitionGross(installment, finance, school);
+    const gross = readTuitionGross(installment, finance, school, classData);
     if (gross === null) continue;
     const targetPayments = [...payments, pendingPayment];
     const quote = buildQuote({ gross, benefits, payments: targetPayments, moratoriums, school, schoolId, academicYear,
@@ -1555,7 +1612,7 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     const contextData = await readQuoteContext(transaction, db, uid, input);
     const {
       user, school, student, finance, benefits, payments, moratoriums,
-      quote, classData, financeRef, financeSnap
+      quote, classData, privateData, financeRef, financeSnap
     } = contextData;
     const date = getDoualaDate();
     const cashLedgerId = makeCashLedgerDayId(input.schoolId, date);
@@ -1619,6 +1676,17 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       && /^[A-Za-z0-9_-]{1,128}$/.test(student.testRunId)
       ? { testFixture: true, testRunId: student.testRunId }
       : {};
+    const transportContext = transportQuote ? {
+      zonePk: transportQuote.zonePk,
+      neighborhood: typeof privateData.transportNeighborhood === 'string'
+        ? privateData.transportNeighborhood.trim() : '',
+      pickupPoint: typeof privateData.transportPickupPoint === 'string'
+        ? privateData.transportPickupPoint.trim() : '',
+      feePolicyId: transportQuote.feePolicyId,
+      monthlyGrossAmount: transportQuote.monthlyGrossAmount,
+      transportState: transportQuote.transportState,
+      billingPeriods: transportQuote.installments.map(item => item.period)
+    } : null;
     const commonSnapshot = {
       grossExpectedAmount: quote.grossExpectedAmount,
       discountAmount: quote.discountAmount,
@@ -1661,6 +1729,7 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       ...(input.period ? { period: input.period, month: input.period } : {}),
       method: 'cash', paymentMethod: 'cash', date, paymentDate: date, amount,
       collectedByUserId: uid, collectedByName: user.name || user.displayName || user.email || uid,
+      ...(transportContext ? { transportContext } : {}),
       ...(allocationPlan ? { allocationSummary: allocationPlan.allocations } : {}),
       createdAt: FieldValue.serverTimestamp(), ...commonSnapshot
     };
@@ -1703,7 +1772,7 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
       };
     } else if (input.type === 'tuition') {
       financePatch = buildTuitionProjection(
-        finance, school, benefits, payments, moratoriums,
+        finance, school, classData, benefits, payments, moratoriums,
         input.schoolId, input.academicYear, date, paymentData
       );
     } else if (allocationPlan && transportQuote) {
@@ -2040,6 +2109,8 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
       kind: 'PAYMENT_REVERSAL',
       correctedByUserId: uid,
       correctedByRole: user.role,
+      ...(canonicalTransport && originalReceipt.transportContext
+        ? { transportContext: originalReceipt.transportContext } : {}),
       createdAt: FieldValue.serverTimestamp(),
       grossExpectedAmount: quote.grossExpectedAmount,
       discountAmount: quote.discountAmount,
@@ -2098,7 +2169,7 @@ export const reversePayment = functions.https.onCall(async (raw, context) => {
       };
     } else if (target.type === 'tuition') {
       financePatch = buildTuitionProjection(
-        finance, school, benefits, payments, moratoriums,
+        finance, school, classData, benefits, payments, moratoriums,
         schoolId, academicYear, date, reversalData
       );
     } else if (canonicalTransport) {
