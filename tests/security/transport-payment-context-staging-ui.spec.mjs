@@ -5,6 +5,10 @@ import {
   assertLabelledFrenchCurrencyAmount,
   parseLabelledFrenchCurrencyAmount,
 } from "../../scripts/payment-forward-recovery-currency.mjs";
+import {
+  assertTransportBenefitAppliedToQuote,
+  exactReceiptRowSelector,
+} from "../../scripts/transport-payment-context-assertions.mjs";
 
 const caller = await readFile(".github/workflows/transport-payments-release-runner.yml", "utf8");
 const reusable = await readFile(".github/workflows/transport-payment-context-staging-ui.yml", "utf8");
@@ -86,12 +90,14 @@ test("lot3 UI explicitly proves partial state, ordered allocations, benefit isol
   assert.match(harness, /assertTransportInstallmentRow\(form,[\s\S]*?previousPaid: 1000,[\s\S]*?remaining: 2000,[\s\S]*?status: "PARTIEL"/);
   assert.match(harness, /expectedAllocations = \[[\s\S]*?2026-09[\s\S]*?amount: 2000[\s\S]*?2026-10[\s\S]*?amount: 4000[\s\S]*?2026-11[\s\S]*?amount: 4000[\s\S]*?CREDIT[\s\S]*?amount: 1000/);
   assert.match(harness, /LOT3-TUITION-ISOLATED/);
-  assert.match(harness, /getByText\("LOT3-TUITION-ISOLATED"[\s\S]*?\.count\(\), 0/);
+  assert.match(harness, /forbiddenReferences: \["LOT3-TUITION-ISOLATED"\]/);
+  assert.match(harness, /const quote = await waitForQuote/);
+  assert.match(harness, /quote\.getByText\([\s\S]*?DISCOUNT_VOUCHER/);
   assert.match(harness, /collection-quote-gross[\s\S]*?12_000/);
   assert.match(harness, /collection-quote-net[\s\S]*?11_000/);
-  assert.match(harness, /Bourse \/ réduction applicable[\s\S]*?-1000/);
-  assert.match(harness, /Échéance initiale[\s\S]*?15\/09\/2026/);
-  assert.match(harness, /Échéance effective[\s\S]*?15\/12\/2026/);
+  assert.match(harness, /quote\.getByText\("Bourse \/ réduction applicable"/);
+  assert.match(harness, /quote\.getByText\("Échéance initiale"[\s\S]*?15\/09\/2026/);
+  assert.match(harness, /quote\.getByText\("Échéance effective"[\s\S]*?15\/12\/2026/);
 });
 
 test("lot3 receipt UI proves class, allocations and remaining balance", () => {
@@ -101,6 +107,81 @@ test("lot3 receipt UI proves class, allocations and remaining balance", () => {
   assert.match(harness, /receiptDetail\.getByText\("LOT3 Primaire", \{ exact: true \}\)/);
   assert.match(harness, /receiptAllocation\.locator\("\.receipt-history-allocation-row"\)/);
   assert.match(harness, /receiptRemaining[\s\S]*?parseFrenchCurrencyAmount[\s\S]*?, 0\)/);
+  assert.match(harness, /page\.locator\(exactReceiptRowSelector\(receipt\.receiptNumber\)\)/);
+  assert.match(harness, /receiptDetail\.getByTestId\(`transport-receipt-context-/);
+  assert.doesNotMatch(harness, /page\.getByText\(receipt\.receiptNumber/);
+});
+
+test("transport benefit assertion is quote-scoped, amount-strict and Tuition-isolated", () => {
+  const base = {
+    quoteText: "DISCOUNT_VOUCHER (LOT3-BON-1000) : - 1 000 FCFA",
+    benefitTexts: ["• DISCOUNT_VOUCHER (LOT3-BON-1000) : - 1\u202f000 FCFA"],
+    reference: "LOT3-BON-1000",
+    benefitType: "DISCOUNT_VOUCHER",
+    expectedDiscount: 1000,
+    gross: 12000,
+    discount: 1000,
+    net: 11000,
+    forbiddenReferences: ["LOT3-TUITION-ISOLATED"],
+  };
+  assert.doesNotThrow(() => assertTransportBenefitAppliedToQuote(base));
+  assert.doesNotThrow(() => assertTransportBenefitAppliedToQuote({
+    ...base,
+    pageText: `${base.quoteText} Bon de réduction — 1 000 FCFA — LOT3-BON-1000 — cumulable`,
+  }));
+  assert.throws(() => assertTransportBenefitAppliedToQuote({
+    ...base,
+    quoteText: "Aucun avantage appliqué",
+    benefitTexts: [],
+  }));
+  assert.throws(() => assertTransportBenefitAppliedToQuote({
+    ...base,
+    benefitTexts: ["• DISCOUNT_VOUCHER (LOT3-BON-1000) : - 2 000 FCFA"],
+  }));
+  assert.doesNotThrow(() => assertTransportBenefitAppliedToQuote({
+    ...base,
+    pageText: `${base.quoteText} LOT3-TUITION-ISOLATED`,
+  }));
+  assert.throws(() => assertTransportBenefitAppliedToQuote({
+    ...base,
+    quoteText: `${base.quoteText} LOT3-TUITION-ISOLATED`,
+  }));
+});
+
+test("receipt selector targets one exact row even when receipt contents are similar", () => {
+  const selector = exactReceiptRowSelector("REC-LOT3-100");
+  assert.equal(selector,
+    '[data-receipt-row="true"][data-receipt-number="REC-LOT3-100"]:visible');
+  assert.doesNotMatch(selector, /hasText|\.first\(|\.nth\(0\)/);
+  assert.notEqual(selector, exactReceiptRowSelector("REC-LOT3-1000"));
+  assert.throws(() => exactReceiptRowSelector(""));
+});
+
+test("known Lot 3 text assertions are scoped to their semantic payment contexts", () => {
+  assert.doesNotMatch(harness, /page\.getByText\(/);
+  assert.equal((harness.match(/form\.getByText\(/g) || []).length, 1);
+  assert.match(harness, /form\.getByText\("Mois \(Transport\)"/);
+  assert.doesNotMatch(harness, /form\.getByText\("LOT3-BON-1000"/);
+  assert.doesNotMatch(harness, /form\.getByText\("LOT3-TUITION-ISOLATED"/);
+  assert.match(harness, /quote\.getByText\(\/ACTIF — dette inchangée\//);
+  assert.match(harness, /receiptDetail\.getByText\("LOT3 Primaire"/);
+  assert.match(harness, /receiptDetail\.getByText\("Crédit disponible"/);
+  assert.match(harness, /receiptDetail\.getByText\("Reste à payer"/);
+  assert.doesNotMatch(harness, /\.nth\(0\)/);
+  assert.match(harness, /assert\.equal\(await rows\.count\(\), 1[\s\S]*?rows\.first\(\)/);
+});
+
+test("moratorium status and dates are read only from the current quote", () => {
+  const unrelatedPageText = [
+    "ACTIF — dette inchangée 01/01/2025 01/02/2025",
+    "ACTIF — dette inchangée 02/02/2025 02/03/2025",
+  ];
+  assert.equal(unrelatedPageText.length, 2);
+  assert.match(harness, /quote\.getByText\(\/ACTIF — dette inchangée\//);
+  assert.match(harness, /quote\.getByText\("Échéance initiale"/);
+  assert.match(harness, /quote\.getByText\("Échéance effective"/);
+  assert.doesNotMatch(harness, /form\.getByText\(\/ACTIF — dette inchangée\//);
+  assert.doesNotMatch(harness, /form\.getByText\("Échéance (?:initiale|effective)"/);
 });
 
 test("historical policy remains unchanged and client never derives a rate from address text", () => {
