@@ -13,6 +13,10 @@ import {
   assertLabelledFrenchCurrencyAmount,
   parseFrenchCurrencyAmount,
 } from "./payment-forward-recovery-currency.mjs";
+import {
+  assertTransportBenefitAppliedToQuote,
+  exactReceiptRowSelector,
+} from "./transport-payment-context-assertions.mjs";
 
 dotenv.config({ path: ".env.staging" });
 
@@ -319,7 +323,7 @@ try {
   const form = page.getByTestId("cash-payment-student").locator("xpath=ancestor::form[1]");
   await form.getByTestId("cash-payment-student").selectOption(studentIds.pk28);
   await form.getByTestId("cash-payment-type").selectOption("transport");
-  await waitForQuote(form, 12_000);
+  const quote = await waitForQuote(form, 12_000);
   assert.equal(normalized(await form.getByTestId("transport-student-class").textContent()), "LOT3 Primaire");
   assert.equal(normalized(await form.getByTestId("transport-zone-pk").textContent()), "PK28");
   assert.equal(normalized(await form.getByTestId("transport-neighborhood").textContent()), "Quartier A");
@@ -329,21 +333,35 @@ try {
     label: "Tarif applicable", expected: 4000, suffix: "/ période",
   });
   assert.equal(await form.getByTestId("transport-installments-scroll").locator("tbody tr").count(), 3);
-  await form.getByText("LOT3-BON-1000", { exact: false }).waitFor();
-  assert.equal(await form.getByText("LOT3-TUITION-ISOLATED", { exact: false }).count(), 0);
+  const transportBenefit = quote.getByText(
+    /DISCOUNT_VOUCHER \(LOT3-BON-1000\)/,
+    { exact: false },
+  );
+  const transportBenefitTexts = await transportBenefit.allTextContents();
+  const gross = parseFrenchCurrencyAmount(await quote.getByTestId("collection-quote-gross").textContent());
+  const net = parseFrenchCurrencyAmount(await quote.getByTestId("collection-quote-net").textContent());
+  assert.equal(gross, 12_000);
+  assert.equal(net, 11_000);
   assert.equal(parseFrenchCurrencyAmount(
-    await form.getByTestId("collection-quote-gross").textContent()), 12_000);
-  assert.equal(parseFrenchCurrencyAmount(
-    await form.getByTestId("collection-quote-net").textContent()), 11_000);
-  assert.equal(parseFrenchCurrencyAmount(
-    await form.getByTestId("collection-quote-remaining").textContent()), 10_000);
-  const benefitValue = form.getByText("Bourse / réduction applicable", { exact: true })
+    await quote.getByTestId("collection-quote-remaining").textContent()), 10_000);
+  const benefitValue = quote.getByText("Bourse / réduction applicable", { exact: true })
     .locator("xpath=following-sibling::strong[1]");
-  assert.equal(parseFrenchCurrencyAmount(await benefitValue.textContent()), -1000);
-  await form.getByText(/ACTIF — dette inchangée/).waitFor();
-  assert.equal(normalized(await form.getByText("Échéance initiale", { exact: true })
+  const discount = Math.abs(parseFrenchCurrencyAmount(await benefitValue.textContent()));
+  assertTransportBenefitAppliedToQuote({
+    benefitTexts: transportBenefitTexts,
+    quoteText: await quote.textContent(),
+    reference: "LOT3-BON-1000",
+    benefitType: "DISCOUNT_VOUCHER",
+    expectedDiscount: 1000,
+    gross,
+    discount,
+    net,
+    forbiddenReferences: ["LOT3-TUITION-ISOLATED"],
+  });
+  await quote.getByText(/ACTIF — dette inchangée/).waitFor();
+  assert.equal(normalized(await quote.getByText("Échéance initiale", { exact: true })
     .locator("xpath=following-sibling::strong[1]").textContent()), "15/09/2026");
-  assert.equal(normalized(await form.getByText("Échéance effective", { exact: true })
+  assert.equal(normalized(await quote.getByText("Échéance effective", { exact: true })
     .locator("xpath=following-sibling::strong[1]").textContent()), "15/12/2026");
   await assertTransportInstallmentRow(form, {
     period: "2026-09", gross: 4000, discount: 1000, net: 3000,
@@ -405,18 +423,23 @@ try {
   assert.deepEqual(receipt.allocationSummary, expectedAllocations);
   assert.equal(receipt.benefits.some(item => item.benefitId === tuitionBenefitId), false);
   await page.getByRole("button", { name: "Reçus", exact: true }).click();
-  await page.getByText(receipt.receiptNumber, { exact: true }).waitFor({ timeout: 20_000 });
-  const receiptRow = page.locator('[data-receipt-row="true"]:visible').filter({ hasText: receipt.receiptNumber });
+  const receiptRow = page.locator(exactReceiptRowSelector(receipt.receiptNumber));
+  await receiptRow.waitFor({ state: "visible", timeout: 20_000 });
+  assert.equal(await receiptRow.count(), 1);
+  assert.equal(await receiptRow.getAttribute("data-receipt-number"), receipt.receiptNumber);
   const toggle = receiptRow.getByTestId(`receipt-detail-toggle-${receiptDocument.id}`);
   await toggle.click();
-  const receiptContext = page.getByTestId(`transport-receipt-context-${receiptDocument.id}`);
+  const receiptDetail = page.locator(`#receipt-detail-${receiptDocument.id}`);
+  const receiptContext = receiptDetail.getByTestId(`transport-receipt-context-${receiptDocument.id}`);
   await receiptContext.waitFor({ state: "visible" });
   assert.match(normalized(await receiptContext.textContent()), /PK28.*Quartier A.*Point A.*ITALO PK.*4 000 FCFA/s);
-  const receiptDetail = page.locator(`#receipt-detail-${receiptDocument.id}`);
   await receiptDetail.getByText("LOT3 Primaire", { exact: true }).waitFor();
   const receiptAllocation = receiptDetail.getByTestId(`transport-receipt-allocation-${receiptDocument.id}`);
   await assertAllocationRows(receiptAllocation.locator(".receipt-history-allocation-row"),
     expectedAllocations, { creditLabel: "Crédit Transport" });
+  const receiptCredit = receiptDetail.getByText("Crédit disponible", { exact: false });
+  assert.equal(await receiptCredit.count(), 1);
+  assert.equal(parseFrenchCurrencyAmount(await receiptCredit.textContent()), 1500);
   const receiptRemaining = receiptDetail.getByText("Reste à payer", { exact: true })
     .locator("xpath=following-sibling::div[1]");
   assert.equal(parseFrenchCurrencyAmount(await receiptRemaining.textContent()), 0);
