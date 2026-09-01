@@ -132,11 +132,38 @@ test('workflow is dispatch-only, Production-scoped and backup-gated before fixtu
 
 test('workflow preserves exact project, fixture, counter and WIF contracts', () => {
   assert.match(workflow, /PAYMENT_LOTS123_PROJECT_ID: ecoscolaire-c5861/);
+  assert.match(workflow, /PRODUCTION_FIREBASE_PROJECT_ID: ecoscolaire-c5861/);
   assert.match(workflow, /payment-lots123-production-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/);
   assert.match(workflow, /WORKLOAD_IDENTITY_PROVIDER/);
   assert.match(workflow, /SERVICE_ACCOUNT/);
   assert.doesNotMatch(workflow, /firebaseauth\.users\.update/);
   assert.doesNotMatch(workflow, /roles\/(owner|editor|firebaseauth\.admin|datastore\.user)/i);
+});
+
+test('workflow wires every required post-backup runner configuration value', () => {
+  for (const expected of [
+    /PRODUCTION_FIREBASE_PROJECT_ID: ecoscolaire-c5861/,
+    /PAYMENT_LOTS123_PROJECT_ID: ecoscolaire-c5861/,
+    /GOOGLE_CLOUD_PROJECT: ecoscolaire-c5861/,
+    /PAYMENT_LOTS123_APP_URL: https:\/\/ecoscolaire\.vercel\.app/,
+    /PAYMENT_LOTS123_EXPECTED_MAIN_SHA: \$\{\{ inputs\.expected_main_sha \}\}/,
+    /PAYMENT_LOTS123_CONFIRMATION: \$\{\{ inputs\.confirmation \}\}/,
+    /PAYMENT_LOTS123_TEST_RUN_ID: \$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/,
+    /PAYMENT_LOTS123_FIXTURE_SCHOOL_ID: payment-lots123-production-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/,
+    /PRODUCTION_BACKUP_OPERATIONS_PATH: \$\{\{ runner\.temp \}\}\/firestore-operations\.json/,
+    /PRODUCTION_BACKUP_RECEIPT_PATH: \$\{\{ runner\.temp \}\}\/production-backup-receipt\.json/,
+    /PRODUCTION_BACKUP_MAX_AGE_HOURS: \$\{\{ inputs\.backup_max_age_hours \}\}/,
+    /workload_identity_provider: \$\{\{ secrets\.WORKLOAD_IDENTITY_PROVIDER \}\}/,
+    /service_account: \$\{\{ secrets\.SERVICE_ACCOUNT \}\}/,
+    /VITE_FIREBASE_API_KEY: \$\{\{ secrets\.VITE_FIREBASE_API_KEY \}\}/,
+    /VITE_FIREBASE_AUTH_DOMAIN: \$\{\{ secrets\.VITE_FIREBASE_AUTH_DOMAIN \}\}/,
+    /VITE_FIREBASE_PROJECT_ID: \$\{\{ secrets\.VITE_FIREBASE_PROJECT_ID \}\}/,
+    /VITE_FIREBASE_STORAGE_BUCKET: \$\{\{ secrets\.VITE_FIREBASE_STORAGE_BUCKET \}\}/,
+    /VITE_FIREBASE_MESSAGING_SENDER_ID: \$\{\{ secrets\.VITE_FIREBASE_MESSAGING_SENDER_ID \}\}/,
+    /VITE_FIREBASE_APP_ID: \$\{\{ secrets\.VITE_FIREBASE_APP_ID \}\}/,
+  ]) assert.match(workflow, expected);
+  assert.match(workflow, /PAYMENT_LOTS123_DEPLOYMENT_VERIFIED=true/);
+  assert.match(workflow, /PAYMENT_LOTS123_CLEANUP_CAPABILITY_VERIFIED=true/);
 });
 
 test('runner contains explicit Lot 1, Lot 2 and Lot 3 runtime coverage', () => {

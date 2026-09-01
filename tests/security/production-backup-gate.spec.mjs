@@ -26,6 +26,18 @@ test('accepts only a recent successful Production export', () => {
   assert.equal(verifyProductionBackupReceipt({ receipt }), receipt);
 });
 
+test('fails closed when the Production project ID is missing, empty or unexpected', () => {
+  for (const projectId of [
+    undefined,
+    '',
+    'ecoscolaire-staging',
+    'ecoscolaire-production-shadow',
+  ]) {
+    assert.throws(() => verifyProductionBackupGate({ operations: [operation()], projectId, now }),
+      /unexpected Production project/);
+  }
+});
+
 test('fails closed for missing, stale, failed, running, future, and wrong-project backups', () => {
   assert.throws(() => verifyProductionBackupGate({ operations: [], projectId: 'ecoscolaire-c5861', now }));
   assert.throws(() => verifyProductionBackupGate({ operations: [operation({ metadata: {
