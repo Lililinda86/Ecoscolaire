@@ -9,11 +9,17 @@ const exactSet = (values, label) => {
   return new Set(values);
 };
 
-const financeOwnership = ({ studentIds, schoolId, testRunId }) => {
+const financeOwnership = ({ studentIds, schoolId, testRunId, projectionActorIds = [] }) => {
   assert.match(testRunId, /^[A-Za-z0-9_-]{1,128}$/, "Invalid fixture testRunId.");
   assert.ok(typeof schoolId === "string" && schoolId.length > 0, "Invalid fixture schoolId.");
   assert.notEqual(schoolId, "italo-gsb", "The real school is never a cleanup target.");
-  return { studentIds: exactSet(studentIds, "studentIds"), schoolId, testRunId };
+  assert.ok(Array.isArray(projectionActorIds), "projectionActorIds must be an array.");
+  return {
+    studentIds: exactSet(studentIds, "studentIds"),
+    schoolId,
+    testRunId,
+    projectionActorIds: new Set(projectionActorIds),
+  };
 };
 
 export const isOwnedFixtureAudit = (data, ownership) =>
@@ -31,7 +37,12 @@ export const isOwnedFixtureStudentFinance = (documentId, data, ownership) => {
   if (data.testRunId !== undefined && data.testRunId !== ownership.testRunId) return false;
   if (data.testFixture !== undefined && data.testFixture !== true) return false;
   const hasFixtureMarker = data.testRunId !== undefined || data.testFixture !== undefined;
-  return hasFixtureMarker || data.createdBy === SYSTEM_FINANCE_ACTOR;
+  if (hasFixtureMarker) return true;
+  const allowedActors = new Set([
+    SYSTEM_FINANCE_ACTOR,
+    ...(ownership.projectionActorIds || []),
+  ]);
+  return allowedActors.has(data.createdBy) && allowedActors.has(data.updatedBy);
 };
 
 const timestampKey = (value) => {
@@ -60,12 +71,13 @@ export const waitForStudentFinanceTriggerConvergence = async ({
   studentIds,
   schoolId,
   testRunId,
+  projectionActorIds = [],
   expectedTriggerFields = {},
   timeoutMs = 20_000,
   pollMs = 250,
   stableReads = 2,
 }) => {
-  const ownership = financeOwnership({ studentIds, schoolId, testRunId });
+  const ownership = financeOwnership({ studentIds, schoolId, testRunId, projectionActorIds });
   const deadline = Date.now() + timeoutMs;
   let previousKey = null;
   let stableCount = 0;
@@ -100,10 +112,11 @@ export const deleteOwnedStudentFinanceFinal = async ({
   studentIds,
   schoolId,
   testRunId,
+  projectionActorIds = [],
   verificationReads = 2,
   pollMs = 250,
 }) => {
-  const ownership = financeOwnership({ studentIds, schoolId, testRunId });
+  const ownership = financeOwnership({ studentIds, schoolId, testRunId, projectionActorIds });
   let deleted = 0;
   const records = await readFinance(db, studentIds);
   for (const { id, ref, snapshot } of records) {
@@ -126,6 +139,16 @@ export const deleteOwnedStudentFinanceFinal = async ({
     );
   }
   return deleted;
+};
+
+export const deleteOwnedFixtureReceiptCounter = async ({ db, schoolId }) => {
+  assert.ok(typeof schoolId === "string" && schoolId.length > 0, "Invalid fixture schoolId.");
+  assert.notEqual(schoolId, "italo-gsb", "The real school counter is never a cleanup target.");
+  const ref = db.collection("counters").doc(`receipts_${schoolId}`);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return 0;
+  await ref.delete();
+  return 1;
 };
 
 export const deleteOwnedFixtureAudits = async ({

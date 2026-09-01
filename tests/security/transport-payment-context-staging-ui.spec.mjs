@@ -10,6 +10,7 @@ const caller = await readFile(".github/workflows/transport-payments-release-runn
 const reusable = await readFile(".github/workflows/transport-payment-context-staging-ui.yml", "utf8");
 const harness = await readFile("scripts/test-transport-payment-context-staging.mjs", "utf8");
 const payments = await readFile("src/pages/Payments.tsx", "utf8");
+const receiptHistory = await readFile("src/components/ReceiptHistory.tsx", "utf8");
 
 test("lot3 operation is isolated behind the already authorized WIF caller", () => {
   assert.match(caller, /options: \[transport, lot1_tuition_ui, lot2_transport_student, lot3_transport_payment_ui\]/);
@@ -49,6 +50,20 @@ test("lot3 harness is run-scoped, never targets italo-gsb and cleans every fixtu
   assert.match(harness, /CLEANUP PASS/);
 });
 
+test("lot3 cleanup converges payment triggers before exact finance and counter cleanup", () => {
+  assert.match(harness,
+    /deleteTaggedDocuments\("payments"\)[\s\S]*?deleteTaggedDocuments\("transportPaymentAllocations"\)[\s\S]*?waitForStudentFinanceTriggerConvergence/);
+  assert.match(harness,
+    /waitForStudentFinanceTriggerConvergence[\s\S]*?projectionActorIds: createdAuthUids[\s\S]*?transportPaid: 0/);
+  assert.match(harness,
+    /waitForStudentFinanceTriggerConvergence[\s\S]*?tracked[\s\S]*?deleteOwnedStudentFinanceFinal/);
+  assert.match(harness,
+    /deleteOwnedStudentFinanceFinal[\s\S]*?verificationReads: 3[\s\S]*?deleteUser[\s\S]*?deleteTaggedDocuments\("audit_logs"\)[\s\S]*?deleteOwnedFixtureReceiptCounter/);
+  assert.doesNotMatch(harness, /setTimeout\(resolve => setTimeout|setTimeout\(resolve, 750\)/);
+  assert.match(harness, /collection === "studentFinance"[\s\S]*?Object\.values\(studentIds\)[\s\S]*?snapshot\.exists/);
+  assert.match(harness, /residualCounts\.counters[\s\S]*?const orphans/);
+});
+
 test("lot3 UI proves context, server tariffs, periods, preview, free and incomplete states", () => {
   for (const testId of [
     "transport-student-context", "transport-zone-pk", "transport-neighborhood",
@@ -65,6 +80,27 @@ test("lot3 UI proves context, server tariffs, periods, preview, free and incompl
   assert.match(harness, /transport-configuration-incomplete/);
   assert.match(harness, /Mois \(Transport\)/);
   assert.match(harness, /receipt\.transportContext/);
+});
+
+test("lot3 UI explicitly proves partial state, ordered allocations, benefit isolation and moratorium dates", () => {
+  assert.match(harness, /assertTransportInstallmentRow\(form,[\s\S]*?previousPaid: 1000,[\s\S]*?remaining: 2000,[\s\S]*?status: "PARTIEL"/);
+  assert.match(harness, /expectedAllocations = \[[\s\S]*?2026-09[\s\S]*?amount: 2000[\s\S]*?2026-10[\s\S]*?amount: 4000[\s\S]*?2026-11[\s\S]*?amount: 4000[\s\S]*?CREDIT[\s\S]*?amount: 1000/);
+  assert.match(harness, /LOT3-TUITION-ISOLATED/);
+  assert.match(harness, /getByText\("LOT3-TUITION-ISOLATED"[\s\S]*?\.count\(\), 0/);
+  assert.match(harness, /collection-quote-gross[\s\S]*?12_000/);
+  assert.match(harness, /collection-quote-net[\s\S]*?11_000/);
+  assert.match(harness, /Bourse \/ réduction applicable[\s\S]*?-1000/);
+  assert.match(harness, /Échéance initiale[\s\S]*?15\/09\/2026/);
+  assert.match(harness, /Échéance effective[\s\S]*?15\/12\/2026/);
+});
+
+test("lot3 receipt UI proves class, allocations and remaining balance", () => {
+  assert.match(receiptHistory, /displayModel\.className[\s\S]*?>Classe</);
+  assert.match(receiptHistory, /transport-receipt-allocation-\$\{displayModel\.id\}/);
+  assert.match(receiptHistory, />Reste à payer<[\s\S]*?formattedRemainingBalance/);
+  assert.match(harness, /receiptDetail\.getByText\("LOT3 Primaire", \{ exact: true \}\)/);
+  assert.match(harness, /receiptAllocation\.locator\("\.receipt-history-allocation-row"\)/);
+  assert.match(harness, /receiptRemaining[\s\S]*?parseFrenchCurrencyAmount[\s\S]*?, 0\)/);
 });
 
 test("historical policy remains unchanged and client never derives a rate from address text", () => {
