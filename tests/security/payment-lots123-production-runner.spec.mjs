@@ -10,12 +10,17 @@ import {
   PRODUCTION_LOTS123_TUITION_MORATORIUM, PRODUCTION_LOTS123_TUITION_QUOTE,
   assertProductionTuitionMoratoriumFixture, validateProductionLotsConfig,
 } from '../../scripts/test-payment-lots123-production.mjs';
+import {
+  buildStudentPrivateTransportAuditUpdate,
+} from '../../scripts/test-transport-payments-production.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const workflow = read('.github/workflows/payment-lots123-production-validation.yml');
 const runner = read('scripts/test-payment-lots123-production.mjs');
 const transportRunner = read('scripts/test-transport-payments-production.mjs');
+const rules = read('firestore.rules');
+const rulesSpec = read('tests/security/rules.spec.mjs');
 const ci = read('.github/workflows/ci.yml');
 
 const validReceiptPath = () => {
@@ -39,6 +44,69 @@ const validEnv = () => ({
   PAYMENT_LOTS123_EXPECTED_MAIN_SHA: 'a'.repeat(40), GITHUB_SHA: 'a'.repeat(40),
   PAYMENT_LOTS123_APP_URL: 'https://ecoscolaire.vercel.app',
   PRODUCTION_BACKUP_RECEIPT_PATH: validReceiptPath(),
+});
+
+const validStudentPrivateTransportAuditInput = () => ({
+  transportZonePk: 35,
+  transportNeighborhood: 'Quartier B',
+  transportPickupPoint: 'Point B',
+  updatedAt: { _methodName: 'serverTimestamp' },
+  updatedBy: 'secretary-fixture-uid',
+  secretaryFixtureUid: 'secretary-fixture-uid',
+});
+
+test('studentPrivate transport update requires the canonical secretary audit payload', () => {
+  const input = validStudentPrivateTransportAuditInput();
+  assert.deepEqual(buildStudentPrivateTransportAuditUpdate(input), {
+    transportZonePk: 35,
+    transportNeighborhood: 'Quartier B',
+    transportPickupPoint: 'Point B',
+    updatedAt: input.updatedAt,
+    updatedBy: 'secretary-fixture-uid',
+  });
+
+  for (const field of ['updatedAt', 'updatedBy']) {
+    const invalid = validStudentPrivateTransportAuditInput();
+    delete invalid[field];
+    assert.throws(() => buildStudentPrivateTransportAuditUpdate(invalid), field);
+  }
+  assert.throws(() => buildStudentPrivateTransportAuditUpdate({
+    ...validStudentPrivateTransportAuditInput(), updatedBy: 'foreign-uid',
+  }), /secretary fixture UID/);
+  for (const field of ['id', 'studentId', 'schoolId']) {
+    assert.throws(() => buildStudentPrivateTransportAuditUpdate({
+      ...validStudentPrivateTransportAuditInput(), [field]: 'forbidden',
+    }), /forbidden field/);
+  }
+});
+
+test('Production runner and Rules retain the same-school studentPrivate audit contract', () => {
+  assert.match(transportRunner, /updatedAt: serverTimestamp\(\), updatedBy: secretaryFixtureUid/);
+  assert.match(transportRunner, /const secretaryFixtureUid = credentials\.get\('secretary'\)\.uid/);
+  assert.match(rules, /request\.resource\.data\.updatedAt == request\.time/);
+  assert.match(rules, /request\.resource\.data\.updatedBy == request\.auth\.uid/);
+  assert.match(rulesSpec, /allows a same-school secretary to persist transport enrollment/);
+  assert.match(rulesSpec, /denies transport enrollment writes from a cross-school secretary/);
+  assert.match(rulesSpec, /denies transport enrollment writes from a linked parent/);
+});
+
+test('every Firebase client write is canonical or an explicit denial assertion', () => {
+  const clientWrites = transportRunner.match(/\b(?:setDoc|updateDoc|deleteDoc)\(/g) || [];
+  assert.equal(clientWrites.length, 8);
+  assert.match(transportRunner,
+    /updateDoc\(doc\(secretary\.firestore, 'studentPrivate', editStudent\),[\s\S]*buildStudentPrivateTransportAuditUpdate/);
+  assert.match(transportRunner,
+    /updateDoc\(doc\(secretary\.firestore, 'students', editStudent\), \{ usesTransport: false, transportStatus: 'none' \}\)/);
+  assert.match(transportRunner,
+    /updateDoc\(doc\(secretary\.firestore, 'students', editStudent\), \{ usesTransport: true, transportStatus: 'active' \}\)/);
+  assert.match(transportRunner, /expectFailure\(\(\) => updateDoc\(doc\(parent\.firestore, 'students'/);
+  assert.match(transportRunner, /expectFailure\(\(\) => setDoc\(doc\(secretary\.firestore, collection, directId\)/);
+  assert.match(transportRunner, /expectFailure\(\(\) => updateDoc\(doc\(secretary\.firestore, collection, id\)/);
+  assert.match(transportRunner, /expectFailure\(\(\) => deleteDoc\(doc\(secretary\.firestore, collection, id\)/);
+  assert.match(transportRunner, /expectFailure\(\(\) => setDoc\(doc\(client\.firestore, 'studentFinance'/);
+  assert.match(transportRunner, /JSON\.stringify\(\(await db\.collection\('studentFinance'\)/);
+  assert.match(transportRunner, /db\.collection\('payments'\)\.where\('studentId', '==', editStudent\)/);
+  assert.doesNotMatch(runner, /\b(?:setDoc|updateDoc|deleteDoc)\(/);
 });
 
 test('fixture prefix and exact run identity are mandatory', () => {
