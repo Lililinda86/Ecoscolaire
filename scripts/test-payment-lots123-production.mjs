@@ -20,6 +20,45 @@ export const REQUIRED_ZERO_RESIDUALS = [
   'cashClosures', 'cashLedgerDays', 'counters', 'authUsers', 'audit_logs',
 ];
 
+export const PRODUCTION_LOTS123_ACADEMIC_YEAR = '2025-2026';
+export const PRODUCTION_LOTS123_TUITION_DEADLINES = Object.freeze({
+  T1: '2026-09-15',
+  T2: '2026-12-15',
+  T3: '2027-03-15',
+});
+export const PRODUCTION_LOTS123_TUITION_MORATORIUM = Object.freeze({
+  academicYear: PRODUCTION_LOTS123_ACADEMIC_YEAR,
+  paymentType: 'tuition',
+  installment: 'T1',
+  status: 'approved',
+  effectiveDueDate: '2026-12-15',
+});
+export const PRODUCTION_LOTS123_TUITION_QUOTE = Object.freeze({
+  grossExpectedAmount: 40_000,
+  originalDueDate: '2026-09-15',
+  effectiveDueDate: '2026-12-15',
+});
+
+export const assertProductionTuitionMoratoriumFixture = ({ academicYear, moratorium }) => {
+  assert.equal(academicYear?.name, PRODUCTION_LOTS123_ACADEMIC_YEAR,
+    'Production fixture academic year is invalid.');
+  assert.deepEqual(academicYear?.tuitionPaymentDeadlines, PRODUCTION_LOTS123_TUITION_DEADLINES,
+    'Production fixture tuition deadlines must use the canonical academic-year field.');
+  assert.equal(moratorium?.academicYear, PRODUCTION_LOTS123_ACADEMIC_YEAR,
+    'Production fixture moratorium academic year is invalid.');
+  assert.equal(moratorium?.paymentType, 'tuition',
+    'Production fixture moratorium must target Tuition through paymentType.');
+  assert.equal(Object.hasOwn(moratorium || {}, 'type'), false,
+    'Production fixture moratorium must not use the legacy type field.');
+  assert.equal(moratorium?.installment, 'T1',
+    'Production fixture moratorium installment is invalid.');
+  assert.equal(moratorium?.status, 'approved',
+    'Production fixture moratorium status is invalid.');
+  assert.equal(moratorium?.effectiveDueDate, '2026-12-15',
+    'Production fixture moratorium effective deadline is invalid.');
+  return true;
+};
+
 const sha256 = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const canonical = (value) => {
   if (Array.isArray(value)) return value.map(canonical);

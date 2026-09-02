@@ -10,6 +10,13 @@ import { deleteApp, initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { deleteDoc, doc, getDoc, getFirestore, setDoc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import {
+  PRODUCTION_LOTS123_ACADEMIC_YEAR,
+  PRODUCTION_LOTS123_TUITION_DEADLINES,
+  PRODUCTION_LOTS123_TUITION_MORATORIUM,
+  PRODUCTION_LOTS123_TUITION_QUOTE,
+  assertProductionTuitionMoratoriumFixture,
+} from './test-payment-lots123-production.mjs';
 
 const REAL_ITALO_SCHOOL = 'italo-gsb';
 export const assertTransportEnvironmentEvidence = ({ expectedProject, runtimeProjectId, networkProjectIds }) => {
@@ -168,7 +175,16 @@ const main = async () => {
   };
 
   try {
-    const academicYear = '2025-2026';
+    const academicYear = PRODUCTION_LOTS123_ACADEMIC_YEAR;
+    const tuitionMoratoriumFixture = { ...PRODUCTION_LOTS123_TUITION_MORATORIUM };
+    const academicYearFixture = {
+      name: academicYear,
+      tuitionPaymentDeadlines: { ...PRODUCTION_LOTS123_TUITION_DEADLINES },
+    };
+    assertProductionTuitionMoratoriumFixture({
+      academicYear: academicYearFixture,
+      moratorium: tuitionMoratoriumFixture,
+    });
     const periods = ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01'];
     const yearId = mark('academicYears', `transport-year-${cfg.testRunId}`);
     const primaryClassId = mark('classes', `transport-primary-${cfg.testRunId}`);
@@ -185,7 +201,6 @@ const main = async () => {
         'LOT123 Class 2 installments': { annual: 85_000, t1: 50_000, t2: 35_000, t3: 0 },
       } } : {}),
       transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: periods },
-      tuitionDeadlines: { T1: '2026-09-15', T2: '2026-12-15', T3: '2027-03-15' },
       paymentDeadlines: { transport: {
         '2025-09': '2025-09-10', '2025-10': '2025-10-10', '2025-11': '2025-11-10',
         '2025-12': '2025-12-10', '2026-01': '2026-01-10',
@@ -197,7 +212,7 @@ const main = async () => {
       transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: periods },
     });
     await createMarked('academicYears', yearId, {
-      id: yearId, schoolId: cfg.fixtureSchoolId, name: academicYear, status: 'active', active: true,
+      id: yearId, schoolId: cfg.fixtureSchoolId, ...academicYearFixture, status: 'active', active: true,
     });
     await createMarked('classes', primaryClassId, {
       id: primaryClassId, schoolId: cfg.fixtureSchoolId,
@@ -298,12 +313,14 @@ const main = async () => {
       const tuitionMoratoriumId = `lots123-tuition-moratorium-${cfg.testRunId}`.slice(0, 125);
       await createMarked('paymentMoratoriums', tuitionMoratoriumId, {
         id: tuitionMoratoriumId, schoolId: cfg.fixtureSchoolId, studentId: pk14, academicYear,
-        type: 'tuition', installment: 'T1', status: 'approved', effectiveDueDate: '2026-12-15',
+        ...tuitionMoratoriumFixture,
         reason: 'Lots123 tuition moratorium', createdBy: credentials.get('owner').uid,
       });
       const delayed = await quote(secretary, pk14, 'tuition', { installment: 'T1' });
       assert.deepEqual([delayed.grossExpectedAmount, delayed.originalDueDate, delayed.effectiveDueDate],
-        [40_000, '2026-09-15', '2026-12-15']);
+        [PRODUCTION_LOTS123_TUITION_QUOTE.grossExpectedAmount,
+          PRODUCTION_LOTS123_TUITION_QUOTE.originalDueDate,
+          PRODUCTION_LOTS123_TUITION_QUOTE.effectiveDueDate]);
       await pay(secretary, pk14, `lots123-tuition-partial-${cfg.testRunId}`, 10_000, 'tuition', { installment: 'T1' });
       const partialTuition = await quote(secretary, pk14, 'tuition', { installment: 'T1' });
       assert.deepEqual([partialTuition.previousPaid, partialTuition.remainingBalance], [10_000, 30_000]);
