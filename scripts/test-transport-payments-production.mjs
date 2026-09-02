@@ -373,6 +373,7 @@ const main = async () => {
     const secretary = await newClient('secretary');
     const accountant = await newClient('accountant');
     const director = await newClient('director');
+    const parent = await newClient('parent');
     const crossOwner = await newClient('crossOwner');
     const call = (client, name, data) => httpsCallable(client.functions, name)(data).then((r) => r.data);
     const quote = (client, studentId, type = 'transport', extra = {}) => call(client, 'getCollectionQuote', {
@@ -583,7 +584,6 @@ const main = async () => {
     ]);
 
     await db.collection('users').doc(credentials.get('parent').uid).update({ studentIds: [pk14] });
-    const parent = await newClient('parent');
     const otherSchoolReceiptId = `transport-other-receipt-${cfg.testRunId}`.slice(0, 125);
     await createMarked('receipts', otherSchoolReceiptId, {
       id: otherSchoolReceiptId, paymentId: otherSchoolReceiptId,
