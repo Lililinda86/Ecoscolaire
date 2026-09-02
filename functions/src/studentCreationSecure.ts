@@ -58,6 +58,11 @@ const requireString = (value: unknown, field: string, maxLength = 300): string =
   return value.trim();
 };
 
+const optionalString = (value: unknown, field: string, maxLength = 300): string | undefined => {
+  if (value === undefined || value === null || value === '') return undefined;
+  return requireString(value, field, maxLength);
+};
+
 const normalizeIdentityPart = (value: string): string => value
   .trim()
   .toUpperCase()
@@ -74,15 +79,24 @@ export const normalizeSecureStudentMatricule = (value: string): string => {
   return normalized;
 };
 
-export const buildSecureStudentFingerprint = (studentData: InputMap, privateData: InputMap): string => {
+export const buildSecureStudentFingerprint = (
+  studentData: InputMap,
+  privateData: InputMap,
+  missingDobDiscriminator?: string
+): string => {
   const lastName = normalizeIdentityPart(requireString(studentData.studentLastName, 'studentLastName', 120));
   const firstName = normalizeIdentityPart(requireString(studentData.studentFirstName, 'studentFirstName', 120));
-  const dob = requireString(privateData.dob, 'dob', 10);
+  const dob = optionalString(privateData.dob, 'dob', 10);
   const gender = requireString(studentData.gender, 'gender', 10).toUpperCase();
-  if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(dob) || !['M', 'F'].includes(gender)) {
+  if ((dob !== undefined && !/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(dob))
+      || !['M', 'F'].includes(gender)) {
     throw businessError('invalid-argument', 'INVALID_ARGUMENT', 'Identité élève invalide.');
   }
-  return `${lastName}__${firstName}__${dob}__${gender}`;
+  if (dob !== undefined) return `${lastName}__${firstName}__${dob}__${gender}`;
+
+  const discriminator = requireSafeId(missingDobDiscriminator, 'studentId');
+  const discriminatorHash = crypto.createHash('sha256').update(discriminator).digest('hex').slice(0, 24);
+  return `${lastName}__${firstName}__NO-DOB-${discriminatorHash}__${gender}`;
 };
 
 const generateAutomaticMatricule = (studentId: string, attempt: number): string => {
@@ -111,7 +125,8 @@ const pick = (source: InputMap, keys: readonly string[]): InputMap => Object.fro
 
 const STUDENT_KEYS = [
   'name', 'studentLastName', 'studentFirstName', 'gender', 'section', 'classId',
-  'studentStatus', 'busId', 'usesTransport', 'transportFleet', 'transportStatus'
+  'studentStatus', 'busId', 'usesTransport', 'transportFleet', 'transportStatus',
+  'noKnownMedicalCondition', 'registrationFileStatus', 'missingRegistrationFields'
 ] as const;
 const PRIVATE_KEYS = [
   'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'parentEmails', 'address',
@@ -127,6 +142,31 @@ const FINANCE_KEYS = [
   'financialBypass', 'registrationFeeExpected', 'tuitionExpected', 'transportMonthlyFee'
 ] as const;
 
+const hasText = (value: unknown): boolean => typeof value === 'string' && value.trim().length > 0;
+
+const buildRegistrationFile = (
+  studentData: InputMap,
+  privateData: InputMap
+): { status: 'complete' | 'incomplete'; missingFields: string[] } => {
+  const missingFields: string[] = [];
+  if (!hasText(privateData.dob)) missingFields.push('dob');
+  if (!hasText(privateData.placeOfBirth)) missingFields.push('placeOfBirth');
+  if (!hasText(privateData.parentName)) missingFields.push('parentName');
+  if (!hasText(privateData.parentPhone)) missingFields.push('parentPhone');
+  if (!hasText(privateData.address)) missingFields.push('address');
+  if (!hasText(privateData.emergencyContact)) missingFields.push('emergencyContact');
+  if (!hasText(privateData.allergies)
+      && !hasText(privateData.medicalConditions)
+      && studentData.noKnownMedicalCondition !== true) {
+    missingFields.push('medicalInformation');
+  }
+  if (studentData.usesTransport === true) {
+    if (!hasText(privateData.transportNeighborhood)) missingFields.push('transportNeighborhood');
+    if (!hasText(privateData.transportPickupPoint)) missingFields.push('transportPickupPoint');
+  }
+  return { status: missingFields.length === 0 ? 'complete' : 'incomplete', missingFields };
+};
+
 const validateStudentPayload = (
   studentData: InputMap,
   privateData: InputMap,
@@ -135,8 +175,13 @@ const validateStudentPayload = (
   requireString(studentData.name, 'name', 240);
   requireString(studentData.studentLastName, 'studentLastName', 120);
   requireString(studentData.studentFirstName, 'studentFirstName', 120);
-  requireString(privateData.parentName, 'parentName', 240);
-  requireString(privateData.parentPhone, 'parentPhone', 80);
+  optionalString(privateData.dob, 'dob', 10);
+  optionalString(privateData.parentName, 'parentName', 240);
+  optionalString(privateData.parentPhone, 'parentPhone', 80);
+  if (studentData.noKnownMedicalCondition !== undefined
+      && typeof studentData.noKnownMedicalCondition !== 'boolean') {
+    throw businessError('invalid-argument', 'INVALID_ARGUMENT', 'Confirmation médicale invalide.');
+  }
   if (!['francophone', 'anglophone'].includes(String(studentData.section))) {
     throw businessError('invalid-argument', 'INVALID_ARGUMENT', 'Section élève invalide.');
   }
@@ -178,7 +223,10 @@ export const executeCreateStudentSecure = async (
   requireMap(input.parentPrivateData, 'parentPrivateData');
   requireMap(input.parentFinanceData, 'parentFinanceData');
   validateStudentPayload(studentData, privateData, financeData);
-  const fingerprint = buildSecureStudentFingerprint(studentData, privateData);
+  const registrationFile = buildRegistrationFile(studentData, privateData);
+  studentData.registrationFileStatus = registrationFile.status;
+  studentData.missingRegistrationFields = registrationFile.missingFields;
+  const fingerprint = buildSecureStudentFingerprint(studentData, privateData, studentId);
   const requestedMatricule = typeof input.requestedMatricule === 'string' && input.requestedMatricule.trim()
     ? normalizeSecureStudentMatricule(input.requestedMatricule)
     : null;
@@ -284,7 +332,7 @@ export const executeCreateStudentSecure = async (
           financialBypass: financeData.financialBypass ?? { t1: false, t2: false, t3: false }, ...audit
         });
         transaction.create(firestore.collection('studentParentPrivate').doc(studentId), {
-          ...base, dob: privateData.dob, ...audit
+          ...base, ...pick(privateData, ['dob']), ...audit
         });
         transaction.create(firestore.collection('studentParentFinance').doc(studentId), {
           ...base, feeT1: financeData.feeT1 ?? 0,
