@@ -481,6 +481,49 @@ test('runner contains explicit Lot 1, Lot 2 and Lot 3 runtime coverage', () => {
   ]) assert.match(transportRunner, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
+test('authenticated Firebase clients are initialized and signed in before first use', () => {
+  const credentialSetup = transportRunner.indexOf("await createFixtureUser('parent')");
+  const clientSignIn = transportRunner.indexOf('await signInWithEmailAndPassword(auth, creds.email, creds.password)');
+  const clientReturn = transportRunner.indexOf('return { app, auth, firestore: getFirestore(app)');
+  assert.ok(credentialSetup >= 0, 'Parent fixture credentials must be created.');
+  assert.ok(clientSignIn >= 0 && clientSignIn < clientReturn,
+    'Every Firebase client must sign in before its Firestore client is returned.');
+
+  const clients = [
+    ['owner', "const owner = await newClient('owner')", 'call(owner'],
+    ['secretary', "const secretary = await newClient('secretary')", 'call(secretary'],
+    ['accountant', "const accountant = await newClient('accountant')", 'pay(accountant'],
+    ['director', "const director = await newClient('director')", "['owner', owner], ['secretary', secretary], ['accountant', accountant], ['director', director]"],
+    ['parent', "const parent = await newClient('parent')", 'doc(parent.firestore'],
+    ['cross-school owner', "const crossOwner = await newClient('crossOwner')", 'doc(crossOwner.firestore'],
+  ];
+  for (const [actor, initializer, firstUse] of clients) {
+    const initializationIndex = transportRunner.indexOf(initializer);
+    const firstUseIndex = transportRunner.indexOf(firstUse, initializationIndex + initializer.length);
+    assert.ok(initializationIndex > credentialSetup, `${actor} client must initialize after fixture credentials.`);
+    assert.ok(firstUseIndex > initializationIndex, `${actor} client must initialize before first use.`);
+  }
+  assert.equal((transportRunner.match(/const parent = await newClient\('parent'\)/g) || []).length, 1,
+    'The parent Firebase session must be initialized exactly once and reused.');
+});
+
+test('Lot 2 parent denial uses the authenticated parent client without privileged substitution', () => {
+  const parentInitialization = transportRunner.indexOf("const parent = await newClient('parent')");
+  const lot2Start = transportRunner.indexOf("checkpoint('LOT2_START')");
+  const scenarioStart = transportRunner.indexOf("scenarioId: 'LOT2_PARENT_WRITE_DENY'");
+  const scenarioEnd = transportRunner.indexOf("checkpoint('LOT2_PARENT_DENY_PASS')", scenarioStart);
+  assert.ok(parentInitialization >= 0 && parentInitialization < lot2Start && lot2Start < scenarioStart,
+    'Parent must be signed in before the Lot 2 denial scenario starts.');
+
+  const scenario = transportRunner.slice(scenarioStart, scenarioEnd);
+  assert.match(scenario, /expectedCodes: \['permission-denied'\]/);
+  assert.match(scenario,
+    /updateDoc\(doc\(parent\.firestore, 'students', editStudent\), \{ usesTransport: false \}\)/);
+  assert.doesNotMatch(scenario, /\bdb\.collection\(|adminAuth|secretary\.firestore/,
+    'The parent Rules denial cannot use Admin SDK or secretary credentials.');
+  assert.match(transportRunner, /await createFixtureUser\('parent'\);/,
+    'The parent actor must use the same-school fixture default.');
+});
 test('every expected-failure callsite has unique explicit diagnostic context', () => {
   const callsites = transportRunner.match(/expectFailure\(\{/g) || [];
   const labelledContexts = transportRunner.match(/expectFailure\(\{[\s\S]*?scenarioId(?:\s*:|\s*,)/g) || [];
