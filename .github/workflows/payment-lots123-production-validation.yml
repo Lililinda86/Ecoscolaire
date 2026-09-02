@@ -61,9 +61,10 @@ jobs:
           runs_json="$(mktemp)"
           trap 'rm -f "$runs_json"' EXIT
           gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/firebase-deploy.yml/runs" \
-            -f head_sha="$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" -f branch=main -f event=push -f per_page=100 > "$runs_json"
+            -f head_sha="$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" -f branch=main -f per_page=100 > "$runs_json"
           node scripts/verify-exact-deployment-run.mjs \
-            "$runs_json" "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" '.github/workflows/firebase-deploy.yml' main
+            "$runs_json" "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" '.github/workflows/firebase-deploy.yml' main \
+            295023413 'push,workflow_dispatch'
           node scripts/vercel-production-deployment-gate.mjs --repository "$GITHUB_REPOSITORY" --expected-sha "$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" --timeout-ms 120000 --interval-ms 5000
           echo 'PAYMENT_LOTS123_DEPLOYMENT_VERIFIED=true' >> "$GITHUB_ENV"
 
