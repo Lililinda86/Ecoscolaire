@@ -69,16 +69,128 @@ const todayDouala = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Africa/Douala', year: 'numeric', month: '2-digit', day: '2-digit',
 }).format(new Date());
 
-const expectFailure = async (operation, codes = []) => {
+const SECRET_KEY = /(?:authorization|cookie|credential|password|private.?key|secret|token)/i;
+const SECRET_TEXT_PATTERNS = [
+  [/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/gi, '[REDACTED_PRIVATE_KEY]'],
+  [/(\bBearer\s+)[A-Za-z0-9._~+\/-]+=*/gi, '$1[REDACTED]'],
+  [/((?:authorization|cookie|credential|password|secret|token)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
+    '$1[REDACTED]'],
+];
+
+export const redactDiagnosticText = (value) => SECRET_TEXT_PATTERNS.reduce(
+  (text, [pattern, replacement]) => text.replace(pattern, replacement), String(value ?? ''),
+);
+
+const sanitizeDiagnosticValue = (value, seen = new WeakSet()) => {
+  if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') return value;
+  if (typeof value === 'string') return redactDiagnosticText(value);
+  if (typeof value !== 'object') return redactDiagnosticText(String(value));
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizeDiagnosticValue(item, seen));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+    key,
+    SECRET_KEY.test(key) ? '[REDACTED]' : sanitizeDiagnosticValue(item, seen),
+  ]));
+};
+
+export const safeErrorSnapshot = (error) => {
+  if (error === null || error === undefined) {
+    return { name: String(error), message: String(error), code: null, details: null, businessCode: null,
+      cause: null, stack: null };
+  }
+  if (typeof error !== 'object') {
+    return { name: typeof error, message: redactDiagnosticText(error), code: null, details: null,
+      businessCode: null, cause: null, stack: null };
+  }
+  return {
+    name: redactDiagnosticText(error.name || error.constructor?.name || 'Error'),
+    message: redactDiagnosticText(error.message || String(error)),
+    code: error.code === undefined ? null : redactDiagnosticText(error.code),
+    details: sanitizeDiagnosticValue(error.details ?? null),
+    businessCode: businessCode(error),
+    cause: error.cause === undefined ? null : sanitizeDiagnosticValue(
+      error.cause instanceof Error ? {
+        name: error.cause.name, message: error.cause.message, code: error.cause.code, stack: error.cause.stack,
+      } : error.cause,
+    ),
+    stack: error.stack ? redactDiagnosticText(error.stack) : null,
+  };
+};
+
+const validateExpectedFailureContext = (context) => {
+  assert.ok(context && typeof context === 'object', 'Expected-failure context is required.');
+  assert.match(context.scenarioId || '', /^LOT[123]_[A-Z0-9_]+$/, 'A stable scenarioId is required.');
+  assert.ok([1, 2, 3].includes(context.lot), 'Lot must be 1, 2 or 3.');
+  assert.ok(typeof context.operation === 'string' && context.operation.trim(), 'Operation is required.');
+  assert.ok(Array.isArray(context.expectedCodes) && context.expectedCodes.length > 0,
+    'At least one expected code is required.');
+};
+
+export const createExpectedFailureDiagnostic = (context, originalError, normalizedCode = '') => {
+  validateExpectedFailureContext(context);
+  const original = safeErrorSnapshot(originalError);
+  const metadata = sanitizeDiagnosticValue(context.metadata || {});
+  const lines = [
+    'EXPECT_FAILURE_MISMATCH',
+    `scenarioId=${context.scenarioId}`,
+    `lot=${context.lot}`,
+    `operation=${redactDiagnosticText(context.operation)}`,
+    `expectedCodes=${context.expectedCodes.join(',')}`,
+    `normalizedCode=${normalizedCode || '<empty>'}`,
+    `errorName=${original.name}`,
+    `errorCode=${original.code ?? '<empty>'}`,
+    `businessCode=${original.businessCode ?? '<empty>'}`,
+    `errorMessage=${original.message}`,
+    `details=${JSON.stringify(original.details)}`,
+    `cause=${JSON.stringify(original.cause)}`,
+    `metadata=${JSON.stringify(metadata)}`,
+    `originalStack=${original.stack || '<none>'}`,
+  ];
+  const options = originalError instanceof Error ? { cause: originalError } : undefined;
+  const diagnostic = new Error(lines.join('\n'), options);
+  diagnostic.name = 'ExpectedFailureDiagnosticError';
+  diagnostic.code = 'EXPECT_FAILURE_MISMATCH';
+  diagnostic.scenarioId = context.scenarioId;
+  diagnostic.lot = context.lot;
+  diagnostic.operation = context.operation;
+  diagnostic.expectedCodes = [...context.expectedCodes];
+  diagnostic.normalizedCode = normalizedCode;
+  diagnostic.originalError = original;
+  diagnostic.metadata = metadata;
+  return diagnostic;
+};
+
+export const expectFailure = async (context, operation) => {
+  validateExpectedFailureContext(context);
+  let didThrow = false;
+  let originalError;
   try {
     await operation();
-    assert.fail(`Expected failure: ${codes.join(' or ')}`);
   } catch (error) {
-    if (error?.code === 'ERR_ASSERTION') throw error;
-    const actual = businessCode(error) || String(error?.code || '').replace(/^functions\//, '');
-    assert.ok(codes.includes(actual), `Unexpected failure ${error?.code || 'unknown'} / ${businessCode(error) || 'none'}`);
+    didThrow = true;
+    originalError = error;
   }
+  if (!didThrow) {
+    originalError = new Error('Operation completed successfully although failure was required.');
+  }
+  const normalizedCode = businessCode(originalError)
+    || String(originalError?.code || '').replace(/^functions\//, '');
+  if (context.expectedCodes.includes(normalizedCode)) return originalError;
+  throw createExpectedFailureDiagnostic(context, originalError, normalizedCode);
 };
+
+export const paymentFailureMarker = (error) => ({
+  scenarioId: error?.scenarioId || 'UNSCOPED_FAILURE',
+  lot: error?.lot ?? null,
+  operation: redactDiagnosticText(error?.operation || 'unknown'),
+  errorName: redactDiagnosticText(error?.name || 'Error'),
+  errorCode: redactDiagnosticText(error?.code || ''),
+  businessCode: redactDiagnosticText(error?.originalError?.businessCode || businessCode(error) || ''),
+  message: redactDiagnosticText(error?.message || String(error)),
+});
+
+const checkpoint = (marker) => console.log(`PAYMENT_LOTS123_CHECKPOINT ${marker}`);
 
 
 const snapshotInventory = async (db) => {
@@ -302,6 +414,7 @@ const main = async () => {
     const secondary = await createStudent('secondary', 14, { classId: secondaryClassId });
     const invalid = await createStudent('invalid', undefined);
     if (cfg.isPaymentLots123) {
+      checkpoint('LOT1_START');
       const class120Student = await createStudent('class120', 28, { classId: class120Id });
       const class2Student = await createStudent('class2', 28, { classId: class2Id });
       for (const studentId of [pk14, class120Student, class2Student]) {
@@ -316,8 +429,13 @@ const main = async () => {
       assert.deepEqual((await Promise.all(['T1', 'T2'].map((installment) =>
         quote(secretary, class2Student, 'tuition', { installment })))).map((item) => item.grossExpectedAmount),
       [50_000, 35_000]);
-      await expectFailure(() => quote(secretary, class2Student, 'tuition', { installment: 'T3' }),
-        ['GROSS_AMOUNT_NOT_CONFIGURED']);
+      checkpoint('LOT1_CLASSFEES_PASS');
+      await expectFailure({
+        scenarioId: 'LOT1_TWO_INSTALLMENT_T3_DENY', lot: 1,
+        operation: 'getCollectionQuote tuition T3', expectedCodes: ['GROSS_AMOUNT_NOT_CONFIGURED'],
+        metadata: { studentId: class2Student, installment: 'T3', schoolId: cfg.fixtureSchoolId },
+      }, () => quote(secretary, class2Student, 'tuition', { installment: 'T3' }));
+      checkpoint('LOT1_T3_DENY_PASS');
 
       const tuitionPercentId = `lots123-tuition-percent-${cfg.testRunId}`.slice(0, 125);
       await createMarked('financialBenefits', tuitionPercentId, {
@@ -330,6 +448,7 @@ const main = async () => {
       const discounted = await quote(secretary, class120Student, 'tuition', { installment: 'T1' });
       assert.deepEqual([discounted.grossExpectedAmount, discounted.discountAmount, discounted.netExpectedAmount],
         [60_000, 6_000, 54_000]);
+      checkpoint('LOT1_BENEFIT_PASS');
       const tuitionMoratoriumId = `lots123-tuition-moratorium-${cfg.testRunId}`.slice(0, 125);
       await createMarked('paymentMoratoriums', tuitionMoratoriumId, {
         id: tuitionMoratoriumId, schoolId: cfg.fixtureSchoolId, studentId: pk14, academicYear,
@@ -341,10 +460,14 @@ const main = async () => {
         [PRODUCTION_LOTS123_TUITION_QUOTE.grossExpectedAmount,
           PRODUCTION_LOTS123_TUITION_QUOTE.originalDueDate,
           PRODUCTION_LOTS123_TUITION_QUOTE.effectiveDueDate]);
+      checkpoint('LOT1_MORATORIUM_PASS');
       await pay(secretary, pk14, `lots123-tuition-partial-${cfg.testRunId}`, 10_000, 'tuition', { installment: 'T1' });
       const partialTuition = await quote(secretary, pk14, 'tuition', { installment: 'T1' });
       assert.deepEqual([partialTuition.previousPaid, partialTuition.remainingBalance], [10_000, 30_000]);
+      checkpoint('LOT1_PARTIAL_PASS');
+      checkpoint('LOT1_COMPLETE');
 
+      checkpoint('LOT2_START');
       const editStudent = await createStudent('lot2-edit', 28);
       const financeBeforeEdit = JSON.stringify((await db.collection('studentFinance').doc(editStudent).get()).data());
       const paymentsBeforeEdit = (await db.collection('payments').where('studentId', '==', editStudent).get()).size;
@@ -361,10 +484,34 @@ const main = async () => {
         reloadedPrivate.transportPickupPoint], [35, 'Quartier B', 'Point B']);
       assert.equal(JSON.stringify((await db.collection('studentFinance').doc(editStudent).get()).data()), financeBeforeEdit);
       assert.equal((await db.collection('payments').where('studentId', '==', editStudent).get()).size, paymentsBeforeEdit);
-      await expectFailure(() => updateDoc(doc(parent.firestore, 'students', editStudent), { usesTransport: false }),
-        ['permission-denied']);
-      console.log('PAYMENT LOTS123 COVERAGE: PASS lot1=classFees,zeroFallback,twoInstallments,benefits,moratorium,partial lot2=create,edit,reload,deactivate,reactivate,noSideEffects lot3=transport,receipt,security');
+      checkpoint('LOT2_STUDENTPRIVATE_UPDATE_PASS');
+      await expectFailure({
+        scenarioId: 'LOT2_PARENT_WRITE_DENY', lot: 2,
+        operation: 'parent update students usesTransport', expectedCodes: ['permission-denied'],
+        metadata: { studentId: editStudent, collection: 'students', schoolId: cfg.fixtureSchoolId },
+      }, () => updateDoc(doc(parent.firestore, 'students', editStudent), { usesTransport: false }));
+      checkpoint('LOT2_PARENT_DENY_PASS');
     }
+
+    await db.collection('studentPrivate').doc(invalid).update({ transportZonePk: 13 });
+    await expectFailure({
+      scenarioId: 'LOT2_PRIMARY_OUTSIDE_POLICY_DENY', lot: 2,
+      operation: 'getCollectionQuote transport outside policy', expectedCodes: ['TRANSPORT_ZONE_OUTSIDE_POLICY'],
+      metadata: { studentId: invalid, schoolId: cfg.fixtureSchoolId },
+    }, () => quote(secretary, invalid));
+    checkpoint('LOT2_PRIMARY_INCOMPLETE_PASS');
+    const secondaryQuote = await quote(secretary, secondary);
+    assert.deepEqual({ state: secondaryQuote.transportState, monthly: secondaryQuote.monthlyGrossAmount,
+      remaining: secondaryQuote.remainingBalance }, { state: 'FREE_SECONDARY', monthly: 0, remaining: 0 });
+    await expectFailure({
+      scenarioId: 'LOT2_SECONDARY_FREE_PAYMENT_DENY', lot: 2,
+      operation: 'recordCashPayment transport secondary free', expectedCodes: ['TRANSPORT_FREE_SECONDARY'],
+      metadata: { studentId: secondary, schoolId: cfg.fixtureSchoolId },
+    }, () => pay(secretary, secondary, `secondary-deny-${cfg.testRunId}`, 1_000));
+    checkpoint('LOT2_SECONDARY_FREE_PASS');
+    checkpoint('LOT2_COMPLETE');
+
+    checkpoint('LOT3_START');
     const assertPaymentBalance = (payment, amount) => {
       const allocated = payment.allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
       assert.equal(allocated + (payment.transportCredit || 0), amount);
@@ -408,18 +555,13 @@ const main = async () => {
       assert.deepEqual(payment.allocations, expectedAllocations);
       assertPaymentBalance(payment, amount);
     }
-    await db.collection('studentPrivate').doc(invalid).update({ transportZonePk: 13 });
     assert.deepEqual(await Promise.all([pk14, pk33, pk34, pk42].map(async (id) =>
       (await db.collection('studentPrivate').doc(id).get()).data().transportZonePk)), [14, 33, 34, 42]);
 
     const boundary = await Promise.all([pk14, pk33, pk34, pk42].map((id) => quote(secretary, id)));
     assert.deepEqual(boundary.map((q) => q.monthlyGrossAmount), [4_000, 4_000, 5_000, 5_000]);
-    await expectFailure(() => quote(secretary, invalid), ['TRANSPORT_ZONE_OUTSIDE_POLICY']);
-    const secondaryQuote = await quote(secretary, secondary);
-    assert.deepEqual({ state: secondaryQuote.transportState, monthly: secondaryQuote.monthlyGrossAmount,
-      remaining: secondaryQuote.remainingBalance }, { state: 'FREE_SECONDARY', monthly: 0, remaining: 0 });
-    await expectFailure(() => pay(secretary, secondary, `secondary-deny-${cfg.testRunId}`, 1_000),
-      ['TRANSPORT_FREE_SECONDARY']);
+    checkpoint('LOT3_PK28_PASS');
+    checkpoint('LOT3_PK35_PASS');
 
     const p4000 = await pay(secretary, pk14, `pk14-allocation-${cfg.testRunId}`, 10_000);
     assert.deepEqual(p4000.allocations, [
@@ -452,16 +594,29 @@ const main = async () => {
     });
     assert.equal((await getDoc(doc(parent.firestore, 'receipts', p4000.receiptId))).exists(), true,
       'Receipt Privacy: parent must read own child receipt.');
-    await expectFailure(() => getDoc(doc(parent.firestore, 'receipts', p5000.receiptId)), ['permission-denied']);
-    await expectFailure(() => getDoc(doc(parent.firestore, 'receipts', otherSchoolReceiptId)), ['permission-denied']);
+    await expectFailure({
+      scenarioId: 'LOT3_RECEIPT_PARENT_UNRELATED_DENY', lot: 3,
+      operation: 'parent read unrelated receipt', expectedCodes: ['permission-denied'],
+      metadata: { receiptId: p5000.receiptId, collection: 'receipts' },
+    }, () => getDoc(doc(parent.firestore, 'receipts', p5000.receiptId)));
+    await expectFailure({
+      scenarioId: 'LOT3_RECEIPT_PARENT_CROSS_SCHOOL_DENY', lot: 3,
+      operation: 'parent read cross-school receipt', expectedCodes: ['permission-denied'],
+      metadata: { receiptId: otherSchoolReceiptId, collection: 'receipts' },
+    }, () => getDoc(doc(parent.firestore, 'receipts', otherSchoolReceiptId)));
     assert.equal((await getDoc(doc(secretary.firestore, 'receipts', p4000.receiptId))).exists(), true,
       'Receipt Privacy: same-school secretary must read receipt.');
     assert.equal((await getDoc(doc(owner.firestore, 'receipts', p4000.receiptId))).exists(), true,
       'Receipt Privacy: same-school owner must read receipt.');
-    await expectFailure(() => getDoc(doc(crossOwner.firestore, 'receipts', p4000.receiptId)), ['permission-denied']);
+    await expectFailure({
+      scenarioId: 'LOT3_RECEIPT_CROSS_OWNER_DENY', lot: 3,
+      operation: 'cross-school owner read receipt', expectedCodes: ['permission-denied'],
+      metadata: { receiptId: p4000.receiptId, collection: 'receipts' },
+    }, () => getDoc(doc(crossOwner.firestore, 'receipts', p4000.receiptId)));
     const partial = await pay(secretary, pk42, `pk42-partial-${cfg.testRunId}`, 2_000);
     assert.equal(partial.allocations[0].amount, 2_000);
     assert.equal((await quote(secretary, pk42)).installments[0].remainingBalance, 3_000);
+    checkpoint('LOT3_PARTIAL_PASS');
     const expectedTransportCredit = 2_000;
     const creditPaymentAmount = 10_000;
     const remainingDebtBeforeCredit = creditPaymentAmount - expectedTransportCredit;
@@ -482,6 +637,7 @@ const main = async () => {
     assert.equal(creditReceipt.amount, 10_000);
     assert.deepEqual(creditReceipt.allocationSummary, credit.allocations);
     assert.equal(creditReceipt.transportCredit, expectedTransportCredit);
+    checkpoint('LOT3_ALLOCATIONS_PASS');
 
     const benefitStudent = await createStudent('benefits', 34);
     const benefitDefs = [
@@ -546,7 +702,7 @@ const main = async () => {
       approvalPercentQuote.installments[0].netExpectedAmount,
     ], [5_000, 2_500, 2_500]);
 
-    const expectTransportBenefitApprovalDenied = async (studentId, label, code) => {
+    const expectTransportBenefitApprovalDenied = async (studentId, label, code, scenarioId) => {
       const created = await call(owner, 'createFinancialBenefit', {
         schoolId: cfg.fixtureSchoolId, studentId, academicYear,
         requestId: `approval-deny-${label}-${cfg.testRunId}`, benefitType: 'SCHOLARSHIP', paymentType: 'TRANSPORT',
@@ -554,13 +710,19 @@ const main = async () => {
         stackable: true, reason: `Fixture approval deny ${label}`, maximumUses: 1,
       });
       mark('financialBenefits', created.benefitId);
-      await expectFailure(() => call(owner, 'approveFinancialBenefit', { benefitId: created.benefitId }), [code]);
+      await expectFailure({
+        scenarioId, lot: 3, operation: `approveFinancialBenefit ${label}`, expectedCodes: [code],
+        metadata: { studentId, benefitId: created.benefitId, schoolId: cfg.fixtureSchoolId },
+      }, () => call(owner, 'approveFinancialBenefit', { benefitId: created.benefitId }));
     };
-    await expectTransportBenefitApprovalDenied(secondary, 'secondary', 'TRANSPORT_FREE_SECONDARY');
+    await expectTransportBenefitApprovalDenied(secondary, 'secondary', 'TRANSPORT_FREE_SECONDARY',
+      'LOT3_BENEFIT_SECONDARY_FREE_DENY');
     assert.equal((await quote(secretary, secondary)).remainingBalance, 0);
     const missingPkStudent = await createStudent('benefit-approval-missing-pk', undefined);
-    await expectTransportBenefitApprovalDenied(missingPkStudent, 'missing-pk', 'TRANSPORT_ZONE_REQUIRED');
-    await expectTransportBenefitApprovalDenied(invalid, 'outside-pk', 'TRANSPORT_ZONE_OUTSIDE_POLICY');
+    await expectTransportBenefitApprovalDenied(missingPkStudent, 'missing-pk', 'TRANSPORT_ZONE_REQUIRED',
+      'LOT3_BENEFIT_MISSING_PK_DENY');
+    await expectTransportBenefitApprovalDenied(invalid, 'outside-pk', 'TRANSPORT_ZONE_OUTSIDE_POLICY',
+      'LOT3_BENEFIT_OUTSIDE_PK_DENY');
 
     const duplicateReference = `DUPLICATE-${cfg.testRunId}`;
     const firstDuplicate = await call(owner, 'createFinancialBenefit', {
@@ -581,8 +743,12 @@ const main = async () => {
       reason: 'Fixture duplicate voucher B', reference: duplicateReference, singleUse: true, maximumUses: 1,
     });
     mark('financialBenefits', secondDuplicate.benefitId);
-    await expectFailure(() => call(owner, 'approveFinancialBenefit', { benefitId: secondDuplicate.benefitId }),
-      ['VOUCHER_REFERENCE_ALREADY_USED']);
+    await expectFailure({
+      scenarioId: 'LOT3_DUPLICATE_VOUCHER_REFERENCE_DENY', lot: 3,
+      operation: 'approveFinancialBenefit duplicate voucher', expectedCodes: ['VOUCHER_REFERENCE_ALREADY_USED'],
+      metadata: { benefitId: secondDuplicate.benefitId, reference: duplicateReference },
+    }, () => call(owner, 'approveFinancialBenefit', { benefitId: secondDuplicate.benefitId }));
+    checkpoint('LOT3_BENEFIT_PASS');
 
     const moratoriumStudent = await createStudent('moratorium', 42);
     const futureMoratorium = `transport-moratorium-future-${cfg.testRunId}`.slice(0, 125);
@@ -603,6 +769,7 @@ const main = async () => {
     });
     const noDeadline = (await quote(secretary, noDeadlineStudent)).installments.find((x) => x.period === periods[2]);
     assert.equal(noDeadline.overdue, false);
+    checkpoint('LOT3_MORATORIUM_PASS');
 
     const concurrentStudent = await createStudent('concurrent', 20);
     await Promise.all([
@@ -615,8 +782,11 @@ const main = async () => {
     const original = await pay(secretary, reversalStudent, `reversal-source-${cfg.testRunId}`, 10_000);
     const originalPayment = (await db.collection('payments').doc(original.paymentId).get()).data();
     const originalReceipt = (await db.collection('receipts').doc(original.receiptId).get()).data();
-    await expectFailure(() => reverse(secretary, original.paymentId, `reverse-secretary-${cfg.testRunId}`, 'Refus secrétaire'),
-      ['PERMISSION_DENIED']);
+    await expectFailure({
+      scenarioId: 'LOT3_SECRETARY_REVERSAL_DENY', lot: 3,
+      operation: 'reversePayment by secretary', expectedCodes: ['PERMISSION_DENIED'],
+      metadata: { paymentId: original.paymentId, schoolId: cfg.fixtureSchoolId },
+    }, () => reverse(secretary, original.paymentId, `reverse-secretary-${cfg.testRunId}`, 'Refus secrétaire'));
     const reversed = await reverse(owner, original.paymentId, `reverse-owner-${cfg.testRunId}`, 'Correction fixture');
     assert.equal(reversed.amount, -10_000);
     assert.deepEqual((await db.collection('payments').doc(original.paymentId).get()).data(), originalPayment);
@@ -642,7 +812,11 @@ const main = async () => {
     assert.equal(accountantRecord.amount, 1_000);
     assert.equal((await quote(secretary, rbacStudent)).installments[0].previousPaid, 2_000);
 
-    await expectFailure(() => call(crossOwner, 'recordCashPayment', crossInput), ['CROSS_SCHOOL_DENIED']);
+    await expectFailure({
+      scenarioId: 'LOT3_CROSS_SCHOOL_PAYMENT_DENY', lot: 3,
+      operation: 'recordCashPayment cross-school owner', expectedCodes: ['CROSS_SCHOOL_DENIED'],
+      metadata: { studentId: pk42, schoolId: cfg.fixtureSchoolId },
+    }, () => call(crossOwner, 'recordCashPayment', crossInput));
     for (const client of [owner, secretary, accountant, director]) {
       assert.equal((await getDoc(doc(client.firestore, 'payments', p4000.paymentId))).exists(), true);
     }
@@ -654,10 +828,22 @@ const main = async () => {
     for (const [collection, id] of directTargets) {
       const directId = `direct-${cfg.testRunId}`;
       mark(collection, directId);
-      await expectFailure(() => setDoc(doc(secretary.firestore, collection, directId),
-        { schoolId: cfg.fixtureSchoolId, testFixture: true, testRunId: cfg.testRunId }), ['permission-denied']);
-      await expectFailure(() => updateDoc(doc(secretary.firestore, collection, id), { amount: 1 }), ['permission-denied']);
-      await expectFailure(() => deleteDoc(doc(secretary.firestore, collection, id)), ['permission-denied']);
+      await expectFailure({
+        scenarioId: 'LOT3_DIRECT_FINANCIAL_CREATE_DENY', lot: 3,
+        operation: 'direct financial document create', expectedCodes: ['permission-denied'],
+        metadata: { collection, documentId: directId, schoolId: cfg.fixtureSchoolId },
+      }, () => setDoc(doc(secretary.firestore, collection, directId),
+        { schoolId: cfg.fixtureSchoolId, testFixture: true, testRunId: cfg.testRunId }));
+      await expectFailure({
+        scenarioId: 'LOT3_DIRECT_FINANCIAL_UPDATE_DENY', lot: 3,
+        operation: 'direct financial document update', expectedCodes: ['permission-denied'],
+        metadata: { collection, documentId: id, schoolId: cfg.fixtureSchoolId },
+      }, () => updateDoc(doc(secretary.firestore, collection, id), { amount: 1 }));
+      await expectFailure({
+        scenarioId: 'LOT3_DIRECT_FINANCIAL_DELETE_DENY', lot: 3,
+        operation: 'direct financial document delete', expectedCodes: ['permission-denied'],
+        metadata: { collection, documentId: id, schoolId: cfg.fixtureSchoolId },
+      }, () => deleteDoc(doc(secretary.firestore, collection, id)));
     }
     const missingFinanceStudentId = `transport-legacy-finance-${cfg.testRunId}`.slice(0, 125);
     await createMarked('students', missingFinanceStudentId, {
@@ -672,12 +858,16 @@ const main = async () => {
     ];
     for (const [role, client] of [['owner', owner], ['secretary', secretary], ['accountant', accountant], ['director', director]]) {
       for (const projection of directFinancePayloads) {
-        await expectFailure(() => setDoc(doc(client.firestore, 'studentFinance', missingFinanceStudentId), {
+        await expectFailure({
+          scenarioId: 'LOT3_DIRECT_STUDENT_FINANCE_CREATE_DENY', lot: 3,
+          operation: 'direct studentFinance create', expectedCodes: ['permission-denied'],
+          metadata: { role, studentId: missingFinanceStudentId, schoolId: cfg.fixtureSchoolId },
+        }, () => setDoc(doc(client.firestore, 'studentFinance', missingFinanceStudentId), {
           id: missingFinanceStudentId, studentId: missingFinanceStudentId,
           schoolId: cfg.fixtureSchoolId, ...projection,
           createdAt: new Date().toISOString(), createdBy: credentials.get(role).uid,
           updatedAt: new Date().toISOString(), updatedBy: credentials.get(role).uid,
-        }), ['permission-denied']);
+        }));
       }
     }
     assert.equal((await db.collection('studentFinance').doc(missingFinanceStudentId).get()).exists, false);
@@ -855,6 +1045,7 @@ const main = async () => {
       await waitForToggleState(false);
       assert.equal(await detailToggle.getAttribute('aria-expanded'), 'false');
     }
+    checkpoint('LOT3_RECEIPT_PASS');
     assertTransportEnvironmentEvidence({ expectedProject: cfg.expectedProject, runtimeProjectId: runtimeProject,
       networkProjectIds: [...firebaseProjects] });
     results = {
@@ -869,6 +1060,8 @@ const main = async () => {
         secretary: 'ALLOW', owner: 'ALLOW', crossSchool: 'DENY',
       },
     };
+    checkpoint('LOT3_COMPLETE');
+    checkpoint('PAYMENT_LOTS123_COMPLETE');
     console.log(`TRANSPORT RELEASE CONTRACT: PASS ${JSON.stringify(results)}`);
   } finally {
     console.log(`CLEANUP: exact testRunId=${cfg.testRunId} and manifest IDs only`);
@@ -966,7 +1159,9 @@ const main = async () => {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   main().catch((error) => {
-    console.error(`TRANSPORT RELEASE RUNNER: FAIL ${error?.code || 'UNKNOWN'} ${error?.message || error}`);
+    console.error(`PAYMENT_LOTS123_FAILURE ${JSON.stringify(paymentFailureMarker(error))}`);
+    console.error(redactDiagnosticText(error?.stack || error?.message || error));
+    console.error(`TRANSPORT RELEASE RUNNER: FAIL ${error?.code || 'UNKNOWN'} ${redactDiagnosticText(error?.message || error)}`);
     process.exitCode = 1;
   });
 }

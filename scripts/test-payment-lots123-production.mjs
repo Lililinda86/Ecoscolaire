@@ -161,6 +161,43 @@ export const compareFinancialFingerprints = (before, after) => {
   return true;
 };
 
+export const extractChildFailureMarker = (output = '') => {
+  const prefix = 'PAYMENT_LOTS123_FAILURE ';
+  const line = String(output).split(/\r?\n/).find((item) => item.startsWith(prefix));
+  if (!line) return null;
+  try {
+    return JSON.parse(line.slice(prefix.length));
+  } catch {
+    return { scenarioId: 'MALFORMED_FAILURE_MARKER', raw: line.slice(prefix.length) };
+  }
+};
+
+export const assertProductionChildResult = (child) => {
+  const stdout = String(child?.stdout || '');
+  const stderr = String(child?.stderr || '');
+  const combined = `${stdout}\n${stderr}`;
+  if (child?.error) {
+    throw new Error(`Child Production transport runner failed to spawn: ${child.error.message}`, { cause: child.error });
+  }
+  if (child?.signal || child?.status !== 0) {
+    const marker = extractChildFailureMarker(combined);
+    const scenario = marker?.scenarioId ? ` scenario=${marker.scenarioId}` : '';
+    const signal = child?.signal ? ` signal=${child.signal}` : '';
+    const failure = new Error(
+      `Child Production transport runner exited with code ${child?.status ?? 'null'}.${signal}${scenario}. See child diagnostic above.`,
+    );
+    failure.code = 'CHILD_RUNNER_FAILED';
+    failure.childExitCode = child?.status ?? null;
+    failure.childSignal = child?.signal ?? null;
+    failure.childFailure = marker;
+    throw failure;
+  }
+  if (!stdout.includes('PAYMENT_LOTS123_CHECKPOINT PAYMENT_LOTS123_COMPLETE')) {
+    throw new Error('Child Production transport runner exited successfully without PAYMENT_LOTS123_COMPLETE.');
+  }
+  return true;
+};
+
 export const runProductionLots123 = async (env = process.env) => {
   const config = validateProductionLotsConfig(env);
   createCleanupManifest(config);
@@ -169,7 +206,7 @@ export const runProductionLots123 = async (env = process.env) => {
   const before = await captureFinancialFingerprints(db);
   await deleteApp(app);
   const child = spawnSync(process.execPath, ['scripts/test-transport-payments-production.mjs'], {
-    cwd: process.cwd(), stdio: 'inherit', env: {
+    cwd: process.cwd(), encoding: 'utf8', maxBuffer: 20 * 1024 * 1024, env: {
       ...env,
       TRANSPORT_PAYMENT_LOTS123_RUNNER: 'true',
       TRANSPORT_RELEASE_MODE: 'production',
@@ -188,7 +225,9 @@ export const runProductionLots123 = async (env = process.env) => {
       TRANSPORT_FIREBASE_APP_ID: env.VITE_FIREBASE_APP_ID,
     },
   });
-  assert.equal(child.status, 0, 'Lots 1-3 isolated validation failed.');
+  if (child.stdout) process.stdout.write(child.stdout);
+  if (child.stderr) process.stderr.write(child.stderr);
+  assertProductionChildResult(child);
   const afterApp = initializeApp({ credential: applicationDefault(), projectId: PRODUCTION_PROJECT }, `lots123-after-${config.testRunId}`);
   const after = await captureFinancialFingerprints(getFirestore(afterApp));
   await deleteApp(afterApp);

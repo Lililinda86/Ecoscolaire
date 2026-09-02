@@ -8,10 +8,12 @@ import {
   compareFinancialFingerprints, createCleanupManifest, fixtureSchoolIdFor,
   PRODUCTION_LOTS123_ACADEMIC_YEAR, PRODUCTION_LOTS123_TUITION_DEADLINES,
   PRODUCTION_LOTS123_TUITION_MORATORIUM, PRODUCTION_LOTS123_TUITION_QUOTE,
-  assertProductionTuitionMoratoriumFixture, validateProductionLotsConfig,
+  assertProductionTuitionMoratoriumFixture, assertProductionChildResult,
+  extractChildFailureMarker, validateProductionLotsConfig,
 } from '../../scripts/test-payment-lots123-production.mjs';
 import {
-  buildStudentPrivateTransportAuditUpdate,
+  buildStudentPrivateTransportAuditUpdate, expectFailure, paymentFailureMarker,
+  redactDiagnosticText, safeErrorSnapshot,
 } from '../../scripts/test-transport-payments-production.mjs';
 import { validateExactDeploymentRun } from '../../scripts/verify-exact-deployment-run.mjs';
 
@@ -45,6 +47,126 @@ const validEnv = () => ({
   PAYMENT_LOTS123_EXPECTED_MAIN_SHA: 'a'.repeat(40), GITHUB_SHA: 'a'.repeat(40),
   PAYMENT_LOTS123_APP_URL: 'https://ecoscolaire.vercel.app',
   PRODUCTION_BACKUP_RECEIPT_PATH: validReceiptPath(),
+});
+
+const failureContext = (overrides = {}) => ({
+  scenarioId: 'LOT1_TWO_INSTALLMENT_T3_DENY',
+  lot: 1,
+  operation: 'getCollectionQuote tuition T3',
+  expectedCodes: ['GROSS_AMOUNT_NOT_CONFIGURED'],
+  metadata: { studentId: 'payment-lots123-production-student' },
+  ...overrides,
+});
+
+test('expected Firebase and callable failures still resolve successfully', async () => {
+  await assert.doesNotReject(() => expectFailure(failureContext(), async () => {
+    throw { code: 'functions/failed-precondition', details: { businessCode: 'GROSS_AMOUNT_NOT_CONFIGURED' } };
+  }));
+  await assert.doesNotReject(() => expectFailure(failureContext({
+    scenarioId: 'LOT2_PARENT_WRITE_DENY', lot: 2,
+    operation: 'parent update students usesTransport', expectedCodes: ['permission-denied'],
+  }), async () => {
+    throw { code: 'permission-denied', message: 'Missing or insufficient permissions.' };
+  }));
+});
+
+test('Lot 1 and Lot 2 unexpected failures retain distinct context, stack and cause', async () => {
+  const cases = [
+    [failureContext(), 'raw tuition T3 network failure'],
+    [failureContext({
+      scenarioId: 'LOT2_PARENT_WRITE_DENY', lot: 2,
+      operation: 'parent update students usesTransport', expectedCodes: ['permission-denied'],
+    }), 'raw parent write failure'],
+  ];
+  for (const [context, message] of cases) {
+    const original = new Error(message, { cause: new Error('inner cause') });
+    await assert.rejects(() => expectFailure(context, async () => { throw original; }), (error) => {
+      assert.equal(error.name, 'ExpectedFailureDiagnosticError');
+      assert.equal(error.code, 'EXPECT_FAILURE_MISMATCH');
+      assert.equal(error.scenarioId, context.scenarioId);
+      assert.equal(error.cause, original);
+      assert.match(error.message, new RegExp(`scenarioId=${context.scenarioId}`));
+      assert.match(error.message, new RegExp(`expectedCodes=${context.expectedCodes[0]}`));
+      assert.match(error.message, new RegExp(message));
+      assert.match(error.message, /originalStack=Error:/);
+      assert.deepEqual(error.originalError.cause.name, 'Error');
+      return true;
+    });
+  }
+});
+
+test('unexpected JavaScript rejection shapes always produce useful diagnostics', async () => {
+  const assertion = new assert.AssertionError({ message: 'inner assertion', actual: 1, expected: 0 });
+  const shapes = [
+    new Error('plain error'),
+    assertion,
+    { message: 'message-only object' },
+    'string rejection',
+    null,
+    undefined,
+    new Error('outer error', { cause: new Error('nested cause') }),
+  ];
+  for (const shape of shapes) {
+    await assert.rejects(() => expectFailure(failureContext(), async () => { throw shape; }), (error) => {
+      assert.equal(error.code, 'EXPECT_FAILURE_MISMATCH');
+      assert.match(error.message, /errorName=/);
+      assert.match(error.message, /errorMessage=/);
+      assert.match(error.message, /originalStack=/);
+      assert.ok(error.originalError);
+      return true;
+    });
+  }
+});
+
+test('diagnostic output redacts credentials, tokens, cookies and passwords', async () => {
+  const original = new Error('token=top-secret Authorization: Bearer abc.def password=hunter2');
+  original.details = { cookie: 'session-value', nested: { credential: 'credential-value', safe: 'fixture-id' } };
+  original.code = 'internal';
+  await assert.rejects(() => expectFailure(failureContext({
+    metadata: { schoolId: 'payment-lots123-production-123-1', secret: 'metadata-secret' },
+  }), async () => { throw original; }), (error) => {
+    const marker = JSON.stringify(paymentFailureMarker(error));
+    const snapshot = JSON.stringify(error.originalError);
+    for (const secret of ['top-secret', 'abc.def', 'hunter2', 'session-value', 'credential-value', 'metadata-secret']) {
+      assert.doesNotMatch(`${error.message}\n${marker}\n${snapshot}`, new RegExp(secret.replace('.', '\\.')));
+    }
+    assert.match(error.message, /\[REDACTED\]/);
+    assert.match(error.message, /payment-lots123-production-123-1/);
+    assert.doesNotMatch(redactDiagnosticText('cookie=session-value'), /session-value/);
+    return true;
+  });
+});
+
+test('safe error snapshots retain Firebase metadata and sanitize causes', () => {
+  const error = new Error('callable failed');
+  error.code = 'functions/internal';
+  error.details = { businessCode: 'BACKEND_FAILURE', token: 'secret-token' };
+  error.cause = new Error('password=hidden');
+  const snapshot = safeErrorSnapshot(error);
+  assert.equal(snapshot.code, 'functions/internal');
+  assert.equal(snapshot.businessCode, 'BACKEND_FAILURE');
+  assert.equal(snapshot.details.token, '[REDACTED]');
+  assert.doesNotMatch(JSON.stringify(snapshot.cause), /hidden/);
+});
+
+test('parent reports child exit details and requires the final completion marker', () => {
+  assert.equal(assertProductionChildResult({
+    status: 0, signal: null, stdout: 'PAYMENT_LOTS123_CHECKPOINT PAYMENT_LOTS123_COMPLETE\n', stderr: '',
+  }), true);
+  const marker = { scenarioId: 'LOT1_TWO_INSTALLMENT_T3_DENY', lot: 1, errorCode: 'EXPECT_FAILURE_MISMATCH' };
+  assert.throws(() => assertProductionChildResult({
+    status: 1, signal: null, stdout: '', stderr: `PAYMENT_LOTS123_FAILURE ${JSON.stringify(marker)}\n`,
+  }), (error) => {
+    assert.equal(error.code, 'CHILD_RUNNER_FAILED');
+    assert.equal(error.childExitCode, 1);
+    assert.equal(error.childFailure.scenarioId, marker.scenarioId);
+    assert.match(error.message, /exited with code 1/);
+    assert.match(error.message, /See child diagnostic above/);
+    return true;
+  });
+  assert.throws(() => assertProductionChildResult({ status: 0, signal: null, stdout: '', stderr: '' }),
+    /without PAYMENT_LOTS123_COMPLETE/);
+  assert.deepEqual(extractChildFailureMarker(`PAYMENT_LOTS123_FAILURE ${JSON.stringify(marker)}`), marker);
 });
 
 const firebaseDeploymentSha = 'd0eca1ef2bc8eaae13ffdc28ecc455f01f5a78a9';
@@ -163,11 +285,11 @@ test('every Firebase client write is canonical or an explicit denial assertion',
     /updateDoc\(doc\(secretary\.firestore, 'students', editStudent\), \{ usesTransport: false, transportStatus: 'none' \}\)/);
   assert.match(transportRunner,
     /updateDoc\(doc\(secretary\.firestore, 'students', editStudent\), \{ usesTransport: true, transportStatus: 'active' \}\)/);
-  assert.match(transportRunner, /expectFailure\(\(\) => updateDoc\(doc\(parent\.firestore, 'students'/);
-  assert.match(transportRunner, /expectFailure\(\(\) => setDoc\(doc\(secretary\.firestore, collection, directId\)/);
-  assert.match(transportRunner, /expectFailure\(\(\) => updateDoc\(doc\(secretary\.firestore, collection, id\)/);
-  assert.match(transportRunner, /expectFailure\(\(\) => deleteDoc\(doc\(secretary\.firestore, collection, id\)/);
-  assert.match(transportRunner, /expectFailure\(\(\) => setDoc\(doc\(client\.firestore, 'studentFinance'/);
+  assert.match(transportRunner, /LOT2_PARENT_WRITE_DENY[\s\S]*updateDoc\(doc\(parent\.firestore, 'students'/);
+  assert.match(transportRunner, /LOT3_DIRECT_FINANCIAL_CREATE_DENY[\s\S]*setDoc\(doc\(secretary\.firestore, collection, directId\)/);
+  assert.match(transportRunner, /LOT3_DIRECT_FINANCIAL_UPDATE_DENY[\s\S]*updateDoc\(doc\(secretary\.firestore, collection, id\)/);
+  assert.match(transportRunner, /LOT3_DIRECT_FINANCIAL_DELETE_DENY[\s\S]*deleteDoc\(doc\(secretary\.firestore, collection, id\)/);
+  assert.match(transportRunner, /LOT3_DIRECT_STUDENT_FINANCE_CREATE_DENY[\s\S]*setDoc\(doc\(client\.firestore, 'studentFinance'/);
   assert.match(transportRunner, /JSON\.stringify\(\(await db\.collection\('studentFinance'\)/);
   assert.match(transportRunner, /db\.collection\('payments'\)\.where\('studentId', '==', editStudent\)/);
   assert.doesNotMatch(runner, /\b(?:setDoc|updateDoc|deleteDoc)\(/);
@@ -357,6 +479,64 @@ test('runner contains explicit Lot 1, Lot 2 and Lot 3 runtime coverage', () => {
     'transportNeighborhood', 'transportPickupPoint', 'financeBeforeEdit', 'paymentsBeforeEdit',
     'FREE_SECONDARY', 'transportCredit', 'allocationSummary', 'Receipt Privacy',
   ]) assert.match(transportRunner, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('every expected-failure callsite has unique explicit diagnostic context', () => {
+  const callsites = transportRunner.match(/expectFailure\(\{/g) || [];
+  const labelledContexts = transportRunner.match(/expectFailure\(\{[\s\S]*?scenarioId(?:\s*:|\s*,)/g) || [];
+  assert.equal(callsites.length, 15);
+  assert.equal(labelledContexts.length, callsites.length);
+
+  const runtimeScenarioIds = [...transportRunner.matchAll(/['"](LOT[123]_[A-Z0-9_]+_DENY)['"]/g)]
+    .map((match) => match[1]);
+  assert.equal(runtimeScenarioIds.length, 17);
+  assert.equal(new Set(runtimeScenarioIds).size, runtimeScenarioIds.length);
+  for (const required of ['LOT1_TWO_INSTALLMENT_T3_DENY', 'LOT2_PARENT_WRITE_DENY',
+    'LOT3_CROSS_SCHOOL_PAYMENT_DENY', 'LOT3_DIRECT_STUDENT_FINANCE_CREATE_DENY']) {
+    assert.ok(runtimeScenarioIds.includes(required));
+  }
+});
+
+test('expected-code vocabulary remains aligned with each API layer', () => {
+  assert.match(transportRunner,
+    /LOT1_TWO_INSTALLMENT_T3_DENY[\s\S]*expectedCodes: \['GROSS_AMOUNT_NOT_CONFIGURED'\]/);
+  assert.match(transportRunner,
+    /LOT2_PARENT_WRITE_DENY[\s\S]*expectedCodes: \['permission-denied'\]/);
+  assert.match(transportRunner,
+    /LOT3_CROSS_SCHOOL_PAYMENT_DENY[\s\S]*expectedCodes: \['CROSS_SCHOOL_DENIED'\]/);
+  assert.match(transportRunner,
+    /LOT3_SECRETARY_REVERSAL_DENY[\s\S]*expectedCodes: \['PERMISSION_DENIED'\]/);
+  for (const scenario of ['LOT3_RECEIPT_PARENT_UNRELATED_DENY', 'LOT3_RECEIPT_PARENT_CROSS_SCHOOL_DENY',
+    'LOT3_RECEIPT_CROSS_OWNER_DENY', 'LOT3_DIRECT_FINANCIAL_CREATE_DENY',
+    'LOT3_DIRECT_FINANCIAL_UPDATE_DENY', 'LOT3_DIRECT_FINANCIAL_DELETE_DENY',
+    'LOT3_DIRECT_STUDENT_FINANCE_CREATE_DENY']) {
+    assert.match(transportRunner, new RegExp(`${scenario}[\\s\\S]*?expectedCodes: \\['permission-denied'\\]`));
+  }
+});
+
+test('granular Lot checkpoints replace the premature coverage marker', () => {
+  const markers = [
+    'LOT1_START', 'LOT1_CLASSFEES_PASS', 'LOT1_T3_DENY_PASS', 'LOT1_BENEFIT_PASS',
+    'LOT1_MORATORIUM_PASS', 'LOT1_PARTIAL_PASS', 'LOT1_COMPLETE',
+    'LOT2_START', 'LOT2_STUDENTPRIVATE_UPDATE_PASS', 'LOT2_PARENT_DENY_PASS',
+    'LOT2_PRIMARY_INCOMPLETE_PASS', 'LOT2_SECONDARY_FREE_PASS', 'LOT2_COMPLETE',
+    'LOT3_START', 'LOT3_PK28_PASS', 'LOT3_PK35_PASS', 'LOT3_BENEFIT_PASS',
+    'LOT3_ALLOCATIONS_PASS', 'LOT3_MORATORIUM_PASS', 'LOT3_RECEIPT_PASS', 'LOT3_COMPLETE',
+    'PAYMENT_LOTS123_COMPLETE',
+  ];
+  for (const marker of markers) assert.match(transportRunner, new RegExp(`checkpoint\\('${marker}'\\)`));
+  assert.doesNotMatch(transportRunner, /PAYMENT LOTS123 COVERAGE/);
+  assert.ok(transportRunner.indexOf("checkpoint('LOT1_COMPLETE')")
+    < transportRunner.indexOf("checkpoint('LOT2_START')"));
+  assert.ok(transportRunner.indexOf("checkpoint('LOT2_COMPLETE')")
+    < transportRunner.indexOf("checkpoint('LOT3_START')"));
+  assert.ok(transportRunner.indexOf("checkpoint('LOT3_COMPLETE')")
+    < transportRunner.indexOf("checkpoint('PAYMENT_LOTS123_COMPLETE')"));
+  assert.ok(transportRunner.indexOf("checkpoint('PAYMENT_LOTS123_COMPLETE')")
+    < transportRunner.indexOf('TRANSPORT RELEASE CONTRACT: PASS'));
+  assert.match(runner, /assertProductionChildResult\(child\)/);
+  assert.match(runner, /PAYMENT_LOTS123_CHECKPOINT PAYMENT_LOTS123_COMPLETE/);
+  assert.doesNotMatch(runner, /assert\.equal\(child\.status, 0/);
 });
 
 test('runner forbids wildcard/global deletion and requires school-scoped cleanup', () => {
