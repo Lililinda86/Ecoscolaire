@@ -6,7 +6,9 @@ import test from 'node:test';
 import {
   FIXTURE_PREFIX, assertFixtureSchoolId, assertZeroResiduals, cleanupExactManifest,
   compareFinancialFingerprints, createCleanupManifest, fixtureSchoolIdFor,
-  validateProductionLotsConfig,
+  PRODUCTION_LOTS123_ACADEMIC_YEAR, PRODUCTION_LOTS123_TUITION_DEADLINES,
+  PRODUCTION_LOTS123_TUITION_MORATORIUM, PRODUCTION_LOTS123_TUITION_QUOTE,
+  assertProductionTuitionMoratoriumFixture, validateProductionLotsConfig,
 } from '../../scripts/test-payment-lots123-production.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
@@ -103,6 +105,55 @@ test('financial fingerprints fail closed on every protected change', () => {
   assert.equal(compareFinancialFingerprints(baseline, structuredClone(baseline)), true);
   const changed = structuredClone(baseline); changed.collections.students.fingerprint = 'changed';
   assert.throws(() => compareFinancialFingerprints(baseline, changed));
+});
+
+test('Production Tuition moratorium fixture uses canonical academic-year deadlines', () => {
+  const valid = {
+    academicYear: {
+      name: PRODUCTION_LOTS123_ACADEMIC_YEAR,
+      tuitionPaymentDeadlines: { ...PRODUCTION_LOTS123_TUITION_DEADLINES },
+    },
+    moratorium: { ...PRODUCTION_LOTS123_TUITION_MORATORIUM },
+  };
+  assert.equal(assertProductionTuitionMoratoriumFixture(valid), true);
+  assert.deepEqual(PRODUCTION_LOTS123_TUITION_QUOTE, {
+    grossExpectedAmount: 40_000,
+    originalDueDate: '2026-09-15',
+    effectiveDueDate: '2026-12-15',
+  });
+
+  assert.throws(() => assertProductionTuitionMoratoriumFixture({
+    ...valid, academicYear: { name: PRODUCTION_LOTS123_ACADEMIC_YEAR },
+  }));
+  assert.throws(() => assertProductionTuitionMoratoriumFixture({
+    ...valid,
+    moratorium: { academicYear: PRODUCTION_LOTS123_ACADEMIC_YEAR, type: 'tuition', installment: 'T1',
+      status: 'approved', effectiveDueDate: '2026-12-15' },
+  }));
+});
+
+test('Production Tuition moratorium fixture fails closed on target drift', () => {
+  const academicYear = {
+    name: PRODUCTION_LOTS123_ACADEMIC_YEAR,
+    tuitionPaymentDeadlines: { ...PRODUCTION_LOTS123_TUITION_DEADLINES },
+  };
+  const mutate = (changes) => ({ ...PRODUCTION_LOTS123_TUITION_MORATORIUM, ...changes });
+  for (const moratorium of [
+    mutate({ installment: 'T2' }),
+    mutate({ academicYear: '2026-2027' }),
+    mutate({ effectiveDueDate: '2026-12-16' }),
+  ]) {
+    assert.throws(() => assertProductionTuitionMoratoriumFixture({ academicYear, moratorium }));
+  }
+});
+
+test('Production runner consumes the validated Tuition fixture contract before writes', () => {
+  const contractIndex = transportRunner.indexOf('assertProductionTuitionMoratoriumFixture({');
+  const firstWriteIndex = transportRunner.indexOf("await createMarked('schools'");
+  assert.ok(contractIndex >= 0 && contractIndex < firstWriteIndex);
+  assert.match(transportRunner, /tuitionPaymentDeadlines: \{ \.\.\.PRODUCTION_LOTS123_TUITION_DEADLINES \}/);
+  assert.match(transportRunner, /\.\.\.tuitionMoratoriumFixture/);
+  assert.doesNotMatch(transportRunner, /type: 'tuition', installment: 'T1', status: 'approved'/);
 });
 
 test('workflow is dispatch-only, Production-scoped and backup-gated before fixtures', () => {
