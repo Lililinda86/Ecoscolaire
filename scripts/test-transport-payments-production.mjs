@@ -8,7 +8,7 @@ import { FieldValue, getFirestore as getAdminFirestore } from 'firebase-admin/fi
 import { chromium } from '@playwright/test';
 import { deleteApp, initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { deleteDoc, doc, getDoc, getFirestore, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   PRODUCTION_LOTS123_ACADEMIC_YEAR,
@@ -19,6 +19,26 @@ import {
 } from './test-payment-lots123-production.mjs';
 
 const REAL_ITALO_SCHOOL = 'italo-gsb';
+const STUDENT_PRIVATE_TRANSPORT_AUDIT_INPUT_KEYS = new Set([
+  'transportZonePk', 'transportNeighborhood', 'transportPickupPoint',
+  'updatedAt', 'updatedBy', 'secretaryFixtureUid',
+]);
+export const buildStudentPrivateTransportAuditUpdate = (input) => {
+  assert.ok(input && typeof input === 'object' && !Array.isArray(input), 'studentPrivate audit input is required.');
+  assert.ok(Object.keys(input).every((key) => STUDENT_PRIVATE_TRANSPORT_AUDIT_INPUT_KEYS.has(key)),
+    'studentPrivate transport update contains a forbidden field.');
+  assert.ok(input.updatedAt !== undefined && input.updatedAt !== null, 'updatedAt is required.');
+  assert.ok(typeof input.secretaryFixtureUid === 'string' && input.secretaryFixtureUid.length > 0,
+    'secretary fixture UID is required.');
+  assert.equal(input.updatedBy, input.secretaryFixtureUid, 'updatedBy must be the secretary fixture UID.');
+  return {
+    transportZonePk: input.transportZonePk,
+    transportNeighborhood: input.transportNeighborhood,
+    transportPickupPoint: input.transportPickupPoint,
+    updatedAt: input.updatedAt,
+    updatedBy: input.updatedBy,
+  };
+};
 export const assertTransportEnvironmentEvidence = ({ expectedProject, runtimeProjectId, networkProjectIds }) => {
   assert.ok(typeof expectedProject === 'string' && expectedProject.trim(), 'expectedProject is mandatory.');
   assert.ok(typeof runtimeProjectId === 'string' && runtimeProjectId.trim(), 'Authoritative runtime projectId is mandatory.');
@@ -328,9 +348,12 @@ const main = async () => {
       const editStudent = await createStudent('lot2-edit', 28);
       const financeBeforeEdit = JSON.stringify((await db.collection('studentFinance').doc(editStudent).get()).data());
       const paymentsBeforeEdit = (await db.collection('payments').where('studentId', '==', editStudent).get()).size;
-      await updateDoc(doc(secretary.firestore, 'studentPrivate', editStudent), {
-        transportZonePk: 35, transportNeighborhood: 'Quartier B', transportPickupPoint: 'Point B',
-      });
+      const secretaryFixtureUid = credentials.get('secretary').uid;
+      await updateDoc(doc(secretary.firestore, 'studentPrivate', editStudent),
+        buildStudentPrivateTransportAuditUpdate({
+          transportZonePk: 35, transportNeighborhood: 'Quartier B', transportPickupPoint: 'Point B',
+          updatedAt: serverTimestamp(), updatedBy: secretaryFixtureUid, secretaryFixtureUid,
+        }));
       await updateDoc(doc(secretary.firestore, 'students', editStudent), { usesTransport: false, transportStatus: 'none' });
       await updateDoc(doc(secretary.firestore, 'students', editStudent), { usesTransport: true, transportStatus: 'active' });
       const reloadedPrivate = (await getDoc(doc(secretary.firestore, 'studentPrivate', editStudent))).data();
