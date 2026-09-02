@@ -13,6 +13,7 @@ import {
 import {
   buildStudentPrivateTransportAuditUpdate,
 } from '../../scripts/test-transport-payments-production.mjs';
+import { validateExactDeploymentRun } from '../../scripts/verify-exact-deployment-run.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -44,6 +45,69 @@ const validEnv = () => ({
   PAYMENT_LOTS123_EXPECTED_MAIN_SHA: 'a'.repeat(40), GITHUB_SHA: 'a'.repeat(40),
   PAYMENT_LOTS123_APP_URL: 'https://ecoscolaire.vercel.app',
   PRODUCTION_BACKUP_RECEIPT_PATH: validReceiptPath(),
+});
+
+const firebaseDeploymentSha = 'd0eca1ef2bc8eaae13ffdc28ecc455f01f5a78a9';
+const firebaseDeploymentRun = (overrides = {}) => ({
+  conclusion: 'success',
+  event: 'push',
+  head_branch: 'main',
+  head_sha: firebaseDeploymentSha,
+  id: 101,
+  path: '.github/workflows/firebase-deploy.yml',
+  status: 'completed',
+  workflow_id: 295023413,
+  ...overrides,
+});
+const validateProductionFirebaseDeployment = (workflowRuns) => validateExactDeploymentRun(
+  { workflow_runs: workflowRuns },
+  {
+    allowedEvents: ['push', 'workflow_dispatch'],
+    expectedBranch: 'main',
+    expectedSha: firebaseDeploymentSha,
+    expectedWorkflowId: 295023413,
+    expectedWorkflowPath: '.github/workflows/firebase-deploy.yml',
+  },
+);
+
+test('Production Firebase gate accepts approved push and manual deployments only', () => {
+  assert.equal(validateProductionFirebaseDeployment([firebaseDeploymentRun()]).id, 101);
+  assert.equal(validateProductionFirebaseDeployment([
+    firebaseDeploymentRun({ event: 'workflow_dispatch', id: 102 }),
+  ]).id, 102);
+  for (const run of [
+    firebaseDeploymentRun({ path: '.github/workflows/unrelated.yml', event: 'workflow_dispatch' }),
+    firebaseDeploymentRun({ workflow_id: 999999999, event: 'workflow_dispatch' }),
+    firebaseDeploymentRun({ head_sha: 'b'.repeat(40) }),
+    firebaseDeploymentRun({ head_branch: 'staging' }),
+    firebaseDeploymentRun({ conclusion: 'failure' }),
+    firebaseDeploymentRun({ conclusion: 'cancelled' }),
+    firebaseDeploymentRun({ conclusion: 'skipped' }),
+    firebaseDeploymentRun({ path: '.github/workflows/deploy-staging.yml' }),
+    firebaseDeploymentRun({ path: undefined }),
+  ]) assert.throws(() => validateProductionFirebaseDeployment([run]));
+  assert.throws(() => validateExactDeploymentRun({ workflow_runs: [firebaseDeploymentRun()] }, {
+    allowedEvents: ['push', 'workflow_dispatch'], expectedBranch: 'main', expectedSha: 'abc123',
+    expectedWorkflowId: 295023413, expectedWorkflowPath: '.github/workflows/firebase-deploy.yml',
+  }), /full exact deployment SHA/);
+});
+
+test('Production Firebase gate selects a successful approved manual run over failed or unrelated runs', () => {
+  const selected = validateProductionFirebaseDeployment([
+    firebaseDeploymentRun({ conclusion: 'failure', id: 103 }),
+    firebaseDeploymentRun({ event: 'workflow_dispatch', id: 104 }),
+    firebaseDeploymentRun({
+      event: 'workflow_dispatch', id: 105, path: '.github/workflows/unrelated.yml', workflow_id: 42,
+    }),
+  ]);
+  assert.equal(selected.id, 104);
+});
+
+test('Production workflow queries the approved Firebase workflow without a brittle event filter', () => {
+  assert.match(workflow, /actions\/workflows\/firebase-deploy\.yml\/runs/);
+  assert.match(workflow, /-f head_sha="\$PAYMENT_LOTS123_EXPECTED_MAIN_SHA" -f branch=main -f per_page=100/);
+  assert.doesNotMatch(workflow, /-f event=push/);
+  assert.match(workflow, /295023413 'push,workflow_dispatch'/);
 });
 
 const validStudentPrivateTransportAuditInput = () => ({
