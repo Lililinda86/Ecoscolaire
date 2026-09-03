@@ -20,6 +20,7 @@ jobs:
       STAGING_URL: https://ecoscolaire-8t5s71k88-linda-lemofouet-s-projects.vercel.app
       FIREBASE_PROJECT_ID: ecoscolaire-staging
       GITHUB_TOKEN: ${{ github.token }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       VITE_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
       VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
       VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
@@ -37,6 +38,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Test Staging UI preflight contract
+        run: node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
+
+      - name: Run HTTP and exact-deployment preflight
+        run: |
+          node scripts/test-student-progressive-registration-staging.mjs --preflight-only
+          echo "STAGING_UI_HTTP_PREFLIGHT_VERIFIED=true" >> "$GITHUB_ENV"
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

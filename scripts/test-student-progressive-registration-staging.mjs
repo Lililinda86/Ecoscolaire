@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { initializeApp as initializeAdminApp, applicationDefault, deleteApp as deleteAdminApp } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
@@ -9,6 +10,12 @@ import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { chromium } from '@playwright/test';
 import * as XLSX from 'xlsx';
+import {
+  StagingUiPreflightError,
+  assertExactStagingMetadata,
+  classifyBrowserLanding,
+  inspectUiHttpPreflight
+} from '../tests/security/student-progressive-registration-staging-preflight-contract.mjs';
 
 const EXPECTED_SHA = 'f4c1fc5ab70113f56165c4fcf38d44c1061ef9a2';
 const EXPECTED_URL = 'https://ecoscolaire-8t5s71k88-linda-lemofouet-s-projects.vercel.app';
@@ -16,6 +23,8 @@ const EXPECTED_PROJECT = 'ecoscolaire-staging';
 const PROD_PROJECT = 'ecoscolaire-c5861';
 const REQUIRED_MISSING = ['dob', 'placeOfBirth', 'parentName', 'parentPhone', 'address', 'emergencyContact', 'medicalInformation'];
 const ARTIFACT_DIR = path.resolve('artifacts/student-progressive-registration');
+const PREFLIGHT_TIMEOUT_MS = 10_000;
+const BROWSER_PREFLIGHT_TIMEOUT_MS = 8_000;
 
 const runId = `${process.env.GITHUB_RUN_ID || Date.now()}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`;
 const prefix = `student-progressive-registration-${runId}`;
@@ -57,7 +66,9 @@ let minimalStudentId;
 let financeUpdateTimeBeforeEdits;
 const fixtureStudentIds = new Set([legacyId]);
 
+const failPreflight = (code, message) => { throw new StagingUiPreflightError(code, message); };
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const requirePreflight = (condition, code, message) => { if (!condition) failPreflight(code, message); };
 const sameStrings = (actual, expected) => JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -69,34 +80,62 @@ async function github(pathname) {
   return response.json();
 }
 
-async function preflight() {
+async function httpAndDeploymentPreflight() {
   assert(process.env.EXPECTED_STAGING_SHA === EXPECTED_SHA, 'EXPECTED_STAGING_SHA mismatch');
   assert(process.env.STAGING_URL?.replace(/\/$/, '') === EXPECTED_URL, 'STAGING_URL mismatch');
   assert(process.env.FIREBASE_PROJECT_ID === EXPECTED_PROJECT, 'Firebase project mismatch');
+  assert(process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'VERCEL_AUTOMATION_BYPASS_SECRET is missing');
+  assert(process.env.GITHUB_TOKEN, 'GITHUB_TOKEN is missing');
+  assert(process.env.GITHUB_REPOSITORY, 'GITHUB_REPOSITORY is missing');
   assert(EXPECTED_PROJECT !== PROD_PROJECT && !schoolId.toLowerCase().includes('italo'), 'Production/Italo guard');
 
   const ref = await github('git/ref/heads/staging');
-  assert(ref.object?.sha === EXPECTED_SHA, `origin/staging mismatch: ${ref.object?.sha}`);
   const runs = await github('actions/workflows/deploy-staging.yml/runs?branch=staging&event=push&per_page=20');
   const deployRun = runs.workflow_runs?.find(run => run.head_sha === EXPECTED_SHA && run.status === 'completed' && run.conclusion === 'success');
-  assert(deployRun, 'Firebase Staging deployment for exact SHA is not PASS');
 
   const deployments = await github(`deployments?sha=${EXPECTED_SHA}&per_page=20`);
   let vercelPass = false;
+  let productionDeployment = false;
   for (const deployment of deployments) {
     if (deployment.creator?.login !== 'vercel[bot]') continue;
     const statuses = await github(`deployments/${deployment.id}/statuses`);
-    if (statuses.some(status => status.state === 'success' && status.environment_url?.replace(/\/$/, '') === EXPECTED_URL)) vercelPass = true;
+    const exactUrlPass = statuses.some(status => status.state === 'success' && status.environment_url?.replace(/\/$/, '') === EXPECTED_URL);
+    if (!exactUrlPass) continue;
+    productionDeployment ||= /production/i.test(String(deployment.environment || ''));
+    vercelPass = true;
   }
-  assert(vercelPass, 'Vercel immutable deployment for exact SHA is not PASS');
-  const response = await fetch(EXPECTED_URL, { redirect: 'follow' });
-  assert(response.ok, `Immutable URL unavailable: HTTP ${response.status}`);
+  assertExactStagingMetadata({
+    branchSha: ref.object?.sha,
+    firebaseDeploymentPass: Boolean(deployRun),
+    vercelDeploymentPass: vercelPass,
+    productionDeployment,
+    expectedSha: EXPECTED_SHA
+  });
 
+  const response = await fetch(EXPECTED_URL, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(PREFLIGHT_TIMEOUT_MS),
+    headers: {
+      'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+      'x-vercel-set-bypass-cookie': 'true'
+    }
+  });
+  const html = await response.text();
+  inspectUiHttpPreflight({
+    configuredUrl: process.env.STAGING_URL,
+    finalUrl: response.url,
+    status: response.status,
+    body: html,
+    expectedUrl: EXPECTED_URL
+  });
+  console.log(`HTTP PREFLIGHT PASS sha=${EXPECTED_SHA} project=${EXPECTED_PROJECT} url=${EXPECTED_URL}`);
+}
+
+function initializeAdminRuntime() {
   adminApp = initializeAdminApp({ credential: applicationDefault(), projectId: EXPECTED_PROJECT }, `spr-admin-${runId}`);
   adminDb = getAdminFirestore(adminApp);
   adminAuth = getAdminAuth(adminApp);
   assert(adminApp.options.projectId === EXPECTED_PROJECT, 'Admin runtime project mismatch');
-  console.log(`PREFLIGHT PASS sha=${EXPECTED_SHA} project=${EXPECTED_PROJECT} url=${EXPECTED_URL}`);
 }
 
 async function setupFixtures() {
@@ -168,8 +207,29 @@ function formField(form, labelPattern, selector = 'input') {
   return form.locator('.form-group').filter({ has: form.locator('label').filter({ hasText: labelPattern }) }).locator(selector).first();
 }
 
+async function browserPreflight() {
+  await page.goto(`${EXPECTED_URL}/#/login`, { waitUntil: 'domcontentloaded', timeout: PREFLIGHT_TIMEOUT_MS });
+  let hasLoginEmail = false;
+  let hasAppShell = false;
+  const deadline = Date.now() + BROWSER_PREFLIGHT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const finalHost = new URL(page.url()).hostname;
+    if (/^(?:www\.)?vercel\.com$/i.test(finalHost)) {
+      failPreflight('VERCEL_PROTECTED_URL', `Browser redirected to ${finalHost}`);
+    }
+    hasLoginEmail = await page.getByTestId('login-email').isVisible().catch(() => false);
+    hasAppShell = await page.locator('[data-testid="sidebar"], [data-testid="app-shell"], #root main, #root nav').first().isVisible().catch(() => false);
+    if (hasLoginEmail || hasAppShell) break;
+    await page.waitForTimeout(200);
+  }
+  classifyBrowserLanding({ finalUrl: page.url(), hasLoginEmail, hasAppShell });
+  console.log(`BROWSER PREFLIGHT PASS url=${page.url()}`);
+}
+
 async function openStudentsPage() {
-  await page.goto(`${EXPECTED_URL}/#/login`, { waitUntil: 'domcontentloaded' });
+  if (!(await page.getByTestId('login-email').isVisible().catch(() => false))) {
+    await page.goto(`${EXPECTED_URL}/#/login`, { waitUntil: 'domcontentloaded', timeout: PREFLIGHT_TIMEOUT_MS });
+  }
   await page.getByTestId('login-email').fill(secretaryEmail);
   await page.getByTestId('login-password').fill(secretaryPassword);
   await page.getByTestId('login-submit').click();
@@ -399,13 +459,25 @@ async function cleanup() {
 async function main() {
   await mkdir(ARTIFACT_DIR, { recursive: true });
   try {
-    await preflight();
-    await setupFixtures();
-    await setupCallableClient();
+    requirePreflight(process.env.STAGING_UI_HTTP_PREFLIGHT_VERIFIED === 'true', 'HTTP_PREFLIGHT_NOT_VERIFIED', 'HTTP and deployment preflight must PASS before Chromium');
+    assert(process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'VERCEL_AUTOMATION_BYPASS_SECRET is missing');
+    initializeAdminRuntime();
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'fr-FR' });
     page = await context.newPage();
+    await page.route(`${new URL(EXPECTED_URL).origin}/**`, async route => {
+      await route.continue({
+        headers: {
+          ...route.request().headers(),
+          'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+          'x-vercel-set-bypass-cookie': 'true'
+        }
+      });
+    });
     page.on('dialog', dialog => dialog.accept().catch(() => {}));
+    await browserPreflight();
+    await setupFixtures();
+    await setupCallableClient();
     await openStudentsPage();
     currentScenario = 'A'; await scenarioMinimal();
     currentScenario = 'B'; await scenarioReload();
@@ -433,4 +505,18 @@ async function main() {
   if (results.failure || results.cleanup !== 'PASS') process.exitCode = 1;
 }
 
-await main();
+async function preflightOnlyMain() {
+  try {
+    await httpAndDeploymentPreflight();
+  } catch (error) {
+    const classification = error?.code || 'STAGING_UI_PREFLIGHT_FAILED';
+    console.error(`PREFLIGHT FAIL classification=${classification}: ${error?.stack || error}`);
+    process.exitCode = 1;
+  }
+}
+
+const invokedDirectly = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+if (invokedDirectly) {
+  if (process.argv.includes('--preflight-only')) await preflightOnlyMain();
+  else await main();
+}
