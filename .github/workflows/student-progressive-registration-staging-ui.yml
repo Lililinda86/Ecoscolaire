@@ -1,0 +1,68 @@
+name: Student Progressive Registration Staging UI
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact full SHA currently at the head of staging
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+
+jobs:
+  staging-ui-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      EXPECTED_STAGING_SHA: ${{ inputs.expected_sha }}
+      FIREBASE_PROJECT_ID: ecoscolaire-staging
+      GITHUB_TOKEN: ${{ github.token }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      VITE_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.STAGING_FIREBASE_APP_ID }}
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test Staging UI preflight contract
+        run: node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
+
+      - name: Run HTTP and exact-deployment preflight
+        run: node scripts/test-student-progressive-registration-staging.mjs --preflight-only
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Authenticate Firebase Staging
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Run the single Staging UI validation
+        run: node scripts/test-student-progressive-registration-staging.mjs
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-progressive-registration-staging-ui-${{ github.run_id }}
+          path: artifacts/student-progressive-registration/**
+          if-no-files-found: warn
+          retention-days: 14

@@ -80,6 +80,15 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Validate Student Progressive Registration Staging preflight
+        run: |
+          node --check scripts/test-student-progressive-registration-staging.mjs
+          node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
+          npx --no-install js-yaml .github/workflows/ci.yml > /dev/null
+          npx --no-install js-yaml .github/workflows/student-progressive-registration-staging-ui.yml > /dev/null
+          echo "Targeted workflow YAML PASS"
+          npx --no-install eslint scripts/test-student-progressive-registration-staging.mjs tests/security/student-progressive-registration-staging-preflight-contract.mjs tests/security/student-progressive-registration-staging-preflight.spec.mjs
+
       # TODO(E3.1b): frontend lint debt (305 errors)
       # - name: Lint
       #   run: npm run lint
