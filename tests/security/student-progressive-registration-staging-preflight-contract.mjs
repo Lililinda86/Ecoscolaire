@@ -6,6 +6,38 @@ export class StagingUiPreflightError extends Error {
   }
 }
 
+const TIMEOUT_PATTERN = /(?:timeout|timed out|aborted due to timeout)/i;
+
+export function describeHttpTransportError(error) {
+  const cause = error?.cause;
+  return {
+    error: {
+      name: error?.name || null,
+      message: error?.message || String(error)
+    },
+    cause: {
+      name: cause?.name || null,
+      message: cause?.message || null,
+      code: cause?.code || null,
+      errno: cause?.errno ?? null,
+      syscall: cause?.syscall || null,
+      hostname: cause?.hostname || null
+    }
+  };
+}
+
+export function classifyHttpTransportError(error) {
+  const details = describeHttpTransportError(error);
+  const timedOut = [
+    details.error.name,
+    details.error.message,
+    details.cause.name,
+    details.cause.message,
+    details.cause.code
+  ].some(value => TIMEOUT_PATTERN.test(String(value || ''))) || details.cause.code === 'ABORT_ERR';
+  return timedOut ? 'STAGING_UI_PREFLIGHT_TIMEOUT' : 'STAGING_UI_NETWORK_FAILURE';
+}
+
 const fail = (code, message) => { throw new StagingUiPreflightError(code, message); };
 const requireCheck = (condition, code, message) => { if (!condition) fail(code, message); };
 

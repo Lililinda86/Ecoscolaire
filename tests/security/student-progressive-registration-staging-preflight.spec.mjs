@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  classifyHttpTransportError,
+  describeHttpTransportError,
   inspectUiHttpPreflight,
   resolveExpectedStagingSha,
   selectStagingVercelUrl
@@ -144,10 +146,68 @@ test('Vercel login response remains denied even when bypass was supplied', () =>
   }));
 });
 
+test('wrong bypass is denied when Vercel returns its protected login', () => {
+  expectCode('VERCEL_PROTECTED_URL', () => inspectUiHttpPreflight({
+    selectedUrl: STAGING_URL,
+    finalUrl: 'https://vercel.com/login',
+    status: 200,
+    body: '<title>Login - Vercel</title>',
+    bypassSecretPresent: true
+  }));
+});
+
+test('network failures surface the complete safe nested cause', () => {
+  const cause = Object.assign(new Error('getaddrinfo ENOTFOUND immutable.example'), {
+    code: 'ENOTFOUND',
+    errno: -3008,
+    syscall: 'getaddrinfo',
+    hostname: 'immutable.example'
+  });
+  const error = new TypeError('fetch failed', { cause });
+  assert.deepEqual(describeHttpTransportError(error), {
+    error: {
+      name: 'TypeError',
+      message: 'fetch failed'
+    },
+    cause: {
+      name: 'Error',
+      message: 'getaddrinfo ENOTFOUND immutable.example',
+      code: 'ENOTFOUND',
+      errno: -3008,
+      syscall: 'getaddrinfo',
+      hostname: 'immutable.example'
+    }
+  });
+  assert.equal(classifyHttpTransportError(error), 'STAGING_UI_NETWORK_FAILURE');
+});
+
+test('transport timeout receives an explicit timeout classification', () => {
+  const error = Object.assign(new Error('apiRequestContext.get: Timeout 10000ms exceeded.'), {
+    name: 'TimeoutError'
+  });
+  assert.equal(classifyHttpTransportError(error), 'STAGING_UI_PREFLIGHT_TIMEOUT');
+});
+
 test('workflow declares required exact-SHA manual input', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/student-progressive-registration-staging-ui.yml', import.meta.url), 'utf8');
   assert.match(workflow, /^\s*workflow_dispatch:\s*$/m);
   assert.match(workflow, /^\s*expected_sha:\s*$/m);
   assert.match(workflow, /^\s*required:\s*true\s*$/m);
   assert.match(workflow, /EXPECTED_STAGING_SHA:\s*\$\{\{\s*inputs\.expected_sha\s*\}\}/);
+});
+
+test('connectivity-only mode cannot launch browser, authenticate, run scenarios, or upload functional evidence', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/student-progressive-registration-staging-ui.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /^\s*connectivity_only:\s*$/m);
+  assert.match(workflow, /connectivity_only:[\s\S]*?type:\s*boolean/);
+  for (const stepName of [
+    'Test Staging UI preflight contract',
+    'Install Chromium',
+    'Authenticate Firebase Staging',
+    'Run the single Staging UI validation'
+  ]) {
+    const step = workflow.slice(workflow.indexOf(`- name: ${stepName}`));
+    assert.match(step.slice(0, step.indexOf('\n\n')), /if:\s*\$\{\{\s*!inputs\.connectivity_only\s*\}\}/);
+  }
+  assert.match(workflow, /if:\s*\$\{\{\s*!inputs\.connectivity_only\s*&&\s*always\(\)\s*\}\}/);
 });
