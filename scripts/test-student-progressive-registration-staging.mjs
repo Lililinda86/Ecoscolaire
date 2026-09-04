@@ -8,11 +8,13 @@ import { FieldValue, Timestamp, getFirestore as getAdminFirestore } from 'fireba
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { chromium } from '@playwright/test';
+import { chromium, request } from '@playwright/test';
 import * as XLSX from 'xlsx';
 import {
   StagingUiPreflightError,
   classifyBrowserLanding,
+  classifyHttpTransportError,
+  describeHttpTransportError,
   inspectUiHttpPreflight,
   resolveExpectedStagingSha,
   selectStagingVercelUrl
@@ -133,24 +135,82 @@ async function httpAndDeploymentPreflight() {
   });
   results.immutableUrl = stagingUrl;
 
-  const response = await fetch(stagingUrl, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(PREFLIGHT_TIMEOUT_MS),
-    headers: {
-      'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-      'x-vercel-set-bypass-cookie': 'true'
-    }
-  });
-  const html = await response.text();
+  const targetHostname = new URL(stagingUrl).hostname;
+  const bypassPresent = Boolean(process.env.VERCEL_AUTOMATION_BYPASS_SECRET);
+  const requestMetadata = {
+    targetHostname,
+    timeoutMs: PREFLIGHT_TIMEOUT_MS,
+    redirectMode: 'follow',
+    bypassHeaderPresent: bypassPresent ? 'YES' : 'NO',
+    transport: 'playwright-api-request'
+  };
+  console.log(`HTTP PREFLIGHT REQUEST ${JSON.stringify(requestMetadata)}`);
+  let apiContext;
+  let response;
+  let html;
+  try {
+    apiContext = await request.newContext({
+      extraHTTPHeaders: {
+        'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+        'x-vercel-set-bypass-cookie': 'true'
+      }
+    });
+    response = await apiContext.get(stagingUrl, {
+      maxRedirects: 20,
+      timeout: PREFLIGHT_TIMEOUT_MS
+    });
+    html = await response.text();
+  } catch (error) {
+    const details = describeHttpTransportError(error);
+    const classification = classifyHttpTransportError(error);
+    console.error(`HTTP PREFLIGHT TRANSPORT ERROR ${JSON.stringify({
+      classification,
+      ...requestMetadata,
+      ...details
+    })}`);
+    console.error(`STAGING_CONNECTIVITY_PREFLIGHT_REPORT=${JSON.stringify({
+      stagingSha: expectedSha,
+      resolvedUrl: stagingUrl,
+      bypassPresent: bypassPresent ? 'YES' : 'NO',
+      transport: requestMetadata.transport,
+      httpResponseReceived: 'NO',
+      status: null,
+      finalHostname: null,
+      ecoScolaireDetected: 'NO',
+      vercelLoginDetected: 'UNKNOWN',
+      fixturesCreated: 0,
+      authCreated: 0,
+      classification,
+      ...details
+    })}`);
+    failPreflight(classification, `${details.error.name}: ${details.error.message}`);
+  } finally {
+    if (apiContext) await apiContext.dispose();
+  }
+  const finalUrl = response.url();
+  const status = response.status();
   inspectUiHttpPreflight({
     selectedUrl: stagingUrl,
-    finalUrl: response.url,
-    status: response.status,
+    finalUrl,
+    status,
     body: html,
-    bypassSecretPresent: Boolean(process.env.VERCEL_AUTOMATION_BYPASS_SECRET)
+    bypassSecretPresent: bypassPresent
   });
   assert(process.env.GITHUB_ENV, 'GITHUB_ENV is missing');
   await appendFile(process.env.GITHUB_ENV, `STAGING_UI_HTTP_PREFLIGHT_VERIFIED=true\nSTAGING_URL=${stagingUrl}\n`);
+  console.log(`STAGING_CONNECTIVITY_PREFLIGHT_REPORT=${JSON.stringify({
+    stagingSha: expectedSha,
+    resolvedUrl: stagingUrl,
+    bypassPresent: bypassPresent ? 'YES' : 'NO',
+    transport: requestMetadata.transport,
+    httpResponseReceived: 'YES',
+    status,
+    finalHostname: new URL(finalUrl).hostname,
+    ecoScolaireDetected: 'YES',
+    vercelLoginDetected: 'NO',
+    fixturesCreated: 0,
+    authCreated: 0
+  })}`);
   console.log(`HTTP PREFLIGHT PASS sha=${expectedSha} project=${EXPECTED_PROJECT} url=${stagingUrl}`);
 }
 

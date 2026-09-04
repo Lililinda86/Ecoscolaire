@@ -7,6 +7,11 @@ on:
         description: Exact full SHA currently at the head of staging
         required: true
         type: string
+      connectivity_only:
+        description: Run exact-SHA deployment and Vercel bypass connectivity gates only
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -42,24 +47,28 @@ jobs:
         run: npm ci
 
       - name: Test Staging UI preflight contract
+        if: ${{ !inputs.connectivity_only }}
         run: node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
 
       - name: Run HTTP and exact-deployment preflight
         run: node scripts/test-student-progressive-registration-staging.mjs --preflight-only
 
       - name: Install Chromium
+        if: ${{ !inputs.connectivity_only }}
         run: npx playwright install --with-deps chromium
 
       - name: Authenticate Firebase Staging
+        if: ${{ !inputs.connectivity_only }}
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Run the single Staging UI validation
+        if: ${{ !inputs.connectivity_only }}
         run: node scripts/test-student-progressive-registration-staging.mjs
 
       - name: Upload validation evidence
-        if: always()
+        if: ${{ !inputs.connectivity_only && always() }}
         uses: actions/upload-artifact@v4
         with:
           name: student-progressive-registration-staging-ui-${{ github.run_id }}
