@@ -19,6 +19,11 @@ import {
   resolveExpectedStagingSha,
   selectStagingVercelUrl
 } from '../tests/security/student-progressive-registration-staging-preflight-contract.mjs';
+import {
+  REGISTRATION_ACTION_NAMES,
+  REGISTRATION_CONTROL_SELECTORS,
+  requireUniqueRegistrationLocatorCount
+} from '../tests/security/student-progressive-registration-locator-contract.mjs';
 
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
 const PROD_PROJECT = 'ecoscolaire-c5861';
@@ -26,6 +31,7 @@ const REQUIRED_MISSING = ['dob', 'placeOfBirth', 'parentName', 'parentPhone', 'a
 const ARTIFACT_DIR = path.resolve('artifacts/student-progressive-registration');
 const PREFLIGHT_TIMEOUT_MS = 10_000;
 const BROWSER_PREFLIGHT_TIMEOUT_MS = 8_000;
+const REGISTRATION_LOCATOR_TIMEOUT_MS = 5_000;
 
 const runId = `${process.env.GITHUB_RUN_ID || Date.now()}-${process.env.GITHUB_RUN_ATTEMPT || '1'}`;
 const prefix = `student-progressive-registration-${runId}`;
@@ -290,6 +296,28 @@ function formField(form, labelPattern, selector = 'input') {
   return form.locator('.form-group').filter({ has: form.locator('label').filter({ hasText: labelPattern }) }).locator(selector).first();
 }
 
+async function requireUniqueRegistrationLocator(locator, name) {
+  requireUniqueRegistrationLocatorCount(name, await locator.count());
+  await locator.waitFor({ state: 'visible', timeout: REGISTRATION_LOCATOR_TIMEOUT_MS });
+  return locator;
+}
+
+async function registrationForm() {
+  const modal = await requireUniqueRegistrationLocator(page.getByTestId('modal-content'), 'registration modal');
+  return requireUniqueRegistrationLocator(modal.locator('form'), 'registration form');
+}
+
+async function registrationControl(form, name) {
+  return requireUniqueRegistrationLocator(form.locator(REGISTRATION_CONTROL_SELECTORS[name]), name);
+}
+
+async function registrationAction(form, name) {
+  return requireUniqueRegistrationLocator(
+    form.getByRole('button', { name: REGISTRATION_ACTION_NAMES[name], exact: true }),
+    name
+  );
+}
+
 async function browserPreflight() {
   await page.goto(`${stagingUrl}/#/login`, { waitUntil: 'domcontentloaded', timeout: PREFLIGHT_TIMEOUT_MS });
   let hasLoginEmail = false;
@@ -331,31 +359,31 @@ async function waitForStudentByName(name) {
 }
 
 async function clickNext(form) {
-  await form.getByRole('button', { name: 'Suivant' }).click();
+  await (await registrationAction(form, 'next')).click();
 }
 
 async function openEdit(name) {
   const row = page.locator('tbody tr').filter({ hasText: name }).first();
   await row.getByRole('button', { name: `Actions pour ${name}` }).click();
   await row.locator('button[data-action="edit-student"]').click();
-  const form = page.locator('form').filter({ hasText: 'Étape 1 sur 4' }).first();
-  await form.waitFor({ state: 'visible' });
-  return form;
+  return registrationForm();
 }
 
 async function scenarioMinimal() {
   const name = `MINIMAL ${runId}`;
   await page.getByRole('button', { name: 'Ajouter un élève' }).click();
-  const form = page.locator('form').filter({ hasText: 'Étape 1 sur 4' }).first();
-  await formField(form, /^Nom /).fill('MINIMAL');
-  await formField(form, /^Prénom/).fill(runId);
-  await formField(form, /^Sexe/, 'select').selectOption('F');
+  const form = await registrationForm();
+  await (await registrationControl(form, 'lastName')).fill('MINIMAL');
+  await (await registrationControl(form, 'firstName')).fill(runId);
+  await (await registrationControl(form, 'gender')).selectOption('F');
   await clickNext(form);
-  await formField(form, /^Section/, 'select').selectOption('francophone');
-  await formField(form, /^Classe/, 'select').selectOption(classId);
+  await (await registrationControl(form, 'section')).selectOption('francophone');
+  await (await registrationControl(form, 'classId')).selectOption(classId);
+  const academicYear = await registrationControl(form, 'academicYear');
+  assert((await academicYear.inputValue()).trim() === '2026-2027', 'A: active academic year control mismatch');
   await clickNext(form);
   await clickNext(form);
-  await form.getByRole('button', { name: 'Enregistrer' }).click();
+  await (await registrationAction(form, 'save')).click();
   const row = page.locator('tbody tr').filter({ hasText: name }).first();
   await row.waitFor({ state: 'visible', timeout: 30000 });
   await row.getByText('À compléter', { exact: true }).waitFor({ state: 'visible' });
