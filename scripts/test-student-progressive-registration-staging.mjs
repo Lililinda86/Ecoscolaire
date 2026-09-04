@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -12,13 +12,12 @@ import { chromium } from '@playwright/test';
 import * as XLSX from 'xlsx';
 import {
   StagingUiPreflightError,
-  assertExactStagingMetadata,
   classifyBrowserLanding,
-  inspectUiHttpPreflight
+  inspectUiHttpPreflight,
+  resolveExpectedStagingSha,
+  selectStagingVercelUrl
 } from '../tests/security/student-progressive-registration-staging-preflight-contract.mjs';
 
-const EXPECTED_SHA = 'f4c1fc5ab70113f56165c4fcf38d44c1061ef9a2';
-const EXPECTED_URL = 'https://ecoscolaire-8t5s71k88-linda-lemofouet-s-projects.vercel.app';
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
 const PROD_PROJECT = 'ecoscolaire-c5861';
 const REQUIRED_MISSING = ['dob', 'placeOfBirth', 'parentName', 'parentPhone', 'address', 'emergencyContact', 'medicalInformation'];
@@ -41,8 +40,8 @@ const secretaryPassword = `Spr!${crypto.randomBytes(18).toString('base64url')}9a
 const results = {
   workflow: process.env.GITHUB_WORKFLOW || null,
   run: process.env.GITHUB_RUN_ID || null,
-  stagingSha: EXPECTED_SHA,
-  immutableUrl: EXPECTED_URL,
+  stagingSha: null,
+  immutableUrl: null,
   project: EXPECTED_PROJECT,
   minimalStudent: 'NOT_RUN', missingDob: 'NOT_RUN', missingParentName: 'NOT_RUN', missingParentPhone: 'NOT_RUN',
   incompleteStatus: 'NOT_RUN', missingRegistrationFields: 'NOT_RUN', reload: 'NOT_RUN', completeTransition: 'NOT_RUN',
@@ -65,6 +64,8 @@ let secretaryUid;
 let minimalStudentId;
 let financeUpdateTimeBeforeEdits;
 const fixtureStudentIds = new Set([legacyId]);
+let expectedSha;
+let stagingUrl;
 
 const failPreflight = (code, message) => { throw new StagingUiPreflightError(code, message); };
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -81,8 +82,13 @@ async function github(pathname) {
 }
 
 async function httpAndDeploymentPreflight() {
-  assert(process.env.EXPECTED_STAGING_SHA === EXPECTED_SHA, 'EXPECTED_STAGING_SHA mismatch');
-  assert(process.env.STAGING_URL?.replace(/\/$/, '') === EXPECTED_URL, 'STAGING_URL mismatch');
+  expectedSha = resolveExpectedStagingSha({
+    eventName: process.env.GITHUB_EVENT_NAME,
+    githubSha: process.env.GITHUB_SHA,
+    githubRef: process.env.GITHUB_REF,
+    dispatchSha: process.env.EXPECTED_STAGING_SHA
+  });
+  results.stagingSha = expectedSha;
   assert(process.env.FIREBASE_PROJECT_ID === EXPECTED_PROJECT, 'Firebase project mismatch');
   assert(process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'VERCEL_AUTOMATION_BYPASS_SECRET is missing');
   assert(process.env.GITHUB_TOKEN, 'GITHUB_TOKEN is missing');
@@ -91,28 +97,43 @@ async function httpAndDeploymentPreflight() {
 
   const ref = await github('git/ref/heads/staging');
   const runs = await github('actions/workflows/deploy-staging.yml/runs?branch=staging&event=push&per_page=20');
-  const deployRun = runs.workflow_runs?.find(run => run.head_sha === EXPECTED_SHA && run.status === 'completed' && run.conclusion === 'success');
-
-  const deployments = await github(`deployments?sha=${EXPECTED_SHA}&per_page=20`);
-  let vercelPass = false;
-  let productionDeployment = false;
+  const deployRun = runs.workflow_runs?.find(run => run.head_sha === expectedSha && run.status === 'completed' && run.conclusion === 'success');
+  const deployments = await github(`deployments?sha=${expectedSha}&per_page=20`);
+  const deploymentRecords = [];
+  let officialStagingDeploymentPass = false;
   for (const deployment of deployments) {
-    if (deployment.creator?.login !== 'vercel[bot]') continue;
     const statuses = await github(`deployments/${deployment.id}/statuses`);
-    const exactUrlPass = statuses.some(status => status.state === 'success' && status.environment_url?.replace(/\/$/, '') === EXPECTED_URL);
-    if (!exactUrlPass) continue;
-    productionDeployment ||= /production/i.test(String(deployment.environment || ''));
-    vercelPass = true;
+    if (
+      deployment.sha === expectedSha &&
+      deployment.ref === 'staging' &&
+      /^staging$/i.test(String(deployment.environment || '')) &&
+      !deployment.production_environment &&
+      statuses.some(status => status.state === 'success' && /^staging$/i.test(String(status.environment || '')))
+    ) {
+      officialStagingDeploymentPass = true;
+    }
+    deploymentRecords.push({
+      creatorLogin: deployment.creator?.login,
+      sha: deployment.sha,
+      ref: deployment.ref,
+      environment: deployment.environment,
+      productionEnvironment: Boolean(deployment.production_environment),
+      statuses: statuses.map(status => ({
+        state: status.state,
+        environment: status.environment,
+        environmentUrl: status.environment_url
+      }))
+    });
   }
-  assertExactStagingMetadata({
+  stagingUrl = selectStagingVercelUrl({
+    expectedSha,
     branchSha: ref.object?.sha,
-    firebaseDeploymentPass: Boolean(deployRun),
-    vercelDeploymentPass: vercelPass,
-    productionDeployment,
-    expectedSha: EXPECTED_SHA
+    stagingDeploymentPass: Boolean(deployRun) && officialStagingDeploymentPass,
+    deployments: deploymentRecords
   });
+  results.immutableUrl = stagingUrl;
 
-  const response = await fetch(EXPECTED_URL, {
+  const response = await fetch(stagingUrl, {
     redirect: 'follow',
     signal: AbortSignal.timeout(PREFLIGHT_TIMEOUT_MS),
     headers: {
@@ -122,13 +143,15 @@ async function httpAndDeploymentPreflight() {
   });
   const html = await response.text();
   inspectUiHttpPreflight({
-    configuredUrl: process.env.STAGING_URL,
+    selectedUrl: stagingUrl,
     finalUrl: response.url,
     status: response.status,
     body: html,
-    expectedUrl: EXPECTED_URL
+    bypassSecretPresent: Boolean(process.env.VERCEL_AUTOMATION_BYPASS_SECRET)
   });
-  console.log(`HTTP PREFLIGHT PASS sha=${EXPECTED_SHA} project=${EXPECTED_PROJECT} url=${EXPECTED_URL}`);
+  assert(process.env.GITHUB_ENV, 'GITHUB_ENV is missing');
+  await appendFile(process.env.GITHUB_ENV, `STAGING_UI_HTTP_PREFLIGHT_VERIFIED=true\nSTAGING_URL=${stagingUrl}\n`);
+  console.log(`HTTP PREFLIGHT PASS sha=${expectedSha} project=${EXPECTED_PROJECT} url=${stagingUrl}`);
 }
 
 function initializeAdminRuntime() {
@@ -208,7 +231,7 @@ function formField(form, labelPattern, selector = 'input') {
 }
 
 async function browserPreflight() {
-  await page.goto(`${EXPECTED_URL}/#/login`, { waitUntil: 'domcontentloaded', timeout: PREFLIGHT_TIMEOUT_MS });
+  await page.goto(`${stagingUrl}/#/login`, { waitUntil: 'domcontentloaded', timeout: PREFLIGHT_TIMEOUT_MS });
   let hasLoginEmail = false;
   let hasAppShell = false;
   const deadline = Date.now() + BROWSER_PREFLIGHT_TIMEOUT_MS;
@@ -228,7 +251,7 @@ async function browserPreflight() {
 
 async function openStudentsPage() {
   if (!(await page.getByTestId('login-email').isVisible().catch(() => false))) {
-    await page.goto(`${EXPECTED_URL}/#/login`, { waitUntil: 'domcontentloaded', timeout: PREFLIGHT_TIMEOUT_MS });
+    await page.goto(`${stagingUrl}/#/login`, { waitUntil: 'domcontentloaded', timeout: PREFLIGHT_TIMEOUT_MS });
   }
   await page.getByTestId('login-email').fill(secretaryEmail);
   await page.getByTestId('login-password').fill(secretaryPassword);
@@ -461,11 +484,21 @@ async function main() {
   try {
     requirePreflight(process.env.STAGING_UI_HTTP_PREFLIGHT_VERIFIED === 'true', 'HTTP_PREFLIGHT_NOT_VERIFIED', 'HTTP and deployment preflight must PASS before Chromium');
     assert(process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'VERCEL_AUTOMATION_BYPASS_SECRET is missing');
+    expectedSha = resolveExpectedStagingSha({
+      eventName: process.env.GITHUB_EVENT_NAME,
+      githubSha: process.env.GITHUB_SHA,
+      githubRef: process.env.GITHUB_REF,
+      dispatchSha: process.env.EXPECTED_STAGING_SHA
+    });
+    stagingUrl = process.env.STAGING_URL?.replace(/\/$/, '');
+    requirePreflight(Boolean(stagingUrl), 'MISSING_IMMUTABLE_URL', 'Resolved Staging URL is missing after HTTP preflight');
+    results.stagingSha = expectedSha;
+    results.immutableUrl = stagingUrl;
     initializeAdminRuntime();
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'fr-FR' });
     page = await context.newPage();
-    await page.route(`${new URL(EXPECTED_URL).origin}/**`, async route => {
+    await page.route(`${new URL(stagingUrl).origin}/**`, async route => {
       await route.continue({
         headers: {
           ...route.request().headers(),

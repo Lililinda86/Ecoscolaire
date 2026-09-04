@@ -1,9 +1,12 @@
 name: Student Progressive Registration Staging UI
 
 on:
-  push:
-    branches:
-      - codex/student-progressive-staging-ui
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact full SHA currently at the head of staging
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,8 +19,7 @@ jobs:
     timeout-minutes: 20
     environment: staging
     env:
-      EXPECTED_STAGING_SHA: f4c1fc5ab70113f56165c4fcf38d44c1061ef9a2
-      STAGING_URL: https://ecoscolaire-8t5s71k88-linda-lemofouet-s-projects.vercel.app
+      EXPECTED_STAGING_SHA: ${{ inputs.expected_sha }}
       FIREBASE_PROJECT_ID: ecoscolaire-staging
       GITHUB_TOKEN: ${{ github.token }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -43,9 +45,7 @@ jobs:
         run: node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
 
       - name: Run HTTP and exact-deployment preflight
-        run: |
-          node scripts/test-student-progressive-registration-staging.mjs --preflight-only
-          echo "STAGING_UI_HTTP_PREFLIGHT_VERIFIED=true" >> "$GITHUB_ENV"
+        run: node scripts/test-student-progressive-registration-staging.mjs --preflight-only
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
