@@ -256,7 +256,7 @@ test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
         page.getByRole("heading", { name: "Pilotage pédagogique" }),
       ).toBeVisible();
       await expect(page.getByText("forbidden")).toHaveCount(0);
-      await page.getByRole("link", { name: "Planification" }).click();
+      await page.getByRole("link", { name: "Planification", exact: true }).click();
       await page.getByLabel("Classe").selectOption(fixture.classId);
       await page
         .getByRole("button", { name: "Initialiser les semaines" })
