@@ -824,6 +824,37 @@ const paymentMatchesTarget = (
   && (type !== 'transport' || payment.period === period)
   && isConfirmedPayment(payment);
 
+const paymentAmountForTarget = (
+  payment: Data,
+  schoolId: string,
+  academicYear: string,
+  type: PaymentType,
+  installment: Installment | null,
+  period: string | null
+): number => {
+  if (!isConfirmedPayment(payment) || payment.schoolId !== schoolId
+      || payment.academicYear !== academicYear) return 0;
+  if (paymentMatchesTarget(payment, schoolId, academicYear, type, installment, period)) {
+    return requireSignedPaymentAmount(payment);
+  }
+  if (payment.type !== 'collection' || !Array.isArray(payment.lineItems)) return 0;
+  let total = 0;
+  for (const rawLine of payment.lineItems) {
+    if (!rawLine || typeof rawLine !== 'object' || Array.isArray(rawLine)) continue;
+    const line = rawLine as Data;
+    if (line.type !== type
+        || (type === 'tuition' && line.installment !== installment)
+        || (type === 'transport' && line.period !== period)) continue;
+    const amount = line.amount;
+    if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount === 0) {
+      throw httpsError('failed-precondition', 'Une ventilation historique est invalide.',
+        'FINANCIAL_HISTORY_INCONSISTENT');
+    }
+    total = safeAdd(total, amount, 'allocatedPreviousPaid');
+  }
+  return total;
+};
+
 const buildQuote = ({
   gross, benefits, payments, moratoriums, school, schoolId, academicYear, type, installment, period, today
 }: {
@@ -842,10 +873,10 @@ const buildQuote = ({
   const applicable = selectApplicableBenefits(benefits, type, installment, period, today);
   const calculated = calculateBenefits(gross, applicable);
   let previousPaid = 0;
-  for (const payment of payments.filter(item => paymentMatchesTarget(
-    item, schoolId, academicYear, type, installment, period
-  ))) {
-    previousPaid = safeAdd(previousPaid, requireSignedPaymentAmount(payment), 'previousPaid');
+  for (const payment of payments) {
+    previousPaid = safeAdd(previousPaid, paymentAmountForTarget(
+      payment, schoolId, academicYear, type, installment, period
+    ), 'previousPaid');
   }
   if (previousPaid < 0 || previousPaid > calculated.netExpectedAmount) {
     throw httpsError('failed-precondition', 'Le cumul historique dépasse le montant net dû.', 'FINANCIAL_HISTORY_INCONSISTENT');
@@ -1867,6 +1898,28 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
     };
   });
 });
+
+/**
+ * Narrow internal contract used by the additive multi-fee collection module.
+ * Keeping the canonical quote/projection code in one place prevents the new
+ * workflow from drifting from historical single-payment behavior.
+ */
+export const collectionInternals = {
+  parseQuoteInput,
+  readQuoteContext,
+  buildTuitionProjection,
+  buildCanonicalTransportProjection,
+  writeStudentFinanceProjection,
+  makePaymentTargetKey: paymentTargetKey,
+  safeAdd,
+  requireMoney,
+  requireId,
+  requireText,
+  requireAcademicYear,
+  getDoualaDate,
+  hashId,
+  auditData
+};
 
 export const reversePayment = functions.https.onCall(async (raw, context) => {
   if (!context.auth?.uid) {
