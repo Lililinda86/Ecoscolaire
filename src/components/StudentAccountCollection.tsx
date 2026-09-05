@@ -23,8 +23,10 @@ interface AccountLine {
   remainingBalance: number;
   status: AccountStatus;
   benefits: Array<{ benefitId: string; benefitType: string; discountAmount: number; reference?: string | null }>;
+  originalDueDate: string | null;
   moratoriumStatus: 'NONE' | 'ACTIVE' | 'EXPIRED';
   effectiveDueDate: string | null;
+  nextDueDate?: string | null;
   overdue: boolean;
   dueStatus: string;
   selectable: boolean;
@@ -53,6 +55,7 @@ interface Props {
   students: Student[];
   school: School;
   initialStudentId?: string;
+  classNamesById?: Record<string, string>;
   onClose: () => void;
   onCompleted?: (result: CollectionResult) => void;
 }
@@ -74,7 +77,6 @@ const statusLabel = (line: AccountLine): string => {
   if (line.status === 'PAID') return 'SOLDÉ';
   if (line.moratoriumStatus === 'ACTIVE') return 'MORATOIRE';
   if (line.overdue) return 'EN RETARD';
-  if (line.status === 'PARTIAL') return 'PARTIELLEMENT PAYÉ';
   if (line.dueStatus === 'NOT_DUE') return 'À VENIR';
   return 'À PAYER';
 };
@@ -85,7 +87,30 @@ const normalizeAmount = (value: string): number => {
   return Number.isSafeInteger(amount) ? amount : 0;
 };
 
-const StudentAccountCollection: React.FC<Props> = ({ students, school, initialStudentId, onClose, onCompleted }) => {
+const benefitTypeLabel = (type: string): string => ({
+  scholarship: 'Bourse',
+  family_discount: 'Réduction familiale',
+  voucher: 'Bon de réduction',
+  exceptional_discount: 'Remise exceptionnelle',
+  discount: 'Réduction'
+}[type.toLocaleLowerCase('fr')] || type.replace(/_/g, ' '));
+
+const formatSchoolYear = (value: string): string => value.replace('-', '–');
+
+const formatDueDate = (value: string | null): string => {
+  if (!value) return 'échéance approuvée';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+};
+
+const StudentAccountCollection: React.FC<Props> = ({
+  students,
+  school,
+  initialStudentId,
+  classNamesById = {},
+  onClose,
+  onCompleted
+}) => {
   const [studentId, setStudentId] = useState(initialStudentId || '');
   const [search, setSearch] = useState('');
   const [account, setAccount] = useState<StudentAccount | null>(null);
@@ -93,33 +118,51 @@ const StudentAccountCollection: React.FC<Props> = ({ students, school, initialSt
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [result, setResult] = useState<CollectionResult | null>(null);
   const attemptRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
+  const loadSequenceRef = useRef(0);
 
   const visibleStudents = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('fr');
-    if (!query) return students;
-    return students.filter(student => `${student.name} ${student.matricule || ''}`.toLocaleLowerCase('fr').includes(query));
-  }, [search, students]);
+    return students
+      .filter(student => (!student.schoolId || student.schoolId === school.id)
+        && student.schoolingStatus !== 'inactive'
+        && (!school.activeAcademicYearId || !student.academicYearId
+          || student.academicYearId === school.activeAcademicYearId))
+      .filter(student => student.id === studentId || !query
+        || `${student.name} ${student.studentLastName || ''} ${student.studentFirstName || ''} ${student.matricule || ''}`
+        .toLocaleLowerCase('fr').includes(query))
+      .sort((left, right) => left.name.localeCompare(right.name, 'fr', { sensitivity: 'base' }));
+  }, [school.activeAcademicYearId, school.id, search, studentId, students]);
 
   const loadAccount = async (selectedId = studentId) => {
+    const sequence = ++loadSequenceRef.current;
     if (!selectedId) {
       setAccount(null);
+      setLoading(false);
+      setLoadFailed(false);
+      setError('');
       return;
     }
     setLoading(true);
+    setAccount(null);
+    setLoadFailed(false);
     setError('');
     try {
       const call = httpsCallable<Record<string, string>, StudentAccount>(functions, 'getStudentFinancialAccount');
       const response = await call({ schoolId: school.id, studentId: selectedId, academicYear: school.academicYear });
+      if (sequence !== loadSequenceRef.current) return;
       setAccount(response.data);
       setAmounts(previous => Object.fromEntries(response.data.lines.map(line => [line.key,
         previous[line.key] && normalizeAmount(previous[line.key]) <= line.remainingBalance ? previous[line.key] : ''])));
     } catch (loadError) {
+      if (sequence !== loadSequenceRef.current) return;
       setAccount(null);
-      setError(errorMessage(loadError));
+      setLoadFailed(true);
+      setError(`Impossible de charger la situation financière. ${errorMessage(loadError)}`);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequenceRef.current) setLoading(false);
     }
   };
 
@@ -134,6 +177,32 @@ const StudentAccountCollection: React.FC<Props> = ({ students, school, initialSt
     return amount > 0 ? [{ ...line, amount }] : [];
   }) || [], [account, amounts]);
   const total = selectedLines.reduce((sum, line) => sum + line.amount, 0);
+
+  const payableLines = useMemo(() => account?.lines.filter(line => line.selectable && line.remainingBalance > 0) || [], [account]);
+  const settledLines = useMemo(() => account?.lines.filter(line => !line.selectable || line.remainingBalance <= 0) || [], [account]);
+  const activeBenefits = useMemo(() => account?.lines.flatMap(line => line.benefits.map(benefit => ({
+    ...benefit,
+    lineKey: line.key,
+    lineLabel: line.label
+  }))).filter((benefit, index, entries) => entries.findIndex(candidate =>
+    candidate.benefitId === benefit.benefitId && candidate.lineKey === benefit.lineKey) === index) || [], [account]);
+  const moratoriumLines = useMemo(() => account?.lines.filter(line => line.moratoriumStatus === 'ACTIVE') || [], [account]);
+  const nextDueLine = useMemo(() => account?.lines
+    .filter(line => !line.overdue)
+    .filter(line => line.remainingBalance > 0 && Boolean(line.nextDueDate || line.effectiveDueDate || line.originalDueDate))
+    .map(line => ({ line, date: line.nextDueDate || line.effectiveDueDate || line.originalDueDate || '' }))
+    .sort((left, right) => left.date.localeCompare(right.date))[0] || null, [account]);
+
+  const selectStudent = (nextStudentId: string) => {
+    loadSequenceRef.current += 1;
+    setStudentId(nextStudentId);
+    setAccount(null);
+    setAmounts({});
+    setResult(null);
+    setError('');
+    setLoadFailed(false);
+    attemptRef.current = null;
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -184,12 +253,12 @@ const StudentAccountCollection: React.FC<Props> = ({ students, school, initialSt
   if (result && account) return (
     <section className="student-account-success" aria-live="polite">
       <CheckCircle size={44} aria-hidden="true" />
-      <h2>Encaissement validé</h2>
+      <h2>Encaissement enregistré ✓</h2>
       <p>Le reçu <strong>{result.receiptNumber}</strong> a été généré automatiquement.</p>
       {result.idempotentReplay && <p className="account-notice">Cette demande avait déjà été traitée : aucun doublon n’a été créé.</p>}
       <div className="student-account-receipt">
         <h3>{account.school.name}</h3>
-        <p>{account.student.name} · {account.student.className} · {account.academicYear}</p>
+        <p>{account.student.name} · {account.student.className} · {formatSchoolYear(account.academicYear)}</p>
         {result.lineItems.map(line => <div className="receipt-line" key={line.key}><span>{line.label}</span><strong>{formatCurrency(line.amount)}</strong></div>)}
         <div className="receipt-total"><span>Total reçu — Espèces</span><strong>{formatCurrency(result.amount)}</strong></div>
         <small>Opération : {result.collectionId}</small>
@@ -198,6 +267,7 @@ const StudentAccountCollection: React.FC<Props> = ({ students, school, initialSt
         <button type="button" className="secondary" onClick={() => window.print()}><Printer size={18} /> Imprimer</button>
         <button type="button" className="secondary" onClick={downloadPdf}><FileDown size={18} /> Télécharger PDF</button>
         <button type="button" onClick={startNew}><RefreshCw size={18} /> Nouvel encaissement</button>
+        <button type="button" className="secondary" onClick={onClose}>Fermer</button>
       </div>
     </section>
   );
@@ -206,64 +276,108 @@ const StudentAccountCollection: React.FC<Props> = ({ students, school, initialSt
     <form className="student-account-collection" onSubmit={submit}>
       <div className="student-account-header">
         <div>
-          <label htmlFor="student-account-search">Rechercher un élève</label>
-          <div className="student-search"><Search size={18} aria-hidden="true" />
-            <input id="student-account-search" value={search} onChange={event => setSearch(event.target.value)}
-              placeholder="Nom ou matricule" autoComplete="off" /></div>
-        </div>
-        <div>
           <label htmlFor="cash-payment-student">Élève</label>
           <select id="cash-payment-student" data-testid="cash-payment-student" required value={studentId}
-            onChange={event => { setStudentId(event.target.value); setResult(null); setAmounts({}); }}>
-            <option value="">-- Choisir --</option>
-            {visibleStudents.map(student => <option key={student.id} value={student.id}>{student.name} ({student.matricule || student.section})</option>)}
+            onChange={event => selectStudent(event.target.value)}>
+            <option value="">-- Choisir un élève --</option>
+            {visibleStudents.map(student => <option key={student.id} value={student.id}>
+              {student.name} — {classNamesById[student.classId || ''] || 'Classe non renseignée'} — {student.matricule || 'Sans matricule'}
+            </option>)}
           </select>
+        </div>
+        <div>
+          <label htmlFor="student-account-search">Filtrer la liste <span>(facultatif)</span></label>
+          <div className="student-search"><Search size={18} aria-hidden="true" />
+            <input id="student-account-search" value={search} onChange={event => setSearch(event.target.value)}
+              placeholder="Nom, prénom ou matricule" autoComplete="off" /></div>
         </div>
       </div>
 
-      {loading && <p className="account-loading" role="status">Calcul sécurisé du compte en cours…</p>}
-      {error && <p className="account-error" role="alert">{error}</p>}
+      {!studentId && <p className="account-empty">Choisissez un élève pour afficher immédiatement sa situation financière.</p>}
+      {loading && <p className="account-loading" role="status">Chargement de la situation financière...</p>}
+      {error && <div className="account-error" role="alert"><p>{error}</p>
+        {loadFailed && <button type="button" className="secondary" onClick={() => void loadAccount(studentId)}>Réessayer</button>}
+      </div>}
       {account && !loading && <>
         <div className="student-identity">
           <div><strong>{account.student.name}</strong><span>{account.student.matricule || 'Sans matricule'}</span></div>
           <div><span>Classe</span><strong>{account.student.className || 'Non renseignée'}</strong></div>
-          <div><span>Année scolaire</span><strong>{account.academicYear}</strong></div>
+          <div><span>Année scolaire</span><strong>{formatSchoolYear(account.academicYear)}</strong></div>
         </div>
+        <h3 className="account-section-title">Situation financière</h3>
         <div className="account-summary" aria-label="Résumé financier">
           <div><span>Total facturé</span><strong>{formatCurrency(account.totals.totalBilled)}</strong></div>
-          <div><span>Aides approuvées</span><strong>- {formatCurrency(account.totals.totalBenefits)}</strong></div>
-          <div><span>Total payé</span><strong>{formatCurrency(account.totals.totalPaid)}</strong></div>
+          <div><span>Avantages</span><strong>{account.totals.totalBenefits > 0
+            ? `- ${formatCurrency(account.totals.totalBenefits)}`
+            : formatCurrency(0)}</strong></div>
+          <div><span>Déjà payé</span><strong>{formatCurrency(account.totals.totalPaid)}</strong></div>
           <div className="summary-remaining"><span>Reste total</span><strong>{formatCurrency(account.totals.totalRemaining)}</strong></div>
+          {nextDueLine && <div className="summary-next-due"><span>Prochaine échéance</span>
+            <strong>{formatDueDate(nextDueLine.date)}</strong><small>{nextDueLine.line.label}</small></div>}
           {account.totals.overdueAmount > 0 && <div className="summary-overdue"><span>En retard</span><strong>{formatCurrency(account.totals.overdueAmount)}</strong></div>}
         </div>
+        <section className="account-benefits" aria-labelledby="benefits-title">
+          <div><h3 id="benefits-title">Avantages &amp; aménagements</h3>
+            {activeBenefits.length === 0 && moratoriumLines.length === 0
+              ? <p>Aucun avantage financier actif.</p>
+              : <div className="benefit-list">
+                {activeBenefits.map(benefit => <p key={`${benefit.benefitId}-${benefit.lineKey}`}>
+                  <CheckCircle size={16} aria-hidden="true" /> <strong>{benefitTypeLabel(benefit.benefitType)}</strong>
+                  <span>{benefit.lineLabel} · - {formatCurrency(benefit.discountAmount)}</span>
+                </p>)}
+                {moratoriumLines.map(line => <p key={`moratorium-${line.key}`}>
+                  <strong>Moratoire actif</strong><span>{line.label} · Nouvelle échéance : {formatDueDate(line.effectiveDueDate)}</span>
+                </p>)}
+              </div>}
+          </div>
+        </section>
         <div className="account-workspace">
           <section className="obligations" aria-labelledby="obligations-title">
-            <h3 id="obligations-title">Frais applicables</h3>
+            <h3 id="obligations-title">Frais à régler</h3>
             <div className="obligation-list">
-              {account.lines.map(line => <article className="obligation-row" key={line.key}>
+              {payableLines.length === 0 && <p className="no-fees">Aucun frais à régler pour cet élève.</p>}
+              {payableLines.map(line => <article className="obligation-row" key={line.key}>
                 <div className="obligation-main">
                   <strong>{line.label}</strong>
                   <span className={`account-status status-${statusLabel(line).toLowerCase().replace(/\s+/g, '-')}`}>{statusLabel(line)}</span>
-                  {line.discountAmount > 0 && <span className="benefit-label">RÉDUCTION APPLIQUÉE</span>}
                 </div>
-                <div className="obligation-values"><span>Prévu <b>{formatCurrency(line.grossExpectedAmount)}</b></span>
-                  <span>Payé <b>{formatCurrency(line.previousPaid)}</b></span><span>Reste <b>{formatCurrency(line.remainingBalance)}</b></span></div>
-                {line.moratoriumStatus === 'ACTIVE' && <small>Moratoire jusqu’au {line.effectiveDueDate || 'terme approuvé'}</small>}
+                <div className="obligation-values">
+                  <span>Tarif de référence <b>{formatCurrency(line.grossExpectedAmount)}</b></span>
+                  {line.discountAmount > 0 && <span className="line-discount">Avantage <b>- {formatCurrency(line.discountAmount)}</b></span>}
+                  <span>Montant dû <b>{formatCurrency(line.netExpectedAmount)}</b></span>
+                  <span>Déjà payé <b>{formatCurrency(line.previousPaid)}</b></span>
+                  <span>Échéance initiale <b>{line.originalDueDate ? formatDueDate(line.originalDueDate) : 'Non configurée'}</b></span>
+                  {line.moratoriumStatus === 'ACTIVE' && <span className="line-effective-due">Échéance effective <b>{line.effectiveDueDate ? formatDueDate(line.effectiveDueDate) : 'Non configurée'}</b></span>}
+                  <span className="line-remaining">Reste à payer <b>{formatCurrency(line.remainingBalance)}</b></span>
+                </div>
                 {line.benefits.length > 0 && <details><summary>Détails du calcul</summary>
-                  {line.benefits.map(benefit => <p key={benefit.benefitId}>{benefit.benefitType} : - {formatCurrency(benefit.discountAmount)} {benefit.reference ? `(${benefit.reference})` : ''}</p>)}</details>}
-                <label className="allocation-input">Montant reçu
+                  {line.benefits.map(benefit => <p key={benefit.benefitId}>{benefitTypeLabel(benefit.benefitType)} : - {formatCurrency(benefit.discountAmount)} {benefit.reference ? `(${benefit.reference})` : ''}</p>)}</details>}
+                <div className="allocation-control"><label className="allocation-input">Montant reçu
                   <input type="number" min="1" max={line.type === 'transport' ? undefined : line.remainingBalance} step="1"
                     disabled={!line.selectable} value={amounts[line.key] || ''}
                     onChange={event => setAmounts(previous => ({ ...previous, [line.key]: event.target.value }))}
-                    aria-label={`Montant reçu pour ${line.label}`} placeholder={line.selectable ? '0' : 'Soldé'} /></label>
+                    aria-label={`Montant reçu pour ${line.label}`} placeholder="0" /></label>
+                  <button type="button" className="secondary settle-button"
+                    onClick={() => setAmounts(previous => ({ ...previous, [line.key]: String(line.remainingBalance) }))}>
+                    Solder {formatCurrency(line.remainingBalance)}
+                  </button></div>
               </article>)}
             </div>
+            {settledLines.length > 0 && <details className="settled-fees"><summary>Frais soldés ({settledLines.length})</summary>
+              <div>{settledLines.map(line => <div className="settled-fee" key={line.key}>
+                <strong>{line.label}</strong>
+                <span>Échéance initiale : {line.originalDueDate ? formatDueDate(line.originalDueDate) : 'Non configurée'}</span>
+                {line.moratoriumStatus === 'ACTIVE' && <span>Échéance effective : {line.effectiveDueDate ? formatDueDate(line.effectiveDueDate) : 'Non configurée'}</span>}
+                <span>Reste à payer : {formatCurrency(line.remainingBalance)}</span>
+                <span className="account-status status-soldé">SOLDÉ</span>
+              </div>)}</div>
+            </details>}
           </section>
           <aside className="collection-basket" aria-labelledby="basket-title">
-            <h3 id="basket-title">Ventilation</h3>
+            <h3 id="basket-title">Paiement en cours</h3>
             {selectedLines.length === 0 ? <p>Saisissez un montant sur un ou plusieurs frais.</p> : selectedLines.map(line =>
               <div className="basket-line" key={line.key}><span>{line.label}</span><strong>{formatCurrency(line.amount)}</strong></div>)}
-            <div className="basket-total"><span>TOTAL</span><strong>{formatCurrency(total)}</strong></div>
+            <div className="basket-total"><span>Total reçu</span><strong>{formatCurrency(total)}</strong></div>
             <fieldset><legend>Mode de paiement</legend>
               <label><input type="radio" checked readOnly /> Espèces</label>
               <label className="disabled-method"><input type="radio" disabled /> Mobile Money <small>Disponible uniquement pour un paiement simple</small></label>

@@ -2296,9 +2296,10 @@ const Payments: React.FC = () => {
       )}
 
       {/* Encaissement Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Nouvel Encaissement">
+      <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Nouvel Encaissement" size="wide">
         <StudentAccountCollection students={db.students} school={currentSchool!}
           initialStudentId={currentPayment.studentId}
+          classNamesById={Object.fromEntries(db.classes.map(item => [item.id, item.name]))}
           onClose={() => setModalOpen(false)}
           onCompleted={() => setQuoteRefresh(value => value + 1)} />
         {legacyPaymentFormEnabled && (
