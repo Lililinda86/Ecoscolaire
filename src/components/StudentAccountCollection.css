@@ -1,35 +1,67 @@
-.student-account-collection { min-width: min(1040px, 88vw); }
-.student-account-header { display: grid; grid-template-columns: 1fr 1.2fr; gap: 1rem; align-items: end; }
+.student-account-collection { width: 100%; min-width: 0; color: var(--text-primary); }
+.student-account-header { display: grid; grid-template-columns: minmax(320px, 1.35fr) minmax(240px, .65fr); gap: 1rem; align-items: end; }
 .student-account-header label, .allocation-input { display: grid; gap: .35rem; font-weight: 600; }
+.student-account-header label span { color: var(--text-secondary); font-size: .75rem; font-weight: 500; }
+.student-account-header select { min-height: 46px; width: 100%; }
 .student-search { display: flex; align-items: center; gap: .5rem; border: 1px solid var(--border-color); border-radius: 8px; padding: 0 .75rem; background: var(--surface-color, #fff); }
-.student-search input { border: 0; min-width: 0; width: 100%; }
+.student-search:focus-within { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(37, 99, 235, .16); }
+.student-search input { border: 0; min-width: 0; width: 100%; min-height: 44px; outline: 0; background: transparent; }
 .student-identity { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: .75rem; margin: 1rem 0; padding: .85rem 1rem; background: #eff6ff; border-radius: 10px; }
 .student-identity > div { display: grid; gap: .2rem; }
 .student-identity span { color: var(--text-secondary); font-size: .85rem; }
+.account-section-title { margin: 0 0 .6rem; font-size: .95rem; letter-spacing: .04em; text-transform: uppercase; }
 .account-summary { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: .65rem; margin-bottom: 1rem; }
 .account-summary > div { display: grid; gap: .25rem; padding: .75rem; border: 1px solid var(--border-color); border-radius: 9px; }
 .account-summary span { color: var(--text-secondary); font-size: .8rem; }
+.account-summary small { color: var(--text-secondary); font-size: .7rem; }
+.summary-next-due { border-color: #7c3aed !important; background: #faf5ff; }
 .summary-remaining { border-color: #2563eb !important; background: #eff6ff; }
+.summary-remaining strong { color: #1d4ed8; font-size: 1.12rem; }
 .summary-overdue { border-color: #dc2626 !important; background: #fef2f2; }
+.account-benefits { margin-bottom: 1rem; padding: .85rem 1rem; border: 1px solid #ddd6fe; border-radius: 10px; background: #faf5ff; }
+.account-benefits h3 { margin: 0 0 .35rem; font-size: .95rem; text-transform: uppercase; letter-spacing: .035em; }
+.account-benefits p { margin: .2rem 0; }
+.benefit-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .5rem; margin-top: .55rem; }
+.benefit-list p { display: grid; grid-template-columns: auto 1fr; column-gap: .4rem; padding: .55rem .65rem; border-radius: 8px; background: #fff; }
+.benefit-list p svg { grid-row: 1 / 3; color: #15803d; margin-top: .1rem; }
+.benefit-list p span { color: var(--text-secondary); font-size: .78rem; }
 .account-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 1rem; align-items: start; }
+.obligations { min-width: 0; }
 .obligations h3, .collection-basket h3 { margin: 0 0 .75rem; }
-.obligation-list { display: grid; gap: .6rem; max-height: 54vh; overflow: auto; padding-right: .25rem; }
-.obligation-row { display: grid; grid-template-columns: minmax(170px, 1.2fr) minmax(270px, 1fr) 135px; gap: .65rem; align-items: center; padding: .75rem; border: 1px solid var(--border-color); border-radius: 10px; }
+.obligation-list { display: grid; gap: .6rem; min-width: 0; }
+.obligation-row { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(340px, 1.65fr) minmax(145px, .7fr); gap: .75rem; align-items: center; padding: .85rem; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface-color, #fff); }
 .obligation-main { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.obligation-main > strong { min-width: 100%; overflow-wrap: anywhere; }
+.obligation-status-group, .settled-status-group { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; }
+.status-due-date { color: var(--text-secondary); font-size: .75rem; line-height: 1.25; }
+.status-due-date strong { color: var(--text-primary); }
 .account-status, .benefit-label { display: inline-flex; padding: .16rem .42rem; border-radius: 999px; font-size: .68rem; font-weight: 800; letter-spacing: .02em; border: 1px solid currentColor; }
 .status-soldé { color: #166534; background: #f0fdf4; }
 .status-en-retard { color: #991b1b; background: #fef2f2; }
 .status-moratoire, .status-à-venir { color: #854d0e; background: #fefce8; }
 .status-à-payer, .status-partiellement-payé { color: #1d4ed8; background: #eff6ff; }
 .benefit-label { color: #6b21a8; background: #faf5ff; }
-.obligation-values { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; font-size: .78rem; color: var(--text-secondary); }
+.obligation-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: .5rem; font-size: .74rem; color: var(--text-secondary); }
 .obligation-values span { display: grid; gap: .15rem; }
 .obligation-values b { color: var(--text-primary); }
-.obligation-row details, .obligation-row small { grid-column: 1 / 3; }
+.obligation-values .line-discount b { color: #6b21a8; }
+.obligation-values .line-remaining b { color: #1d4ed8; font-size: .88rem; }
+.obligation-values .line-effective-due b { color: #854d0e; }
+.obligation-row details { grid-column: 1 / 3; }
 .obligation-row details { font-size: .8rem; }
 .obligation-row details p { margin: .25rem 0; }
+.allocation-control { display: grid; gap: .4rem; }
 .allocation-input input { width: 100%; }
-.collection-basket { position: sticky; top: 0; display: grid; gap: .65rem; padding: 1rem; border: 1px solid #bfdbfe; background: #f8fafc; border-radius: 12px; }
+.settle-button { min-height: 40px; padding: .35rem .45rem; font-size: .75rem; }
+.no-fees, .account-empty { margin: 0; padding: 1.1rem; text-align: center; color: var(--text-secondary); background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; }
+.account-empty { margin-top: 1rem; }
+.settled-fees { margin-top: .8rem; padding: .65rem .75rem; border: 1px solid var(--border-color); border-radius: 8px; }
+.settled-fees summary { cursor: pointer; font-weight: 700; }
+.settled-fee { display: grid; grid-template-columns: minmax(130px, 1fr) repeat(2, auto) auto; align-items: center; gap: .75rem; margin-top: .55rem; padding-top: .55rem; border-top: 1px solid var(--border-color); font-size: .78rem; }
+.settled-fee > span:not(.account-status) { color: var(--text-secondary); }
+.settled-status-group { justify-self: end; }
+.collection-basket { position: sticky; top: .5rem; align-self: start; display: grid; gap: .65rem; padding: 1rem; border: 1px solid #bfdbfe; background: #f8fafc; border-radius: 12px; }
+.collection-basket > button[type='submit'] { font-size: .95rem; font-weight: 800; }
 .basket-line, .basket-total, .receipt-line, .receipt-total { display: flex; justify-content: space-between; gap: .75rem; }
 .basket-total, .receipt-total { border-top: 2px solid #94a3b8; padding-top: .65rem; font-size: 1.05rem; }
 .collection-basket fieldset { display: grid; gap: .55rem; border: 1px solid var(--border-color); border-radius: 8px; }
@@ -38,22 +70,31 @@
 .disabled-method { opacity: .62; flex-wrap: wrap; }
 .disabled-method small { width: 100%; margin-left: 1.35rem; }
 .account-loading, .account-notice { padding: .8rem; background: #eff6ff; border-radius: 8px; }
-.account-error { padding: .8rem; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; }
+.account-loading { margin-top: 1rem; }
+.account-error { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; padding: .8rem; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; }
+.account-error p { margin: 0; }
 .student-account-success { min-width: min(720px, 82vw); text-align: center; color: #166534; }
 .student-account-receipt { display: grid; gap: .55rem; margin: 1rem auto; padding: 1.25rem; max-width: 600px; color: #0f172a; text-align: left; border: 1px solid #cbd5e1; border-radius: 10px; background: white; }
 .student-account-receipt h3, .student-account-receipt p { text-align: center; margin: .15rem; }
 .account-actions { display: flex; gap: .65rem; justify-content: center; flex-wrap: wrap; }
 .account-actions button { display: inline-flex; gap: .4rem; align-items: center; }
 @media (max-width: 900px) {
-  .student-account-collection { min-width: 0; }
   .student-account-header, .student-identity, .account-workspace { grid-template-columns: 1fr; }
   .account-summary { grid-template-columns: repeat(2, 1fr); }
   .obligation-row { grid-template-columns: 1fr; }
-  .obligation-row details, .obligation-row small { grid-column: auto; }
+  .obligation-row details { grid-column: auto; }
+  .settled-fee { grid-template-columns: 1fr; }
+  .settled-status-group { justify-self: start; }
   .collection-basket { position: static; }
 }
 @media (max-width: 560px) {
-  .account-summary, .obligation-values { grid-template-columns: 1fr; }
+  .account-summary { grid-template-columns: 1fr 1fr; }
+  .account-summary > div { min-width: 0; }
+  .obligation-values { grid-template-columns: 1fr 1fr; }
+  .account-error { align-items: stretch; flex-direction: column; }
+  .student-account-success { min-width: 0; }
+  .account-actions { align-items: stretch; flex-direction: column; }
+  .account-actions button { justify-content: center; width: 100%; }
 }
 @media print {
   body * { visibility: hidden !important; }

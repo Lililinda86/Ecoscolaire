@@ -7,6 +7,7 @@ interface ModalProps {
   children: React.ReactNode;
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
+  size?: 'default' | 'wide';
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -15,8 +16,12 @@ const Modal: React.FC<ModalProps> = ({
   title,
   children,
   closeOnBackdrop = true,
-  closeOnEscape = true
+  closeOnEscape = true,
+  size = 'default'
 }) => {
+  const titleId = React.useId();
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -27,6 +32,13 @@ const Modal: React.FC<ModalProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, closeOnEscape, onClose]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    return () => previouslyFocused?.focus();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -47,12 +59,17 @@ const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         data-testid="modal-content"
         className="card"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '500px',
+          maxWidth: size === 'wide' ? '1180px' : '500px',
           maxHeight: 'calc(100dvh - 1rem)',
           overflowY: 'auto',
           overflowX: 'hidden',
@@ -60,7 +77,7 @@ const Modal: React.FC<ModalProps> = ({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', marginBottom: '1.5rem' }}>
-          <h2 style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>{title}</h2>
+          <h2 id={titleId} style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>{title}</h2>
           <button aria-label="Fermer" className="secondary" onClick={onClose} style={{ minWidth: 44, minHeight: 44, padding: '0.25rem 0.5rem', flexShrink: 0 }}>✕</button>
         </div>
         {children}
