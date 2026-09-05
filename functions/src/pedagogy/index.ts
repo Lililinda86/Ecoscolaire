@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adoptionId, addDaysIso, mondayIso, teachingPlanId, teachingWeekId } from './ids';
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { deterministicPlanningGenerator, GeneratorSubject, GeneratorUnit } from './planningGenerator';
@@ -35,10 +36,10 @@ export const adoptCurriculumProgram = functions.https.onCall(async (data, contex
     const previous = await transaction.get(ref);
     transaction.set(ref, {
       id: ref.id, schoolId, academicYearId, catalogLevelId, curriculumProgramId, status: 'active',
-      adoptedAt: admin.firestore.FieldValue.serverTimestamp(), adoptedBy: actor.uid,
-      createdAt: previous.exists ? previous.data()?.createdAt : admin.firestore.FieldValue.serverTimestamp(),
+      adoptedAt: FieldValue.serverTimestamp(), adoptedBy: actor.uid,
+      createdAt: previous.exists ? previous.data()?.createdAt : FieldValue.serverTimestamp(),
       createdBy: previous.exists ? previous.data()?.createdBy : actor.uid,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+      updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     }, { merge: true });
     audit(transaction, actor, schoolId, 'CURRICULUM_PROGRAM_ADOPTED', 'schoolCurriculumAdoption', ref.id, { academicYearId, catalogLevelId, curriculumProgramId });
   });
@@ -63,12 +64,12 @@ export const ensureTeachingWeeks = functions.https.onCall(async (data, context) 
   if (!weeks.length) throw new functions.https.HttpsError('failed-precondition', 'Aucune semaine ouvrée dans cette année.');
   const batch = db().batch();
   weeks.forEach(week => batch.set(db().collection('teachingWeeks').doc(week.id), {
-    ...week, schoolId, academicYearId, status: 'open', updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+    ...week, schoolId, academicYearId, status: 'open', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
   }, { merge: true }));
   batch.create(db().collection('audit_logs').doc(), {
     schoolId, action: 'TEACHING_WEEKS_ENSURED', actorUid: actor.uid, actorRole: actor.role,
     targetType: 'academicYear', targetId: academicYearId, details: { weekCount: weeks.length },
-    timestamp: admin.firestore.FieldValue.serverTimestamp(), createdAt: admin.firestore.FieldValue.serverTimestamp(), canonicalBackendAudit: true
+    timestamp: FieldValue.serverTimestamp(), createdAt: FieldValue.serverTimestamp(), canonicalBackendAudit: true
   });
   await batch.commit();
   return { weekCount: weeks.length, firstWeekId: weeks[0].id, lastWeekId: weeks[weeks.length - 1].id };
@@ -95,8 +96,8 @@ export const ensureTeachingPlanDraft = functions.https.onCall(async (data, conte
     transaction.create(ref, {
       id: planId, schoolId, academicYearId, classId, weekId: weekSnap.id, weekStartDate,
       weekEndDate: week.weekEndDate, weekNumber: week.weekNumber, periodId: week.periodId || null, status: 'draft', version: 1,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: actor.uid,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+      createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid,
+      updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
     audit(transaction, actor, schoolId, 'TEACHING_PLAN_DRAFT_CREATED', 'teachingPlan', planId, { academicYearId, classId, weekStartDate });
     return { planId, created: true, status: 'draft' };
@@ -137,12 +138,12 @@ export const generateTeachingPlanProposal = functions.https.onCall(async (data, 
     items.forEach(item => transaction.set(db().collection('teachingPlanItems').doc(item.id), {
       ...item, schoolId, planId, academicYearId: plan.academicYearId, classId: plan.classId,
       weekStartDate: plan.weekStartDate, generatorVersion: deterministicPlanningGenerator.version,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: actor.uid,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+      createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid,
+      updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     }, { merge: true }));
     transaction.update(planRef, {
       status: 'proposed', itemCount: items.length, generatorVersion: deterministicPlanningGenerator.version,
-      version: (fresh.version || 1) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+      version: (fresh.version || 1) + 1, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
     audit(transaction, actor, schoolId, 'TEACHING_PLAN_PROPOSED', 'teachingPlan', planId, { itemCount: items.length, generatorVersion: deterministicPlanningGenerator.version });
   });
@@ -165,10 +166,10 @@ export const saveTeachingPlanAdjustments = functions.https.onCall(async (data, c
       const raw = data.adjustments[index];
       transaction.update(snap.ref, {
         lessonTitle: requiredText(raw.lessonTitle ?? item.lessonTitle, 'lessonTitle'), objective: optionalText(raw.objective ?? item.objective),
-        note: optionalText(raw.note), status: 'adjusted', updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+        note: optionalText(raw.note), status: 'adjusted', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
       });
     });
-    transaction.update(planRef, { status: 'adjusted', version: (plan.version || 1) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid });
+    transaction.update(planRef, { status: 'adjusted', version: (plan.version || 1) + 1, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     audit(transaction, actor, schoolId, 'TEACHING_PLAN_ADJUSTED', 'teachingPlan', planId, { adjustmentCount: data.adjustments.length });
   });
   return { planId, status: 'adjusted' };
@@ -188,14 +189,14 @@ export const recordTeacherPlanValidation = functions.https.onCall(async (data, c
     if (!isActive(teacher)) throw new functions.https.HttpsError('failed-precondition', 'Enseignant inactif.');
     transaction.update(planRef, {
       status: 'teacher_validated', teacherValidated: true, teacherStaffId,
-      teacherValidatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      teacherValidationRecordedBy: actor.uid, teacherValidationRecordedAt: admin.firestore.FieldValue.serverTimestamp(),
+      teacherValidatedAt: FieldValue.serverTimestamp(),
+      teacherValidationRecordedBy: actor.uid, teacherValidationRecordedAt: FieldValue.serverTimestamp(),
       teacherValidationNote: optionalText(data?.note),
-      version: (plan.version || 1) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+      version: (plan.version || 1) + 1, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
     items.docs.forEach(item => transaction.update(item.ref, {
-      status: 'teacher_validated', teacherValidatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      teacherStaffId, updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
+      status: 'teacher_validated', teacherValidatedAt: FieldValue.serverTimestamp(),
+      teacherStaffId, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     }));
     audit(transaction, actor, schoolId, 'TEACHING_PLAN_TEACHER_VALIDATED', 'teachingPlan', planId, {
       teacherStaffId, itemCount: items.size, declarationRecordedBySecretary: actor.role === 'secretary'
@@ -211,7 +212,7 @@ export const archiveTeachingPlan = functions.https.onCall(async (data, context) 
   await db().runTransaction(async transaction => {
     const plan = schoolData(await transaction.get(ref), schoolId, 'Planification');
     if (plan.status !== 'teacher_validated') throw new functions.https.HttpsError('failed-precondition', 'Seule une planification validée peut être archivée.');
-    transaction.update(ref, { status: 'archived', archivedAt: admin.firestore.FieldValue.serverTimestamp(), archivedBy: actor.uid, updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid });
+    transaction.update(ref, { status: 'archived', archivedAt: FieldValue.serverTimestamp(), archivedBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     audit(transaction, actor, schoolId, 'TEACHING_PLAN_ARCHIVED', 'teachingPlan', planId, {});
   });
   return { planId, status: 'archived' };

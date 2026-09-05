@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export interface PedagogyActor { uid: string; role: string; schoolId?: string }
 
@@ -36,8 +37,8 @@ export const audit = (
 ): void => {
   transaction.create(admin.firestore().collection('audit_logs').doc(), {
     schoolId, action, actorUid: actor.uid, actorRole: actor.role, targetType, targetId, details,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
     canonicalBackendAudit: true
   });
 };
