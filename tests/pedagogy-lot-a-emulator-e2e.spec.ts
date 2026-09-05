@@ -69,6 +69,7 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
     !emulatorRun && !stagingRun,
     "Émulateurs ou exécution Staging explicite obligatoires.",
   );
+  test.setTimeout(stagingRun ? 180_000 : 30_000);
 
   test("persiste, reste idempotent et ne modifie aucune collection métier externe", async ({
     page,

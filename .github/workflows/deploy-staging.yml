@@ -320,6 +320,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Bounded Staging functional validation
+        timeout-minutes: 5
         env:
           PEDAGOGY_STAGING_E2E: "true"
           PEDAGOGY_FIREBASE_PROJECT_ID: ecoscolaire-staging
