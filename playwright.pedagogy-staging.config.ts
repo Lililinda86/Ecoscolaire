@@ -10,6 +10,9 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: "line",
+  expect: {
+    timeout: 30_000,
+  },
   use: {
     baseURL: appUrl,
     trace: "retain-on-failure",
