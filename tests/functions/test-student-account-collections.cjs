@@ -15,6 +15,7 @@ const studentId = `account-student-${suffix}`;
 const classId = `account-class-${suffix}`;
 const yearId = `account-year-${suffix}`;
 const secretaryId = `account-secretary-${suffix}`;
+const directorId = `account-director-${suffix}`;
 const ownerId = `account-owner-${suffix}`;
 const teacherId = `account-teacher-${suffix}`;
 const crossSchoolId = `account-cross-school-${suffix}`;
@@ -43,6 +44,7 @@ const reverse = (uid, collectionId, requestId) => reverseCashCollection.run({
 (async () => {
   await Promise.all([
     db.collection('users').doc(secretaryId).set({ role: 'secretary', schoolId, isActive: true, name: 'Secrétaire Test' }),
+    db.collection('users').doc(directorId).set({ role: 'director', schoolId, isActive: true, name: 'Directeur Test' }),
     db.collection('users').doc(ownerId).set({ role: 'owner', schoolId, isActive: true, name: 'Direction Test' }),
     db.collection('users').doc(teacherId).set({ role: 'teacher', schoolId, isActive: true }),
     db.collection('users').doc(crossSchoolId).set({ role: 'secretary', schoolId: otherSchoolId, isActive: true }),
@@ -150,11 +152,11 @@ const reverse = (uid, collectionId, requestId) => reverseCashCollection.run({
   assert.notEqual(second.receiptNumber, first.receiptNumber, 'receipt numbers are unique');
   const reversalRequestId = `reverse_${suffix}`.replace(/[^A-Za-z0-9_-]/g, '_');
   await expectFailure(reverse(secretaryId, first.collectionId, reversalRequestId), 'PERMISSION_DENIED');
-  const reversal = await reverse(ownerId, first.collectionId, reversalRequestId);
+  const reversal = await reverse(directorId, first.collectionId, reversalRequestId);
   assert.equal(reversal.amount, -44000);
   assert.equal(reversal.idempotentReplay, false);
   assert.match(reversal.correctionReceiptNumber, /^ANN-/);
-  const reversalReplay = await reverse(ownerId, first.collectionId, reversalRequestId);
+  const reversalReplay = await reverse(directorId, first.collectionId, reversalRequestId);
   assert.equal(reversalReplay.idempotentReplay, true, 'reversal retry is deterministic');
   const originalAfterReversal = (await db.collection('payments').doc(first.collectionId).get()).data();
   const correction = (await db.collection('receipts').doc(reversal.correctionReceiptId).get()).data();
