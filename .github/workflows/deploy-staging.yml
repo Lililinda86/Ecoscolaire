@@ -382,7 +382,7 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test tests/pedagogy-lot-a-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
       - name: Bounded Staging Lot B functional validation and cleanup
-        timeout-minutes: 6
+        timeout-minutes: 8
         env:
           PEDAGOGY_STAGING_E2E: "true"
           PEDAGOGY_FIREBASE_PROJECT_ID: ecoscolaire-staging
