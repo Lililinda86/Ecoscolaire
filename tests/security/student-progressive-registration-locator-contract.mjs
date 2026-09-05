@@ -53,7 +53,14 @@ export const REGISTRATION_STATUS_NAMES = Object.freeze({
   incomplete: 'À compléter',
   complete: 'Dossier complet'
 });
-
+export const STUDENT_IMPORT_TEST_IDS = Object.freeze({
+  open: 'student-import-open',
+  form: 'student-import-form',
+  file: 'student-import-file',
+  previewSubmit: 'student-import-preview-submit',
+  preview: 'student-import-preview',
+  confirm: 'student-import-confirm'
+});
 
 export function requireUniqueRegistrationLocatorCount(name, count) {
   if (count === 0) {

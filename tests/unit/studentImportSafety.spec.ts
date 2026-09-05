@@ -27,10 +27,16 @@ describe('legacy student import safety', () => {
     expect(sanitized).not.toHaveProperty('financialBypass');
   });
 
-  it('keeps real-data import explicitly disabled in the students UI', () => {
+  it('routes the students UI import through secure callable creation only', () => {
     const source = readFileSync('src/pages/Students.tsx', 'utf8');
-    expect(source).toContain('Import temporairement indisponible — utilisez l’ajout manuel sécurisé.');
-    expect(source).toMatch(/<button[\s\S]*?disabled[\s\S]*?Import temporairement indisponible[\s\S]*?<\/button>/);
+    const confirmation = source.slice(
+      source.indexOf('const handleConfirmImport = async () =>'),
+      source.indexOf('const exportInscriptionsCSV')
+    );
+    expect(source).toContain('data-testid="student-import-open"');
+    expect(confirmation).toContain('await createStudentSecure({');
+    expect(confirmation).toContain('splitStudentData(student)');
+    expect(confirmation).not.toMatch(/writeBatch\(|batch\.set\(|setDoc\(/);
   });
 
   it('keeps the BulkWriter real-data path disabled defensively', () => {
