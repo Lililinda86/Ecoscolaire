@@ -178,11 +178,11 @@ const main = async () => {
       }),
     ]);
     await createUser('secretary');
-    await createUser('owner');
+    await createUser('director');
     await createUser('teacher');
     await createUser('secretary', otherSchoolId);
     const secretary = await makeClient('secretary');
-    const owner = await makeClient('owner');
+    const director = await makeClient('director');
     const teacher = await makeClient('teacher');
     const cross = await makeClient('crossSecretary');
     const call = (client, name, data) => httpsCallable(client.functions, name)(data).then((result) => result.data);
@@ -240,11 +240,11 @@ const main = async () => {
 
     await expectFailure(() => reverse(secretary, first.collectionId, `account_v3_reverse_denied_${suffix}`), 'PERMISSION_DENIED');
     const reversalRequestId = `account_v3_reverse_${suffix}`;
-    const reversed = await reverse(owner, first.collectionId, reversalRequestId);
+    const reversed = await reverse(director, first.collectionId, reversalRequestId);
     assert.equal(reversed.amount, -44_000);
     assert.equal(reversed.idempotentReplay, false);
     assert.match(reversed.correctionReceiptNumber, /^ANN-/);
-    assert.equal((await reverse(owner, first.collectionId, reversalRequestId)).idempotentReplay, true);
+    assert.equal((await reverse(director, first.collectionId, reversalRequestId)).idempotentReplay, true);
     assert.equal((await db.collection('payments').doc(first.collectionId).get()).data().amount, 44_000);
     const correction = (await db.collection('receipts').doc(reversed.correctionReceiptId).get()).data();
     assert.equal(correction.kind, 'PAYMENT_REVERSAL');
