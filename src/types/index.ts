@@ -695,7 +695,7 @@ export interface Breakdown {
   actualCost?: number;
 }
 
-export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'registration_fee' | 'other';
+export type PaymentType = 'transport' | 'uniforms' | 'tuition' | 'registration_fee' | 'other' | 'collection';
 
 export interface FinancialPeriodSummary {
   grossExpectedAmount: number;
@@ -829,6 +829,15 @@ export interface Payment {
     kind: 'INSTALLMENT' | 'CREDIT';
     period: string | null;
     amount: number;
+  }>;
+  lineItems?: Array<{
+    key: string;
+    label: string;
+    type: string;
+    amount: number;
+    remainingBalance?: number;
+    installment?: 'T1' | 'T2' | 'T3' | null;
+    feeId?: string | null;
   }>;
   transportCredit?: number;
 }

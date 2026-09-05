@@ -45,6 +45,7 @@ export interface ReceiptDisplayModel {
   paymentType?: string;
   collectedByName?: string;
   benefits: Array<{ benefitType?: string; reference?: string | null; discountAmount?: number }>;
+  lineItems: Array<{ key: string; label: string; type: string; amount: number; remainingBalance?: number }>;
   allocations: Array<{ kind: 'INSTALLMENT' | 'CREDIT'; period: string | null; amount: number }>;
   transportCredit: number;
   formattedTransportCredit: string;
@@ -67,6 +68,7 @@ export const translatePaymentType = (type?: string): string => {
     tuition: 'Frais de scolarité',
     registration_fee: "Frais d'inscription",
     transport: 'Transport (Bus)',
+    collection: 'Encaissement multi-frais',
     uniforms: 'Tenues',
     other: 'Autre'
   };
@@ -208,6 +210,17 @@ export const buildReceiptDisplayModel = (
         }
       : null;
 
+  const sourceLineItems = receipt.lineItems ?? relatedPayment?.lineItems;
+  const lineItems = Array.isArray(sourceLineItems) ? sourceLineItems.flatMap(raw => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+    const line = raw as Record<string, unknown>;
+    if (typeof line.key !== 'string' || typeof line.label !== 'string' || typeof line.type !== 'string'
+        || typeof line.amount !== 'number' || !Number.isSafeInteger(line.amount)) return [];
+    return [{ key: line.key, label: line.label, type: line.type, amount: line.amount,
+      ...(typeof line.remainingBalance === 'number' && Number.isSafeInteger(line.remainingBalance)
+        ? { remainingBalance: line.remainingBalance } : {}) }];
+  }) : [];
+
   return {
     id: receipt.id || receipt.paymentId || '',
     receiptNumber: receipt.receiptNumber || 'En attente',
@@ -243,6 +256,7 @@ export const buildReceiptDisplayModel = (
     paymentType: (receipt.type || receipt.paymentType) as string | undefined,
     collectedByName: (receipt.collectedByName || receipt.correctedByRole || receipt.correctedByUserId) as string | undefined,
     benefits: Array.isArray(receipt.benefits) ? receipt.benefits as Array<{ benefitType?: string; reference?: string | null; discountAmount?: number }> : [],
+    lineItems,
     allocations,
     transportCredit,
     formattedTransportCredit: formatCurrency(transportCredit),

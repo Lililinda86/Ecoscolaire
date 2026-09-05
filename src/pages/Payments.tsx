@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import TransactionHistory from '../components/TransactionHistory';
 import ReceiptHistory from '../components/ReceiptHistory';
 import FinanceDashboard from '../components/FinanceDashboard';
+import StudentAccountCollection from '../components/StudentAccountCollection';
 import { Plus, Minus, Wallet, ClipboardList, Undo2, History, FileText, TrendingUp, Lock, Calendar, CheckCircle } from 'lucide-react';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import { db as firestoreDb, functions } from '../db/firebase';
@@ -292,6 +293,7 @@ const Payments: React.FC = () => {
   const [bilanType, setBilanType] = useState<'tuition'|'transport'|'uniforms'>('tuition');
 
   const [isModalOpen, setModalOpen] = useState(false);
+  const [legacyPaymentFormEnabled] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash'|'mobile_money'>('cash');
   const [parentPhone, setParentPhone] = useState('');
   const [isProcessingMoMo, setIsProcessingMoMo] = useState(false);
@@ -1126,11 +1128,14 @@ const Payments: React.FC = () => {
 
     setReversingPaymentId(payment.id);
     try {
-      const reversePaymentCall = httpsCallable<
-        { paymentId: string; reason: string; requestId: string },
-        ReversePaymentResult
-      >(functions, 'reversePayment');
-      const result = await reversePaymentCall({ paymentId: payment.id, reason, requestId });
+      const isCollection = payment.type === 'collection';
+      const reversePaymentCall = httpsCallable<Record<string, string>, ReversePaymentResult>(
+        functions,
+        isCollection ? 'reverseCashCollection' : 'reversePayment'
+      );
+      const result = await reversePaymentCall(isCollection
+        ? { collectionId: payment.id, reason, requestId }
+        : { paymentId: payment.id, reason, requestId });
       const response = result.data;
       setPendingReversal(null);
 
@@ -2292,6 +2297,11 @@ const Payments: React.FC = () => {
 
       {/* Encaissement Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Nouvel Encaissement">
+        <StudentAccountCollection students={db.students} school={currentSchool!}
+          initialStudentId={currentPayment.studentId}
+          onClose={() => setModalOpen(false)}
+          onCompleted={() => setQuoteRefresh(value => value + 1)} />
+        {legacyPaymentFormEnabled && (
         <form onSubmit={handleSavePayment}>
           <div className="form-group">
             <label>Élève</label>
@@ -2635,6 +2645,7 @@ const Payments: React.FC = () => {
             </button>
           </div>
         </form>
+        )}
       </Modal>
 
       {/* Dépense Modal */}
