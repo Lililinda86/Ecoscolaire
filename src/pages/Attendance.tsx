@@ -5,6 +5,7 @@ import { useI18n } from '../context/I18nContext';
 import { db as firestore } from '../db/firebase';
 
 import { sortClasses } from '../utils/sortClasses';
+import { getClassOptionLabel } from '../utils/classCatalog';
 import { Check, X, Calendar, Clock, LogOut, Printer } from 'lucide-react';
 import Modal from '../components/Modal';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
@@ -227,7 +228,7 @@ const Attendance: React.FC = () => {
                   <select value={classFilter} onChange={e => setClassFilter(e.target.value)}>
                     <option value="all">Toutes les classes</option>
                     {sortClasses(availableClasses).filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>{getClassOptionLabel(c, db.classes)}</option>
                     ))}
                   </select>
                 </>
@@ -333,7 +334,7 @@ const Attendance: React.FC = () => {
                 <select value={classFilter} onChange={e => setClassFilter(e.target.value)}>
                   <option value="all">Toutes classes</option>
                   {sortClasses(availableClasses).filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{getClassOptionLabel(c, db.classes)}</option>
                   ))}
                 </select>
               </>

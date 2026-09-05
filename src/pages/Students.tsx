@@ -6,7 +6,7 @@ import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClas
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
-import { getDisplayClassName } from '../utils/classCatalog';
+import { getClassOptionLabel, getDisplayClassName } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
@@ -1774,7 +1774,7 @@ const Students: React.FC = () => {
             <select value={classFilter} onChange={e => setClassFilter(e.target.value)} aria-label="Filtrer par classe">
               <option value="all">Toutes les classes</option>
               {db.classes.filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
-                 <option key={c.id} value={c.id}>{getDisplayClassName(c.name)}</option>
+                 <option key={c.id} value={c.id}>{getClassOptionLabel(c, db.classes)}</option>
               ))}
             </select>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrer par statut">
@@ -2320,7 +2320,7 @@ const Students: React.FC = () => {
                             const isInactiveCurrent = currentClassObj && c.id === currentClassObj.id && c.isActive === false;
                             return (
                               <option key={c.id} value={c.id}>
-                                {getDisplayClassName(c.name)} {isInactiveCurrent ? '(Inactive - Classe Actuelle)' : ''}
+                                {getClassOptionLabel(c, db.classes)} {isInactiveCurrent ? '(Inactive - Classe Actuelle)' : ''}
                               </option>
                             );
                           })}

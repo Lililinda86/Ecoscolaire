@@ -175,6 +175,65 @@ export function getDisplayClassName(name: string): string {
   return levelId ? FRANCOPHONE_MATERNELLE_DISPLAY_NAMES[levelId] : trimmed;
 }
 
+export type ClassOptionLabelItem = {
+  id: string;
+  name: string;
+  schoolId?: string;
+  section?: string;
+  type?: string;
+  language?: string;
+  level?: string;
+  campus?: string;
+  site?: string;
+};
+
+const normalizeLabelPart = (value?: string): string =>
+  (value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+
+export function getClassOptionLabel(
+  classItem: ClassOptionLabelItem,
+  allClasses: ClassOptionLabelItem[]
+): string {
+  const displayName = getDisplayClassName(classItem.name);
+  const uniqueClasses = new Map<string, ClassOptionLabelItem>();
+
+  [...allClasses, classItem].forEach(item => {
+    if (item?.id) uniqueClasses.set(item.id, item);
+  });
+
+  const duplicates = [...uniqueClasses.values()].filter(item => {
+    const sameSchool = !classItem.schoolId || !item.schoolId || item.schoolId === classItem.schoolId;
+    return sameSchool && getDisplayClassName(item.name) === displayName;
+  });
+
+  if (duplicates.length <= 1) return displayName;
+
+  const candidateValues = [
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.section || item.type),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.language),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.level),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.campus),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.site)
+  ];
+
+  for (const getCandidate of candidateValues) {
+    const values = duplicates.map(getCandidate);
+    const normalizedValues = values.map(value => value.toLocaleLowerCase('fr-FR'));
+    if (values.every(Boolean) && new Set(normalizedValues).size === duplicates.length) {
+      return `${displayName} · ${getCandidate(classItem)}`;
+    }
+  }
+
+  const ids = duplicates.map(item => normalizeLabelPart(item.id));
+  const maxLength = Math.max(...ids.map(id => id.length));
+  let suffixLength = Math.min(6, maxLength);
+  while (suffixLength < maxLength && new Set(ids.map(id => id.slice(-suffixLength))).size !== ids.length) {
+    suffixLength += 1;
+  }
+
+  return `${displayName} · ${normalizeLabelPart(classItem.id).slice(-suffixLength)}`;
+}
+
 export function resolveClassActiveStatus(cls?: { isActive?: boolean } | null): boolean {
   if (!cls) return false;
   return cls.isActive !== false;
