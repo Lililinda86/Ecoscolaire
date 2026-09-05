@@ -204,4 +204,3 @@ describe('StudentAccountBenefitsDrawer', () => {
     expect(drawerCss).toMatch(/@media\s*\(max-width:\s*560px\)[\s\S]*\.advantage-drawer\s*\{[^}]*width:\s*100vw/);
   });
 });
-

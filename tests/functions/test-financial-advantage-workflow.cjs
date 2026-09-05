@@ -120,6 +120,10 @@ const moratoriumInput = (requestId, overrides = {}) => ({
     context(secretaryId)
   );
   assert.equal(draft.status, 'draft');
+  await expectFailure(
+    approveFinancialBenefit.run({ benefitId: draft.benefitId }, context(directorId)),
+    'BENEFIT_NOT_APPROVABLE'
+  );
   assert.equal((await account(secretaryId)).lines.find(line => line.key === 'tuition:T1').netExpectedAmount, 50000,
     'draft benefit does not alter debt');
 
@@ -162,6 +166,18 @@ const moratoriumInput = (requestId, overrides = {}) => ({
   assert.equal(rejected.status, 'rejected');
   assert.equal((await account(secretaryId)).lines.find(line => line.key === 'tuition:T2').netExpectedAmount, 40000,
     'rejected benefit does not alter debt');
+  const oversized = await createFinancialBenefit.run(
+    benefitInput(`oversized_${suffix}`, { installment: 'T3', value: 30001 }),
+    context(secretaryId)
+  );
+  await submitFinancialBenefit.run({ benefitId: oversized.benefitId }, context(secretaryId));
+  await expectFailure(
+    approveFinancialBenefit.run({ benefitId: oversized.benefitId }, context(directorId)),
+    'BENEFIT_EXCEEDS_SCOPE'
+  );
+  assert.equal((await account(secretaryId)).lines.find(line => line.key === 'tuition:T3').netExpectedAmount, 30000,
+    'an excessive reduction is never approved');
+
 
   await db.collection('financialBenefits').doc(`expired-${suffix}`).set({
     id: `expired-${suffix}`, schoolId, studentId, academicYear,
@@ -180,6 +196,10 @@ const moratoriumInput = (requestId, overrides = {}) => ({
   let t2 = (await account(secretaryId)).lines.find(line => line.key === 'tuition:T2');
   assert.equal(t2.effectiveDueDate, '2027-01-10', 'draft moratorium does not alter the deadline');
   assert.equal(t2.netExpectedAmount, 40000, 'draft moratorium does not alter debt');
+  await expectFailure(
+    approvePaymentMoratorium.run({ moratoriumId: moratoriumDraft.moratoriumId }, context(directorId)),
+    'MORATORIUM_NOT_APPROVABLE'
+  );
 
   await submitPaymentMoratorium.run({ moratoriumId: moratoriumDraft.moratoriumId }, context(secretaryId));
   t2 = (await account(secretaryId)).lines.find(line => line.key === 'tuition:T2');

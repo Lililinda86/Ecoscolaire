@@ -520,4 +520,3 @@ const StudentAccountBenefitsDrawer: React.FC<Props> = ({
 
 export const AdvantageAddIcon = Plus;
 export default StudentAccountBenefitsDrawer;
-
