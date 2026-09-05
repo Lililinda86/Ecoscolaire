@@ -740,9 +740,14 @@ export interface FinancialBenefit {
   maximumUses?: number;
   validFrom?: string;
   validUntil?: string;
-  status: 'draft' | 'approved' | 'applied' | 'settled' | 'cancelled';
+  status: 'draft' | 'pending' | 'approved' | 'applied' | 'settled' | 'rejected' | 'cancelled';
   createdBy: string;
   createdAt: DateLike;
+  submittedBy?: string;
+  submittedAt?: DateLike;
+  rejectedBy?: string;
+  rejectedAt?: DateLike;
+  rejectionReason?: string;
   approvedBy?: string;
   approvedAt?: DateLike;
   cancelledBy?: string;
