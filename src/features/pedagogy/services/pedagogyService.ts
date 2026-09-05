@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getMetadata, ref, uploadBytes } from 'firebase/storage';
 import { db, functions, storage } from '../../../db/firebase';
@@ -36,6 +36,14 @@ export const loadLessonPreparations = async (schoolId: string, academicYearId: s
   if (classId) clauses.push(where('classId', '==', classId));
   const snapshot = await getDocs(query(collection(db, 'lessonPreparations'), ...clauses, limit(250)));
   return documents<LessonPreparation>(snapshot).sort((a, b) => (a.classId + a.subjectName + (a.slotIndex || 0)).localeCompare(b.classId + b.subjectName + (b.slotIndex || 0)));
+};
+
+export const loadLessonPreparation = async (schoolId: string, preparationId: string): Promise<LessonPreparation> => {
+  const snapshot = await getDoc(doc(db, 'lessonPreparations', preparationId));
+  if (!snapshot.exists()) throw new Error('Préparation introuvable.');
+  const preparation = { id: snapshot.id, ...snapshot.data() } as LessonPreparation;
+  if (preparation.schoolId !== schoolId) throw new Error('Accès inter-écoles interdit.');
+  return preparation;
 };
 
 export const loadPreparationTemplates = async (schoolId: string, academicYearId: string, classId: string): Promise<LessonPreparationTemplate[]> => {

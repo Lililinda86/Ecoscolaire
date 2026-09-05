@@ -5,8 +5,8 @@ import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { PreparationStatus } from '../components/PreparationStatus';
 import { useLessonPreparations } from '../hooks/useLessonPreparations';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
-import { saveLessonPreparationReview, startLessonPreparationAnalysis, uploadLessonPreparation, validateLessonPreparation } from '../services/pedagogyService';
-import type { PreparationReview } from '../types';
+import { loadLessonPreparation, saveLessonPreparationReview, startLessonPreparationAnalysis, uploadLessonPreparation, validateLessonPreparation } from '../services/pedagogyService';
+import type { LessonPreparation, PreparationReview } from '../types';
 
 const emptyReview: PreparationReview = { lessonTitle: '', objective: '', prerequisites: '', materials: '', lessonSteps: '', assessment: '', differentiation: '' };
 
@@ -31,9 +31,14 @@ export default function PedagogyPreparationImport() {
   const [review, setReview] = useState<PreparationReview>(emptyReview);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [loadedPreparation, setLoadedPreparation] = useState<LessonPreparation>();
   const selectedClassId = classId || classes[0]?.id || '';
   const selectedWeekStartDate = weekStartDate || workspace.weeks[0]?.weekStartDate || '';
-  const selected = state.preparations.find(item => item.id === preparationId);
+  const selected = loadedPreparation?.id === preparationId ? loadedPreparation : state.preparations.find(item => item.id === preparationId);
+  useEffect(() => {
+    if (!currentSchool?.id || !preparationId) return;
+    void loadLessonPreparation(currentSchool.id, preparationId).then(setLoadedPreparation).catch(() => undefined);
+  }, [currentSchool?.id, preparationId]);
   useEffect(() => {
     if (!selected) return;
     const extracted = selected.extractedData || {};
@@ -58,6 +63,7 @@ export default function PedagogyPreparationImport() {
       setPreparationId(registered.preparationId);
       const analyzed = await startLessonPreparationAnalysis(currentSchool.id, registered.uploadId);
       await state.refresh();
+      setLoadedPreparation(await loadLessonPreparation(currentSchool.id, registered.preparationId));
       setMessage(analyzed.analysisStatus === 'failed' ? 'Analyse échouée : la relecture manuelle reste disponible.' : 'Analyse terminée : vérifiez chaque champ avant validation.');
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Dépôt impossible.'); }
     finally { setBusy(false); }
@@ -65,14 +71,14 @@ export default function PedagogyPreparationImport() {
   const save = async () => {
     if (!currentSchool?.id || !preparationId) return;
     setBusy(true);
-    try { await saveLessonPreparationReview(currentSchool.id, preparationId, review); await state.refresh(); setMessage('Corrections enregistrées.'); }
+    try { await saveLessonPreparationReview(currentSchool.id, preparationId, review); await state.refresh(); setLoadedPreparation(await loadLessonPreparation(currentSchool.id, preparationId)); setMessage('Corrections enregistrées.'); }
     catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Correction impossible.'); }
     finally { setBusy(false); }
   };
   const validate = async () => {
     if (!currentSchool?.id || !preparationId) return;
     setBusy(true);
-    try { await validateLessonPreparation(currentSchool.id, preparationId); await state.refresh(); setMessage('Préparation validée après relecture du secrétariat.'); }
+    try { await validateLessonPreparation(currentSchool.id, preparationId); await state.refresh(); setLoadedPreparation(await loadLessonPreparation(currentSchool.id, preparationId)); setMessage('Préparation validée après relecture du secrétariat.'); }
     catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Validation impossible.'); }
     finally { setBusy(false); }
   };
@@ -87,7 +93,7 @@ export default function PedagogyPreparationImport() {
       <div className="pedagogy-form-grid">
         <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label>Semaine<select value={selectedWeekStartDate} onChange={event => setWeekStartDate(event.target.value)}>{workspace.weeks.map(item => <option key={item.id} value={item.weekStartDate}>S{item.weekNumber} · {item.weekStartDate}</option>)}</select></label>
-        {!manual && <label>Préparation attendue<select value={preparationId} onChange={event => setPreparationId(event.target.value)}><option value="">Choisir…</option>{state.preparations.map(item => <option key={item.id} value={item.id}>{item.subjectName} — {item.lessonTitle || 'sans titre'}</option>)}</select></label>}
+        {!manual && <label>Préparation attendue<select value={preparationId} onChange={event => { setPreparationId(event.target.value); setLoadedPreparation(undefined); }}><option value="">Choisir…</option>{state.preparations.map(item => <option key={item.id} value={item.id}>{item.subjectName} — {item.lessonTitle || 'sans titre'}</option>)}</select></label>}
         {manual && <><label>Matière<select value={subjectId} onChange={event => setSubjectId(event.target.value)}><option value="">Choisir…</option>{subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Enseignant<select value={teacherStaffId} onChange={event => setTeacherStaffId(event.target.value)}><option value="">Choisir…</option>{teachers.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Titre<input value={lessonTitle} onChange={event => setLessonTitle(event.target.value)} /></label><label>Objectif<textarea value={objective} onChange={event => setObjective(event.target.value)} /></label></>}
         <label>Document<input type="file" accept="application/pdf,image/jpeg,image/png" onChange={event => setFile(event.target.files?.[0] || null)} /></label>
       </div>
