@@ -246,7 +246,7 @@ export const createPaymentMoratorium = functions.https.onCall(async (raw, contex
       return { moratoriumId: id, status: existing.status, idempotentReplay: true };
     }
     transaction.create(existingRef, {
-      id, ...input, originalDueDate, status: 'draft', requestFingerprint: fingerprint,
+      id, ...input, originalDueDate, workflowVersion: 2, status: 'draft', requestFingerprint: fingerprint,
       createdBy: uid, createdAt: FieldValue.serverTimestamp()
     });
     transaction.create(db.collection('audit_logs').doc(), auditData(
@@ -278,7 +278,12 @@ export const submitPaymentMoratorium = functions.https.onCall(async (raw, contex
     transaction.update(ref, { status: 'pending', submittedBy: uid, submittedAt: FieldValue.serverTimestamp() });
     transaction.create(db.collection('audit_logs').doc(), auditData(
       'MORATORIUM_SUBMITTED', String(item.schoolId), uid, moratoriumId,
-      { studentId: item.studentId, academicYear: item.academicYear, status: 'pending', role: user.role }
+      {
+        studentId: item.studentId, academicYear: item.academicYear,
+        paymentType: item.paymentType, installment: item.installment || null, period: item.period || null,
+        originalDueDate: item.originalDueDate, effectiveDueDate: item.effectiveDueDate,
+        reason: item.reason, status: 'pending', role: user.role
+      }
     ));
     return { moratoriumId, status: 'pending', idempotentReplay: false };
   });
@@ -299,7 +304,7 @@ export const approvePaymentMoratorium = functions.https.onCall(async (raw, conte
       String(item.academicYear), APPROVAL_ROLES
     );
     if (item.status === 'approved') return { moratoriumId, status: 'approved', idempotentReplay: true };
-    if (item.status !== 'pending' && item.status !== 'draft') {
+    if (item.status !== 'pending') {
       throw httpsError('failed-precondition', 'Moratorium is not approvable.', 'MORATORIUM_NOT_APPROVABLE');
     }
     const target = parseTarget(item);
@@ -360,9 +365,13 @@ export const rejectPaymentMoratorium = functions.https.onCall(async (raw, contex
     });
     transaction.create(db.collection('audit_logs').doc(), auditData(
       'MORATORIUM_REJECTED', String(item.schoolId), uid, moratoriumId,
-      { studentId: item.studentId, academicYear: item.academicYear, reason, status: 'rejected', role: user.role }
+      {
+        studentId: item.studentId, academicYear: item.academicYear,
+        paymentType: item.paymentType, installment: item.installment || null, period: item.period || null,
+        originalDueDate: item.originalDueDate, effectiveDueDate: item.effectiveDueDate,
+        requestReason: item.reason, reason, status: 'rejected', role: user.role
+      }
     ));
     return { moratoriumId, status: 'rejected', idempotentReplay: false };
   });
 });
-
