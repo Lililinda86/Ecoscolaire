@@ -242,7 +242,7 @@ jobs:
             us-central1
 
       - name: Deploy Firebase Backend
-        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only firestore:rules,storage,functions:approveFinancialBenefit,functions:approveTuitionDiscount,functions:archiveClassProgram,functions:assignStudentToClass,functions:bulkAddSubjectsToClasses,functions:campayWebhook,functions:cancelFinancialBenefit,functions:closeCashDrawer,functions:createExpense,functions:createFinancialBenefit,functions:createSaaSCheckout,functions:createStudentSecure,functions:createTuitionDiscount,functions:dailySubscriptionCheck,functions:deactivateTeacherAssignment,functions:enforceStudentSaasLimits,functions:ensureClassProgramDraft,functions:getBoardViewerGovernanceSummary,functions:getCollectionQuote,functions:getStudentFinancialAccount,functions:getTeacherAssignmentCandidates,functions:initiatePayment,functions:linkStaffToUser,functions:manageAcademicPeriod,functions:manageEvaluation,functions:manageReportCard,functions:manageStaff,functions:manageTeacherAssignment,functions:mockConfirmPayment,functions:onPaymentCreated,functions:processStudentImportJob,functions:publishClassProgramDraft,functions:recordAuthenticatedAudit,functions:recordCashCollection,functions:recordCashPayment,functions:recordGradesBatch,functions:recordStudentAttendance,functions:reverseCashCollection,functions:reverseExpense,functions:reversePayment,functions:seedDefaultSubjectCatalog,functions:setPrimaryTeacherAssignment,functions:sweepZombieImportJobs,functions:unlinkStaffFromUser,functions:updateAcademicYearBounds,functions:updateClassProgramDraft,functions:updateStudentFinancialStatus,functions:verifySaaSPayment --non-interactive
+        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only firestore:rules,firestore:indexes,storage,functions:approveFinancialBenefit,functions:approveTuitionDiscount,functions:archiveClassProgram,functions:assignStudentToClass,functions:bulkAddSubjectsToClasses,functions:campayWebhook,functions:cancelFinancialBenefit,functions:closeCashDrawer,functions:createExpense,functions:createFinancialBenefit,functions:createLessonPreparationUpload,functions:createSaaSCheckout,functions:createStudentSecure,functions:createTuitionDiscount,functions:dailySubscriptionCheck,functions:deactivateTeacherAssignment,functions:enforceStudentSaasLimits,functions:ensureClassProgramDraft,functions:ensureExpectedLessonPreparations,functions:getBoardViewerGovernanceSummary,functions:getCollectionQuote,functions:getStudentFinancialAccount,functions:getTeacherAssignmentCandidates,functions:initiatePayment,functions:linkStaffToUser,functions:manageAcademicPeriod,functions:manageEvaluation,functions:manageReportCard,functions:manageStaff,functions:manageTeacherAssignment,functions:mockConfirmPayment,functions:onPaymentCreated,functions:processStudentImportJob,functions:publishClassProgramDraft,functions:recordAuthenticatedAudit,functions:recordCashCollection,functions:recordCashPayment,functions:recordGradesBatch,functions:recordStudentAttendance,functions:reverseCashCollection,functions:reverseExpense,functions:reversePayment,functions:saveLessonPreparationReview,functions:seedDefaultSubjectCatalog,functions:setPrimaryTeacherAssignment,functions:startLessonPreparationAnalysis,functions:sweepZombieImportJobs,functions:unlinkStaffFromUser,functions:updateAcademicYearBounds,functions:updateClassProgramDraft,functions:updateStudentFinancialStatus,functions:validateLessonPreparation,functions:verifySaaSPayment --non-interactive
 
   lot1-staging-ui:
     if: >-
@@ -328,3 +328,63 @@ jobs:
         run: >-
           npx playwright test tests/pedagogy-lot-a-emulator-e2e.spec.ts
           --config=playwright.pedagogy-staging.config.ts --workers=1
+
+  pedagogy-lot-b-staging:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.confirmation == 'RUN_PEDAGOGY_LOT_B_STAGING' ||
+      inputs.confirmation == 'RUN_PEDAGOGY_LOT_B_STAGING_VALIDATE')
+    name: Deploy and validate Pedagogy Lot B
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      FIREBASE_PROJECT_ID: ecoscolaire-staging
+      STAGING_APP_URL: ${{ inputs.app_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Guard exact SHA, Preview and Production
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$FIREBASE_PROJECT_ID" = "ecoscolaire-staging"
+          test "$FIREBASE_PROJECT_ID" != "ecoscolaire-c5861"
+          printf '%s' "$STAGING_APP_URL" | grep -Eq '^https://ecoscolaire-git-codex-pedagogy-lot-b-linda-lemofouet-s-projects\.vercel\.app$'
+      - run: npm ci
+      - run: npm ci
+        if: inputs.confirmation == 'RUN_PEDAGOGY_LOT_B_STAGING'
+        working-directory: functions
+      - run: npm --prefix functions run build
+        if: inputs.confirmation == 'RUN_PEDAGOGY_LOT_B_STAGING'
+      - run: npm install -g firebase-tools@15.25.0
+        if: inputs.confirmation == 'RUN_PEDAGOGY_LOT_B_STAGING'
+      - name: Authenticate to Staging only
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy Lot B Functions, Rules, Storage and indexes
+        if: inputs.confirmation == 'RUN_PEDAGOGY_LOT_B_STAGING'
+        run: >-
+          firebase deploy --project "$FIREBASE_PROJECT_ID" --non-interactive
+          --only
+          "functions:ensureExpectedLessonPreparations,functions:createLessonPreparationUpload,functions:startLessonPreparationAnalysis,functions:saveLessonPreparationReview,functions:validateLessonPreparation,firestore:rules,firestore:indexes,storage"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Bounded Staging Lot A regression
+        timeout-minutes: 5
+        env:
+          PEDAGOGY_STAGING_E2E: "true"
+          PEDAGOGY_FIREBASE_PROJECT_ID: ecoscolaire-staging
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: npx playwright test tests/pedagogy-lot-a-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
+      - name: Bounded Staging Lot B functional validation and cleanup
+        timeout-minutes: 6
+        env:
+          PEDAGOGY_STAGING_E2E: "true"
+          PEDAGOGY_FIREBASE_PROJECT_ID: ecoscolaire-staging
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1

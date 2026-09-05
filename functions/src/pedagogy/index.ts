@@ -5,6 +5,14 @@ import { adoptionId, addDaysIso, mondayIso, teachingPlanId, teachingWeekId } fro
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { deterministicPlanningGenerator, GeneratorSubject, GeneratorUnit } from './planningGenerator';
 
+export {
+  ensureExpectedLessonPreparations,
+  createLessonPreparationUpload,
+  startLessonPreparationAnalysis,
+  saveLessonPreparationReview,
+  validateLessonPreparation
+} from './preparations';
+
 const db = () => admin.firestore();
 const requiredText = (value: unknown, name: string, max = 500): string => {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new functions.https.HttpsError('invalid-argument', `${name} invalide.`);

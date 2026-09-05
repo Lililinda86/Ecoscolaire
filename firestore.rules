@@ -1288,6 +1288,33 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // --- PEDAGOGY LOT B: raw preparation documents are never exposed to board viewers or teachers. ---
+    match /lessonPreparationTemplates/{templateId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow create, update, delete: if false;
+    }
+
+    match /lessonPreparations/{preparationId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow create, update, delete: if false;
+    }
+
+    match /preparationUploads/{uploadId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow create, update, delete: if false;
+    }
+
+    match /preparationAnalyses/{analysisId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow create, update, delete: if false;
+    }
+
+    match /pedagogyPreparationStats/{statsId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+        && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+      allow create, update, delete: if false;
+    }
+
     // --- STUDENT IMPORT JOBS ---
     match /student_import_jobs/{jobId} {
       allow read: if isAuthenticated() && isActive() && !isBoardViewer() && (isSuperAdmin() || hasSchoolAccess(resource.data.schoolId));

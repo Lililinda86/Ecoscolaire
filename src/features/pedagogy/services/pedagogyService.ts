@@ -1,7 +1,8 @@
-import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../../../db/firebase';
-import type { CurriculumProgram, PedagogyWorkspace, SchoolCurriculumAdoption, TeachingPlan, TeachingPlanItem, TeachingWeek } from '../types';
+import { getMetadata, ref, uploadBytes } from 'firebase/storage';
+import { db, functions, storage } from '../../../db/firebase';
+import type { CurriculumProgram, LessonPreparation, LessonPreparationTemplate, PedagogyWorkspace, PreparationReview, SchoolCurriculumAdoption, TeachingPlan, TeachingPlanItem, TeachingWeek } from '../types';
 
 const documents = <T>(snapshot: Awaited<ReturnType<typeof getDocs>>): T[] => snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Record<string, unknown>) } as T));
 
@@ -28,6 +29,51 @@ export const loadTeachingPlanItems = async (schoolId: string, planId: string): P
 const call = async <TInput extends object, TOutput>(name: string, input: TInput): Promise<TOutput> => {
   const result = await httpsCallable<TInput, TOutput>(functions, name)(input);
   return result.data;
+};
+
+export const loadLessonPreparations = async (schoolId: string, academicYearId: string, weekStartDate: string, classId?: string): Promise<LessonPreparation[]> => {
+  const clauses = [where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), where('weekStartDate', '==', weekStartDate)];
+  if (classId) clauses.push(where('classId', '==', classId));
+  const snapshot = await getDocs(query(collection(db, 'lessonPreparations'), ...clauses, limit(250)));
+  return documents<LessonPreparation>(snapshot).sort((a, b) => (a.classId + a.subjectName + (a.slotIndex || 0)).localeCompare(b.classId + b.subjectName + (b.slotIndex || 0)));
+};
+
+export const loadLessonPreparation = async (schoolId: string, preparationId: string): Promise<LessonPreparation> => {
+  const snapshot = await getDoc(doc(db, 'lessonPreparations', preparationId));
+  if (!snapshot.exists()) throw new Error('Préparation introuvable.');
+  const preparation = { id: snapshot.id, ...snapshot.data() } as LessonPreparation;
+  if (preparation.schoolId !== schoolId) throw new Error('Accès inter-écoles interdit.');
+  return preparation;
+};
+
+export const loadPreparationTemplates = async (schoolId: string, academicYearId: string, classId: string): Promise<LessonPreparationTemplate[]> => {
+  const snapshot = await getDocs(query(collection(db, 'lessonPreparationTemplates'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), where('classId', '==', classId), limit(100)));
+  return documents<LessonPreparationTemplate>(snapshot);
+};
+
+export const ensureExpectedLessonPreparations = (schoolId: string, planId: string) => call<{ schoolId: string; planId: string }, { planId: string; expectedCount: number; createdCount: number }>('ensureExpectedLessonPreparations', { schoolId, planId });
+export const startLessonPreparationAnalysis = (schoolId: string, uploadId: string) => call<{ schoolId: string; uploadId: string }, { preparationId: string; analysisStatus: 'succeeded' | 'failed'; fallback?: string }>('startLessonPreparationAnalysis', { schoolId, uploadId });
+export const saveLessonPreparationReview = (schoolId: string, preparationId: string, review: PreparationReview) => call('saveLessonPreparationReview', { schoolId, preparationId, review });
+export const validateLessonPreparation = (schoolId: string, preparationId: string) => call('validateLessonPreparation', { schoolId, preparationId });
+
+export interface ManualPreparationInput {
+  academicYearId: string; classId: string; subjectId: string; subjectName: string; teacherStaffId: string;
+  weekStartDate: string; lessonTitle: string; objective: string;
+}
+
+export const uploadLessonPreparation = async (schoolId: string, file: File, preparationId?: string, manual?: ManualPreparationInput) => {
+  const checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())))
+    .map(byte => byte.toString(16).padStart(2, '0')).join('');
+  const registered = await call<Record<string, unknown>, { preparationId: string; uploadId: string; storagePath: string; created: boolean }>('createLessonPreparationUpload', {
+    schoolId, preparationId, ...manual, checksum, fileName: file.name, mimeType: file.type, size: file.size
+  });
+  const objectRef = ref(storage, registered.storagePath);
+  if (registered.created) {
+    await uploadBytes(objectRef, file, { contentType: file.type, customMetadata: { checksum, preparationId: registered.preparationId } });
+  } else {
+    await getMetadata(objectRef);
+  }
+  return registered;
 };
 
 export const ensureTeachingWeeks = (schoolId: string, academicYearId: string) => call('ensureTeachingWeeks', { schoolId, academicYearId });

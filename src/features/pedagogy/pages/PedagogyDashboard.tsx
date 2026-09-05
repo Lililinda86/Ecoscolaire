@@ -2,15 +2,20 @@ import { Link } from 'react-router-dom';
 import { useAppContext } from '../../../context/AppContext';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { StatusBadge } from '../components/StatusBadge';
+import { useLessonPreparations } from '../hooks/useLessonPreparations';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 
 export default function PedagogyDashboard() {
-  const { db, currentSchool } = useAppContext();
+  const { db, currentSchool, currentUser } = useAppContext();
   const year = db?.academicYears?.find(item => item.id === currentSchool?.activeAcademicYearId) || db?.academicYears?.find(item => item.status === 'active');
   const workspace = usePedagogyWorkspace(currentSchool?.id, year?.id);
   const validated = workspace.plans.filter(plan => plan.status === 'teacher_validated').length;
   const today = new Date().toISOString().slice(0, 10);
   const currentWeek = workspace.weeks.find(week => week.weekStartDate <= today && week.weekEndDate >= today);
+  const preparationState = useLessonPreparations(currentUser?.role === 'boardViewer' ? undefined : currentSchool?.id, year?.id, currentWeek?.weekStartDate);
+  const missingPreparations = preparationState.preparations.filter(item => item.status === 'expected').length;
+  const reviewPreparations = preparationState.preparations.filter(item => item.status === 'needs_review').length;
+  const validatedPreparations = preparationState.preparations.filter(item => item.status === 'validated').length;
   const pending = workspace.plans.filter(plan => ['proposed', 'needs_adjustment', 'adjusted'].includes(plan.status)).length;
   return <main className="pedagogy-page">
     <PedagogyHeader title="Pilotage pédagogique" description="Une vue opérationnelle des semaines, propositions et validations enregistrées par le secrétariat." />
@@ -24,6 +29,11 @@ export default function PedagogyDashboard() {
       <article><strong>{workspace.plans.length}</strong><span>planifications</span></article>
       <article><strong>{pending}</strong><span>validations à suivre</span></article>
       <article><strong>{validated}</strong><span>validées enseignant</span></article>
+      {currentUser?.role !== 'boardViewer' && <>
+        <article><strong>{missingPreparations}</strong><span>préparations manquantes</span></article>
+        <article><strong>{reviewPreparations}</strong><span>préparations à relire</span></article>
+        <article><strong>{validatedPreparations}</strong><span>préparations validées</span></article>
+      </>}
     </section>
     <section className="pedagogy-card">
       <div className="pedagogy-card-title"><div><h2>À traiter</h2><p>Les planifications récentes qui attendent une action.</p></div><Link className="pedagogy-button" to="/pedagogy/planning">Ouvrir la semaine</Link></div>

@@ -31,6 +31,9 @@ import PedagogyDashboard from './features/pedagogy/pages/PedagogyDashboard';
 import PedagogyProgram from './features/pedagogy/pages/PedagogyProgram';
 import PedagogyPlanning from './features/pedagogy/pages/PedagogyPlanning';
 import PedagogyHistory from './features/pedagogy/pages/PedagogyHistory';
+import PedagogyPreparations from './features/pedagogy/pages/PedagogyPreparations';
+import PedagogyPreparationImport from './features/pedagogy/pages/PedagogyPreparationImport';
+import PedagogyMissingPreparations from './features/pedagogy/pages/PedagogyMissingPreparations';
 
 import Diagnostic from './pages/Diagnostic';
 
@@ -116,6 +119,9 @@ function App() {
         <Route path="/pedagogy/program" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><PedagogyProgram /></Layout></ProtectedRoute>} />
         <Route path="/pedagogy/planning" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><PedagogyPlanning /></Layout></ProtectedRoute>} />
         <Route path="/pedagogy/history" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><PedagogyHistory /></Layout></ProtectedRoute>} />
+        <Route path="/pedagogy/preparations" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogyPreparations /></Layout></ProtectedRoute>} />
+        <Route path="/pedagogy/preparations/import" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogyPreparationImport /></Layout></ProtectedRoute>} />
+        <Route path="/pedagogy/preparations/missing" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogyMissingPreparations /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><Settings /></Layout></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'secretary', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director']}><Layout><UsersManagement /></Layout></ProtectedRoute>} />
