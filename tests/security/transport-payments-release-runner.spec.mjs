@@ -563,8 +563,12 @@ const functionInventory = (generation = 'GEN_1', overrides = {}) => REQUIRED_STA
   };
 });
 
-test('Staging deployment contract queries both generations and keeps the full Functions deployment', () => {
-  assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only functions,firestore:rules,storage/);
+test('Staging deployment contract queries both generations and deploys versioned Functions explicitly', () => {
+  assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only firestore:rules,storage,functions:/);
+  assert.match(stagingDeploymentWorkflow, /functions:getStudentFinancialAccount/);
+  assert.match(stagingDeploymentWorkflow, /functions:recordCashCollection/);
+  assert.match(stagingDeploymentWorkflow, /functions:reverseCashCollection/);
+  assert.doesNotMatch(stagingDeploymentWorkflow, /--only functions,firestore:rules,storage/);
   assert.match(stagingDeploymentWorkflow, /gcloud functions list \\\n\s+--v2 \\\n\s+--project "\$FIREBASE_PROJECT_ID" \\\n\s+--regions us-central1 \\\n\s+--format=json \\\n\s+> \/tmp\/staging-functions-gen2\.json/);
   assert.doesNotMatch(stagingDeploymentWorkflow, /gcloud functions list --gen2/);
   assert.match(stagingDeploymentWorkflow, /verify-staging-function-deployment-contract\.mjs/);
