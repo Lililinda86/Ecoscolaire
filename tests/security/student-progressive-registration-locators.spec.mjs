@@ -7,8 +7,10 @@ import {
   REGISTRATION_CONTROL_SELECTORS,
   REGISTRATION_CONTROL_STEPS,
   REGISTRATION_SCOPE_HEADINGS,
+  REGISTRATION_STATUS_NAMES,
   requireRegistrationControlStep,
-  requireUniqueRegistrationLocatorCount
+  requireUniqueRegistrationLocatorCount,
+  waitForUniqueRegistrationLocator
 } from './student-progressive-registration-locator-contract.mjs';
 
 const studentsSource = readFileSync(new URL('../../src/pages/Students.tsx', import.meta.url), 'utf8');
@@ -181,6 +183,47 @@ test('scenario C uses exact form-scoped wizard actions', () => {
   assert.equal(occurrences(scenarioC, 'await clickNext(form);'), 3);
   assert.match(scenarioC, /registrationAction\(form, 'save'\)/);
   assert.match(harnessSource, /form\.getByRole\('button', \{ name: REGISTRATION_ACTION_NAMES\[name\], exact: true \}\)/);
+});
+
+test('scenario C waits for the exact row-scoped complete badge before enforcing uniqueness', () => {
+  assert.equal(REGISTRATION_STATUS_NAMES.complete, 'Dossier complet');
+  assert.match(studentsSource, /\{isComplete \? 'Dossier complet' : 'À compléter'\}/);
+  assert.match(scenarioC, /row\.getByText\(REGISTRATION_STATUS_NAMES\.complete, \{ exact: true \}\)/);
+  assert.match(scenarioC, /'complete registration badge',\s*30_000/);
+});
+
+test('async unique locator guard accepts delayed render and classifies missing or duplicate controls', async () => {
+  let delayedCount = 0;
+  const delayed = {
+    async waitFor() { delayedCount = 1; },
+    async count() { return delayedCount; }
+  };
+  assert.equal(await waitForUniqueRegistrationLocator(delayed, 'delayed badge'), delayed);
+
+  const missing = {
+    async waitFor() { throw new Error('timeout'); },
+    async count() { return 0; }
+  };
+  await assert.rejects(
+    waitForUniqueRegistrationLocator(missing, 'missing badge'),
+    error => error?.code === 'MISSING_REGISTRATION_CONTROL'
+  );
+
+  const duplicate = {
+    async waitFor() { throw new Error('strict mode violation'); },
+    async count() { return 2; }
+  };
+  await assert.rejects(
+    waitForUniqueRegistrationLocator(duplicate, 'duplicate badge'),
+    error => error?.code === 'AMBIGUOUS_REGISTRATION_CONTROL'
+  );
+});
+
+test('all registration result badges wait in a unique student row without arbitrary first', () => {
+  assert.equal(occurrences(harnessSource, 'REGISTRATION_STATUS_NAMES.incomplete'), 4);
+  assert.equal(occurrences(harnessSource, 'REGISTRATION_STATUS_NAMES.complete'), 1);
+  assert.doesNotMatch(harnessSource, /page\.locator\('tbody tr'\)\.filter\(\{ hasText: [^}]+ \}\)\.first\(\)/);
+  assert.doesNotMatch(harnessSource, /getByRole\('button', \{ name: 'Enregistrer' \}\)/);
 });
 
 test('scenario C wrong wizard steps fail with an explicit classification', () => {
