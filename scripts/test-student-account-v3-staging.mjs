@@ -110,7 +110,19 @@ const main = async () => {
     const app = initializeApp(cfg.firebaseConfig, `account-v3-${key}-${suffix}`);
     clientApps.push(app);
     const auth = getAuth(app);
-    await signInWithEmailAndPassword(auth, credential.email, credential.password);
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await signInWithEmailAndPassword(auth, credential.email, credential.password);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        if (error?.code !== 'auth/network-request-failed' || attempt === 3) break;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+      }
+    }
+    if (lastError) throw lastError;
     return { auth, functions: getFunctions(app, 'us-central1') };
   };
 
