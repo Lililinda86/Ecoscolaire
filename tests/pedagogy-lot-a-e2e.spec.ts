@@ -12,9 +12,10 @@ test.describe('Lot A — parcours secrétaire', () => {
 
   test('proposition, ajustement, validation et historique sans écriture métier externe', async ({ page }) => {
     const env = await initializeTestEnvironment({ projectId: 'demo-ecoscolaire' });
-    const adminDb = env.unauthenticatedContext().firestore();
     const protectedCollections = ['students', 'payments', 'expenses', 'buses'];
-    const before = await Promise.all(protectedCollections.map(name => getCountFromServer(collection(adminDb, name))));
+    const counts = () => env.withSecurityRulesDisabled(context =>
+      Promise.all(protectedCollections.map(name => getCountFromServer(collection(context.firestore(), name)))));
+    const before = await counts();
 
     await loginAs(page, secretaryEmail, secretaryPassword);
     await page.goto('/#/pedagogy');
@@ -36,7 +37,7 @@ test.describe('Lot A — parcours secrétaire', () => {
     await page.getByRole('link', { name: 'Historique' }).click();
     await expect(page.getByText('Validé par l’enseignant').first()).toBeVisible();
 
-    const after = await Promise.all(protectedCollections.map(name => getCountFromServer(collection(adminDb, name))));
+    const after = await counts();
     expect(after.map(item => item.data().count)).toEqual(before.map(item => item.data().count));
     await env.cleanup();
   });
