@@ -19,7 +19,7 @@ const protectedCollections = ['students', 'payments', 'expenses', 'grades', 'eva
 test.describe('Lot B — préparations de cours', () => {
   const emulatorRun = Boolean(process.env.FIRESTORE_EMULATOR_HOST) && Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST) && Boolean(process.env.FIREBASE_STORAGE_EMULATOR_HOST);
   test.skip(!emulatorRun && !stagingRun, 'Émulateurs complets ou Staging explicite obligatoires.');
-  test.setTimeout(stagingRun ? 180_000 : 120_000);
+  test.setTimeout(stagingRun ? 360_000 : 120_000);
 
   test('dérive, dépose, analyse, corrige, valide et nettoie sans régression Lot A', async ({ page }) => {
     const app = getApps().find(candidate => candidate.name === 'pedagogy-lot-b-e2e') || initializeApp({ projectId, storageBucket: stagingRun ? `${projectId}.firebasestorage.app` : `${projectId}.appspot.com` }, 'pedagogy-lot-b-e2e');
