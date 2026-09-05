@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   REGISTRATION_ACTION_NAMES,
+  REGISTRATION_CONTROL_SCOPES,
   REGISTRATION_CONTROL_SELECTORS,
+  REGISTRATION_CONTROL_STEPS,
+  REGISTRATION_SCOPE_HEADINGS,
+  requireRegistrationControlStep,
   requireUniqueRegistrationLocatorCount
 } from './student-progressive-registration-locator-contract.mjs';
 
@@ -12,6 +16,10 @@ const harnessSource = readFileSync(new URL('../../scripts/test-student-progressi
 const scenarioA = harnessSource.slice(
   harnessSource.indexOf('async function scenarioMinimal()'),
   harnessSource.indexOf('async function scenarioReload()')
+);
+const scenarioC = harnessSource.slice(
+  harnessSource.indexOf('async function scenarioComplete()'),
+  harnessSource.indexOf('async function scenarioTransport()')
 );
 
 function occurrences(source, needle) {
@@ -26,7 +34,12 @@ function sourceWindow(marker, before = 350, after = 500) {
 
 function requireScenarioControl(name) {
   assert.match(scenarioA, new RegExp(`registrationControl\\(form, '${name}'\\)`));
-  assert.match(harnessSource, /form\.locator\(REGISTRATION_CONTROL_SELECTORS\[name\]\)/);
+  assert.match(harnessSource, /scope\.locator\(REGISTRATION_CONTROL_SELECTORS\[name\]\)/);
+}
+
+function requireScenarioCControl(name, step) {
+  assert.equal(REGISTRATION_CONTROL_STEPS[name], step);
+  assert.match(scenarioC, new RegExp(`registrationControl\\(form, '${name}', ${step}\\)`));
 }
 
 test('Nom locator matches the unique required text input in wizard step 1', () => {
@@ -85,6 +98,105 @@ test('wizard navigation uses one exact form-scoped Suivant action', () => {
 test('save uses one exact form-scoped Enregistrer action', () => {
   assert.equal(REGISTRATION_ACTION_NAMES.save, 'Enregistrer');
   assert.match(scenarioA, /registrationAction\(form, 'save'\)/);
+});
+
+test('Date de naissance locator matches the unique date input in wizard step 1', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.dob, 'input[type="date"]');
+  const block = sourceWindow("value={currentStudent.dob || ''}", 200, 200);
+  assert.match(block, /<label>Date de Naissance<\/label>/);
+  assert.match(block, /value=\{currentStudent\.dob \|\| ''\}/);
+  assert.doesNotMatch(block, /readOnly/);
+  requireScenarioCControl('dob', 1);
+});
+
+test('Lieu de naissance locator uses its exact unique placeholder in wizard step 1', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.placeOfBirth, 'input[placeholder="Ex: Yaoundé"]');
+  const block = sourceWindow('placeholder="Ex: Yaoundé"', 300, 100);
+  assert.match(block, /<label>Lieu de Naissance<\/label>/);
+  assert.match(block, /value=\{currentStudent\.placeOfBirth \|\| ''\}/);
+  assert.doesNotMatch(block, /readOnly/);
+  requireScenarioCControl('placeOfBirth', 1);
+});
+
+test('responsable controls are scoped to the unique legal guardian section', () => {
+  assert.equal(REGISTRATION_SCOPE_HEADINGS.guardian, '🏠 Responsable Légal Principal (à compléter)');
+  for (const name of ['parentName', 'parentPhone', 'address', 'emergencyContact']) {
+    assert.equal(REGISTRATION_CONTROL_SCOPES[name], 'guardian');
+  }
+  assert.match(harnessSource, /form\.getByRole\('heading', \{ name: REGISTRATION_SCOPE_HEADINGS\[scopeName\], exact: true \}\)\.locator\('\.\.'\)/);
+});
+
+test('Nom du responsable locator matches the exact guardian input in wizard step 3', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.parentName, 'input[placeholder="Ex: Paul Dupont"]');
+  const block = sourceWindow('placeholder="Ex: Paul Dupont"', 250, 100);
+  assert.match(block, /<label>Nom du Responsable<\/label>/);
+  assert.match(block, /value=\{currentStudent\.parentName \|\| ''\}/);
+  requireScenarioCControl('parentName', 3);
+});
+
+test('Téléphone responsable locator resolves the duplicate placeholder inside guardian scope', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.parentPhone, 'input[placeholder="Ex: +237650336558"]');
+  assert.equal(occurrences(studentsSource, 'placeholder="Ex: +237650336558"'), 2);
+  const block = sourceWindow('value={currentStudent.parentPhone || \'\'}', 250, 200);
+  assert.match(block, /<label>Contact \(Téléphone\)<\/label>/);
+  assert.match(block, /placeholder="Ex: \+237650336558"/);
+  requireScenarioCControl('parentPhone', 3);
+});
+
+test('Adresse locator matches the exact guardian input in wizard step 3', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.address, 'input[placeholder="Ex: Akwa, Douala"]');
+  const block = sourceWindow('placeholder="Ex: Akwa, Douala"', 250, 100);
+  assert.match(block, /<label>Adresse d'habitation<\/label>/);
+  assert.match(block, /value=\{currentStudent\.address \|\| ''\}/);
+  requireScenarioCControl('address', 3);
+});
+
+test('Contact urgence locator matches the exact guardian input in wizard step 3', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.emergencyContact, 'input[placeholder="Numéro en cas d\'urgence"]');
+  const block = sourceWindow('placeholder="Numéro en cas d\'urgence"', 250, 100);
+  assert.match(block, /<label>Contact d'Urgence<\/label>/);
+  assert.match(block, /value=\{currentStudent\.emergencyContact \|\| ''\}/);
+  requireScenarioCControl('emergencyContact', 3);
+});
+
+test('medical information controls expose stable unique ids in wizard step 4', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.allergies, '#student-allergies-input');
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.medicalConditions, '#student-medical-conditions-input');
+  assert.equal(REGISTRATION_CONTROL_STEPS.allergies, 4);
+  assert.equal(REGISTRATION_CONTROL_STEPS.medicalConditions, 4);
+  assert.match(sourceWindow('id="student-allergies-input"'), /<textarea[\s\S]*?value=\{currentStudent\.allergies \|\| ''\}/);
+  assert.match(sourceWindow('id="student-medical-conditions-input"'), /<textarea[\s\S]*?value=\{currentStudent\.medicalConditions \|\| ''\}/);
+});
+
+test('absence de problème médical uses the stable checkbox id in wizard step 4', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.noMedicalCondition, '#student-no-medical-condition-checkbox');
+  const block = sourceWindow('id="student-no-medical-condition-checkbox"', 250, 500);
+  assert.match(block, /type="checkbox"/);
+  assert.match(block, /checked=\{noMedicalConditionConfirmed\}/);
+  assert.match(block, /Aucune allergie ou condition médicale connue à signaler/);
+  requireScenarioCControl('noMedicalCondition', 4);
+});
+
+test('scenario C uses exact form-scoped wizard actions', () => {
+  assert.equal(occurrences(scenarioC, 'await clickNext(form);'), 3);
+  assert.match(scenarioC, /registrationAction\(form, 'save'\)/);
+  assert.match(harnessSource, /form\.getByRole\('button', \{ name: REGISTRATION_ACTION_NAMES\[name\], exact: true \}\)/);
+});
+
+test('scenario C wrong wizard steps fail with an explicit classification', () => {
+  assert.throws(() => requireRegistrationControlStep('placeOfBirth', 3), error => error?.code === 'WRONG_REGISTRATION_WIZARD_STEP');
+  assert.doesNotThrow(() => requireRegistrationControlStep('placeOfBirth', 1));
+});
+
+test('scenario C missing and ambiguous controls fail immediately', () => {
+  assert.throws(() => requireUniqueRegistrationLocatorCount('placeOfBirth', 0), error => error?.code === 'MISSING_REGISTRATION_CONTROL');
+  assert.throws(() => requireUniqueRegistrationLocatorCount('parentPhone', 2), error => error?.code === 'AMBIGUOUS_REGISTRATION_CONTROL');
+});
+
+test('scenario C contains no re-rooted has locator, arbitrary first, global text locator, or sleep', () => {
+  assert.doesNotMatch(harnessSource, /function formField\(/);
+  assert.doesNotMatch(scenarioC, /filter\(\{\s*has:|\.first\(\)|page\.getByText\(|waitForTimeout\(|sleep\(/);
+  assert.equal(occurrences(scenarioC, "registrationControl(form, '"), 7);
 });
 
 test('missing controls fail immediately with an explicit classification', () => {
