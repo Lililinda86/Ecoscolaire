@@ -1,0 +1,54 @@
+name: Seed Encaissement UX Staging
+
+on:
+  push:
+    branches:
+      - staging
+    paths:
+      - "scripts/setup-encaissement-ux-staging.mjs"
+      - ".github/workflows/seed-encaissement-ux-staging.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    name: Create isolated Encaissement UX fixtures
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      FIREBASE_PROJECT_ID: ecoscolaire-staging
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+
+      - name: Guard staging target
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/staging" ]; then
+            echo "Refusing non-staging branch"
+            exit 1
+          fi
+          if [ "$FIREBASE_PROJECT_ID" != "ecoscolaire-staging" ]; then
+            echo "Refusing unexpected Firebase project"
+            exit 1
+          fi
+          if [ "$FIREBASE_PROJECT_ID" = "ecoscolaire-c5861" ]; then
+            echo "Production is forbidden"
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed dedicated UX account and data
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          STAGING_UX_TEST_PASSWORD: ${{ secrets.STAGING_UX_TEST_PASSWORD }}
+        run: node scripts/setup-encaissement-ux-staging.mjs
