@@ -6,7 +6,7 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
-import { getDisplayClassName } from '../utils/classCatalog';
+import { getClassOptionLabel } from '../utils/classCatalog';
 import type { School, EducationCycle } from '../types';
 import { AcademicCalendarSettings } from '../components/Settings/AcademicCalendarSettings';
 import { TuitionDeadlineSettings } from '../components/Settings/TuitionDeadlineSettings';
@@ -920,7 +920,7 @@ const Settings: React.FC = () => {
             <tbody>
               {sortClasses(db.classes).map(c => (
                 <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{getDisplayClassName(c.name)}</td>
+                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{getClassOptionLabel(c, db.classes)}</td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.registration || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], registration: e.target.value } }))} /></td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.tuition || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], tuition: e.target.value } }))} /></td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t1 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t1: e.target.value } }))} /></td>
@@ -1010,7 +1010,7 @@ const Settings: React.FC = () => {
           <tbody>
             {sortClasses(db.classes).map(c => (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '0.75rem' }}>{getDisplayClassName(c.name)} <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>({c.type})</span></td>
+                <td style={{ padding: '0.75rem' }}>{getClassOptionLabel(c, db.classes)} <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>({c.type})</span></td>
                 <td style={{ padding: '0.75rem', textAlign: 'right' }}>
                   <button className="secondary" style={{ padding: '0.25rem 0.5rem', marginRight: '0.5rem' }} onClick={() => { setCurrentClassId(c.id); setSubjModalOpen(true); }} title="Gérer les matières de cette classe"><BookOpen size={14} /></button>
                   <button className="secondary" style={{ padding: '0.25rem 0.5rem', marginRight: '0.5rem' }} onClick={() => handleEditClass(c.id, c.name)} title="Modifier le nom"><Edit2 size={14} /></button>
@@ -1029,7 +1029,7 @@ const Settings: React.FC = () => {
            const clsSubjects = cls.subjects || [];
            return (
              <div>
-               <p style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>Cochez les matières enseignées en <strong>{getDisplayClassName(cls.name)}</strong> :</p>
+               <p style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>Cochez les matières enseignées en <strong>{getClassOptionLabel(cls, db.classes)}</strong> :</p>
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
                  {db.subjects.map(s => {
                     const isChecked = clsSubjects.includes(s.id);

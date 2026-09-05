@@ -7,6 +7,7 @@ import { useLessonPreparations } from '../hooks/useLessonPreparations';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 import { loadLessonPreparation, saveLessonPreparationReview, startLessonPreparationAnalysis, uploadLessonPreparation, validateLessonPreparation } from '../services/pedagogyService';
 import type { LessonPreparation, PreparationReview } from '../types';
+import { getClassOptionLabel } from '../../../utils/classCatalog';
 
 const emptyReview: PreparationReview = { lessonTitle: '', objective: '', prerequisites: '', materials: '', lessonSteps: '', assessment: '', differentiation: '' };
 
@@ -91,7 +92,7 @@ export default function PedagogyPreparationImport() {
       <div className="pedagogy-card-title"><div><h2>Original immuable</h2><p>Un même contenu conserve le même identifiant; l’écrasement et la suppression sont interdits.</p></div><Link to="/pedagogy/preparations">Retour au suivi</Link></div>
       <label className="pedagogy-check"><input type="checkbox" checked={manual} onChange={event => setManual(event.target.checked)} /> Préparation manuelle non planifiée</label>
       <div className="pedagogy-form-grid">
-        <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
         <label>Semaine<select value={selectedWeekStartDate} onChange={event => setWeekStartDate(event.target.value)}>{workspace.weeks.map(item => <option key={item.id} value={item.weekStartDate}>S{item.weekNumber} · {item.weekStartDate}</option>)}</select></label>
         {!manual && <label>Préparation attendue<select value={preparationId} onChange={event => { setPreparationId(event.target.value); setLoadedPreparation(undefined); }}><option value="">Choisir…</option>{state.preparations.map(item => <option key={item.id} value={item.id}>{item.subjectName} — {item.lessonTitle || 'sans titre'}</option>)}</select></label>}
         {manual && <><label>Matière<select value={subjectId} onChange={event => setSubjectId(event.target.value)}><option value="">Choisir…</option>{subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Enseignant<select value={teacherStaffId} onChange={event => setTeacherStaffId(event.target.value)}><option value="">Choisir…</option>{teachers.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Titre<input value={lessonTitle} onChange={event => setLessonTitle(event.target.value)} /></label><label>Objectif<textarea value={objective} onChange={event => setObjective(event.target.value)} /></label></>}

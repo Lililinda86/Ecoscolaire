@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useId } from 'react';
-import { getDisplayClassName, getSpecialtyName, resolveEducationType } from '../../utils/classCatalog';
+import { getClassOptionLabel, getDisplayClassName, getSpecialtyName, resolveEducationType } from '../../utils/classCatalog';
 import type { ClassSection, TechnicalSpecialty } from '../../types';
 import { sortClasses } from '../../utils/sortClasses';
 import {
@@ -221,7 +221,7 @@ export const ClassSearchPicker: React.FC<ClassSearchPickerProps> = ({
   const getTriggerText = () => {
     if (!currentClass) return `-- Choisir une classe (${classes.length} disponible(s)) --`;
     const count = studentCountMap[currentClass.id] || 0;
-    const displayName = getDisplayClassName(currentClass.name);
+    const displayName = getClassOptionLabel(currentClass, classes);
     const specRes = currentClass.specialtyId ? getSpecialtyName(currentClass.specialtyId, technicalSpecialties, currentSchoolId, currentClass.type || currentClass.section) : { name: null };
     const specText = specRes.name ? ` — ${specRes.name}` : '';
     const statusText = currentClass.isActive === false ? ' — Inactive' : '';
@@ -330,7 +330,7 @@ export const ClassSearchPicker: React.FC<ClassSearchPickerProps> = ({
                     const isActiveHighlighted = globalIdx === safeActiveIndex;
                     const count = studentCountMap[c.id] || 0;
 
-                    const displayName = getDisplayClassName(c.name);
+                    const displayName = getClassOptionLabel(c, classes);
                     const specRes = c.specialtyId ? getSpecialtyName(c.specialtyId, technicalSpecialties, currentSchoolId, c.type || c.section) : { name: null };
                     const specText = specRes.name ? ` — ${specRes.name}` : '';
                     const isInactive = c.isActive === false;

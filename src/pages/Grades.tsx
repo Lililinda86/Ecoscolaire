@@ -11,6 +11,7 @@ import { manageEvaluation } from '../services/gradeFunctions';
 import Modal from '../components/Modal';
 import { Plus, Printer, Trophy } from 'lucide-react';
 import { sortClasses } from '../utils/sortClasses';
+import { getClassOptionLabel } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 import { SubjectSelectDropdown } from '../components/SubjectSelectDropdown';
@@ -587,7 +588,7 @@ const Grades: React.FC = () => {
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Sélectionner une classe complète :</label>
               <select value={selectedClassRank} onChange={e => setSelectedClassRank(e.target.value)}>
                 <option value="">-- Choisir --</option>
-                {sortClasses(db.classes).map(c => <option key={c.id} value={c.id}>{c.name} ({c.type})</option>)}
+                {sortClasses(db.classes).map(c => <option key={c.id} value={c.id}>{getClassOptionLabel(c, db.classes)} ({c.type})</option>)}
               </select>
             </div>
             {selectedClassRank && rankingData.length > 0 && (
@@ -775,7 +776,7 @@ const Grades: React.FC = () => {
                   }}>
                   <option value="">-- Choisir --</option>
                   {sortClasses(db.classes.filter(c => c.schoolId === currentSchool?.id)).map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.type})</option>
+                    <option key={c.id} value={c.id}>{getClassOptionLabel(c, db.classes)} ({c.type})</option>
                   ))}
                 </select>
               </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getDisplayClassName,
+  getClassOptionLabel,
   normalizeFrancophoneMaternelleLevel
 } from './classCatalog';
 import { sortClasses } from './sortClasses';
@@ -75,5 +76,40 @@ describe('francophone maternelle class compatibility', () => {
       'SIL',
       'CP'
     ]);
+  });
+});
+
+describe('getClassOptionLabel', () => {
+  it('keeps the normalized label simple when it is unique', () => {
+    const classItem = { id: 'abc', name: 'Maternelle 1' };
+
+    expect(getClassOptionLabel(classItem, [classItem])).toBe('Maternelle Petite Section');
+  });
+
+  it('uses a short stable ID suffix for duplicate display labels', () => {
+    const classes = [
+      { id: 'abc123456', name: 'Maternelle 1' },
+      { id: 'xyz987654', name: 'Petite Section' }
+    ];
+
+    expect(classes.map(item => getClassOptionLabel(item, classes))).toEqual([
+      'Maternelle Petite Section · 123456',
+      'Maternelle Petite Section · 987654'
+    ]);
+  });
+
+  it('preserves every distinct class ID and option', () => {
+    const classes = [
+      { id: 'abc123456', name: 'Maternelle 1' },
+      { id: 'xyz987654', name: 'Petite Section' }
+    ];
+    const options = classes.map(item => ({
+      value: item.id,
+      label: getClassOptionLabel(item, classes)
+    }));
+
+    expect(options).toHaveLength(classes.length);
+    expect(options.map(option => option.value)).toEqual(classes.map(item => item.id));
+    expect(new Set(options.map(option => option.label)).size).toBe(classes.length);
   });
 });

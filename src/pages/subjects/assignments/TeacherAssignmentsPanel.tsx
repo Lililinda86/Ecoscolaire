@@ -5,6 +5,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { getSchoolTeacherAssignments, type TeacherAssignment } from '../../../services/teacherAssignments';
 import { getTeacherAssignmentCandidates, manageTeacherAssignment, type TeacherAssignmentCandidate, type TeacherAssignmentError } from '../../../services/teacherAssignmentFunctions';
 import { getActiveAcademicYearId } from '../../../utils/academicYearDeduplication';
+import { getClassOptionLabel } from '../../../utils/classCatalog';
 
 type ModalMode = 'create' | 'edit' | null;
 const fieldStyle: React.CSSProperties = { width: '100%', minHeight: 42, padding: '0.55rem 0.7rem', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--card-bg, white)' };
@@ -50,7 +51,7 @@ export const TeacherAssignmentsPanel: React.FC = () => {
   useEffect(() => { void reload(); }, [reload]);
 
   const teacherName = (id: string) => candidates.find(row => row.teacherStaffId === id)?.name || db?.staff?.find(row => row.id === id)?.name || 'Enseignant inconnu';
-  const className = (id: string) => db?.classes?.find(row => row.id === id)?.name || id;
+  const className = (id: string) => { const cls = db?.classes?.find(row => row.id === id); return cls ? getClassOptionLabel(cls, db?.classes || []) : id; };
   const subjectName = (id: string) => db?.subjects?.find(row => row.id === id)?.name || id;
   const yearName = (id: string) => db?.academicYears?.find(row => row.id === id)?.name || id;
   const compatibility = (assignment: TeacherAssignment) => {
@@ -97,7 +98,7 @@ export const TeacherAssignmentsPanel: React.FC = () => {
     </div>
     <div className="card" aria-label="Filtres des affectations" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.65rem' }}>
       <select aria-label="Année scolaire" style={fieldStyle} value={yearFilter} onChange={event => setYearFilter(event.target.value)}><option value="">Toutes les années</option>{(db?.academicYears || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
-      <select aria-label="Classe" style={fieldStyle} value={classFilter} onChange={event => setClassFilter(event.target.value)}><option value="">Toutes les classes</option>{(db?.classes || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+      <select aria-label="Classe" style={fieldStyle} value={classFilter} onChange={event => setClassFilter(event.target.value)}><option value="">Toutes les classes</option>{(db?.classes || []).map(row => <option key={row.id} value={row.id}>{getClassOptionLabel(row, db?.classes || [])}</option>)}</select>
       <select aria-label="Enseignant" style={fieldStyle} value={teacherFilter} onChange={event => setTeacherFilter(event.target.value)}><option value="">Tous les enseignants</option>{candidates.map(row => <option key={row.teacherStaffId} value={row.teacherStaffId}>{row.name}</option>)}</select>
       <select aria-label="Matière" style={fieldStyle} value={subjectFilter} onChange={event => setSubjectFilter(event.target.value)}><option value="">Toutes les matières</option>{(db?.subjects || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
       <select aria-label="Statut" style={fieldStyle} value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">Tous les statuts</option><option value="draft">DRAFT</option><option value="active">ACTIVE</option><option value="inactive">INACTIVE</option></select>
@@ -116,7 +117,7 @@ export const TeacherAssignmentsPanel: React.FC = () => {
       <form onSubmit={submitDraft} style={{ display: 'grid', gap: '0.8rem' }}>
         {modalMode === 'create' && <>
           <label>Année scolaire<select required style={fieldStyle} value={form.academicYearId} onChange={event => setForm({ ...form, academicYearId: event.target.value })}><option value="">Sélectionner</option>{(db?.academicYears || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
-          <label>Classe<select required style={fieldStyle} value={form.classId} onChange={event => setForm({ ...form, classId: event.target.value })}><option value="">Sélectionner</option>{(db?.classes || []).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+          <label>Classe<select required style={fieldStyle} value={form.classId} onChange={event => setForm({ ...form, classId: event.target.value })}><option value="">Sélectionner</option>{(db?.classes || []).map(row => <option key={row.id} value={row.id}>{getClassOptionLabel(row, db?.classes || [])}</option>)}</select></label>
           <label>Matière<select required style={fieldStyle} value={form.subjectId} onChange={event => setForm({ ...form, subjectId: event.target.value })}><option value="">Sélectionner</option>{(db?.subjects || []).filter(row => row.isActive !== false).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
           <label>Enseignant<select required style={fieldStyle} value={form.teacherStaffId} onChange={event => setForm({ ...form, teacherStaffId: event.target.value })}><option value="">Sélectionner</option>{candidates.filter(row => row.isEligible).map(row => <option key={row.teacherStaffId} value={row.teacherStaffId}>{row.name} · {row.accountStatus === 'linked' ? 'compte lié' : 'DRAFT uniquement'}</option>)}</select></label>
         </>}

@@ -9,6 +9,7 @@ import {
 } from '../services/pedagogyService';
 import type { TeachingPlanItem } from '../types';
 import { canEditTeachingPlan, canValidateTeachingPlan } from '../validators';
+import { getClassOptionLabel } from '../../../utils/classCatalog';
 
 export default function PedagogyPlanning() {
   const { db, currentSchool, currentUser } = useAppContext();
@@ -55,7 +56,7 @@ export default function PedagogyPlanning() {
     <PedagogyNav />
     {(workspace.error || message) && <div className={`pedagogy-alert${workspace.error ? ' pedagogy-alert--error' : ''}`}>{workspace.error || message}</div>}
     <section className="pedagogy-toolbar">
-      <label>Classe<select value={classId} onChange={event => { setClassId(event.target.value); setItems([]); }}><option value="">Choisir…</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label>Classe<select value={classId} onChange={event => { setClassId(event.target.value); setItems([]); }}><option value="">Choisir…</option>{classes.map(item => <option key={item.id} value={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
       <label>Semaine<select value={weekStartDate} onChange={event => { setWeekStartDate(event.target.value); setItems([]); }}><option value="">Choisir…</option>{workspace.weeks.map(item => <option key={item.id} value={item.weekStartDate}>S{item.weekNumber} · {item.weekStartDate}</option>)}</select></label>
       <button className="pedagogy-button pedagogy-button--secondary" disabled={readOnly || !year} onClick={() => void initialize()}>Initialiser les semaines</button>
       <button className="pedagogy-button" disabled={readOnly || !classId || !weekStartDate} onClick={() => void run(createProposal, 'Proposition générée.')}>{plan ? 'Regénérer la proposition' : 'Créer la proposition'}</button>

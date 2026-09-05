@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ClassSection, TechnicalSpecialty } from '../../../types';
 import { sortClasses } from '../../../utils/sortClasses';
+import { getClassOptionLabel } from '../../../utils/classCatalog';
 import {
   normalizeClassSection,
   normalizeClassCycle,
@@ -182,7 +183,7 @@ export const ClassProgramSelectors: React.FC<ClassProgramSelectorsProps> = ({
               <optgroup label={groupLabel} key={groupLabel}>
                 {list.map((cls) => (
                   <option key={cls.id} value={cls.id}>
-                    {cls.name}
+                    {getClassOptionLabel(cls, classes)}
                   </option>
                 ))}
               </optgroup>

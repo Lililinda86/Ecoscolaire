@@ -5,6 +5,7 @@ import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { PreparationStatus } from '../components/PreparationStatus';
 import { useLessonPreparations } from '../hooks/useLessonPreparations';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
+import { getClassOptionLabel } from '../../../utils/classCatalog';
 
 export default function PedagogyMissingPreparations() {
   const { db, currentSchool } = useAppContext();
@@ -22,7 +23,7 @@ export default function PedagogyMissingPreparations() {
     <PedagogyNav />
     {state.error && <div className="pedagogy-alert pedagogy-alert--error">{state.error}</div>}
     <section className="pedagogy-toolbar">
-      <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
       <label>Semaine<select value={selectedWeekStartDate} onChange={event => setWeekStartDate(event.target.value)}>{workspace.weeks.map(item => <option key={item.id} value={item.weekStartDate}>S{item.weekNumber} · {item.weekStartDate}</option>)}</select></label>
       <Link className="pedagogy-button pedagogy-button--secondary" to="/pedagogy/preparations">Retour au suivi</Link>
     </section>
