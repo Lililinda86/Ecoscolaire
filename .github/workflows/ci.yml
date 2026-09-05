@@ -80,10 +80,14 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Validate Student Progressive Registration Staging preflight
+      - name: Run Student Progressive Registration contracts
+        run: |
+          node --test tests/security/student-progressive-registration-locators.spec.mjs
+          node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
+
+      - name: Validate Student Progressive Registration Staging harness
         run: |
           node --check scripts/test-student-progressive-registration-staging.mjs
-          node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
           npx --no-install js-yaml .github/workflows/ci.yml > /dev/null
           npx --no-install js-yaml .github/workflows/student-progressive-registration-staging-ui.yml > /dev/null
           echo "Targeted workflow YAML PASS"
