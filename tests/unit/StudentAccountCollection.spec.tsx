@@ -1,9 +1,13 @@
 /** @vitest-environment jsdom */
 import React from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import StudentAccountCollection from '../../src/components/StudentAccountCollection';
 import type { School, Student } from '../../src/types';
+
+const collectionCss = readFileSync(resolve(process.cwd(), 'src/components/StudentAccountCollection.css'), 'utf8');
 
 const mocks = vi.hoisted(() => ({ getAccount: vi.fn(), recordCollection: vi.fn() }));
 
@@ -68,6 +72,16 @@ describe('StudentAccountCollection', () => {
     expect(screen.getByLabelText('Montant reçu pour Transport')).toBeTruthy();
     expect(screen.getByRole('button', { name: /ENCAISSER/ }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(students[0].name)).toBeTruthy();
+  });
+
+  it('uses one desktop scroll container with a two-panel workspace and a sticky payment panel', () => {
+    expect(collectionCss).toMatch(/\.account-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+310px/);
+    expect(collectionCss).toMatch(/\.collection-basket\s*\{[^}]*position:\s*sticky[^}]*align-self:\s*start/);
+    const obligationListRule = collectionCss.match(/\.obligation-list\s*\{([^}]*)\}/)?.[1] || '';
+    expect(obligationListRule).not.toMatch(/overflow:\s*(auto|scroll)/);
+    expect(obligationListRule).not.toMatch(/max-height/);
+    expect(collectionCss).toMatch(/@media\s*\(max-width:\s*900px\)[\s\S]*\.account-workspace\s*\{[^}]*grid-template-columns:\s*1fr/);
+    expect(collectionCss).toMatch(/@media\s*\(max-width:\s*900px\)[\s\S]*\.collection-basket\s*\{[^}]*position:\s*static/);
   });
 
   it('submits only selected targets and integer amounts, then renders one global receipt', async () => {
@@ -152,7 +166,22 @@ describe('StudentAccountCollection', () => {
     expect(screen.getByText('En retard')).toBeTruthy();
     expect(screen.getAllByText(/40.000 FCFA/).length).toBeGreaterThan(0);
     expect(screen.getByText('MORATOIRE')).toBeTruthy();
+    const statusGroup = screen.getByText('MORATOIRE').closest('.obligation-status-group');
+    expect(statusGroup?.textContent).toContain('Nouvelle échéance : 05/11/2026');
+    expect(statusGroup?.textContent).not.toContain('05/10/2026');
     expect(screen.getByText('Avantage')).toBeTruthy();
+  });
+
+  it('places the server-provided applicable due date next to every payable status', async () => {
+    render(<StudentAccountCollection students={students} school={school} initialStudentId="student-1"
+      classNamesById={{ 'class-1': 'CP' }} onClose={vi.fn()} />);
+    await screen.findByText('Frais à régler');
+
+    const statusBadges = screen.getAllByText('À PAYER');
+    expect(statusBadges).toHaveLength(account.lines.length);
+    for (const badge of statusBadges) {
+      expect(badge.closest('.obligation-status-group')?.textContent).toContain('Échéance : 05/10/2026');
+    }
   });
 
   it('clears every allocation and stale account detail when the selected student changes', async () => {

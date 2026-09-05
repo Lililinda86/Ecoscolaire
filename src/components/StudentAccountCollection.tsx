@@ -81,6 +81,12 @@ const statusLabel = (line: AccountLine): string => {
   return 'À PAYER';
 };
 
+const statusDueDate = (line: AccountLine): string | null => line.moratoriumStatus === 'ACTIVE'
+  ? line.effectiveDueDate
+  : line.effectiveDueDate || line.originalDueDate;
+
+const statusDueLabel = (line: AccountLine): string => line.moratoriumStatus === 'ACTIVE' ? 'Nouvelle échéance' : 'Échéance';
+
 const normalizeAmount = (value: string): number => {
   if (!/^\d+$/.test(value.trim())) return 0;
   const amount = Number(value);
@@ -339,14 +345,19 @@ const StudentAccountCollection: React.FC<Props> = ({
               {payableLines.map(line => <article className="obligation-row" key={line.key}>
                 <div className="obligation-main">
                   <strong>{line.label}</strong>
-                  <span className={`account-status status-${statusLabel(line).toLowerCase().replace(/\s+/g, '-')}`}>{statusLabel(line)}</span>
+                  <div className="obligation-status-group">
+                    <span className={`account-status status-${statusLabel(line).toLowerCase().replace(/\s+/g, '-')}`}>{statusLabel(line)}</span>
+                    {statusDueDate(line) && <span className="status-due-date">
+                      {statusDueLabel(line)} : <strong>{formatDueDate(statusDueDate(line))}</strong>
+                    </span>}
+                  </div>
                 </div>
                 <div className="obligation-values">
                   <span>Tarif de référence <b>{formatCurrency(line.grossExpectedAmount)}</b></span>
                   {line.discountAmount > 0 && <span className="line-discount">Avantage <b>- {formatCurrency(line.discountAmount)}</b></span>}
                   <span>Montant dû <b>{formatCurrency(line.netExpectedAmount)}</b></span>
                   <span>Déjà payé <b>{formatCurrency(line.previousPaid)}</b></span>
-                  <span>Échéance initiale <b>{line.originalDueDate ? formatDueDate(line.originalDueDate) : 'Non configurée'}</b></span>
+                  {line.moratoriumStatus === 'ACTIVE' && <span>Échéance initiale <b>{line.originalDueDate ? formatDueDate(line.originalDueDate) : 'Non configurée'}</b></span>}
                   {line.moratoriumStatus === 'ACTIVE' && <span className="line-effective-due">Échéance effective <b>{line.effectiveDueDate ? formatDueDate(line.effectiveDueDate) : 'Non configurée'}</b></span>}
                   <span className="line-remaining">Reste à payer <b>{formatCurrency(line.remainingBalance)}</b></span>
                 </div>
@@ -369,7 +380,10 @@ const StudentAccountCollection: React.FC<Props> = ({
                 <span>Échéance initiale : {line.originalDueDate ? formatDueDate(line.originalDueDate) : 'Non configurée'}</span>
                 {line.moratoriumStatus === 'ACTIVE' && <span>Échéance effective : {line.effectiveDueDate ? formatDueDate(line.effectiveDueDate) : 'Non configurée'}</span>}
                 <span>Reste à payer : {formatCurrency(line.remainingBalance)}</span>
-                <span className="account-status status-soldé">SOLDÉ</span>
+                <div className="settled-status-group">
+                  <span className="account-status status-soldé">SOLDÉ</span>
+                  {statusDueDate(line) && <span className="status-due-date">{statusDueLabel(line)} : <strong>{formatDueDate(statusDueDate(line))}</strong></span>}
+                </div>
               </div>)}</div>
             </details>}
           </section>
