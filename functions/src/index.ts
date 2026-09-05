@@ -3093,3 +3093,5 @@ export {
   recordCashPayment,
   reversePayment
 } from './secretaryCollections';
+export { getStudentFinancialAccount, recordCashCollection } from './studentAccountCollections';
+export { reverseCashCollection } from './reverseStudentAccountCollection';
