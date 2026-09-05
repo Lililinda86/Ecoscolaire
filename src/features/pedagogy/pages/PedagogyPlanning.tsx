@@ -63,6 +63,7 @@ export default function PedagogyPlanning() {
     <div className="pedagogy-alert">Progression planifiée uniquement — la progression réalisée sera alimentée par le Lot B.</div>
     {plan && <section className="pedagogy-card">
       <div className="pedagogy-card-title"><div><h2>{classes.find(item => item.id === plan.classId)?.name || plan.classId}</h2><p>Semaine {plan.weekNumber}, du {plan.weekStartDate} au {plan.weekEndDate}</p></div><StatusBadge status={plan.status} /></div>
+      {plan.teacherValidated && <p className="pedagogy-alert">Validation de l’enseignant enregistrée par la secrétaire</p>}
       <div className="pedagogy-schedule">
         {items.map((item, index) => <article key={item.id}>
           <div className="pedagogy-slot">{['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'][item.dayIndex]} · Créneau {item.slotIndex}</div><strong>{item.subjectName}</strong>
