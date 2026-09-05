@@ -365,6 +365,17 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
             testInfo.project.use.baseURL as string,
           );
           await loginAs(rolePage, identity.email, identity.password);
+          if (identity.role === "superAdmin") {
+            await expect(
+              rolePage.getByRole("heading", { name: "Espace Super Admin SaaS" }),
+            ).toBeVisible();
+            await rolePage
+              .getByRole("row")
+              .filter({ hasText: "École E2E Pédagogie" })
+              .getByRole("button", { name: "Accéder" })
+              .click();
+            await expect(rolePage.getByTestId("nav-dashboard")).toBeVisible();
+          }
           await rolePage.goto("/#/pedagogy");
           await expect(rolePage.getByTestId("nav-pedagogy")).toBeVisible({
             timeout: 15_000,
