@@ -26,11 +26,15 @@
 .benefit-list p svg { grid-row: 1 / 3; color: #15803d; margin-top: .1rem; }
 .benefit-list p span { color: var(--text-secondary); font-size: .78rem; }
 .account-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 1rem; align-items: start; }
+.obligations { min-width: 0; }
 .obligations h3, .collection-basket h3 { margin: 0 0 .75rem; }
-.obligation-list { display: grid; gap: .6rem; max-height: 54vh; overflow: auto; padding-right: .25rem; }
+.obligation-list { display: grid; gap: .6rem; min-width: 0; }
 .obligation-row { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(340px, 1.65fr) minmax(145px, .7fr); gap: .75rem; align-items: center; padding: .85rem; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface-color, #fff); }
 .obligation-main { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
 .obligation-main > strong { min-width: 100%; overflow-wrap: anywhere; }
+.obligation-status-group, .settled-status-group { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; }
+.status-due-date { color: var(--text-secondary); font-size: .75rem; line-height: 1.25; }
+.status-due-date strong { color: var(--text-primary); }
 .account-status, .benefit-label { display: inline-flex; padding: .16rem .42rem; border-radius: 999px; font-size: .68rem; font-weight: 800; letter-spacing: .02em; border: 1px solid currentColor; }
 .status-soldé { color: #166534; background: #f0fdf4; }
 .status-en-retard { color: #991b1b; background: #fef2f2; }
@@ -55,8 +59,8 @@
 .settled-fees summary { cursor: pointer; font-weight: 700; }
 .settled-fee { display: grid; grid-template-columns: minmax(130px, 1fr) repeat(2, auto) auto; align-items: center; gap: .75rem; margin-top: .55rem; padding-top: .55rem; border-top: 1px solid var(--border-color); font-size: .78rem; }
 .settled-fee > span:not(.account-status) { color: var(--text-secondary); }
-.settled-fee .account-status { justify-self: end; }
-.collection-basket { position: sticky; top: 0; display: grid; gap: .65rem; padding: 1rem; border: 1px solid #bfdbfe; background: #f8fafc; border-radius: 12px; }
+.settled-status-group { justify-self: end; }
+.collection-basket { position: sticky; top: .5rem; align-self: start; display: grid; gap: .65rem; padding: 1rem; border: 1px solid #bfdbfe; background: #f8fafc; border-radius: 12px; }
 .collection-basket > button[type='submit'] { font-size: .95rem; font-weight: 800; }
 .basket-line, .basket-total, .receipt-line, .receipt-total { display: flex; justify-content: space-between; gap: .75rem; }
 .basket-total, .receipt-total { border-top: 2px solid #94a3b8; padding-top: .65rem; font-size: 1.05rem; }
@@ -80,8 +84,8 @@
   .obligation-row { grid-template-columns: 1fr; }
   .obligation-row details { grid-column: auto; }
   .settled-fee { grid-template-columns: 1fr; }
+  .settled-status-group { justify-self: start; }
   .collection-basket { position: static; }
-  .obligation-list { max-height: none; overflow: visible; }
 }
 @media (max-width: 560px) {
   .account-summary { grid-template-columns: 1fr 1fr; }
