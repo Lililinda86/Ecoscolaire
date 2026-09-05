@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const appUrl = process.env.STAGING_APP_URL;
 if (!appUrl) throw new Error("STAGING_APP_URL is required.");
+const vercelBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
 export default defineConfig({
   testDir: "./tests",
@@ -17,6 +18,9 @@ export default defineConfig({
     baseURL: appUrl,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    extraHTTPHeaders: vercelBypassSecret
+      ? { "x-vercel-protection-bypass": vercelBypassSecret }
+      : undefined,
   },
   projects: [
     {
