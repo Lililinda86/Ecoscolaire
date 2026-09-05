@@ -4,12 +4,12 @@ export async function loginAs(page: Page, email: string, password: string) {
   const logs: string[] = [];
   page.on('console', msg => logs.push(`[BROWSER] ${msg.text()}`));
 
-  await page.goto('/#/login');
+  await page.goto('/#/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
   
   // Remplissage du formulaire
-  await page.getByTestId('login-email').fill(email);
-  await page.getByTestId('login-password').fill(password);
-  await page.getByTestId('login-submit').click();
+  await page.getByTestId('login-email').fill(email, { timeout: 30_000 });
+  await page.getByTestId('login-password').fill(password, { timeout: 30_000 });
+  await page.getByTestId('login-submit').click({ timeout: 30_000 });
 
   // Attendre la redirection ou une erreur
   let result = 'timeout';
