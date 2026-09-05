@@ -1,0 +1,305 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import {
+  REGISTRATION_ACTION_NAMES,
+  REGISTRATION_CONTROL_SCOPES,
+  REGISTRATION_CONTROL_SELECTORS,
+  REGISTRATION_CONTROL_STEPS,
+  REGISTRATION_SCOPE_HEADINGS,
+  REGISTRATION_STATUS_NAMES,
+  STUDENT_IMPORT_TEST_IDS,
+  requireRegistrationControlStep,
+  requireUniqueRegistrationLocatorCount,
+  waitForUniqueRegistrationLocator
+} from './student-progressive-registration-locator-contract.mjs';
+
+const studentsSource = readFileSync(new URL('../../src/pages/Students.tsx', import.meta.url), 'utf8');
+const harnessSource = readFileSync(new URL('../../scripts/test-student-progressive-registration-staging.mjs', import.meta.url), 'utf8');
+const scenarioA = harnessSource.slice(
+  harnessSource.indexOf('async function scenarioMinimal()'),
+  harnessSource.indexOf('async function scenarioReload()')
+);
+const scenarioC = harnessSource.slice(
+  harnessSource.indexOf('async function scenarioComplete()'),
+  harnessSource.indexOf('async function scenarioTransport()')
+);
+const scenarioF = harnessSource.slice(
+  harnessSource.indexOf('async function scenarioExcel()'),
+  harnessSource.indexOf('async function cleanup()')
+);
+
+function occurrences(source, needle) {
+  return source.split(needle).length - 1;
+}
+
+function sourceWindow(marker, before = 350, after = 500) {
+  assert.equal(occurrences(studentsSource, marker), 1, `DOM marker must be unique: ${marker}`);
+  const index = studentsSource.indexOf(marker);
+  return studentsSource.slice(Math.max(0, index - before), index + marker.length + after);
+}
+
+function requireScenarioControl(name) {
+  assert.match(scenarioA, new RegExp(`registrationControl\\(form, '${name}'\\)`));
+  assert.match(harnessSource, /scope\.locator\(REGISTRATION_CONTROL_SELECTORS\[name\]\)/);
+}
+
+function requireScenarioCControl(name, step) {
+  assert.equal(REGISTRATION_CONTROL_STEPS[name], step);
+  assert.match(scenarioC, new RegExp(`registrationControl\\(form, '${name}', ${step}\\)`));
+}
+
+test('Nom locator matches the unique required text input in wizard step 1', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.lastName, 'input[required][placeholder="Ex: N’GONO"]');
+  const block = sourceWindow('placeholder="Ex: N’GONO"', 900, 100);
+  assert.match(block, /<label>Nom <span/);
+  assert.match(block, /<input[\s\S]*?required[\s\S]*?value=\{currentStudent\.studentLastName \|\| ''\}/);
+  requireScenarioControl('lastName');
+});
+
+test('Prénom locator matches the unique required input in wizard step 1', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.firstName, 'input[required][aria-describedby="student-first-name-error"]');
+  const block = sourceWindow('aria-describedby="student-first-name-error"');
+  assert.match(block, /<label>Prénom\(s\) <span/);
+  assert.match(block, /<input[\s\S]*?required[\s\S]*?value=\{currentStudent\.studentFirstName \|\| ''\}/);
+  requireScenarioControl('firstName');
+});
+
+test('Sexe locator matches the unique M/F select in wizard step 1', () => {
+  const block = sourceWindow('value={currentStudent.gender}', 200, 400);
+  assert.match(block, /<label>Sexe <span/);
+  assert.match(block, /<option value="M">Masculin<\/option>/);
+  assert.match(block, /<option value="F">Féminin<\/option>/);
+  requireScenarioControl('gender');
+});
+
+test('Section locator matches the unique francophone/anglophone select in wizard step 2', () => {
+  const block = sourceWindow('value={currentStudent.section}', 250, 700);
+  assert.match(block, /t\('section', 'Section'\)/);
+  assert.match(block, /<option value="francophone">Francophone<\/option>/);
+  assert.match(block, /<option value="anglophone">Anglophone<\/option>/);
+  requireScenarioControl('section');
+});
+
+test('Classe locator matches the unique required select in wizard step 2', () => {
+  const block = sourceWindow("value={currentStudent.classId || ''}", 250, 300);
+  assert.match(block, /<label>Classe <span/);
+  assert.match(block, /<select[\s\S]*?required/);
+  requireScenarioControl('classId');
+});
+
+test('Année locator matches the unique read-only active-year input in wizard step 2', () => {
+  const block = sourceWindow('aria-label="Année scolaire active"', 500, 100);
+  assert.match(block, /<label>Année Scolaire<\/label>/);
+  assert.match(block, /<input[\s\S]*?readOnly/);
+  assert.match(scenarioA, /academicYear\.inputValue\(\)/);
+  requireScenarioControl('academicYear');
+});
+
+test('wizard navigation uses one exact form-scoped Suivant action', () => {
+  assert.equal(REGISTRATION_ACTION_NAMES.next, 'Suivant');
+  assert.match(harnessSource, /form\.getByRole\('button', \{ name: REGISTRATION_ACTION_NAMES\[name\], exact: true \}\)/);
+  assert.equal(occurrences(scenarioA, 'await clickNext(form);'), 3);
+});
+
+test('save uses one exact form-scoped Enregistrer action', () => {
+  assert.equal(REGISTRATION_ACTION_NAMES.save, 'Enregistrer');
+  assert.match(scenarioA, /registrationAction\(form, 'save'\)/);
+});
+
+test('Date de naissance locator matches the unique date input in wizard step 1', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.dob, 'input[type="date"]');
+  const block = sourceWindow("value={currentStudent.dob || ''}", 200, 200);
+  assert.match(block, /<label>Date de Naissance<\/label>/);
+  assert.match(block, /value=\{currentStudent\.dob \|\| ''\}/);
+  assert.doesNotMatch(block, /readOnly/);
+  requireScenarioCControl('dob', 1);
+});
+
+test('Lieu de naissance locator uses its exact unique placeholder in wizard step 1', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.placeOfBirth, 'input[placeholder="Ex: Yaoundé"]');
+  const block = sourceWindow('placeholder="Ex: Yaoundé"', 300, 100);
+  assert.match(block, /<label>Lieu de Naissance<\/label>/);
+  assert.match(block, /value=\{currentStudent\.placeOfBirth \|\| ''\}/);
+  assert.doesNotMatch(block, /readOnly/);
+  requireScenarioCControl('placeOfBirth', 1);
+});
+
+test('responsable controls are scoped to the unique legal guardian section', () => {
+  assert.equal(REGISTRATION_SCOPE_HEADINGS.guardian, '🏠 Responsable Légal Principal (à compléter)');
+  for (const name of ['parentName', 'parentPhone', 'address', 'emergencyContact']) {
+    assert.equal(REGISTRATION_CONTROL_SCOPES[name], 'guardian');
+  }
+  assert.match(harnessSource, /form\.getByRole\('heading', \{ name: REGISTRATION_SCOPE_HEADINGS\[scopeName\], exact: true \}\)\.locator\('\.\.'\)/);
+});
+
+test('Nom du responsable locator matches the exact guardian input in wizard step 3', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.parentName, 'input[placeholder="Ex: Paul Dupont"]');
+  const block = sourceWindow('placeholder="Ex: Paul Dupont"', 250, 100);
+  assert.match(block, /<label>Nom du Responsable<\/label>/);
+  assert.match(block, /value=\{currentStudent\.parentName \|\| ''\}/);
+  requireScenarioCControl('parentName', 3);
+});
+
+test('Téléphone responsable locator resolves the duplicate placeholder inside guardian scope', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.parentPhone, 'input[placeholder="Ex: +237650336558"]');
+  assert.equal(occurrences(studentsSource, 'placeholder="Ex: +237650336558"'), 2);
+  const block = sourceWindow('value={currentStudent.parentPhone || \'\'}', 250, 200);
+  assert.match(block, /<label>Contact \(Téléphone\)<\/label>/);
+  assert.match(block, /placeholder="Ex: \+237650336558"/);
+  requireScenarioCControl('parentPhone', 3);
+});
+
+test('Adresse locator matches the exact guardian input in wizard step 3', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.address, 'input[placeholder="Ex: Akwa, Douala"]');
+  const block = sourceWindow('placeholder="Ex: Akwa, Douala"', 250, 100);
+  assert.match(block, /<label>Adresse d'habitation<\/label>/);
+  assert.match(block, /value=\{currentStudent\.address \|\| ''\}/);
+  requireScenarioCControl('address', 3);
+});
+
+test('Contact urgence locator matches the exact guardian input in wizard step 3', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.emergencyContact, 'input[placeholder="Numéro en cas d\'urgence"]');
+  const block = sourceWindow('placeholder="Numéro en cas d\'urgence"', 250, 100);
+  assert.match(block, /<label>Contact d'Urgence<\/label>/);
+  assert.match(block, /value=\{currentStudent\.emergencyContact \|\| ''\}/);
+  requireScenarioCControl('emergencyContact', 3);
+});
+
+test('medical information controls expose stable unique ids in wizard step 4', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.allergies, '#student-allergies-input');
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.medicalConditions, '#student-medical-conditions-input');
+  assert.equal(REGISTRATION_CONTROL_STEPS.allergies, 4);
+  assert.equal(REGISTRATION_CONTROL_STEPS.medicalConditions, 4);
+  assert.match(sourceWindow('id="student-allergies-input"'), /<textarea[\s\S]*?value=\{currentStudent\.allergies \|\| ''\}/);
+  assert.match(sourceWindow('id="student-medical-conditions-input"'), /<textarea[\s\S]*?value=\{currentStudent\.medicalConditions \|\| ''\}/);
+});
+
+test('absence de problème médical uses the stable checkbox id in wizard step 4', () => {
+  assert.equal(REGISTRATION_CONTROL_SELECTORS.noMedicalCondition, '#student-no-medical-condition-checkbox');
+  const block = sourceWindow('id="student-no-medical-condition-checkbox"', 250, 500);
+  assert.match(block, /type="checkbox"/);
+  assert.match(block, /checked=\{noMedicalConditionConfirmed\}/);
+  assert.match(block, /Aucune allergie ou condition médicale connue à signaler/);
+  requireScenarioCControl('noMedicalCondition', 4);
+});
+
+test('scenario C uses exact form-scoped wizard actions', () => {
+  assert.equal(occurrences(scenarioC, 'await clickNext(form);'), 3);
+  assert.match(scenarioC, /registrationAction\(form, 'save'\)/);
+  assert.match(harnessSource, /form\.getByRole\('button', \{ name: REGISTRATION_ACTION_NAMES\[name\], exact: true \}\)/);
+});
+
+test('scenario C waits for the exact row-scoped complete badge before enforcing uniqueness', () => {
+  assert.equal(REGISTRATION_STATUS_NAMES.complete, 'Dossier complet');
+  assert.match(studentsSource, /\{isComplete \? 'Dossier complet' : 'À compléter'\}/);
+  assert.match(scenarioC, /row\.getByText\(REGISTRATION_STATUS_NAMES\.complete, \{ exact: true \}\)/);
+  assert.match(scenarioC, /'complete registration badge',\s*30_000/);
+});
+
+test('async unique locator guard accepts delayed render and classifies missing or duplicate controls', async () => {
+  let delayedCount = 0;
+  const delayed = {
+    async waitFor() { delayedCount = 1; },
+    async count() { return delayedCount; }
+  };
+  assert.equal(await waitForUniqueRegistrationLocator(delayed, 'delayed badge'), delayed);
+
+  const missing = {
+    async waitFor() { throw new Error('timeout'); },
+    async count() { return 0; }
+  };
+  await assert.rejects(
+    waitForUniqueRegistrationLocator(missing, 'missing badge'),
+    error => error?.code === 'MISSING_REGISTRATION_CONTROL'
+  );
+
+  const duplicate = {
+    async waitFor() { throw new Error('strict mode violation'); },
+    async count() { return 2; }
+  };
+  await assert.rejects(
+    waitForUniqueRegistrationLocator(duplicate, 'duplicate badge'),
+    error => error?.code === 'AMBIGUOUS_REGISTRATION_CONTROL'
+  );
+});
+
+test('all registration result badges wait in a unique student row without arbitrary first', () => {
+  assert.equal(occurrences(harnessSource, 'REGISTRATION_STATUS_NAMES.incomplete'), 4);
+  assert.equal(occurrences(harnessSource, 'REGISTRATION_STATUS_NAMES.complete'), 1);
+  assert.doesNotMatch(harnessSource, /page\.locator\('tbody tr'\)\.filter\(\{ hasText: [^}]+ \}\)\.first\(\)/);
+  assert.doesNotMatch(harnessSource, /getByRole\('button', \{ name: 'Enregistrer' \}\)/);
+});
+
+test('scenario C wrong wizard steps fail with an explicit classification', () => {
+  assert.throws(() => requireRegistrationControlStep('placeOfBirth', 3), error => error?.code === 'WRONG_REGISTRATION_WIZARD_STEP');
+  assert.doesNotThrow(() => requireRegistrationControlStep('placeOfBirth', 1));
+});
+
+test('scenario C missing and ambiguous controls fail immediately', () => {
+  assert.throws(() => requireUniqueRegistrationLocatorCount('placeOfBirth', 0), error => error?.code === 'MISSING_REGISTRATION_CONTROL');
+  assert.throws(() => requireUniqueRegistrationLocatorCount('parentPhone', 2), error => error?.code === 'AMBIGUOUS_REGISTRATION_CONTROL');
+});
+
+test('scenario C contains no re-rooted has locator, arbitrary first, global text locator, or sleep', () => {
+  assert.doesNotMatch(harnessSource, /function formField\(/);
+  assert.doesNotMatch(scenarioC, /filter\(\{\s*has:|\.first\(\)|page\.getByText\(|waitForTimeout\(|sleep\(/);
+  assert.equal(occurrences(scenarioC, "registrationControl(form, '"), 7);
+});
+
+test('missing controls fail immediately with an explicit classification', () => {
+  assert.throws(
+    () => requireUniqueRegistrationLocatorCount('lastName', 0),
+    error => error?.code === 'MISSING_REGISTRATION_CONTROL'
+  );
+});
+
+test('duplicate controls fail immediately with an explicit ambiguity classification', () => {
+  assert.throws(
+    () => requireUniqueRegistrationLocatorCount('lastName', 2),
+    error => error?.code === 'AMBIGUOUS_REGISTRATION_CONTROL'
+  );
+  assert.doesNotThrow(() => requireUniqueRegistrationLocatorCount('lastName', 1));
+});
+
+test('scenario A no longer uses approximate labels or global wizard text locators', () => {
+  assert.doesNotMatch(scenarioA, /formField\(|hasText:\s*['"]Étape/);
+  assert.match(harnessSource, /page\.getByTestId\('modal-content'\)/);
+  assert.match(harnessSource, /const REGISTRATION_LOCATOR_TIMEOUT_MS = 5_000/);
+});
+
+test('scenario F exposes one stable locator for every Excel import control', () => {
+  for (const [name, testId] of Object.entries(STUDENT_IMPORT_TEST_IDS)) {
+    assert.equal(occurrences(studentsSource, `data-testid="${testId}"`), 1, `${name} import control must be unique`);
+    assert.match(scenarioF, new RegExp(`STUDENT_IMPORT_TEST_IDS\\.${name}`));
+  }
+  assert.match(sourceWindow('data-testid="student-import-file"', 150, 150), /id="student-import-file"[\s\S]*?name="studentImportFile"[\s\S]*?type="file"/);
+});
+
+test('scenario F uses only unique modal-scoped controls without arbitrary or global fallbacks', () => {
+  assert.match(scenarioF, /page\.getByTestId\(STUDENT_IMPORT_TEST_IDS\.open\)/);
+  assert.match(scenarioF, /modal\.getByTestId\(STUDENT_IMPORT_TEST_IDS\.form\)/);
+  assert.match(scenarioF, /form\.getByTestId\(STUDENT_IMPORT_TEST_IDS\.file\)/);
+  assert.match(scenarioF, /preview\.getByText\(importName, \{ exact: true \}\)/);
+  assert.doesNotMatch(scenarioF, /\.first\(\)|page\.getByText\(|page\.getByRole\(|page\.locator\(|filter\(\{\s*has:|waitForTimeout\(|sleep\(/);
+});
+
+test('Excel import confirmation uses secure student creation and keeps legacy BulkWriter dormant', () => {
+  const confirmation = studentsSource.slice(
+    studentsSource.indexOf('const handleConfirmImport = async () =>'),
+    studentsSource.indexOf('const exportInscriptionsCSV')
+  );
+  assert.match(confirmation, /splitStudentData\(student\)/);
+  assert.match(confirmation, /await createStudentSecure\(\{/);
+  assert.match(confirmation, /requestedMatricule: student\.matricule && student\.matricule !== '-'/);
+  assert.doesNotMatch(confirmation, /writeBatch\(|batch\.set\(|setDoc\(/);
+  assert.doesNotMatch(studentsSource, /Import temporairement indisponible/);
+  assert.throws(
+    () => requireUniqueRegistrationLocatorCount('Excel import file input', 0),
+    error => error?.code === 'MISSING_REGISTRATION_CONTROL'
+  );
+  assert.throws(
+    () => requireUniqueRegistrationLocatorCount('Excel import confirm action', 2),
+    error => error?.code === 'AMBIGUOUS_REGISTRATION_CONTROL'
+  );
+});

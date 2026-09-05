@@ -422,4 +422,116 @@ describe('createStudentSecure callable', () => {
       requestedMatricule: sharedMatricule
     }))).resolves.toMatchObject({ created: true });
   });
+
+  it('31 creates a minimal progressive registration without private administrative fields', async () => {
+    const fixture = await seed();
+    const payload = input(fixture.classId, {
+      privateData: {},
+      parentPrivateData: {}
+    });
+    const result = await call(fixture.uid, payload);
+    const publicDocument = (await db.collection('students').doc(result.studentId).get()).data();
+    const parentPrivateDocument = (await db.collection('studentParentPrivate').doc(result.studentId).get()).data();
+    expect(result).toMatchObject({ created: true });
+    expect(publicDocument).toMatchObject({
+      registrationFileStatus: 'incomplete',
+      missingRegistrationFields: [
+        'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'address',
+        'emergencyContact', 'medicalInformation'
+      ]
+    });
+    expect(parentPrivateDocument).not.toHaveProperty('dob');
+  });
+
+  for (const missingField of ['parentName', 'parentPhone'] as const) {
+    it(`32 accepts a registration without ${missingField}`, async () => {
+      const fixture = await seed();
+      const basePayload = input(fixture.classId);
+      const privateData = { ...basePayload.privateData };
+      delete privateData[missingField];
+      const result = await call(fixture.uid, input(fixture.classId, { privateData }));
+      expect(result).toMatchObject({ created: true });
+      expect((await db.collection('students').doc(result.studentId).get()).data()?.missingRegistrationFields)
+        .toContain(missingField);
+    });
+  }
+
+  it('33 keeps the existing duplicate protection when date of birth is present', async () => {
+    const fixture = await seed();
+    const first = input(fixture.classId);
+    await call(fixture.uid, first);
+    const second = input(fixture.classId, {
+      studentData: { ...first.studentData },
+      privateData: { ...first.privateData }
+    });
+    await expectBusinessError(call(fixture.uid, second), 'PROBABLE_DUPLICATE');
+  });
+
+  it('34 safely allows the same identity without date of birth in distinct operations', async () => {
+    const fixture = await seed();
+    const first = input(fixture.classId, { privateData: {} });
+    const second = input(fixture.classId, {
+      studentData: { ...first.studentData },
+      privateData: {}
+    });
+    const [firstResult, secondResult] = await Promise.all([
+      call(fixture.uid, first),
+      call(fixture.uid, second)
+    ]);
+    expect(firstResult.duplicateFingerprint).not.toBe(secondResult.duplicateFingerprint);
+    expect((await db.collection('students').where('schoolId', '==', fixture.schoolId).get()).size).toBe(2);
+  });
+
+  it('35 allows different students without date of birth', async () => {
+    const fixture = await seed();
+    await expect(Promise.all([
+      call(fixture.uid, input(fixture.classId, { privateData: {} })),
+      call(fixture.uid, input(fixture.classId, { privateData: {} }))
+    ])).resolves.toHaveLength(2);
+  });
+
+  it('36 keeps reservations intact when a missing date of birth is added later', async () => {
+    const fixture = await seed();
+    const result = await call(fixture.uid, input(fixture.classId, { privateData: {} }));
+    await db.collection('studentPrivate').doc(result.studentId).update({ dob: '2018-01-02' });
+    expect((await db.collection('students').doc(result.studentId).get()).exists).toBe(true);
+    expect((await db.collection('studentDuplicateReservations').doc(result.duplicateReservationId).get()).data())
+      .toMatchObject({ studentIds: [result.studentId] });
+    expect((await db.collection('studentPrivate').doc(result.studentId).get()).data()?.dob).toBe('2018-01-02');
+  });
+
+  it('37 computes and persists registration fields instead of trusting client values', async () => {
+    const fixture = await seed();
+    const basePayload = input(fixture.classId);
+    const payload = input(fixture.classId, {
+      studentData: {
+        ...basePayload.studentData,
+        registrationFileStatus: 'complete',
+        missingRegistrationFields: []
+      },
+      privateData: {}
+    });
+    const result = await call(fixture.uid, payload);
+    expect((await db.collection('students').doc(result.studentId).get()).data()).toMatchObject({
+      registrationFileStatus: 'incomplete',
+      missingRegistrationFields: [
+        'dob', 'placeOfBirth', 'parentName', 'parentPhone', 'address',
+        'emergencyContact', 'medicalInformation'
+      ]
+    });
+  });
+
+  it('38 ignores unknown public and private fields', async () => {
+    const fixture = await seed();
+    const basePayload = input(fixture.classId);
+    const payload = input(fixture.classId, {
+      studentData: { ...basePayload.studentData, arbitraryPublicField: 'forbidden' },
+      privateData: { ...basePayload.privateData, arbitraryPrivateField: 'forbidden' }
+    });
+    const result = await call(fixture.uid, payload);
+    expect((await db.collection('students').doc(result.studentId).get()).data())
+      .not.toHaveProperty('arbitraryPublicField');
+    expect((await db.collection('studentPrivate').doc(result.studentId).get()).data())
+      .not.toHaveProperty('arbitraryPrivateField');
+  });
 });

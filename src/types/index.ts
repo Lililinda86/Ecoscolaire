@@ -224,7 +224,10 @@ export interface Student {
   detectedClassName?: string; // Used for Excel import preview
   allergies?: string;
   medicalConditions?: string;
+  noKnownMedicalCondition?: boolean;
   emergencyContact?: string;
+  registrationFileStatus?: 'incomplete' | 'complete';
+  missingRegistrationFields?: string[];
   studentStatus?: 'nouveau' | 'ancien';
   registrationYear?: string;
   registrationFeeExpected?: number;

@@ -12,7 +12,7 @@ import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '..
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { resolveStudentEnrollmentAcademicYear } from '../utils/studentEnrollment';
 import {
   acquireStudentSubmissionLock,
@@ -29,14 +29,19 @@ import {
   canRoleChangeStudentStatus,
   canRoleManageStudents,
   getStudentCreationErrorMessage,
-  getStudentStatusErrorMessage,
-  validateRequiredStudentFields
+  getStudentStatusErrorMessage
 } from '../services/studentManagementPolicy';
 import {
   getTransportEnrollmentStatusLabel,
   isValidTransportZonePk,
   resolveTransportEnrollmentStatus
 } from '../services/studentTransportEnrollment';
+import {
+  getEffectiveRegistrationFile,
+  getMissingStrictCreationFields,
+  getRegistrationFileFields,
+  REGISTRATION_FIELD_LABELS
+} from '../utils/studentRegistration';
 
 const getErrorCode = (error: unknown): string | undefined => {
   if (
@@ -161,7 +166,10 @@ const normalizeImportedBirthDate = (rawValue: unknown): string | null => {
   return isoStr;
 };
 
-const toImportedStudentPayload = (student: Student, schoolId: string): Student => {
+const toImportedStudentPayload = (student: Student, schoolId: string): Student & { id: string; schoolId: string } => {
+  if (!student.id) {
+    throw new Error("Identifiant de l'élève obligatoire");
+  }
   if (!student.studentLastName?.trim()) {
     throw new Error("Nom de l'élève obligatoire");
   }
@@ -174,10 +182,9 @@ const toImportedStudentPayload = (student: Student, schoolId: string): Student =
   if (student.gender !== 'M' && student.gender !== 'F') {
     throw new Error("Sexe de l'élève invalide");
   }
-  const validatedDob = normalizeImportedBirthDate(student.dob);
-  if (!validatedDob) {
-    throw new Error("Date de naissance invalide ou absente");
-  }
+  const rawDob = student.dob?.trim() || '';
+  const validatedDob = rawDob ? normalizeImportedBirthDate(rawDob) : '';
+  if (rawDob && !validatedDob) throw new Error("Date de naissance invalide");
   if (!student.section) {
     throw new Error("Section scolaire invalide ou absente");
   }
@@ -187,10 +194,6 @@ const toImportedStudentPayload = (student: Student, schoolId: string): Student =
   if (!student.classId) {
     throw new Error("Classe de l'élève obligatoire");
   }
-  if (!student.parentName?.trim()) {
-    throw new Error("Nom du responsable légal obligatoire");
-  }
-
   const normalizedLastName = student.studentLastName.trim().replace(/\s+/g, ' ');
   const normalizedFirstName = student.studentFirstName.trim().replace(/\s+/g, ' ');
   const normalizedName = `${normalizedLastName} ${normalizedFirstName}`
@@ -202,7 +205,7 @@ const toImportedStudentPayload = (student: Student, schoolId: string): Student =
     ? normalizedMatricule
     : '-';
 
-  const payload: Student = {
+  const payload: Student & { id: string; schoolId: string } = {
     id: student.id,
     schoolId,
     schoolingStatus: 'active',
@@ -211,11 +214,12 @@ const toImportedStudentPayload = (student: Student, schoolId: string): Student =
     studentFirstName: normalizedFirstName,
     name: normalizedName,
     gender: student.gender,
-    dob: student.dob.trim(),
+    dob: validatedDob || '',
     section: student.section,
     classId: student.classId,
     studentStatus: 'nouveau',
-    parentName: student.parentName.trim()
+    registrationYear: student.registrationYear,
+    parentName: student.parentName?.trim() || ''
   };
 
   if (student.parentPhone?.trim()) {
@@ -239,6 +243,8 @@ const toImportedStudentPayload = (student: Student, schoolId: string): Student =
   if (student.address?.trim()) {
     payload.address = student.address.trim();
   }
+
+  Object.assign(payload, getRegistrationFileFields(payload));
 
   return payload;
 };
@@ -309,6 +315,8 @@ const Students: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   type SchoolingStatusFilter = 'active' | 'inactive' | 'all';
   const [schoolingStatusFilter, setSchoolingStatusFilter] = useState<SchoolingStatusFilter>('active');
+  type RegistrationFileFilter = 'all' | 'complete' | 'incomplete';
+  const [registrationFileFilter, setRegistrationFileFilter] = useState<RegistrationFileFilter>('all');
 
   const [selectedStudentForStatus, setSelectedStudentForStatus] = useState<Student | null>(null);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
@@ -434,7 +442,9 @@ const Students: React.FC = () => {
     const matchStatus = statusFilter === 'all' || (student.studentStatus || 'nouveau') === statusFilter;
     const matchSchoolingStatus = schoolingStatusFilter === 'all' ||
       getStudentSchoolingStatus(student) === schoolingStatusFilter;
-    return matchSearch && matchSection && matchClass && matchStatus && matchSchoolingStatus;
+    const matchRegistrationFile = registrationFileFilter === 'all'
+      || getEffectiveRegistrationFile(student).status === registrationFileFilter;
+    return matchSearch && matchSection && matchClass && matchStatus && matchSchoolingStatus && matchRegistrationFile;
   });
 
   const exportableStudents = filteredStudents.filter(
@@ -478,13 +488,14 @@ const Students: React.FC = () => {
       initEmails = (student.parentEmails || []).join(', ');
       setCurrentStudent(initStudent);
       setParentEmailsInput(initEmails);
+      setNoMedicalConditionConfirmed(student.noKnownMedicalCondition === true);
     } else {
       initStudent = {
         id: crypto.randomUUID(), name: '', studentLastName: '', studentFirstName: '', gender: 'M', dob: '', section: 'francophone', parentName: '', classId: '',
         fatherName: '', fatherPhone: '', fatherProfession: '', motherName: '', motherPhone: '', motherProfession: '',
         guardianRelationship: 'other', guardianRelationshipDetails: '',
-        studentStatus: 'nouveau', registrationYear: '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0,
-        registrationFeeStatus: 'unpaid', usesTransport: false, transportMonthlyFee: 0, transportStatus: 'none', transportPaid: 0
+        studentStatus: 'nouveau', registrationYear: currentSchool?.academicYear || '2026-2027', registrationFeeExpected: 15000, registrationFeePaid: 0,
+        registrationFeeStatus: 'unpaid', usesTransport: false, transportStatus: 'none', transportPaid: 0
       };
       initEmails = '';
       setCurrentStudent(initStudent);
@@ -551,14 +562,6 @@ const Students: React.FC = () => {
     e?.preventDefault();
     if (currentStep !== 4) return;
 
-    if (!isEditing) {
-      const requiredFieldError = validateRequiredStudentFields(currentStudent);
-      if (requiredFieldError) {
-        setStepValidationError(requiredFieldError);
-        return;
-      }
-    }
-
     if (!currentStudent.classId) {
       alert("Veuillez choisir une classe !");
       return;
@@ -577,6 +580,26 @@ const Students: React.FC = () => {
       setStepValidationError('Lorsqu’il est renseigné, le PK transport doit être un entier de PK14 à PK42.');
       setCurrentStep(4);
       return;
+    }
+
+    const progressiveCandidate: Partial<Student> = {
+      ...currentStudent,
+      schoolId: currentStudent.schoolId || currentSchool?.id,
+      registrationYear: currentStudent.registrationYear || currentSchool?.academicYear,
+      noKnownMedicalCondition: noMedicalConditionConfirmed
+    };
+    const missingStrictFields = getMissingStrictCreationFields(progressiveCandidate);
+    if (missingStrictFields.length > 0) {
+      setStepValidationError('L’identité minimale, le sexe, la section, la classe et l’année scolaire doivent être renseignés.');
+      return;
+    }
+    const progressiveFile = getEffectiveRegistrationFile(progressiveCandidate);
+    if (progressiveFile.status === 'incomplete') {
+      const missingLabels = progressiveFile.missingFields.map(field => REGISTRATION_FIELD_LABELS[field] || field);
+      const confirmed = window.confirm(
+        `Ce dossier est incomplet :\n- ${missingLabels.join('\n- ')}\n\nEnregistrer l’élève et compléter le dossier ultérieurement ?`
+      );
+      if (!confirmed) return;
     }
 
     if (!acquireStudentSubmissionLock(saveInFlightRef)) return;
@@ -599,11 +622,16 @@ const Students: React.FC = () => {
         parentEmails: normalizedEmails,
         parentPhone,
         matricule,
-        transportStatus
+        transportStatus,
+        noKnownMedicalCondition: noMedicalConditionConfirmed
       } as Student;
       if (!finalStudent.schoolId && currentSchool) {
         finalStudent.schoolId = currentSchool.id;
       }
+      if (!finalStudent.registrationYear && currentSchool?.academicYear) {
+        finalStudent.registrationYear = currentSchool.academicYear;
+      }
+      Object.assign(finalStudent, getRegistrationFileFields(finalStudent));
 
       const expected = finalStudent.registrationFeeExpected ?? 15000;
       const paid = finalStudent.registrationFeePaid ?? 0;
@@ -654,8 +682,11 @@ const Students: React.FC = () => {
           emergencyContact: finalStudent.emergencyContact,
           allergies: finalStudent.allergies,
           medicalConditions: finalStudent.medicalConditions,
+          noKnownMedicalCondition: finalStudent.noKnownMedicalCondition,
+          registrationFileStatus: finalStudent.registrationFileStatus,
+          missingRegistrationFields: finalStudent.missingRegistrationFields,
           studentStatus: getPatchValue('studentStatus', 'nouveau'),
-          registrationYear: getPatchValue('registrationYear', '2026-2027')
+          registrationYear: getPatchValue('registrationYear', currentSchool?.academicYear || '2026-2027')
         };
         const patchData = {
           ...Object.fromEntries(Object.entries(rawPatchData).filter(([, v]) => v !== undefined)),
@@ -1144,9 +1175,9 @@ const Students: React.FC = () => {
 
           // Validation Date de naissance
           const rawDob = getRawVal(['DATE DE NAISSANCE', 'DATE', 'DOB']);
-          const normalizedDob = normalizeImportedBirthDate(rawDob);
-          if (!normalizedDob) {
-            errorsLog.push(`Ligne ${i + 1} : Date de naissance absente, invalide ou future.`);
+          const normalizedDob = rawDob === undefined ? '' : (normalizeImportedBirthDate(rawDob) || '');
+          if (rawDob !== undefined && !normalizedDob) {
+            errorsLog.push(`Ligne ${i + 1} : Date de naissance invalide ou future.`);
             continue;
           }
 
@@ -1202,20 +1233,12 @@ const Students: React.FC = () => {
 
           // Validation Responsable (parentName) - CAS A
           const rawParentName = getVal(['TUTEUR', 'PARENT', 'NOMS DES PARENTS', 'NOM_PARENT']);
-          if (!rawParentName || !rawParentName.trim()) {
-            errorsLog.push(`Ligne ${i + 1} : Nom du responsable légal obligatoire.`);
-            continue;
-          }
           const parentName = rawParentName.trim().replace(/\s+/g, ' ');
 
           // Validation Téléphone parent
           const rawPhone = getVal(['CONTACT', 'TÉLÉPHONE', 'TELEPHONE', 'TEL', 'PHONE', 'TELEPHONE_PARENT']);
-          if (!rawPhone || !rawPhone.trim()) {
-            errorsLog.push(`Ligne ${i + 1} : Téléphone du responsable légal obligatoire.`);
-            continue;
-          }
-          const normalizedPhone = normalizeCameroonPhoneNumber(rawPhone);
-          if (!normalizedPhone) {
+          const normalizedPhone = rawPhone ? (normalizeCameroonPhoneNumber(rawPhone) || '') : '';
+          if (rawPhone && !normalizedPhone) {
             errorsLog.push(`Ligne ${i + 1} : Téléphone parent "${rawPhone}" invalide.`);
             continue;
           }
@@ -1276,6 +1299,7 @@ const Students: React.FC = () => {
             section: finalSection,
             classId: classId,
             studentStatus: 'nouveau',
+            registrationYear: currentSchool.academicYear || '2026-2027',
             parentName: parentName,
             parentPhone: normalizedPhone,
             parentEmails: normalizedEmails,
@@ -1332,7 +1356,7 @@ const Students: React.FC = () => {
     setIsSaving(true);
 
     try {
-      const persistedStudents: Student[] = [];
+      const persistedStudents: Array<Student & { id: string; schoolId: string }> = [];
 
       for (const student of previewStudents) {
         const importedPayload = toImportedStudentPayload(student, currentSchool.id);
@@ -1360,11 +1384,11 @@ const Students: React.FC = () => {
         if (student.gender !== 'M' && student.gender !== 'F') {
           throw new Error("Erreur de données : Sexe de l'élève invalide.");
         }
-        if (!student.dob || !/^\d{4}-\d{2}-\d{2}$/.test(student.dob)) {
+        if (student.dob && !/^\d{4}-\d{2}-\d{2}$/.test(student.dob)) {
           throw new Error("Erreur de données : Format de date de naissance invalide.");
         }
-        const dDate = new Date(student.dob);
-        if (isNaN(dDate.getTime()) || dDate > new Date()) {
+        const dDate = student.dob ? new Date(student.dob) : null;
+        if (dDate && (isNaN(dDate.getTime()) || dDate > new Date())) {
           throw new Error("Erreur de données : Date de naissance invalide ou dans le futur.");
         }
         if (student.section !== 'francophone' && student.section !== 'anglophone') {
@@ -1413,16 +1437,30 @@ const Students: React.FC = () => {
         }
       }
 
-      const batch = writeBatch(firestoreDb);
-
+      const createdStudents: Student[] = [];
       for (const student of persistedStudents) {
-        const studentRef = doc(firestoreDb, 'students', student.id);
-        batch.set(studentRef, student);
+        const { schoolData, privateData, financeData, parentPrivateData, parentFinanceData } = splitStudentData(student);
+        const creationResult = await createStudentSecure({
+          studentId: student.id,
+          requestedMatricule: student.matricule && student.matricule !== '-' ? student.matricule : undefined,
+          studentData: schoolData,
+          privateData: privateData as unknown as Record<string, unknown>,
+          financeData: financeData as unknown as Record<string, unknown>,
+          parentPrivateData: parentPrivateData as unknown as Record<string, unknown>,
+          parentFinanceData: parentFinanceData as unknown as Record<string, unknown>
+        });
+        createdStudents.push({
+          ...student,
+          academicYearId: creationResult.academicYearId,
+          registrationYear: creationResult.registrationYear,
+          matricule: creationResult.matricule,
+          matriculeNormalized: creationResult.matriculeNormalized,
+          matriculeReservationId: creationResult.matriculeReservationId,
+          duplicateFingerprint: creationResult.duplicateFingerprint,
+          duplicateReservationId: creationResult.duplicateReservationId
+        });
       }
-
-      await batch.commit();
-
-      addStudentsLocal(persistedStudents);
+      addStudentsLocal(createdStudents);
       setPreviewStudents(null);
       setImportReport(null);
       setImportModalOpen(false);
@@ -1430,7 +1468,7 @@ const Students: React.FC = () => {
       alert("Importation finalisée avec succès !");
     } catch (err: unknown) {
       console.error("Student import failed.", { code: getErrorCode(err) });
-      alert("Erreur lors de l'enregistrement du lot. Zéro élève n'a été importé. Détails : " + getErrorMessage(err));
+      alert("Erreur lors de l'enregistrement sécurisé de l'import. Détails : " + getErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -1692,11 +1730,13 @@ const Students: React.FC = () => {
               </button>
               <button
                 className="secondary"
-                disabled
-                aria-label="Import temporairement indisponible"
-                title="Import temporairement indisponible — utilisez l’ajout manuel sécurisé."
+                type="button"
+                data-testid="student-import-open"
+                onClick={() => setImportModalOpen(true)}
+                disabled={isSchoolSuspended}
+                aria-label="Importer des élèves depuis Excel"
               >
-                <FileSpreadsheet size={18} /> Import temporairement indisponible
+                <FileSpreadsheet size={18} /> Importer depuis Excel
               </button>
             </>
           )}
@@ -1746,11 +1786,16 @@ const Students: React.FC = () => {
               <option value="inactive">Inactifs</option>
               <option value="all">Tous</option>
             </select>
-            {(searchTerm !== '' || sectionFilter !== 'all' || classFilter !== 'all' || statusFilter !== 'all' || schoolingStatusFilter !== 'active') && (
+            <select value={registrationFileFilter} onChange={e => setRegistrationFileFilter(e.target.value as RegistrationFileFilter)} aria-label="État du dossier d’inscription">
+              <option value="all">Tous les dossiers</option>
+              <option value="complete">Dossiers complets</option>
+              <option value="incomplete">Dossiers à compléter</option>
+            </select>
+            {(searchTerm !== '' || sectionFilter !== 'all' || classFilter !== 'all' || statusFilter !== 'all' || schoolingStatusFilter !== 'active' || registrationFileFilter !== 'all') && (
               <button
                 type="button"
                 className="secondary"
-                onClick={() => { setSearchTerm(''); setSectionFilter('all'); setClassFilter('all'); setStatusFilter('all'); setSchoolingStatusFilter('active'); }}
+                onClick={() => { setSearchTerm(''); setSectionFilter('all'); setClassFilter('all'); setStatusFilter('all'); setSchoolingStatusFilter('active'); setRegistrationFileFilter('all'); }}
                 style={{ fontSize: '0.85rem' }}
                 aria-label="Réinitialiser les filtres"
               >
@@ -1838,6 +1883,22 @@ const Students: React.FC = () => {
                             </span>
                           );
                         })()}
+                        {(() => {
+                          const registrationFile = getEffectiveRegistrationFile(student);
+                          const isComplete = registrationFile.status === 'complete';
+                          const missingLabels = registrationFile.missingFields.map(field => REGISTRATION_FIELD_LABELS[field] || field);
+                          return (
+                            <span
+                              title={isComplete ? 'Toutes les informations attendues sont renseignées.' : `À compléter : ${missingLabels.join(', ')}`}
+                              style={{
+                                padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 600,
+                                background: isComplete ? '#dcfce7' : '#fef3c7', color: isComplete ? '#166534' : '#92400e'
+                              }}
+                            >
+                              {isComplete ? 'Dossier complet' : 'À compléter'}
+                            </span>
+                          );
+                        })()}
                         {getStudentSchoolingStatus(student) === 'inactive' && student.departureReason && (
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                             ({getDepartureReasonLabel(student.departureReason)})
@@ -1906,7 +1967,7 @@ const Students: React.FC = () => {
                                 }}
                               >
                                 <Edit2 size={14} aria-hidden="true" style={{ color: 'inherit' }} />
-                                Modifier l’élève
+                                {getEffectiveRegistrationFile(student).status === 'incomplete' ? 'Compléter le dossier' : 'Modifier l’élève'}
                               </button>
                             )}
                             {canChangeStudentActiveStatus && (
@@ -2094,6 +2155,9 @@ const Students: React.FC = () => {
 
           {/* Step Content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+            <p style={{ margin: '0 0 1rem', color: '#64748b', fontSize: '0.82rem' }}>
+              Seuls l’identité minimale, le sexe, la section, la classe et l’année scolaire bloquent l’inscription. Les autres informations peuvent être complétées plus tard.
+            </p>
             {stepValidationError && (
               <div role="alert" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: '#fee2e2', color: '#b91c1c', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 500 }}>
                 ⚠️ {stepValidationError}
@@ -2159,10 +2223,9 @@ const Students: React.FC = () => {
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: '1 1 180px' }}>
-                    <label>Date de Naissance <span style={{ color: 'red' }}>*</span></label>
+                    <label>Date de Naissance</label>
                     <input
                       type="date"
-                      required
                       value={currentStudent.dob || ''}
                       onChange={e => setCurrentStudent({...currentStudent, dob: e.target.value})}
                     />
@@ -2332,7 +2395,7 @@ const Students: React.FC = () => {
 
                 {/* Section Responsable Légal */}
                 <div style={{ padding: '0.85rem 1rem', background: '#eef2ff', borderRadius: '8px', border: '1px solid #c7d2fe' }}>
-                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#3730a3', fontSize: '0.9rem' }}>🏠 Responsable Légal Principal (Obligatoire)</h4>
+                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#3730a3', fontSize: '0.9rem' }}>🏠 Responsable Légal Principal (à compléter)</h4>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                     <div className="form-group" style={{ flex: '1 1 200px' }}>
                       <label>Définir le responsable principal</label>
@@ -2377,12 +2440,12 @@ const Students: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <div className="form-group" style={{ flex: '1 1 200px' }}>
-                      <label>Nom du Responsable <span style={{ color: 'red' }}>*</span></label>
-                      <input required value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} placeholder="Ex: Paul Dupont" />
+                      <label>Nom du Responsable</label>
+                      <input value={currentStudent.parentName || ''} onChange={e => setCurrentStudent({...currentStudent, parentName: e.target.value})} placeholder="Ex: Paul Dupont" />
                     </div>
                     <div className="form-group" style={{ flex: '1 1 200px' }}>
-                      <label>Contact (Téléphone) <span style={{ color: 'red' }}>*</span></label>
-                      <input required value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} placeholder="Ex: +237650336558" />
+                      <label>Contact (Téléphone)</label>
+                      <input value={currentStudent.parentPhone || ''} onChange={e => setCurrentStudent({...currentStudent, parentPhone: e.target.value})} placeholder="Ex: +237650336558" />
                     </div>
                   </div>
                   <div className="form-group" style={{ marginTop: '0.75rem' }}>
@@ -2535,6 +2598,28 @@ const Students: React.FC = () => {
                   </div>
                 </div>
 
+                {(() => {
+                  const registrationFile = getEffectiveRegistrationFile({
+                    ...currentStudent,
+                    noKnownMedicalCondition: noMedicalConditionConfirmed
+                  });
+                  const isComplete = registrationFile.status === 'complete';
+                  return (
+                    <div style={{ padding: '0.85rem 1rem', background: isComplete ? '#f0fdf4' : '#fffbeb', borderRadius: '8px', border: `1px solid ${isComplete ? '#bbf7d0' : '#fde68a'}`, fontSize: '0.85rem' }}>
+                      <strong style={{ color: isComplete ? '#166534' : '#92400e' }}>
+                        {isComplete ? 'Dossier complet' : 'À compléter'}
+                      </strong>
+                      {!isComplete && (
+                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', color: '#78350f' }}>
+                          {registrationFile.missingFields.map(field => (
+                            <li key={field}>{REGISTRATION_FIELD_LABELS[field] || field}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Récapitulatif compact */}
                 <div style={{ padding: '0.85rem 1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
                   <h4 style={{ margin: '0 0 0.5rem 0', color: '#475569', fontSize: '0.9rem' }}>📋 Récapitulatif du Dossier Élève</h4>
@@ -2609,11 +2694,7 @@ const Students: React.FC = () => {
                         setStepValidationError('Veuillez renseigner le ou les prénoms.');
                         return;
                       }
-                      if (!currentStudent.dob) {
-                        setStepValidationError('Veuillez renseigner la date de naissance.');
-                        return;
-                      }
-                      if (new Date(currentStudent.dob) > new Date()) {
+                      if (currentStudent.dob && new Date(currentStudent.dob) > new Date()) {
                         setStepValidationError('La date de naissance ne peut pas être dans le futur.');
                         return;
                       }
@@ -2621,16 +2702,6 @@ const Students: React.FC = () => {
                     if (currentStep === 2 && !currentStudent.classId) {
                       setStepValidationError('Veuillez sélectionner une classe.');
                       return;
-                    }
-                    if (currentStep === 3) {
-                      if (!currentStudent.parentName) {
-                        setStepValidationError('Veuillez renseigner le nom du responsable légal.');
-                        return;
-                      }
-                      if (!currentStudent.parentPhone) {
-                        setStepValidationError('Veuillez renseigner le téléphone du responsable légal.');
-                        return;
-                      }
                     }
                     setCurrentStep(s => Math.min(s + 1, 4));
                   }}
@@ -2724,7 +2795,7 @@ const Students: React.FC = () => {
       {/* Excel Import Modal */}
       <Modal isOpen={isImportModalOpen} onClose={() => {setImportModalOpen(false); setPreviewStudents(null); setImportReport(null);}} title="Importation d'élèves depuis Excel">
         {!previewStudents ? (
-          <form onSubmit={handleImportSubmit}>
+          <form data-testid="student-import-form" onSubmit={handleImportSubmit}>
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#eef2ff', borderRadius: '4px', border: '1px solid var(--primary-color)' }}>
               <p style={{ margin: '0 0 0.5rem 0', fontWeight: 500 }}>Étape 1 : Format de votre fichier Excel (.xlsx)</p>
               <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
@@ -2794,17 +2865,17 @@ const Students: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label>Fichier Excel complété (.xlsx, .xls)</label>
-              <input type="file" accept=".xlsx, .xls" required onChange={e => setExcelFile(e.target.files ? e.target.files[0] : null)} style={{ padding: '0.5rem', border: '1px dashed var(--border-color)', width: '100%', background: 'var(--bg-color)', cursor: 'pointer' }} />
+              <label htmlFor="student-import-file">Fichier Excel complété (.xlsx, .xls)</label>
+              <input id="student-import-file" name="studentImportFile" data-testid="student-import-file" type="file" accept=".xlsx, .xls" required onChange={e => setExcelFile(e.target.files ? e.target.files[0] : null)} style={{ padding: '0.5rem', border: '1px dashed var(--border-color)', width: '100%', background: 'var(--bg-color)', cursor: 'pointer' }} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
               <button type="button" className="secondary" onClick={() => setImportModalOpen(false)}>{t('cancel', 'Annuler')}</button>
-              <button type="submit">Afficher l'aperçu avant import</button>
+              <button type="submit" data-testid="student-import-preview-submit">Afficher l'aperçu avant import</button>
             </div>
           </form>
         ) : (
-          <div>
+          <div data-testid="student-import-preview">
             {importReport && (
               <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-color)' }}>Rapport de Validation de l'Import</h4>
@@ -2867,7 +2938,7 @@ const Students: React.FC = () => {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
               <button type="button" className="secondary" onClick={() => { setPreviewStudents(null); setImportReport(null); }}>Retour</button>
-              <button type="button" onClick={handleConfirmImport} disabled={previewStudents.length === 0} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>Confirmer l'importation</button>
+              <button type="button" data-testid="student-import-confirm" onClick={handleConfirmImport} disabled={previewStudents.length === 0 || isSaving} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>Confirmer l'importation</button>
             </div>
           </div>
         )}
