@@ -26,6 +26,7 @@ test.describe('Lot B — préparations de cours', () => {
     const firestore = getFirestore(app); const auth = getAuth(app); const bucket = getStorage(app).bucket();
     const countProtected = async () => Promise.all(protectedCollections.map(async name => (await firestore.collection(name).count().get()).data().count));
     const cleanup = async () => {
+      if (stagingRun) console.info('[Lot B staging] cleanup: firestore start');
       for (const name of [...scopedCollections, 'teachingPlanItems', 'teachingPlans', 'teachingWeeks']) {
         const snapshot = await firestore.collection(name).where('schoolId', '==', fixture.schoolId).get();
         const batch = firestore.batch(); snapshot.docs.forEach(document => batch.delete(document.ref)); if (!snapshot.empty) await batch.commit();
@@ -35,11 +36,15 @@ test.describe('Lot B — préparations de cours', () => {
         ['classes', fixture.classId], ['staff', fixture.staffId], ['subjects', 'pedagogy-lot-b-math']
       ];
       const batch = firestore.batch(); exact.forEach(([name, id]) => batch.delete(firestore.collection(name).doc(id))); await batch.commit();
+      if (stagingRun) console.info('[Lot B staging] cleanup: firestore done; storage start');
       try { await bucket.deleteFiles({ prefix: `schools/${fixture.schoolId}/pedagogy/preparations/` }); } catch (error) { if (!String(error).includes('404')) throw error; }
+      if (stagingRun) console.info('[Lot B staging] cleanup: storage done; auth start');
       try { await auth.deleteUser(fixture.uid); } catch (error) { if ((error as { code?: string }).code !== 'auth/user-not-found') throw error; }
+      if (stagingRun) console.info('[Lot B staging] cleanup: auth done');
     };
     await cleanup();
     try {
+      if (stagingRun) console.info('[Lot B staging] setup: start');
       await auth.createUser({ uid: fixture.uid, email: fixture.email, password: fixture.password, displayName: 'Secrétaire Lot B' });
       await auth.setCustomUserClaims(fixture.uid, { role: 'secretary', schoolId: fixture.schoolId });
       const batch = firestore.batch();
@@ -62,6 +67,7 @@ test.describe('Lot B — préparations de cours', () => {
       await batch.commit();
 
       const before = await countProtected();
+      if (stagingRun) console.info('[Lot B staging] setup: done; browser flow start');
       await loginAs(page, fixture.email, fixture.password);
       await page.goto('/#/pedagogy/preparations');
       await expect(page.getByRole('heading', { name: 'Préparations de cours' })).toBeVisible();
@@ -111,12 +117,15 @@ test.describe('Lot B — préparations de cours', () => {
       expect((await firestore.collection('lessonPreparations').where('schoolId', '==', fixture.schoolId).where('source', '==', 'manual_unplanned').get()).size).toBe(1);
       expect(await countProtected()).toEqual(before);
       expect((await firestore.collection('audit_logs').where('schoolId', '==', fixture.schoolId).get()).size).toBeGreaterThanOrEqual(10);
+      if (stagingRun) console.info('[Lot B staging] browser flow: done');
     } finally {
+      if (stagingRun) console.info('[Lot B staging] final cleanup: start');
       await firestore.collection('lessonPreparations').doc('cross-school-preparation').delete();
       await cleanup();
       const residuals = await Promise.all(scopedCollections.map(async name => (await firestore.collection(name).where('schoolId', '==', fixture.schoolId).get()).size));
       const [files] = await bucket.getFiles({ prefix: `schools/${fixture.schoolId}/pedagogy/preparations/` });
       expect(residuals.reduce((sum, value) => sum + value, files.length)).toBe(0);
+      if (stagingRun) console.info('[Lot B staging] final cleanup: verified');
       await deleteApp(app);
     }
   });
