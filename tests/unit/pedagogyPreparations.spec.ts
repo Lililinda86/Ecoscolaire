@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deterministicMockPreparationAnalyzer, validatePreparationAnalysis } from '../../functions/src/pedagogy/preparationAnalyzer';
-import { canTransitionPreparation, preparationIdForItem, uploadIdForChecksum } from '../../functions/src/pedagogy/preparations';
+import { canTransitionPreparation, manualPreparationId, preparationIdForItem, uploadIdForChecksum } from '../../functions/src/pedagogy/preparations';
 
 describe('Lot B preparation domain', () => {
   it('derives stable identities from a Lot A item and a checksum', () => {
@@ -8,6 +8,12 @@ describe('Lot B preparation domain', () => {
     expect(id).toMatch(/^prep__school__year__class__math__d1__s__[a-f0-9]{16}$/);
     expect(uploadIdForChecksum('prep__item', 'a'.repeat(64))).toBe(`upload__prep__item__${'a'.repeat(24)}`);
   });
+  it('keeps manual preparation and upload identities within callable bounds', () => {
+    const id = manualPreparationId('school-with-a-long-identity', 'academic-year-id', 'class-id', 'subject-id', 'teacher-id', '2026-09-07', 'a'.repeat(64));
+    expect(id).toMatch(/^prep__manual__school-with-__[a-f0-9]{24}$/);
+    expect(uploadIdForChecksum(id, 'b'.repeat(64)).length).toBeLessThanOrEqual(100);
+  });
+
 
   it('allows only the explicit lifecycle', () => {
     expect(canTransitionPreparation('expected', 'uploaded')).toBe(true);

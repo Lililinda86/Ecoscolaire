@@ -30,6 +30,8 @@ export const preparationIdForItem = (itemId: string): string => {
   return `prep__${safe.slice(0, 32)}__${createHash('sha256').update(itemId).digest('hex').slice(0, 16)}`;
 };
 export const uploadIdForChecksum = (preparationId: string, checksum: string): string => `upload__${safePart(preparationId)}__${checksum.slice(0, 24)}`;
+export const manualPreparationId = (...identity: string[]): string =>
+  `prep__manual__${safePart(identity[0]).slice(0, 12)}__${createHash('sha256').update(identity.join('|')).digest('hex').slice(0, 24)}`;
 export const canTransitionPreparation = (from: string, to: string): boolean => ({
   expected: ['uploaded'], uploaded: ['needs_review'], needs_review: ['needs_review', 'validated'], validated: []
 } as Record<string, string[]>)[from]?.includes(to) === true;
@@ -114,7 +116,7 @@ export const createLessonPreparationUpload = functions.https.onCall(async (data,
       db().collection('academicYears').doc(academicYearId).get(), db().collection('classes').doc(classId).get(), db().collection('staff').doc(teacherStaffId).get()
     ]);
     schoolDocument(yearSnap, schoolId, 'Année scolaire'); schoolDocument(classSnap, schoolId, 'Classe'); schoolDocument(teacherSnap, schoolId, 'Enseignant');
-    preparationId = `prep__manual__${safePart(schoolId)}__${safePart(academicYearId)}__${safePart(classId)}__${safePart(subjectId)}__${checksum.slice(0, 20)}`;
+    preparationId = manualPreparationId(schoolId, academicYearId, classId, subjectId, teacherStaffId, weekStartDate, checksum);
     preparation = {
       id: preparationId, schoolId, academicYearId, classId, subjectId, subjectName: text(data?.subjectName, 'subjectName', 200),
       teacherStaffId, weekStartDate, lessonTitle: nullableText(data?.lessonTitle, 500), objective: nullableText(data?.objective),
