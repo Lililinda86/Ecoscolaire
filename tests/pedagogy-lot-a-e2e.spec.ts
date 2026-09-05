@@ -4,7 +4,7 @@ import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { loginAs } from './helpers/auth';
 
 const emulatorOnly = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const secretaryEmail = process.env.E2E_SECRETARY_EMAIL || 'secretary.alpha@ecoscolaire.com';
+const secretaryEmail = process.env.E2E_SECRETARY_EMAIL || '';
 const secretaryPassword = process.env.VITE_TEST_ALPHA_PASSWORD || process.env.TEST_ALPHA_PASSWORD || '';
 
 test.describe('Lot A — parcours secrétaire', () => {
