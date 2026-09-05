@@ -24,6 +24,7 @@ export default defineConfig({
       'tests/unit/classProgramPickerFilters.spec.ts',
       'tests/unit/classPrograms.spec.ts',
     ],
+    pool: 'threads',
     watch: false,
     fileParallelism: false,
     maxWorkers: 1,

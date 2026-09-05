@@ -29,7 +29,7 @@ describe('deterministic planning generator', () => {
     const first = deterministicPlanningGenerator.generate(input);
     expect(deterministicPlanningGenerator.generate(input)).toEqual(first);
     expect(first).toHaveLength(2);
-    expect(first[0]).toMatchObject({ curriculumUnitId: 'u2', teacherStaffId: 'teacher-1', lessonTitle: 'Calcul', dayIndex: 1, status: 'proposed' });
+    expect(first[0]).toMatchObject({ curriculumUnitId: 'u2', teacherStaffId: 'teacher-1', lessonTitle: 'Calcul', dayIndex: 1, status: 'planned' });
   });
 });
 
