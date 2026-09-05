@@ -41,8 +41,8 @@ export const reverseCashCollection = functions.https.onCall(async (raw, context)
         transaction.get(reversalRef), transaction.get(correctionReceiptRef), transaction.get(transportAllocationsQuery)]);
     if (!userSnap.exists) throw httpsError('permission-denied', 'Operator profile not found.', 'PERMISSION_DENIED');
     const user = userSnap.data() || {};
-    if (user.isActive === false || user.active === false || !['owner', 'superAdmin'].includes(String(user.role))) {
-      throw httpsError('permission-denied', 'Only an owner can reverse a collection.', 'PERMISSION_DENIED');
+    if (user.isActive === false || user.active === false || !['owner', 'director', 'superAdmin'].includes(String(user.role))) {
+      throw httpsError('permission-denied', 'Only an owner or director can reverse a collection.', 'PERMISSION_DENIED');
     }
     if (reversalSnap.exists || correctionReceiptSnap.exists) {
       if (!reversalSnap.exists || !correctionReceiptSnap.exists
