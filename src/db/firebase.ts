@@ -73,6 +73,7 @@ if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true
     __firestore_emulator_connected__?: boolean;
     __auth_emulator_connected__?: boolean;
     __functions_emulator_connected__?: boolean;
+    __storage_emulator_connected__?: boolean;
   };
   if (!g.__firestore_emulator_connected__) {
     const { connectFirestoreEmulator } = await import('firebase/firestore');
@@ -88,6 +89,11 @@ if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true
     const { connectFunctionsEmulator } = await import('firebase/functions');
     connectFunctionsEmulator(functions, '127.0.0.1', 5001);
     g.__functions_emulator_connected__ = true;
+  }
+  if (!g.__storage_emulator_connected__) {
+    const { connectStorageEmulator } = await import('firebase/storage');
+    connectStorageEmulator(storage, '127.0.0.1', 9199);
+    g.__storage_emulator_connected__ = true;
   }
 }
 

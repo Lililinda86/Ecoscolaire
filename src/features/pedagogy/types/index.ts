@@ -71,6 +71,65 @@ export interface TeachingPlanItem {
   status: TeachingPlanItemStatus;
 }
 
+export type LessonPreparationStatus = 'expected' | 'uploaded' | 'needs_review' | 'validated';
+export type PreparationAnalysisStatus = 'not_started' | 'pending' | 'processing' | 'succeeded' | 'failed';
+
+export interface LessonPreparationTemplate {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  subjectId: string;
+  subjectName: string;
+  version: number;
+  schemaVersion: 'lesson-preparation-template-v1';
+  status: 'active' | 'archived';
+  sections: Array<{ key: string; title: string; fields: string[] }>;
+}
+
+export interface PreparationReview {
+  lessonTitle: string;
+  objective: string;
+  prerequisites: string;
+  materials: string;
+  lessonSteps: string;
+  assessment: string;
+  differentiation: string;
+}
+
+export interface LessonPreparation {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  weekId?: string;
+  weekNumber?: number;
+  weekStartDate: string;
+  weekEndDate?: string;
+  planId?: string;
+  teachingPlanItemId?: string;
+  source: 'planned' | 'manual_unplanned';
+  templateId?: string;
+  subjectId: string;
+  subjectName: string;
+  teacherStaffId: string;
+  curriculumUnitId?: string | null;
+  lessonDate?: string | null;
+  dayIndex?: number;
+  slotIndex?: number;
+  lessonTitle?: string | null;
+  objective?: string | null;
+  status: LessonPreparationStatus;
+  analysisStatus: PreparationAnalysisStatus;
+  currentUploadId?: string;
+  currentAnalysisId?: string;
+  analysisError?: string;
+  extractedData?: Record<string, unknown>;
+  reviewData?: PreparationReview;
+  validationMeaning?: string;
+  version: number;
+}
+
 export interface PedagogyWorkspace {
   programs: CurriculumProgram[];
   adoptions: SchoolCurriculumAdoption[];
