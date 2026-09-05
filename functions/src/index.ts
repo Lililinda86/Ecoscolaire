@@ -3090,8 +3090,16 @@ export {
   cancelFinancialBenefit,
   createFinancialBenefit,
   getCollectionQuote,
+  rejectFinancialBenefit,
   recordCashPayment,
-  reversePayment
+  reversePayment,
+  submitFinancialBenefit
 } from './secretaryCollections';
+export {
+  approvePaymentMoratorium,
+  createPaymentMoratorium,
+  rejectPaymentMoratorium,
+  submitPaymentMoratorium
+} from './paymentMoratoriumWorkflow';
 export { getStudentFinancialAccount, recordCashCollection } from './studentAccountCollections';
 export { reverseCashCollection } from './reverseStudentAccountCollection';

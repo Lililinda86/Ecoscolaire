@@ -30,6 +30,7 @@ type MoratoriumStatus = 'NONE' | 'ACTIVE' | 'EXPIRED';
 
 const PAYMENT_ROLES = new Set(['owner', 'director', 'accountant', 'secretary', 'superAdmin']);
 const APPROVAL_ROLES = new Set(['owner', 'director', 'superAdmin']);
+const ADVANTAGE_REQUEST_ROLES = new Set(['owner', 'director', 'secretary', 'superAdmin']);
 const BENEFIT_TYPES = new Set<BenefitType>([
   'SCHOLARSHIP', 'DISCOUNT_VOUCHER', 'FAMILY_DISCOUNT', 'EXCEPTIONAL_DISCOUNT'
 ]);
@@ -1077,7 +1078,7 @@ export const createFinancialBenefit = functions.https.onCall(async (raw, context
     const [userSnap, schoolSnap, studentSnap, benefitSnap] = await Promise.all([
       transaction.get(userRef), transaction.get(schoolRef), transaction.get(studentRef), transaction.get(benefitRef)
     ]);
-    const user = validateActiveUser(userSnap, APPROVAL_ROLES);
+    const user = validateActiveUser(userSnap, ADVANTAGE_REQUEST_ROLES);
     validateTenant(user, String(input.schoolId));
     if (!schoolSnap.exists) throw httpsError('not-found', 'School not found.', 'SCHOOL_NOT_FOUND');
     if (!studentSnap.exists) throw httpsError('not-found', 'Student not found.', 'STUDENT_NOT_FOUND');
@@ -1102,9 +1103,45 @@ export const createFinancialBenefit = functions.https.onCall(async (raw, context
     });
     transaction.create(db.collection('audit_logs').doc(), auditData(
       'BENEFIT_CREATED', String(input.schoolId), uid, 'FINANCIAL_BENEFIT', benefitId,
-      { benefitType: input.benefitType, paymentType: input.paymentType }
+      {
+        academicYear: input.academicYear, studentId: input.studentId,
+        benefitType: input.benefitType, paymentType: input.paymentType,
+        mode: input.mode, value: input.value, installment: input.installment,
+        transportStartPeriod: input.transportStartPeriod, transportEndPeriod: input.transportEndPeriod,
+        reason: input.reason, stackable: input.stackable, validFrom: input.validFrom, validUntil: input.validUntil,
+        status: 'draft', role: user.role
+      }
     ));
     return { benefitId, status: 'draft', idempotentReplay: false };
+  });
+});
+
+export const submitFinancialBenefit = functions.https.onCall(async (raw, context) => {
+  if (!context.auth?.uid) throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
+  const benefitId = requireId((raw || {}).benefitId, 'benefitId');
+  const uid = context.auth.uid;
+  const db = admin.firestore();
+  return db.runTransaction(async transaction => {
+    const [userSnap, benefitSnap] = await Promise.all([
+      transaction.get(db.collection('users').doc(uid)),
+      transaction.get(db.collection('financialBenefits').doc(benefitId))
+    ]);
+    const user = validateActiveUser(userSnap, ADVANTAGE_REQUEST_ROLES);
+    if (!benefitSnap.exists) throw httpsError('not-found', 'Benefit not found.', 'BENEFIT_NOT_FOUND');
+    const benefit = benefitSnap.data() || {};
+    validateTenant(user, String(benefit.schoolId));
+    if (benefit.status === 'pending') return { benefitId, status: 'pending', idempotentReplay: true };
+    if (benefit.status !== 'draft') {
+      throw httpsError('failed-precondition', 'Benefit is not submittable.', 'BENEFIT_NOT_SUBMITTABLE');
+    }
+    transaction.update(benefitSnap.ref, {
+      status: 'pending', submittedBy: uid, submittedAt: FieldValue.serverTimestamp()
+    });
+    transaction.create(db.collection('audit_logs').doc(), auditData(
+      'BENEFIT_SUBMITTED', String(benefit.schoolId), uid, 'FINANCIAL_BENEFIT', benefitId,
+      { studentId: benefit.studentId, academicYear: benefit.academicYear, status: 'pending', role: user.role }
+    ));
+    return { benefitId, status: 'pending', idempotentReplay: false };
   });
 });
 
@@ -1122,7 +1159,9 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
     const benefit = benefitSnap.data() || {};
     validateTenant(user, String(benefit.schoolId));
     if (benefit.status === 'approved') return { benefitId, status: 'approved', idempotentReplay: true };
-    if (benefit.status !== 'draft') {
+    // Draft approval remains accepted for records created before the explicit
+    // submission step was introduced.
+    if (benefit.status !== 'draft' && benefit.status !== 'pending') {
       throw httpsError('failed-precondition', 'Benefit is not approvable.', 'BENEFIT_NOT_APPROVABLE');
     }
     const schoolRef = db.collection('schools').doc(String(benefit.schoolId));
@@ -1216,6 +1255,16 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       : targetType === 'transport'
         ? resolveTransportBenefitGross({ student, privateData: privateSnap.data() || {}, classData, finance, school, bus })
         : resolveGross(targetType, targetInstallment, finance, school, bus, null, classData);
+    if (benefit.mode === 'FIXED_AMOUNT') {
+      const maximumTargetAmount = benefit.paymentType === 'TUITION' && benefit.installment === 'ALL_TUITION'
+        ? Math.min(...(['T1', 'T2', 'T3'] as Installment[])
+          .map(item => readTuitionGross(item, finance, school, classData))
+          .filter((amount): amount is number => amount !== null))
+        : gross;
+      if (benefit.value > maximumTargetAmount) {
+        throw httpsError('failed-precondition', 'Benefit exceeds its target obligation.', 'BENEFIT_EXCEEDS_SCOPE');
+      }
+    }
     calculateBenefitAmount(gross, benefit.mode as BenefitMode, benefit.value as number);
     let referenceRef: admin.firestore.DocumentReference | null = null;
     if (typeof benefit.reference === 'string') {
@@ -1237,9 +1286,40 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       status: 'approved', approvedBy: uid, approvedAt: FieldValue.serverTimestamp()
     });
     transaction.create(db.collection('audit_logs').doc(), auditData(
-      'BENEFIT_APPROVED', String(benefit.schoolId), uid, 'FINANCIAL_BENEFIT', benefitId
+      'BENEFIT_APPROVED', String(benefit.schoolId), uid, 'FINANCIAL_BENEFIT', benefitId,
+      { studentId: benefit.studentId, academicYear: benefit.academicYear, status: 'approved', role: user.role }
     ));
     return { benefitId, status: 'approved', idempotentReplay: false };
+  });
+});
+
+export const rejectFinancialBenefit = functions.https.onCall(async (raw, context) => {
+  if (!context.auth?.uid) throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
+  const benefitId = requireId((raw || {}).benefitId, 'benefitId');
+  const reason = requireText((raw || {}).reason, 'reason', 3, 500);
+  const uid = context.auth.uid;
+  const db = admin.firestore();
+  return db.runTransaction(async transaction => {
+    const [userSnap, benefitSnap] = await Promise.all([
+      transaction.get(db.collection('users').doc(uid)),
+      transaction.get(db.collection('financialBenefits').doc(benefitId))
+    ]);
+    const user = validateActiveUser(userSnap, APPROVAL_ROLES);
+    if (!benefitSnap.exists) throw httpsError('not-found', 'Benefit not found.', 'BENEFIT_NOT_FOUND');
+    const benefit = benefitSnap.data() || {};
+    validateTenant(user, String(benefit.schoolId));
+    if (benefit.status === 'rejected') return { benefitId, status: 'rejected', idempotentReplay: true };
+    if (benefit.status !== 'pending') {
+      throw httpsError('failed-precondition', 'Benefit is not rejectable.', 'BENEFIT_NOT_REJECTABLE');
+    }
+    transaction.update(benefitSnap.ref, {
+      status: 'rejected', rejectedBy: uid, rejectedAt: FieldValue.serverTimestamp(), rejectionReason: reason
+    });
+    transaction.create(db.collection('audit_logs').doc(), auditData(
+      'BENEFIT_REJECTED', String(benefit.schoolId), uid, 'FINANCIAL_BENEFIT', benefitId,
+      { studentId: benefit.studentId, academicYear: benefit.academicYear, reason, status: 'rejected', role: user.role }
+    ));
+    return { benefitId, status: 'rejected', idempotentReplay: false };
   });
 });
 
