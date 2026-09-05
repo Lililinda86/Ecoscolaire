@@ -28,6 +28,9 @@ const requiredFunctions = new Set([
   'approveFinancialBenefit',
   'cancelFinancialBenefit',
   'getCollectionQuote',
+  'getStudentFinancialAccount',
+  'recordCashCollection',
+  'reverseCashCollection',
   'closeCashDrawer',
   'getBoardViewerGovernanceSummary',
   'recordAuthenticatedAudit',
@@ -102,7 +105,7 @@ test('Production deploy eligibility is fail-closed for every configured trigger'
   assert.equal(productionDeployJobEligible('workflow_dispatch', 'refs/heads/feature/example'), false);
 });
 
-test('Production deployment includes Firestore Rules and the exact thirty-three Functions', () => {
+test('Production deployment includes Firestore Rules and the exact thirty-six Functions', () => {
   assert.ok(deployTargets.includes('firestore:rules'));
   assert.deepEqual(deployedFunctions, requiredFunctions);
 });
