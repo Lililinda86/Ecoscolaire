@@ -475,6 +475,20 @@ const ReceiptHistory: React.FC<ReceiptHistoryProps> = ({ receipts, students, sch
                             )}
                           </div>
 
+                          {displayModel.lineItems.length > 0 && (
+                            <div className="receipt-history-allocation" data-testid={`receipt-line-items-${displayModel.id}`}>
+                              <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: '.75rem' }}>
+                                Ventilation de l’encaissement
+                              </div>
+                              {displayModel.lineItems.map(line => (
+                                <div key={line.key} className="receipt-history-allocation-row">
+                                  <span>{line.label}</span>
+                                  <strong>{line.amount.toLocaleString('fr-FR')} FCFA</strong>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           {displayModel.paymentType === 'transport' && (
                             <div
                               data-testid={`transport-receipt-allocation-${displayModel.id}`}

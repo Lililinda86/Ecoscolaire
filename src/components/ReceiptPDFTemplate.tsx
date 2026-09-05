@@ -101,6 +101,17 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
             </tr>
           </thead>
           <tbody>
+            {displayModel.lineItems.length > 0 ? (
+              displayModel.lineItems.map(line => (
+                <tr key={line.key}>
+                  <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', fontSize: '11pt' }}>{line.label}</td>
+                  <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', fontSize: '11pt' }}>{displayModel.method}</td>
+                  <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', fontSize: '11pt', textAlign: 'right', fontWeight: 'bold' }}>
+                    {line.amount.toLocaleString('fr-FR')} FCFA
+                  </td>
+                </tr>
+              ))
+            ) : (
             <tr>
               <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', fontSize: '11pt' }}>
                 <div>{displayModel.nature}</div>
@@ -122,6 +133,7 @@ const ReceiptPDFTemplate = React.forwardRef<HTMLDivElement, ReceiptPDFTemplatePr
                 {displayModel.formattedAmount}
               </td>
             </tr>
+            )}
           </tbody>
         </table>
 
