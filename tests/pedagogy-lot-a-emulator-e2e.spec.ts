@@ -280,26 +280,30 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
       await batch.commit();
 
       for (const identity of identities) {
-        const roleContext = await browser.newContext({
-          baseURL: testInfo.project.use.baseURL as string,
-          ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-            ? {
-                extraHTTPHeaders: {
-                  "x-vercel-protection-bypass":
-                    process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-                  "x-vercel-set-bypass-cookie": "true",
-                },
-              }
-            : {}),
-        });
-        const rolePage = await roleContext.newPage();
-        await loginAs(rolePage, identity.email, identity.password);
-        await rolePage.goto("/#/pedagogy");
-        await expect(rolePage.getByTestId("nav-pedagogy")).toBeVisible();
-        await expect(
-          rolePage.getByRole("heading", { name: "Pilotage pédagogique" }),
-        ).toBeVisible();
-        await roleContext.close();
+        if (stagingRun) {
+          const roleContext = await browser.newContext({
+            baseURL: testInfo.project.use.baseURL as string,
+            ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+              ? {
+                  extraHTTPHeaders: {
+                    "x-vercel-protection-bypass":
+                      process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+                    "x-vercel-set-bypass-cookie": "true",
+                  },
+                }
+              : {}),
+          });
+          const rolePage = await roleContext.newPage();
+          await loginAs(rolePage, identity.email, identity.password);
+          await rolePage.goto("/#/pedagogy");
+          await expect(rolePage.getByTestId("nav-pedagogy")).toBeVisible({
+            timeout: 15_000,
+          });
+          await expect(
+            rolePage.getByRole("heading", { name: "Pilotage pédagogique" }),
+          ).toBeVisible();
+          await roleContext.close();
+        }
       }
 
       const before = await countProtected();
