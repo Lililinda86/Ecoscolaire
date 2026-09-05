@@ -34,6 +34,7 @@
 .basket-total, .receipt-total { border-top: 2px solid #94a3b8; padding-top: .65rem; font-size: 1.05rem; }
 .collection-basket fieldset { display: grid; gap: .55rem; border: 1px solid var(--border-color); border-radius: 8px; }
 .collection-basket label { display: flex; align-items: center; gap: .4rem; }
+.collection-basket button, .account-actions button { min-height: 44px; }
 .disabled-method { opacity: .62; flex-wrap: wrap; }
 .disabled-method small { width: 100%; margin-left: 1.35rem; }
 .account-loading, .account-notice { padding: .8rem; background: #eff6ff; border-radius: 8px; }
