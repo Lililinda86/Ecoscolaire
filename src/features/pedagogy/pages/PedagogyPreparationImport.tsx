@@ -34,7 +34,7 @@ export default function PedagogyPreparationImport() {
   const [loadedPreparation, setLoadedPreparation] = useState<LessonPreparation>();
   const selectedClassId = classId || classes[0]?.id || '';
   const selectedWeekStartDate = weekStartDate || workspace.weeks[0]?.weekStartDate || '';
-  const selected = loadedPreparation?.id === preparationId ? loadedPreparation : state.preparations.find(item => item.id === preparationId);
+  const selected = manual ? undefined : loadedPreparation?.id === preparationId ? loadedPreparation : state.preparations.find(item => item.id === preparationId);
   useEffect(() => {
     if (!currentSchool?.id || !preparationId) return;
     void loadLessonPreparation(currentSchool.id, preparationId).then(setLoadedPreparation).catch(() => undefined);
