@@ -353,7 +353,7 @@ jobs:
           test "$EXPECTED_SHA" = "$GITHUB_SHA"
           test "$FIREBASE_PROJECT_ID" = "ecoscolaire-staging"
           test "$FIREBASE_PROJECT_ID" != "ecoscolaire-c5861"
-          printf '%s' "$STAGING_APP_URL" | grep -Eq '^https://ecoscolaire-git-codex-pedagogy-lot-b-linda-lemofouet-s-projects\.vercel\.app$'
+          printf '%s' "$STAGING_APP_URL" | grep -Eq '^https://(ecoscolaire-git-codex-pedagogy-lot-b|ecoscolaire-4i6jij2bl)-linda-lemofouet-s-projects\.vercel\.app$'
       - run: npm ci
       - run: npm ci
         if: inputs.confirmation == 'RUN_PEDAGOGY_LOT_B_STAGING'
