@@ -1,0 +1,1 @@
+export { ensureTeachingWeeks } from './index';

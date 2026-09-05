@@ -50,11 +50,14 @@ export const ensureTeachingWeeks = functions.https.onCall(async (data, context) 
   const academicYearId = requireId(data?.academicYearId, 'academicYearId');
   const yearSnap = await db().collection('academicYears').doc(academicYearId).get();
   const year = schoolData(yearSnap, schoolId, 'Année scolaire');
+  const periodsSnap = await db().collection('periods').where('academicYearId', '==', academicYearId).get();
+  const periods = (periodsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Array<admin.firestore.DocumentData & { id: string }>).filter(period => period.schoolId === schoolId && isActive(period));
   let current = mondayIso(requiredText(year.startDate, 'startDate', 10));
   if (current < year.startDate) current = addDaysIso(current, 7);
-  const weeks: Array<{ id: string; weekStartDate: string; weekEndDate: string; weekNumber: number }> = [];
+  const weeks: Array<{ id: string; weekStartDate: string; weekEndDate: string; weekNumber: number; periodId?: string }> = [];
   while (current <= year.endDate && weeks.length < 60) {
-    weeks.push({ id: teachingWeekId(schoolId, academicYearId, current), weekStartDate: current, weekEndDate: addDaysIso(current, 4), weekNumber: weeks.length + 1 });
+    const periodId = periods.find(period => period.startDate <= current && period.endDate >= current)?.id;
+    weeks.push({ id: teachingWeekId(schoolId, academicYearId, current), weekStartDate: current, weekEndDate: addDaysIso(current, 4), weekNumber: weeks.length + 1, ...(periodId ? { periodId } : {}) });
     current = addDaysIso(current, 7);
   }
   if (!weeks.length) throw new functions.https.HttpsError('failed-precondition', 'Aucune semaine ouvrée dans cette année.');
@@ -91,7 +94,7 @@ export const ensureTeachingPlanDraft = functions.https.onCall(async (data, conte
     if (existing.exists) return { planId, created: false, status: existing.data()?.status };
     transaction.create(ref, {
       id: planId, schoolId, academicYearId, classId, weekId: weekSnap.id, weekStartDate,
-      weekEndDate: week.weekEndDate, weekNumber: week.weekNumber, status: 'draft', version: 1,
+      weekEndDate: week.weekEndDate, weekNumber: week.weekNumber, periodId: week.periodId || null, status: 'draft', version: 1,
       createdAt: admin.firestore.FieldValue.serverTimestamp(), createdBy: actor.uid,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
@@ -171,7 +174,7 @@ export const saveTeachingPlanAdjustments = functions.https.onCall(async (data, c
   return { planId, status: 'adjusted' };
 });
 
-export const recordTeacherValidation = functions.https.onCall(async (data, context) => {
+export const recordTeacherPlanValidation = functions.https.onCall(async (data, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, data?.schoolId);
   const planId = requireId(data?.planId, 'planId');
   const teacherStaffId = requireId(data?.teacherStaffId, 'teacherStaffId');
@@ -184,8 +187,10 @@ export const recordTeacherValidation = functions.https.onCall(async (data, conte
     if (!['proposed', 'needs_adjustment', 'adjusted'].includes(plan.status)) throw new functions.https.HttpsError('failed-precondition', 'Transition vers validation non autorisée.');
     if (!isActive(teacher)) throw new functions.https.HttpsError('failed-precondition', 'Enseignant inactif.');
     transaction.update(planRef, {
-      status: 'teacher_validated', teacherStaffId, validationNote: optionalText(data?.note),
-      teacherValidatedAt: admin.firestore.FieldValue.serverTimestamp(), teacherValidationRecordedBy: actor.uid,
+      status: 'teacher_validated', teacherValidated: true, teacherStaffId,
+      teacherValidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      teacherValidationRecordedBy: actor.uid, teacherValidationRecordedAt: admin.firestore.FieldValue.serverTimestamp(),
+      teacherValidationNote: optionalText(data?.note),
       version: (plan.version || 1) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
     items.docs.forEach(item => transaction.update(item.ref, {

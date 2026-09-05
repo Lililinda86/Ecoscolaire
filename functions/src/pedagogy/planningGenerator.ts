@@ -12,7 +12,7 @@ export interface GeneratedPlanItem {
   objective: string;
   dayIndex: number;
   slotIndex: number;
-  status: 'proposed';
+  status: 'planned';
 }
 export interface PlanningGenerator {
   version: string;
@@ -35,7 +35,7 @@ export const deterministicPlanningGenerator: PlanningGenerator = {
           id: teachingPlanItemId(planId, subject.subjectId, dayIndex, slotIndex),
           subjectId: subject.subjectId, subjectName: subject.subjectName,
           teacherStaffId: subject.teacherStaffId, curriculumUnitId: unit.id,
-          lessonTitle: unit.title, objective: unit.objective || '', dayIndex, slotIndex, status: 'proposed'
+          lessonTitle: unit.title, objective: unit.objective || '', dayIndex, slotIndex, status: 'planned'
         });
         cursor += 1;
       }
