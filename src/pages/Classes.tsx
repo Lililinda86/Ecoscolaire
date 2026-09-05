@@ -877,7 +877,7 @@ const Classes: React.FC = () => {
                             style={{ padding: '0.25rem', fontSize: '0.85rem' }}
                           >
                             {sortClasses(schoolClasses.filter(c => c.isActive !== false)).filter(c => (c.type || c.section) === s.section).map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
+                              <option key={c.id} value={c.id}>{getDisplayClassName(c.name)}</option>
                             ))}
                           </select>
                           {assignmentSubmittingStudentId === s.id && (
@@ -1008,7 +1008,7 @@ const Classes: React.FC = () => {
                         checked={isChecked}
                         onChange={() => handleToggleLevel(level.catalogLevelId)}
                       />
-                      {level.name}
+                      {getDisplayClassName(level.name)}
                     </label>
                   );
                 })}

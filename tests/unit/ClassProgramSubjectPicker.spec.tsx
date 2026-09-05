@@ -77,7 +77,7 @@ describe('ClassProgramSubjectPicker UX', () => {
     expect(screen.queryByTestId('subjects-step')).toBeNull();
 
     // 4. Sélection d'une classe (ne revient pas automatiquement aux classes si on y est déjà, mais on vérifie qu'on reste)
-    const ce1Label = screen.getByText('Maternelle 2').closest('label'); // cleanName
+    const ce1Label = screen.getByText('Maternelle Moyenne Section').closest('label');
     const ce1Checkbox = within(ce1Label as HTMLElement).getByRole('checkbox');
     await user.click(ce1Checkbox);
     expect(screen.queryByTestId('classes-step')).not.toBeNull(); // On y est toujours
@@ -141,7 +141,7 @@ describe('ClassProgramSubjectPicker UX', () => {
     );
 
     // 8. Alignement (classes)
-    const classNameEl = screen.getByText('Maternelle 1');
+    const classNameEl = screen.getByText('Maternelle Petite Section');
     const label = classNameEl.closest('label');
     expect(label).not.toBeNull();
     

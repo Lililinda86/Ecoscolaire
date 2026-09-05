@@ -6,6 +6,7 @@ import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClas
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
+import { getDisplayClassName } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
@@ -1773,7 +1774,7 @@ const Students: React.FC = () => {
             <select value={classFilter} onChange={e => setClassFilter(e.target.value)} aria-label="Filtrer par classe">
               <option value="all">Toutes les classes</option>
               {db.classes.filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
-                 <option key={c.id} value={c.id}>{c.name}</option>
+                 <option key={c.id} value={c.id}>{getDisplayClassName(c.name)}</option>
               ))}
             </select>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filtrer par statut">
@@ -2319,7 +2320,7 @@ const Students: React.FC = () => {
                             const isInactiveCurrent = currentClassObj && c.id === currentClassObj.id && c.isActive === false;
                             return (
                               <option key={c.id} value={c.id}>
-                                {c.name} {isInactiveCurrent ? '(Inactive - Classe Actuelle)' : ''}
+                                {getDisplayClassName(c.name)} {isInactiveCurrent ? '(Inactive - Classe Actuelle)' : ''}
                               </option>
                             );
                           })}
@@ -2921,7 +2922,7 @@ const Students: React.FC = () => {
                         </td>
                         <td style={{ padding: '0.5rem' }}>
                           {matchedClass ? (
-                            <span style={{ color: 'var(--success)', fontWeight: 500 }}>{matchedClass.name}</span>
+                            <span style={{ color: 'var(--success)', fontWeight: 500 }}>{getDisplayClassName(matchedClass.name)}</span>
                           ) : (
                             <span style={{color: 'var(--danger)', fontWeight: 500}}>À définir</span>
                           )}

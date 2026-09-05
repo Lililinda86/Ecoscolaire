@@ -139,15 +139,40 @@ export function buildTechnicalClassDocumentId(
   return `${cleanSchoolId}__${cleanCatalogLevelId}__technical__${encodeURIComponent(cleanSpecialtyId)}`;
 }
 
+export type FrancophoneMaternelleLevelId =
+  | 'fr-preschool-ps'
+  | 'fr-preschool-ms'
+  | 'fr-preschool-gs';
+
+const FRANCOPHONE_MATERNELLE_ALIASES: Record<string, FrancophoneMaternelleLevelId> = {
+  'maternelle 1': 'fr-preschool-ps',
+  'petite section': 'fr-preschool-ps',
+  'maternelle petite section': 'fr-preschool-ps',
+  'maternelle 2': 'fr-preschool-ms',
+  'moyenne section': 'fr-preschool-ms',
+  'maternelle moyenne section': 'fr-preschool-ms',
+  'maternelle 3': 'fr-preschool-gs',
+  'grande section': 'fr-preschool-gs',
+  'maternelle grande section': 'fr-preschool-gs'
+};
+
+const FRANCOPHONE_MATERNELLE_DISPLAY_NAMES: Record<FrancophoneMaternelleLevelId, string> = {
+  'fr-preschool-ps': 'Maternelle Petite Section',
+  'fr-preschool-ms': 'Maternelle Moyenne Section',
+  'fr-preschool-gs': 'Maternelle Grande Section'
+};
+
+export function normalizeFrancophoneMaternelleLevel(
+  name: string
+): FrancophoneMaternelleLevelId | null {
+  const normalized = (name || '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR');
+  return FRANCOPHONE_MATERNELLE_ALIASES[normalized] || null;
+}
+
 export function getDisplayClassName(name: string): string {
   const trimmed = (name || '').trim();
-  const lower = trimmed.toLowerCase();
-
-  if (lower === 'maternelle 1') return 'Petite Section';
-  if (lower === 'maternelle 2') return 'Moyenne Section';
-  if (lower === 'maternelle 3') return 'Grande Section';
-
-  return trimmed;
+  const levelId = normalizeFrancophoneMaternelleLevel(trimmed);
+  return levelId ? FRANCOPHONE_MATERNELLE_DISPLAY_NAMES[levelId] : trimmed;
 }
 
 export function resolveClassActiveStatus(cls?: { isActive?: boolean } | null): boolean {

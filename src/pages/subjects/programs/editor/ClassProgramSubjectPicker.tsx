@@ -3,6 +3,7 @@ import type { Subject, ClassSubject, ClassSection } from '../../../../types';
 import { normalizeClassSection, normalizeClassCycle } from '../../../../utils/classClassification';
 import { filterAvailableSubjectsForClass } from './classProgramSubjectFilters';
 import { sortClassesPedagogically, cleanClassName } from '../../../../utils/pedagogicalSort';
+import { getDisplayClassName } from '../../../../utils/classCatalog';
 import styles from './ClassProgramSubjectPicker.module.css';
 
 const translateSectionLabel = (val: string): string => {
@@ -268,7 +269,7 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 {availableClasses.map(c => {
                   const cSec = normalizeClassSection(c);
                   const cCyc = normalizeClassCycle(c);
-                  const displayName = cleanClassName(c.name, cSec);
+                  const displayName = getDisplayClassName(cleanClassName(c.name, cSec));
                   return (
                     <label key={c.id} className={styles.optionRow}>
                       <input
