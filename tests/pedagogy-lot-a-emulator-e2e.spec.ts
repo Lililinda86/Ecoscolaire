@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { deleteApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
@@ -46,6 +46,20 @@ const identities = [
     role,
   })),
 ];
+
+const routeVercelPreview = async (page: Page, baseUrl: string) => {
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (!stagingRun || !bypass) return;
+  await page.route(`${baseUrl}/**`, (route) =>
+    route.continue({
+      headers: {
+        ...route.request().headers(),
+        "x-vercel-protection-bypass": bypass,
+        "x-vercel-set-bypass-cookie": "true",
+      },
+    }),
+  );
+};
 
 test.describe("Lot A — parcours secrétaire sécurisé", () => {
   const emulatorRun =
@@ -127,6 +141,66 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
             throw error;
         }
       }
+    };
+
+    const verifyCleanup = async () => {
+      const scopedCollections = [
+        "teachingPlanItems",
+        "teachingPlans",
+        "teachingWeeks",
+        "schoolCurriculumAdoptions",
+        "audit_logs",
+      ];
+      const scopedResiduals = await Promise.all(
+        scopedCollections.map(async (collectionName) =>
+          firestore
+            .collection(collectionName)
+            .where("schoolId", "==", fixture.schoolId)
+            .get()
+            .then((snapshot) => snapshot.size),
+        ),
+      );
+      const exactResiduals = await Promise.all(
+        [
+          ["teacherAssignments", fixture.assignmentId],
+          ["staff", fixture.staffId],
+          ["classSubjects", `${fixture.revisionId}__${fixture.subjectId}`],
+          ["teachingPlans", "pedagogy-e2e-cross-school-sentinel"],
+          ["classPrograms", fixture.classProgramId],
+          ["periods", fixture.periodId],
+          ["classes", fixture.classId],
+          ["academicYears", fixture.yearId],
+          ["schools", fixture.schoolId],
+          ["schools", fixture.otherSchoolId],
+          ...identities.map(({ uid }) => ["users", uid]),
+          ["curriculumUnits", fixture.unitId],
+          ["curriculumPrograms", fixture.programId],
+        ].map(([collectionName, id]) =>
+          firestore
+            .collection(collectionName)
+            .doc(id)
+            .get()
+            .then((document) => (document.exists ? 1 : 0)),
+        ),
+      );
+      let authResiduals = 0;
+      for (const { uid } of identities) {
+        try {
+          await auth.getUser(uid);
+          authResiduals += 1;
+        } catch (error) {
+          if ((error as { code?: string }).code !== "auth/user-not-found")
+            throw error;
+        }
+      }
+      const residuals = [...scopedResiduals, ...exactResiduals].reduce(
+        (sum, count) => sum + count,
+        authResiduals,
+      );
+      console.log(
+        `PEDAGOGY_CLEANUP residuals=${residuals} orphans=${authResiduals}`,
+      );
+      expect(residuals).toBe(0);
     };
 
     await cleanup();
@@ -283,17 +357,12 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
         if (stagingRun) {
           const roleContext = await browser.newContext({
             baseURL: testInfo.project.use.baseURL as string,
-            ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-              ? {
-                  extraHTTPHeaders: {
-                    "x-vercel-protection-bypass":
-                      process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-                    "x-vercel-set-bypass-cookie": "true",
-                  },
-                }
-              : {}),
           });
           const rolePage = await roleContext.newPage();
+          await routeVercelPreview(
+            rolePage,
+            testInfo.project.use.baseURL as string,
+          );
           await loginAs(rolePage, identity.email, identity.password);
           await rolePage.goto("/#/pedagogy");
           await expect(rolePage.getByTestId("nav-pedagogy")).toBeVisible({
@@ -307,6 +376,13 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
       }
 
       const before = await countProtected();
+      await routeVercelPreview(page, testInfo.project.use.baseURL as string);
+      if (stagingRun) {
+        await page.goto("/#/diagnostic");
+        await expect(
+          page.getByTestId("diagnostic-firebase-project"),
+        ).toHaveText("ecoscolaire-staging");
+      }
       await loginAs(page, fixture.email, fixture.password);
       await page.goto("/#/pedagogy");
       await expect(
@@ -415,6 +491,7 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
       });
     } finally {
       await cleanup();
+      await verifyCleanup();
       await deleteApp(app);
     }
   });
