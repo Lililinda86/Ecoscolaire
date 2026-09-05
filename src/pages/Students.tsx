@@ -12,7 +12,7 @@ import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '..
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
 import { db as firestoreDb } from '../db/firebase';
-import { doc, setDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { resolveStudentEnrollmentAcademicYear } from '../utils/studentEnrollment';
 import {
   acquireStudentSubmissionLock,
@@ -166,7 +166,10 @@ const normalizeImportedBirthDate = (rawValue: unknown): string | null => {
   return isoStr;
 };
 
-const toImportedStudentPayload = (student: Student, schoolId: string): Student => {
+const toImportedStudentPayload = (student: Student, schoolId: string): Student & { id: string; schoolId: string } => {
+  if (!student.id) {
+    throw new Error("Identifiant de l'élève obligatoire");
+  }
   if (!student.studentLastName?.trim()) {
     throw new Error("Nom de l'élève obligatoire");
   }
@@ -202,7 +205,7 @@ const toImportedStudentPayload = (student: Student, schoolId: string): Student =
     ? normalizedMatricule
     : '-';
 
-  const payload: Student = {
+  const payload: Student & { id: string; schoolId: string } = {
     id: student.id,
     schoolId,
     schoolingStatus: 'active',
@@ -1353,7 +1356,7 @@ const Students: React.FC = () => {
     setIsSaving(true);
 
     try {
-      const persistedStudents: Student[] = [];
+      const persistedStudents: Array<Student & { id: string; schoolId: string }> = [];
 
       for (const student of previewStudents) {
         const importedPayload = toImportedStudentPayload(student, currentSchool.id);
@@ -1434,16 +1437,30 @@ const Students: React.FC = () => {
         }
       }
 
-      const batch = writeBatch(firestoreDb);
-
+      const createdStudents: Student[] = [];
       for (const student of persistedStudents) {
-        const studentRef = doc(firestoreDb, 'students', student.id);
-        batch.set(studentRef, student);
+        const { schoolData, privateData, financeData, parentPrivateData, parentFinanceData } = splitStudentData(student);
+        const creationResult = await createStudentSecure({
+          studentId: student.id,
+          requestedMatricule: student.matricule && student.matricule !== '-' ? student.matricule : undefined,
+          studentData: schoolData,
+          privateData: privateData as unknown as Record<string, unknown>,
+          financeData: financeData as unknown as Record<string, unknown>,
+          parentPrivateData: parentPrivateData as unknown as Record<string, unknown>,
+          parentFinanceData: parentFinanceData as unknown as Record<string, unknown>
+        });
+        createdStudents.push({
+          ...student,
+          academicYearId: creationResult.academicYearId,
+          registrationYear: creationResult.registrationYear,
+          matricule: creationResult.matricule,
+          matriculeNormalized: creationResult.matriculeNormalized,
+          matriculeReservationId: creationResult.matriculeReservationId,
+          duplicateFingerprint: creationResult.duplicateFingerprint,
+          duplicateReservationId: creationResult.duplicateReservationId
+        });
       }
-
-      await batch.commit();
-
-      addStudentsLocal(persistedStudents);
+      addStudentsLocal(createdStudents);
       setPreviewStudents(null);
       setImportReport(null);
       setImportModalOpen(false);
@@ -1451,7 +1468,7 @@ const Students: React.FC = () => {
       alert("Importation finalisée avec succès !");
     } catch (err: unknown) {
       console.error("Student import failed.", { code: getErrorCode(err) });
-      alert("Erreur lors de l'enregistrement du lot. Zéro élève n'a été importé. Détails : " + getErrorMessage(err));
+      alert("Erreur lors de l'enregistrement sécurisé de l'import. Détails : " + getErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -1713,11 +1730,13 @@ const Students: React.FC = () => {
               </button>
               <button
                 className="secondary"
-                disabled
-                aria-label="Import temporairement indisponible"
-                title="Import temporairement indisponible — utilisez l’ajout manuel sécurisé."
+                type="button"
+                data-testid="student-import-open"
+                onClick={() => setImportModalOpen(true)}
+                disabled={isSchoolSuspended}
+                aria-label="Importer des élèves depuis Excel"
               >
-                <FileSpreadsheet size={18} /> Import temporairement indisponible
+                <FileSpreadsheet size={18} /> Importer depuis Excel
               </button>
             </>
           )}
@@ -2776,7 +2795,7 @@ const Students: React.FC = () => {
       {/* Excel Import Modal */}
       <Modal isOpen={isImportModalOpen} onClose={() => {setImportModalOpen(false); setPreviewStudents(null); setImportReport(null);}} title="Importation d'élèves depuis Excel">
         {!previewStudents ? (
-          <form onSubmit={handleImportSubmit}>
+          <form data-testid="student-import-form" onSubmit={handleImportSubmit}>
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#eef2ff', borderRadius: '4px', border: '1px solid var(--primary-color)' }}>
               <p style={{ margin: '0 0 0.5rem 0', fontWeight: 500 }}>Étape 1 : Format de votre fichier Excel (.xlsx)</p>
               <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
@@ -2846,17 +2865,17 @@ const Students: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label>Fichier Excel complété (.xlsx, .xls)</label>
-              <input type="file" accept=".xlsx, .xls" required onChange={e => setExcelFile(e.target.files ? e.target.files[0] : null)} style={{ padding: '0.5rem', border: '1px dashed var(--border-color)', width: '100%', background: 'var(--bg-color)', cursor: 'pointer' }} />
+              <label htmlFor="student-import-file">Fichier Excel complété (.xlsx, .xls)</label>
+              <input id="student-import-file" name="studentImportFile" data-testid="student-import-file" type="file" accept=".xlsx, .xls" required onChange={e => setExcelFile(e.target.files ? e.target.files[0] : null)} style={{ padding: '0.5rem', border: '1px dashed var(--border-color)', width: '100%', background: 'var(--bg-color)', cursor: 'pointer' }} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
               <button type="button" className="secondary" onClick={() => setImportModalOpen(false)}>{t('cancel', 'Annuler')}</button>
-              <button type="submit">Afficher l'aperçu avant import</button>
+              <button type="submit" data-testid="student-import-preview-submit">Afficher l'aperçu avant import</button>
             </div>
           </form>
         ) : (
-          <div>
+          <div data-testid="student-import-preview">
             {importReport && (
               <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-color)' }}>Rapport de Validation de l'Import</h4>
@@ -2919,7 +2938,7 @@ const Students: React.FC = () => {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
               <button type="button" className="secondary" onClick={() => { setPreviewStudents(null); setImportReport(null); }}>Retour</button>
-              <button type="button" onClick={handleConfirmImport} disabled={previewStudents.length === 0} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>Confirmer l'importation</button>
+              <button type="button" data-testid="student-import-confirm" onClick={handleConfirmImport} disabled={previewStudents.length === 0 || isSaving} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>Confirmer l'importation</button>
             </div>
           </div>
         )}

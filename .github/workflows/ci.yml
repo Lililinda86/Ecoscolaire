@@ -92,6 +92,7 @@ jobs:
       - name: Run Student Progressive Registration contracts
         run: |
           node --test tests/security/student-progressive-registration-locators.spec.mjs
+          npx vitest run tests/unit/studentImportSafety.spec.ts
           node --test tests/security/student-progressive-registration-staging-preflight.spec.mjs
 
       - name: Validate Student Progressive Registration Staging harness

@@ -8,6 +8,7 @@ import {
   REGISTRATION_CONTROL_STEPS,
   REGISTRATION_SCOPE_HEADINGS,
   REGISTRATION_STATUS_NAMES,
+  STUDENT_IMPORT_TEST_IDS,
   requireRegistrationControlStep,
   requireUniqueRegistrationLocatorCount,
   waitForUniqueRegistrationLocator
@@ -22,6 +23,10 @@ const scenarioA = harnessSource.slice(
 const scenarioC = harnessSource.slice(
   harnessSource.indexOf('async function scenarioComplete()'),
   harnessSource.indexOf('async function scenarioTransport()')
+);
+const scenarioF = harnessSource.slice(
+  harnessSource.indexOf('async function scenarioExcel()'),
+  harnessSource.indexOf('async function cleanup()')
 );
 
 function occurrences(source, needle) {
@@ -261,4 +266,40 @@ test('scenario A no longer uses approximate labels or global wizard text locator
   assert.doesNotMatch(scenarioA, /formField\(|hasText:\s*['"]Étape/);
   assert.match(harnessSource, /page\.getByTestId\('modal-content'\)/);
   assert.match(harnessSource, /const REGISTRATION_LOCATOR_TIMEOUT_MS = 5_000/);
+});
+
+test('scenario F exposes one stable locator for every Excel import control', () => {
+  for (const [name, testId] of Object.entries(STUDENT_IMPORT_TEST_IDS)) {
+    assert.equal(occurrences(studentsSource, `data-testid="${testId}"`), 1, `${name} import control must be unique`);
+    assert.match(scenarioF, new RegExp(`STUDENT_IMPORT_TEST_IDS\\.${name}`));
+  }
+  assert.match(sourceWindow('data-testid="student-import-file"', 150, 150), /id="student-import-file"[\s\S]*?name="studentImportFile"[\s\S]*?type="file"/);
+});
+
+test('scenario F uses only unique modal-scoped controls without arbitrary or global fallbacks', () => {
+  assert.match(scenarioF, /page\.getByTestId\(STUDENT_IMPORT_TEST_IDS\.open\)/);
+  assert.match(scenarioF, /modal\.getByTestId\(STUDENT_IMPORT_TEST_IDS\.form\)/);
+  assert.match(scenarioF, /form\.getByTestId\(STUDENT_IMPORT_TEST_IDS\.file\)/);
+  assert.match(scenarioF, /preview\.getByText\(importName, \{ exact: true \}\)/);
+  assert.doesNotMatch(scenarioF, /\.first\(\)|page\.getByText\(|page\.getByRole\(|page\.locator\(|filter\(\{\s*has:|waitForTimeout\(|sleep\(/);
+});
+
+test('Excel import confirmation uses secure student creation and keeps legacy BulkWriter dormant', () => {
+  const confirmation = studentsSource.slice(
+    studentsSource.indexOf('const handleConfirmImport = async () =>'),
+    studentsSource.indexOf('const exportInscriptionsCSV')
+  );
+  assert.match(confirmation, /splitStudentData\(student\)/);
+  assert.match(confirmation, /await createStudentSecure\(\{/);
+  assert.match(confirmation, /requestedMatricule: student\.matricule && student\.matricule !== '-'/);
+  assert.doesNotMatch(confirmation, /writeBatch\(|batch\.set\(|setDoc\(/);
+  assert.doesNotMatch(studentsSource, /Import temporairement indisponible/);
+  assert.throws(
+    () => requireUniqueRegistrationLocatorCount('Excel import file input', 0),
+    error => error?.code === 'MISSING_REGISTRATION_CONTROL'
+  );
+  assert.throws(
+    () => requireUniqueRegistrationLocatorCount('Excel import confirm action', 2),
+    error => error?.code === 'AMBIGUOUS_REGISTRATION_CONTROL'
+  );
 });
