@@ -1,4 +1,76 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "teachingPlans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "weekStartDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "teachingPlans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "weekStartDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "teachingWeeks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "weekStartDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "curriculumUnits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "programId", "order": "ASCENDING" },
+        { "fieldPath": "catalogLevelId", "order": "ASCENDING" },
+        { "fieldPath": "sequence", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "classPrograms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "teacherAssignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "curriculumUnits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "programId", "order": "ASCENDING" },
+        { "fieldPath": "catalogLevelId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "teachingPlanItems",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "planId", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

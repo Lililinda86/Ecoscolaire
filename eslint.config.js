@@ -10,7 +10,22 @@ export default defineConfig([
   // validate-staging.yml qui l'exécute via `node scripts/validate-staging.cjs`).
   // ESLint ne peut pas parser ce fichier (Unexpected character '\0').
   // Il n'a pas besoin d'être linté : c'est un script CI exécuté directement par Node.js.
-  globalIgnores(['dist', 'scripts/validate-staging.cjs']),
+  globalIgnores([
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/coverage/**',
+    '**/playwright-report/**',
+    '**/test-results/**',
+    '**/.vercel/**',
+    '**/.firebase/**',
+    '**/.codex/**',
+    '**/.codex-isolated/**',
+    '**/.codex-worktrees/**',
+    '**/codex-worktrees/**',
+    '**/reports/**',
+    '**/functions/lib/**',
+    'scripts/validate-staging.cjs',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

@@ -3,6 +3,7 @@
   "scripts": {
     "lint": "npx --prefix .. --no-install eslint src",
     "build": "tsc",
+    "typecheck": "tsc --noEmit --incremental false",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",

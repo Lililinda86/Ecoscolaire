@@ -1257,6 +1257,37 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- PEDAGOGY LOT A ---
+    match /curriculumPrograms/{programId} {
+      allow read: if isAuthenticated() && isActive() && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+      allow create, update, delete: if false;
+    }
+
+    match /curriculumUnits/{unitId} {
+      allow read: if isAuthenticated() && isActive() && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+      allow create, update, delete: if false;
+    }
+
+    match /schoolCurriculumAdoptions/{adoptionId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+      allow create, update, delete: if false;
+    }
+
+    match /teachingWeeks/{weekId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+      allow create, update, delete: if false;
+    }
+
+    match /teachingPlans/{planId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+      allow create, update, delete: if false;
+    }
+
+    match /teachingPlanItems/{itemId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+      allow create, update, delete: if false;
+    }
+
     // --- STUDENT IMPORT JOBS ---
     match /student_import_jobs/{jobId} {
       allow read: if isAuthenticated() && isActive() && !isBoardViewer() && (isSuperAdmin() || hasSchoolAccess(resource.data.schoolId));
