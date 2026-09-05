@@ -1406,6 +1406,16 @@ service cloud.firestore {
       // Le grand livre des encaissements est alimenté uniquement par le backend canonique.
       allow create, update, delete: if false;
     }
+    match /paymentAllocations/{allocationId} {
+      allow read: if isAuthenticated() && isActive() && (
+        isSuperAdmin() ||
+        ((isOwner() || isDirector() || isSecretary() || isAccountant())
+          && hasSchoolAccess(resource.data.schoolId)) ||
+        (isParent() && hasSchoolAccess(resource.data.schoolId)
+          && resource.data.studentId in getUserData().get('studentIds', []))
+      );
+      allow create, update, delete: if false;
+    }
     match /transportPaymentAllocations/{allocationId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||

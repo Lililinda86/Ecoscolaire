@@ -29,6 +29,8 @@ const expectedLotTests = [...lot1Tests, ...lot2Tests, ...lot3Tests];
 const historicalTests = [
   'tests/unit/FinancialBenefitsPanel.spec.tsx',
   'tests/unit/paymentReceipt.spec.ts',
+  'tests/unit/studentAccountReceipt.spec.ts',
+  'tests/unit/StudentAccountCollection.spec.tsx',
   'tests/unit/expenseLedger.spec.ts',
   'tests/unit/reportCardCalculations.spec.ts',
   'tests/unit/reportCardPdf.spec.ts',
