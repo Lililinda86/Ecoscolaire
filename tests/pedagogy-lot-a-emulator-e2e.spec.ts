@@ -4,7 +4,14 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { loginAs } from "./helpers/auth";
 
-const projectId = "demo-ecoscolaire";
+const stagingRun = process.env.PEDAGOGY_STAGING_E2E === "true";
+const projectId =
+  process.env.PEDAGOGY_FIREBASE_PROJECT_ID || "demo-ecoscolaire";
+if (stagingRun && projectId !== "ecoscolaire-staging") {
+  throw new Error(
+    "PRODUCTION_GUARD: staging E2E requires ecoscolaire-staging.",
+  );
+}
 const fixture = {
   uid: "pedagogy-e2e-secretary",
   email: "pedagogy.secretary@emulator.test",
@@ -23,16 +30,36 @@ const fixture = {
   assignmentId: "pedagogy-e2e-assignment",
 };
 
-test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
+const identities = [
+  {
+    uid: fixture.uid,
+    email: fixture.email,
+    password: fixture.password,
+    name: "Secrétaire Pédagogie",
+    role: "secretary",
+  },
+  ...(["director", "owner", "superAdmin"] as const).map((role) => ({
+    uid: `pedagogy-e2e-${role}`,
+    email: `pedagogy.${role.toLowerCase()}@emulator.test`,
+    password: fixture.password,
+    name: `E2E ${role}`,
+    role,
+  })),
+];
+
+test.describe("Lot A — parcours secrétaire sécurisé", () => {
+  const emulatorRun =
+    Boolean(process.env.FIRESTORE_EMULATOR_HOST) &&
+    Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST);
   test.skip(
-    !process.env.FIRESTORE_EMULATOR_HOST ||
-      !process.env.FIREBASE_AUTH_EMULATOR_HOST,
-    "Émulateurs Firestore et Auth obligatoires.",
+    !emulatorRun && !stagingRun,
+    "Émulateurs ou exécution Staging explicite obligatoires.",
   );
 
   test("persiste, reste idempotent et ne modifie aucune collection métier externe", async ({
     page,
-  }) => {
+    browser,
+  }, testInfo) => {
     const app =
       getApps().find((candidate) => candidate.name === "pedagogy-e2e") ||
       initializeApp({ projectId }, "pedagogy-e2e");
@@ -83,7 +110,7 @@ test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
         ["academicYears", fixture.yearId],
         ["schools", fixture.schoolId],
         ["schools", fixture.otherSchoolId],
-        ["users", fixture.uid],
+        ...identities.map(({ uid }) => ["users", uid]),
         ["curriculumUnits", fixture.unitId],
         ["curriculumPrograms", fixture.programId],
       ];
@@ -92,22 +119,23 @@ test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
         batch.delete(firestore.collection(collectionName).doc(id)),
       );
       await batch.commit();
-      try {
-        await auth.deleteUser(fixture.uid);
-      } catch (error) {
-        if ((error as { code?: string }).code !== "auth/user-not-found")
-          throw error;
+      for (const { uid } of identities) {
+        try {
+          await auth.deleteUser(uid);
+        } catch (error) {
+          if ((error as { code?: string }).code !== "auth/user-not-found")
+            throw error;
+        }
       }
     };
 
     await cleanup();
     try {
-      await auth.createUser({
-        uid: fixture.uid,
-        email: fixture.email,
-        password: fixture.password,
-        displayName: "Secrétaire Pédagogie",
-      });
+      await Promise.all(
+        identities.map(({ uid, email, password, name }) =>
+          auth.createUser({ uid, email, password, displayName: name }),
+        ),
+      );
       const batch = firestore.batch();
       const set = (
         collectionName: string,
@@ -118,13 +146,15 @@ test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
           id,
           ...data,
         });
-      set("users", fixture.uid, {
-        email: fixture.email,
-        name: "Secrétaire Pédagogie",
-        role: "secretary",
-        schoolId: fixture.schoolId,
-        isActive: true,
-      });
+      identities.forEach(({ uid, email, name, role }) =>
+        set("users", uid, {
+          email,
+          name,
+          role,
+          schoolId: fixture.schoolId,
+          isActive: true,
+        }),
+      );
       set("schools", fixture.schoolId, {
         name: "École E2E Pédagogie",
         activeAcademicYearId: fixture.yearId,
@@ -249,6 +279,29 @@ test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
       });
       await batch.commit();
 
+      for (const identity of identities) {
+        const roleContext = await browser.newContext({
+          baseURL: testInfo.project.use.baseURL as string,
+          ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+            ? {
+                extraHTTPHeaders: {
+                  "x-vercel-protection-bypass":
+                    process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+                  "x-vercel-set-bypass-cookie": "true",
+                },
+              }
+            : {}),
+        });
+        const rolePage = await roleContext.newPage();
+        await loginAs(rolePage, identity.email, identity.password);
+        await rolePage.goto("/#/pedagogy");
+        await expect(rolePage.getByTestId("nav-pedagogy")).toBeVisible();
+        await expect(
+          rolePage.getByRole("heading", { name: "Pilotage pédagogique" }),
+        ).toBeVisible();
+        await roleContext.close();
+      }
+
       const before = await countProtected();
       await loginAs(page, fixture.email, fixture.password);
       await page.goto("/#/pedagogy");
@@ -256,7 +309,13 @@ test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
         page.getByRole("heading", { name: "Pilotage pédagogique" }),
       ).toBeVisible();
       await expect(page.getByText("forbidden")).toHaveCount(0);
-      await page.getByRole("link", { name: "Planification", exact: true }).click();
+      await page
+        .getByRole("link", { name: "Planification", exact: true })
+        .click();
+      await expect(
+        page.getByText(/Progression planifiée uniquement/),
+      ).toBeVisible();
+      await expect(page.getByText(/^Progression réalisée$/)).toHaveCount(0);
       await page.getByLabel("Classe").selectOption(fixture.classId);
       await page
         .getByRole("button", { name: "Initialiser les semaines" })
@@ -338,14 +397,18 @@ test.describe("Lot A — parcours secrétaire sur émulateurs", () => {
         (await firestore.collection("teachingPlans").doc(planId).get()).data()
           ?.status,
       ).toBe("teacher_validated");
-      await firestore
-        .collection("audit_logs")
-        .add({
-          schoolId: fixture.schoolId,
-          action: "PEDAGOGY_E2E_COMPLETED",
-          targetId: planId,
-          createdAt: FieldValue.serverTimestamp(),
-        });
+      await page.getByRole("button", { name: "Archiver" }).click();
+      await expect(page.getByText("Planification archivée.")).toBeVisible();
+      expect(
+        (await firestore.collection("teachingPlans").doc(planId).get()).data()
+          ?.status,
+      ).toBe("archived");
+      await firestore.collection("audit_logs").add({
+        schoolId: fixture.schoolId,
+        action: "PEDAGOGY_E2E_COMPLETED",
+        targetId: planId,
+        createdAt: FieldValue.serverTimestamp(),
+      });
     } finally {
       await cleanup();
       await deleteApp(app);
