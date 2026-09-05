@@ -69,21 +69,25 @@ test.describe('Lot B — préparations de cours', () => {
       const before = await countProtected();
       if (stagingRun) console.info('[Lot B staging] setup: done; browser flow start');
       await loginAs(page, fixture.email, fixture.password);
+      if (stagingRun) console.info('[Lot B staging] browser: login done');
       await page.goto('/#/pedagogy/preparations');
       await expect(page.getByRole('heading', { name: 'Préparations de cours' })).toBeVisible();
       await expect(page.getByText('Interdit')).toHaveCount(0);
       await page.getByRole('button', { name: 'Générer les préparations attendues' }).click();
       await expect(page.getByText(/2 préparation\(s\) attendue\(s\), 2 créée\(s\)/)).toBeVisible();
+      if (stagingRun) console.info('[Lot B staging] browser: expected preparations created');
       await page.getByRole('button', { name: 'Générer les préparations attendues' }).click();
       await expect(page.getByText(/2 préparation\(s\) attendue\(s\), 0 créée\(s\)/)).toBeVisible();
       expect((await firestore.collection('lessonPreparations').where('schoolId', '==', fixture.schoolId).get()).size).toBe(2);
       expect((await firestore.collection('teachingPlans').doc(fixture.planId).get()).data()?.version).toBe(2);
 
       await page.getByRole('link', { name: 'Déposer' }).first().click();
+      if (stagingRun) console.info('[Lot B staging] browser: PDF import opened');
       await page.locator('input[type=file]').setInputFiles({ name: 'preparation.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 Lot B') });
       await page.getByRole('button', { name: 'Déposer et analyser' }).click();
       await expect(page.getByText(/Analyse terminée/)).toBeVisible({ timeout: 20_000 });
       await expect(page.getByRole('heading', { name: 'Relecture structurée' })).toBeVisible();
+      if (stagingRun) console.info('[Lot B staging] browser: PDF analysis done');
       await page.getByLabel('Matériel').fill('Ardoise et craie');
       await page.getByRole('button', { name: 'Enregistrer les corrections' }).click();
       await expect(page.getByText('Corrections enregistrées.')).toBeVisible();
@@ -92,6 +96,7 @@ test.describe('Lot B — préparations de cours', () => {
       await expect(page.getByText('Préparation validée après relecture du secrétariat.')).toBeVisible();
       await page.reload();
       await expect(page.getByText(/Validée/).first()).toBeVisible();
+      if (stagingRun) console.info('[Lot B staging] browser: review and reload done');
 
       await page.goto('/#/pedagogy/preparations');
       const a4 = page.locator('#preparation-template');
@@ -104,6 +109,7 @@ test.describe('Lot B — préparations de cours', () => {
       await page.getByLabel('Objectif').fill('Correction manuelle après échec');
       await page.getByRole('button', { name: 'Enregistrer les corrections' }).click();
       await expect(page.getByText('Corrections enregistrées.')).toBeVisible();
+      if (stagingRun) console.info('[Lot B staging] browser: failure fallback done');
 
       await page.goto('/#/pedagogy/preparations/import');
       await page.getByText('Préparation manuelle non planifiée').click();
@@ -114,6 +120,7 @@ test.describe('Lot B — préparations de cours', () => {
       await page.locator('input[type=file]').setInputFiles({ name: 'photo.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([255, 216, 255]) });
       await page.getByRole('button', { name: 'Déposer et analyser' }).click();
       await expect(page.getByText(/Analyse terminée/)).toBeVisible({ timeout: 20_000 });
+      if (stagingRun) console.info('[Lot B staging] browser: manual preparation done');
       expect((await firestore.collection('lessonPreparations').where('schoolId', '==', fixture.schoolId).where('source', '==', 'manual_unplanned').get()).size).toBe(1);
       expect(await countProtected()).toEqual(before);
       expect((await firestore.collection('audit_logs').where('schoolId', '==', fixture.schoolId).get()).size).toBeGreaterThanOrEqual(10);
