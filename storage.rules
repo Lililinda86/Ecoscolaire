@@ -16,6 +16,35 @@ service firebase.storage {
                      (request.auth.token.schoolId == schoolId && (request.auth.token.role == 'owner' || request.auth.token.role == 'director'))
                    );
     }
+
+    // Lot B — originaux immuables des préparations. Le chemin encode l'école et l'année.
+    match /schools/{schoolId}/pedagogy/preparations/{academicYearId}/{uploadId}/{fileName} {
+      function isPreparationManager() {
+        return request.auth != null && (
+          request.auth.token.role == 'superAdmin' ||
+          (request.auth.token.schoolId == schoolId && request.auth.token.role in ['owner', 'director', 'secretary'])
+        );
+      }
+      function isSupportedPreparationFile() {
+        return request.resource != null
+          && request.resource.size > 0
+          && request.resource.size <= 10 * 1024 * 1024
+          && request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png'];
+      }
+
+      allow read: if isPreparationManager();
+      allow write: if resource == null
+        && isPreparationManager()
+        && isSupportedPreparationFile()
+        && request.resource.metadata.checksum is string
+        && request.resource.metadata.checksum.matches('^[a-f0-9]{64}$')
+        && request.resource.metadata.preparationId is string
+        && (
+          (request.resource.contentType == 'application/pdf' && fileName == 'original.pdf') ||
+          (request.resource.contentType == 'image/png' && fileName == 'original.png') ||
+          (request.resource.contentType == 'image/jpeg' && fileName == 'original.jpg')
+        );
+    }
     // Dossier pour les données d'import Excel massif (JSON)
     match /import_jobs_data/{schoolId}/{fileName} {
       // Kill switch client : aucune lecture ni mutation tant que les imports sont désactivés.
