@@ -25,6 +25,7 @@ import {
   REGISTRATION_CONTROL_SELECTORS,
   REGISTRATION_SCOPE_HEADINGS,
   REGISTRATION_STATUS_NAMES,
+  STUDENT_IMPORT_TEST_IDS,
   requireRegistrationControlStep,
   waitForUniqueRegistrationLocator as requireUniqueRegistrationLocator
 } from '../tests/security/student-progressive-registration-locator-contract.mjs';
@@ -556,19 +557,31 @@ async function scenarioSecurity() {
 
 async function scenarioExcel() {
   const importName = `IMPORT ${runId}`;
-  const trigger = page.getByRole('button', { name: /import/i });
-  assert(await trigger.count() > 0, 'F line 1: aucun bouton UI ne permet d’ouvrir l’import Excel');
-  await trigger.first().click();
+  const trigger = await requireUniqueRegistrationLocator(
+    page.getByTestId(STUDENT_IMPORT_TEST_IDS.open),
+    'Excel import open action'
+  );
+  await trigger.click();
+  const modal = await requireUniqueRegistrationLocator(page.getByTestId('modal-content'), 'Excel import modal');
+  const form = await requireUniqueRegistrationLocator(
+    modal.getByTestId(STUDENT_IMPORT_TEST_IDS.form),
+    'Excel import form'
+  );
   const file = path.join(ARTIFACT_DIR, `minimal-${runId}.xlsx`);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
     ['NOM', 'PRENOM', 'SEXE', 'SECTION', 'CLASSE'], ['IMPORT', runId, 'F', 'francophone', 'CP']
   ]), 'Eleves');
   XLSX.writeFile(workbook, file);
-  await page.locator('input[type="file"][accept*=".xlsx"]').setInputFiles(file);
-  await page.getByRole('button', { name: "Afficher l'aperçu avant import" }).click();
-  await page.getByText(importName, { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
-  await page.getByRole('button', { name: "Confirmer l'importation" }).click();
+  await (await requireUniqueRegistrationLocator(form.getByTestId(STUDENT_IMPORT_TEST_IDS.file), 'Excel import file input')).setInputFiles(file);
+  await (await requireUniqueRegistrationLocator(form.getByTestId(STUDENT_IMPORT_TEST_IDS.previewSubmit), 'Excel import preview action')).click();
+  const preview = await requireUniqueRegistrationLocator(
+    modal.getByTestId(STUDENT_IMPORT_TEST_IDS.preview),
+    'Excel import preview',
+    15_000
+  );
+  await requireUniqueRegistrationLocator(preview.getByText(importName, { exact: true }), 'Excel imported student preview', 15_000);
+  await (await requireUniqueRegistrationLocator(modal.getByTestId(STUDENT_IMPORT_TEST_IDS.confirm), 'Excel import confirm action')).click();
   const doc = await waitForStudentByName(importName);
   fixtureStudentIds.add(doc.id);
   assert(doc.data().registrationFileStatus === 'incomplete' && sameStrings(doc.data().missingRegistrationFields, REQUIRED_MISSING), 'F: imported status/missing fields incorrect');
