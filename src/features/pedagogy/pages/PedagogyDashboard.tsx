@@ -9,6 +9,8 @@ export default function PedagogyDashboard() {
   const year = db?.academicYears?.find(item => item.id === currentSchool?.activeAcademicYearId) || db?.academicYears?.find(item => item.status === 'active');
   const workspace = usePedagogyWorkspace(currentSchool?.id, year?.id);
   const validated = workspace.plans.filter(plan => plan.status === 'teacher_validated').length;
+  const today = new Date().toISOString().slice(0, 10);
+  const currentWeek = workspace.weeks.find(week => week.weekStartDate <= today && week.weekEndDate >= today);
   const pending = workspace.plans.filter(plan => ['proposed', 'needs_adjustment', 'adjusted'].includes(plan.status)).length;
   return <main className="pedagogy-page">
     <PedagogyHeader title="Pilotage pédagogique" description="Une vue opérationnelle des semaines, propositions et validations enregistrées par le secrétariat." />
@@ -16,6 +18,8 @@ export default function PedagogyDashboard() {
     {!year && <div className="pedagogy-alert">Activez une année scolaire pour commencer.</div>}
     {workspace.error && <div className="pedagogy-alert pedagogy-alert--error">{workspace.error}</div>}
     <section className="pedagogy-kpis" aria-busy={workspace.loading}>
+      <article><strong>{currentWeek ? `S${currentWeek.weekNumber}` : '—'}</strong><span>semaine actuelle</span></article>
+      <article><strong>Toutes</strong><span>classes sélectionnées</span></article>
       <article><strong>{workspace.weeks.length}</strong><span>semaines préparées</span></article>
       <article><strong>{workspace.plans.length}</strong><span>planifications</span></article>
       <article><strong>{pending}</strong><span>validations à suivre</span></article>

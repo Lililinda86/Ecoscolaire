@@ -5,7 +5,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 import {
   ensureTeachingPlanDraft, ensureTeachingWeeks, generateTeachingPlanProposal, loadTeachingPlanItems,
-  recordTeacherValidation, saveTeachingPlanAdjustments
+  recordTeacherPlanValidation, saveTeachingPlanAdjustments
 } from '../services/pedagogyService';
 import type { TeachingPlanItem } from '../types';
 import { canEditTeachingPlan, canValidateTeachingPlan } from '../validators';
@@ -46,7 +46,7 @@ export default function PedagogyPlanning() {
     'Ajustements enregistrés.'
   );
   const validate = () => currentSchool?.id && plan && teacherStaffId && run(
-    () => recordTeacherValidation(currentSchool.id, plan.id, teacherStaffId, 'Déclaration de validation enseignant enregistrée par le secrétariat.'),
+    () => recordTeacherPlanValidation(currentSchool.id, plan.id, teacherStaffId, 'Déclaration de validation enseignant enregistrée par le secrétariat.'),
     'Validation enseignant enregistrée.'
   );
 
@@ -60,11 +60,12 @@ export default function PedagogyPlanning() {
       <button className="pedagogy-button pedagogy-button--secondary" disabled={readOnly || !year} onClick={() => void initialize()}>Initialiser les semaines</button>
       <button className="pedagogy-button" disabled={readOnly || !classId || !weekStartDate} onClick={() => void run(createProposal, 'Proposition générée.')}>{plan ? 'Regénérer la proposition' : 'Créer la proposition'}</button>
     </section>
+    <div className="pedagogy-alert">Progression planifiée uniquement — la progression réalisée sera alimentée par le Lot B.</div>
     {plan && <section className="pedagogy-card">
       <div className="pedagogy-card-title"><div><h2>{classes.find(item => item.id === plan.classId)?.name || plan.classId}</h2><p>Semaine {plan.weekNumber}, du {plan.weekStartDate} au {plan.weekEndDate}</p></div><StatusBadge status={plan.status} /></div>
       <div className="pedagogy-schedule">
         {items.map((item, index) => <article key={item.id}>
-          <div className="pedagogy-slot">Jour {item.dayIndex} · Créneau {item.slotIndex}</div><strong>{item.subjectName}</strong>
+          <div className="pedagogy-slot">{['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'][item.dayIndex]} · Créneau {item.slotIndex}</div><strong>{item.subjectName}</strong>
           <input aria-label={`Leçon ${item.subjectName}`} disabled={readOnly || !canEditTeachingPlan(plan.status)} value={item.lessonTitle} onChange={event => setItems(current => current.map((candidate, itemIndex) => itemIndex === index ? { ...candidate, lessonTitle: event.target.value } : candidate))} />
           <textarea aria-label={`Objectif ${item.subjectName}`} disabled={readOnly || !canEditTeachingPlan(plan.status)} value={item.objective} onChange={event => setItems(current => current.map((candidate, itemIndex) => itemIndex === index ? { ...candidate, objective: event.target.value } : candidate))} />
         </article>)}

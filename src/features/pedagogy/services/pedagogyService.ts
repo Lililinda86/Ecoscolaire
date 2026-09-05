@@ -35,5 +35,5 @@ export const adoptCurriculumProgram = (input: { schoolId: string; academicYearId
 export const ensureTeachingPlanDraft = (input: { schoolId: string; academicYearId: string; classId: string; weekStartDate: string }) => call<{ schoolId: string; academicYearId: string; classId: string; weekStartDate: string }, { planId: string }>('ensureTeachingPlanDraft', input);
 export const generateTeachingPlanProposal = (schoolId: string, planId: string) => call('generateTeachingPlanProposal', { schoolId, planId });
 export const saveTeachingPlanAdjustments = (schoolId: string, planId: string, adjustments: Array<Pick<TeachingPlanItem, 'id' | 'lessonTitle' | 'objective' | 'note'>>) => call('saveTeachingPlanAdjustments', { schoolId, planId, adjustments });
-export const recordTeacherValidation = (schoolId: string, planId: string, teacherStaffId: string, note: string) => call('recordTeacherValidation', { schoolId, planId, teacherStaffId, note });
+export const recordTeacherPlanValidation = (schoolId: string, planId: string, teacherStaffId: string, note: string) => call('recordTeacherPlanValidation', { schoolId, planId, teacherStaffId, note });
 export const archiveTeachingPlan = (schoolId: string, planId: string) => call('archiveTeachingPlan', { schoolId, planId });

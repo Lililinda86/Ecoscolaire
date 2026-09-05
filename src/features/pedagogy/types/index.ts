@@ -1,4 +1,5 @@
 export type TeachingPlanStatus = 'draft' | 'proposed' | 'needs_adjustment' | 'adjusted' | 'teacher_validated' | 'archived';
+export type TeachingPlanItemStatus = 'planned' | 'adjusted' | 'teacher_validated' | 'cancelled';
 
 export interface CurriculumProgram {
   id: string;
@@ -45,7 +46,11 @@ export interface TeachingPlan {
   itemCount?: number;
   generatorVersion?: string;
   teacherStaffId?: string;
-  validationNote?: string;
+  teacherValidated?: boolean;
+  teacherValidatedAt?: unknown;
+  teacherValidationRecordedBy?: string;
+  teacherValidationRecordedAt?: unknown;
+  teacherValidationNote?: string;
   version: number;
 }
 
@@ -63,7 +68,7 @@ export interface TeachingPlanItem {
   note?: string;
   dayIndex: number;
   slotIndex: number;
-  status: TeachingPlanStatus;
+  status: TeachingPlanItemStatus;
 }
 
 export interface PedagogyWorkspace {
