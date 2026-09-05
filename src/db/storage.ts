@@ -135,9 +135,6 @@ const initialDB: Database = {
     { id: 'franco-maternelle-1', name: 'Maternelle 1', type: 'francophone', capacity: 30, level: 'maternelle' },
     { id: 'franco-maternelle-2', name: 'Maternelle 2', type: 'francophone', capacity: 30, level: 'maternelle' },
     { id: 'franco-maternelle-3', name: 'Maternelle 3', type: 'francophone', capacity: 30, level: 'maternelle' },
-    { id: 'franco-petite-section', name: 'Petite section', type: 'francophone', capacity: 30, level: 'maternelle' },
-    { id: 'franco-moyenne-section', name: 'Moyenne section', type: 'francophone', capacity: 30, level: 'maternelle' },
-    { id: 'franco-grande-section', name: 'Grande section', type: 'francophone', capacity: 30, level: 'maternelle' },
     // Primaire Francophone
     { id: 'franco-sil', name: 'SIL', type: 'francophone', capacity: 40, level: 'primaire' },
     { id: 'franco-cp', name: 'CP', type: 'francophone', capacity: 40, level: 'primaire' },

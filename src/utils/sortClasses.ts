@@ -1,5 +1,5 @@
 import type { ClassSection } from '../types';
-import { resolveEducationType } from './classCatalog';
+import { normalizeFrancophoneMaternelleLevel, resolveEducationType } from './classCatalog';
 
 export const sortClasses = (
   classes: ClassSection[],
@@ -7,9 +7,9 @@ export const sortClasses = (
 ): ClassSection[] => {
   const fOrder = [
     'pré-maternelle', 'pre-maternelle',
-    'petite section', 'maternelle 1',
-    'moyenne section', 'maternelle 2',
-    'grande section', 'maternelle 3',
+    'petite section',
+    'moyenne section',
+    'grande section',
     'sil', 'cp', 'ce1', 'ce2', 'cm1', 'cm2',
     '6e', '6ème', '5e', '5ème', '4e', '4ème', '3e', '3ème', '2nde', 'seconde', '1re', 'première', 'terminale'
   ];
@@ -55,7 +55,14 @@ export const sortClasses = (
     const orderArray = aType === 'francophone' ? fOrder : aOrder;
     
     // Normalize string to match exactly
-    const normalize = (str: string) => str.toLowerCase().trim();
+    const normalize = (str: string) => {
+      const trimmed = str.toLowerCase().trim();
+      const maternelleLevel = normalizeFrancophoneMaternelleLevel(trimmed);
+      if (maternelleLevel === 'fr-preschool-ps') return 'petite section';
+      if (maternelleLevel === 'fr-preschool-ms') return 'moyenne section';
+      if (maternelleLevel === 'fr-preschool-gs') return 'grande section';
+      return trimmed;
+    };
     const aName = normalize(a.name);
     const bName = normalize(b.name);
 
