@@ -22,7 +22,7 @@ test.describe('Lot B — préparations de cours', () => {
   test.setTimeout(stagingRun ? 180_000 : 120_000);
 
   test('dérive, dépose, analyse, corrige, valide et nettoie sans régression Lot A', async ({ page }) => {
-    const app = getApps().find(candidate => candidate.name === 'pedagogy-lot-b-e2e') || initializeApp({ projectId, storageBucket: `${projectId}.appspot.com` }, 'pedagogy-lot-b-e2e');
+    const app = getApps().find(candidate => candidate.name === 'pedagogy-lot-b-e2e') || initializeApp({ projectId, storageBucket: stagingRun ? `${projectId}.firebasestorage.app` : `${projectId}.appspot.com` }, 'pedagogy-lot-b-e2e');
     const firestore = getFirestore(app); const auth = getAuth(app); const bucket = getStorage(app).bucket();
     const countProtected = async () => Promise.all(protectedCollections.map(async name => (await firestore.collection(name).count().get()).data().count));
     const cleanup = async () => {
