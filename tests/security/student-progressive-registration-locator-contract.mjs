@@ -49,6 +49,11 @@ export const REGISTRATION_ACTION_NAMES = Object.freeze({
   next: 'Suivant',
   save: 'Enregistrer'
 });
+export const REGISTRATION_STATUS_NAMES = Object.freeze({
+  incomplete: 'À compléter',
+  complete: 'Dossier complet'
+});
+
 
 export function requireUniqueRegistrationLocatorCount(name, count) {
   if (count === 0) {
@@ -62,6 +67,17 @@ export function requireUniqueRegistrationLocatorCount(name, count) {
     throw error;
   }
 }
+export async function waitForUniqueRegistrationLocator(locator, name, timeout = 5_000) {
+  try {
+    await locator.waitFor({ state: 'visible', timeout });
+  } catch (error) {
+    requireUniqueRegistrationLocatorCount(name, await locator.count());
+    throw error;
+  }
+  requireUniqueRegistrationLocatorCount(name, await locator.count());
+  return locator;
+}
+
 
 export function requireRegistrationControlStep(name, actualStep) {
   const expectedStep = REGISTRATION_CONTROL_STEPS[name];

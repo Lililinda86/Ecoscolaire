@@ -24,8 +24,9 @@ import {
   REGISTRATION_CONTROL_SCOPES,
   REGISTRATION_CONTROL_SELECTORS,
   REGISTRATION_SCOPE_HEADINGS,
+  REGISTRATION_STATUS_NAMES,
   requireRegistrationControlStep,
-  requireUniqueRegistrationLocatorCount
+  waitForUniqueRegistrationLocator as requireUniqueRegistrationLocator
 } from '../tests/security/student-progressive-registration-locator-contract.mjs';
 
 const EXPECTED_PROJECT = 'ecoscolaire-staging';
@@ -295,11 +296,6 @@ async function expectCallableFailure(label, payload, businessCode) {
   }
 }
 
-async function requireUniqueRegistrationLocator(locator, name) {
-  requireUniqueRegistrationLocatorCount(name, await locator.count());
-  await locator.waitFor({ state: 'visible', timeout: REGISTRATION_LOCATOR_TIMEOUT_MS });
-  return locator;
-}
 
 async function registrationForm() {
   const modal = await requireUniqueRegistrationLocator(page.getByTestId('modal-content'), 'registration modal');
@@ -397,9 +393,16 @@ async function scenarioMinimal() {
   await clickNext(form);
   await clickNext(form);
   await (await registrationAction(form, 'save')).click();
-  const row = page.locator('tbody tr').filter({ hasText: name }).first();
-  await row.waitFor({ state: 'visible', timeout: 30000 });
-  await row.getByText('À compléter', { exact: true }).waitFor({ state: 'visible' });
+  const row = await requireUniqueRegistrationLocator(
+    page.locator('tbody tr').filter({ hasText: name }),
+    `minimal student row for ${name}`,
+    30_000
+  );
+  await requireUniqueRegistrationLocator(
+    row.getByText(REGISTRATION_STATUS_NAMES.incomplete, { exact: true }),
+    'incomplete registration badge',
+    30_000
+  );
 
   const doc = await waitForStudentByName(name);
   minimalStudentId = doc.id;
@@ -420,10 +423,16 @@ async function scenarioMinimal() {
 async function scenarioReload() {
   const name = `MINIMAL ${runId}`;
   await page.reload({ waitUntil: 'domcontentloaded' });
-  const row = page.locator('tbody tr').filter({ hasText: name }).first();
-  await row.waitFor({ state: 'visible', timeout: 30000 });
-  const badge = row.getByText('À compléter', { exact: true });
-  await badge.waitFor({ state: 'visible' });
+  const row = await requireUniqueRegistrationLocator(
+    page.locator('tbody tr').filter({ hasText: name }),
+    `reloaded student row for ${name}`,
+    30_000
+  );
+  const badge = await requireUniqueRegistrationLocator(
+    row.getByText(REGISTRATION_STATUS_NAMES.incomplete, { exact: true }),
+    'reloaded incomplete registration badge',
+    30_000
+  );
   const title = await badge.getAttribute('title');
   for (const expected of ['Date de naissance', 'Nom du responsable légal', 'Téléphone du responsable légal']) assert(title?.includes(expected), `B: missing-list title lacks ${expected}`);
   results.reload = 'PASS';
@@ -445,9 +454,14 @@ async function scenarioComplete() {
   await (await registrationAction(form, 'save')).click();
   const row = await requireUniqueRegistrationLocator(
     page.locator('tbody tr').filter({ hasText: name }),
-    `completed student row for ${name}`
+    `completed student row for ${name}`,
+    30_000
   );
-  await (await requireUniqueRegistrationLocator(row.getByText('Dossier complet', { exact: true }), 'complete registration badge')).waitFor({ state: 'visible', timeout: 30000 });
+  await requireUniqueRegistrationLocator(
+    row.getByText(REGISTRATION_STATUS_NAMES.complete, { exact: true }),
+    'complete registration badge',
+    30_000
+  );
   const snap = await adminDb.collection('students').doc(minimalStudentId).get();
   assert(snap.data()?.registrationFileStatus === 'complete', 'C: status is not complete');
   assert(Array.isArray(snap.data()?.missingRegistrationFields) && snap.data().missingRegistrationFields.length === 0, 'C: missing fields not empty');
@@ -461,9 +475,17 @@ async function scenarioTransport() {
   await form.getByText('Utilise le transport scolaire', { exact: true }).locator('input').check();
   assert(await form.getByTestId('student-transport-zone-pk').inputValue() === '', 'D: false PK prefilled');
   assert(await form.getByTestId('student-transport-pickup-point').inputValue() === '', 'D: false pickup prefilled');
-  await form.getByRole('button', { name: 'Enregistrer' }).click();
-  const row = page.locator('tbody tr').filter({ hasText: name }).first();
-  await row.getByText('À compléter', { exact: true }).waitFor({ state: 'visible', timeout: 30000 });
+  await (await registrationAction(form, 'save')).click();
+  const row = await requireUniqueRegistrationLocator(
+    page.locator('tbody tr').filter({ hasText: name }),
+    `transport student row for ${name}`,
+    30_000
+  );
+  await requireUniqueRegistrationLocator(
+    row.getByText(REGISTRATION_STATUS_NAMES.incomplete, { exact: true }),
+    'transport incomplete registration badge',
+    30_000
+  );
   const student = (await adminDb.collection('students').doc(minimalStudentId).get()).data();
   const priv = (await adminDb.collection('studentPrivate').doc(minimalStudentId).get()).data();
   const finance = await adminDb.collection('studentFinance').doc(minimalStudentId).get();
@@ -484,9 +506,16 @@ async function scenarioLegacy() {
     schoolingStatus: 'active', matricule: `LEG-${runId}`, createdAt: Timestamp.now()
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  const row = page.locator('tbody tr').filter({ hasText: legacyName }).first();
-  await row.waitFor({ state: 'visible', timeout: 30000 });
-  await row.getByText('À compléter', { exact: true }).waitFor({ state: 'visible' });
+  const row = await requireUniqueRegistrationLocator(
+    page.locator('tbody tr').filter({ hasText: legacyName }),
+    `legacy student row for ${legacyName}`,
+    30_000
+  );
+  await requireUniqueRegistrationLocator(
+    row.getByText(REGISTRATION_STATUS_NAMES.incomplete, { exact: true }),
+    'legacy incomplete registration badge',
+    30_000
+  );
   const form = await openEdit(legacyName);
   await form.getByRole('button', { name: 'Annuler' }).click();
   const after = (await adminDb.collection('students').doc(legacyId).get()).data();
