@@ -21,7 +21,10 @@ import {
 } from '../tests/security/student-progressive-registration-staging-preflight-contract.mjs';
 import {
   REGISTRATION_ACTION_NAMES,
+  REGISTRATION_CONTROL_SCOPES,
   REGISTRATION_CONTROL_SELECTORS,
+  REGISTRATION_SCOPE_HEADINGS,
+  requireRegistrationControlStep,
   requireUniqueRegistrationLocatorCount
 } from '../tests/security/student-progressive-registration-locator-contract.mjs';
 
@@ -292,10 +295,6 @@ async function expectCallableFailure(label, payload, businessCode) {
   }
 }
 
-function formField(form, labelPattern, selector = 'input') {
-  return form.locator('.form-group').filter({ has: form.locator('label').filter({ hasText: labelPattern }) }).locator(selector).first();
-}
-
 async function requireUniqueRegistrationLocator(locator, name) {
   requireUniqueRegistrationLocatorCount(name, await locator.count());
   await locator.waitFor({ state: 'visible', timeout: REGISTRATION_LOCATOR_TIMEOUT_MS });
@@ -307,8 +306,16 @@ async function registrationForm() {
   return requireUniqueRegistrationLocator(modal.locator('form'), 'registration form');
 }
 
-async function registrationControl(form, name) {
-  return requireUniqueRegistrationLocator(form.locator(REGISTRATION_CONTROL_SELECTORS[name]), name);
+async function registrationControl(form, name, wizardStep = null) {
+  if (wizardStep !== null) requireRegistrationControlStep(name, wizardStep);
+  const scopeName = REGISTRATION_CONTROL_SCOPES[name];
+  const scope = scopeName
+    ? (await requireUniqueRegistrationLocator(
+        form.getByRole('heading', { name: REGISTRATION_SCOPE_HEADINGS[scopeName], exact: true }).locator('..'),
+        `${scopeName} registration scope`
+      ))
+    : form;
+  return requireUniqueRegistrationLocator(scope.locator(REGISTRATION_CONTROL_SELECTORS[name]), name);
 }
 
 async function registrationAction(form, name) {
@@ -363,9 +370,15 @@ async function clickNext(form) {
 }
 
 async function openEdit(name) {
-  const row = page.locator('tbody tr').filter({ hasText: name }).first();
-  await row.getByRole('button', { name: `Actions pour ${name}` }).click();
-  await row.locator('button[data-action="edit-student"]').click();
+  const row = await requireUniqueRegistrationLocator(
+    page.locator('tbody tr').filter({ hasText: name }),
+    `student row for ${name}`
+  );
+  await (await requireUniqueRegistrationLocator(
+    row.getByRole('button', { name: `Actions pour ${name}`, exact: true }),
+    `student actions for ${name}`
+  )).click();
+  await (await requireUniqueRegistrationLocator(row.locator('button[data-action="edit-student"]'), `edit action for ${name}`)).click();
   return registrationForm();
 }
 
@@ -419,19 +432,22 @@ async function scenarioReload() {
 async function scenarioComplete() {
   const name = `MINIMAL ${runId}`;
   const form = await openEdit(name);
-  await form.locator('input[type="date"]').fill('2018-02-03');
-  await formField(form, /^Lieu de Naissance/).fill('Testville');
+  await (await registrationControl(form, 'dob', 1)).fill('2018-02-03');
+  await (await registrationControl(form, 'placeOfBirth', 1)).fill('Testville');
   await clickNext(form);
   await clickNext(form);
-  await formField(form, /^Nom du Responsable/).fill('Responsable Fixture');
-  await formField(form, /^Contact \(Téléphone\)/).fill('+237650336558');
-  await formField(form, /^Adresse d'habitation/).fill('Adresse fixture');
-  await formField(form, /^Contact d'Urgence/).fill('+237690112233');
+  await (await registrationControl(form, 'parentName', 3)).fill('Responsable Fixture');
+  await (await registrationControl(form, 'parentPhone', 3)).fill('+237650336558');
+  await (await registrationControl(form, 'address', 3)).fill('Adresse fixture');
+  await (await registrationControl(form, 'emergencyContact', 3)).fill('+237690112233');
   await clickNext(form);
-  await form.locator('#student-no-medical-condition-checkbox').check();
-  await form.getByRole('button', { name: 'Enregistrer' }).click();
-  const row = page.locator('tbody tr').filter({ hasText: name }).first();
-  await row.getByText('Dossier complet', { exact: true }).waitFor({ state: 'visible', timeout: 30000 });
+  await (await registrationControl(form, 'noMedicalCondition', 4)).check();
+  await (await registrationAction(form, 'save')).click();
+  const row = await requireUniqueRegistrationLocator(
+    page.locator('tbody tr').filter({ hasText: name }),
+    `completed student row for ${name}`
+  );
+  await (await requireUniqueRegistrationLocator(row.getByText('Dossier complet', { exact: true }), 'complete registration badge')).waitFor({ state: 'visible', timeout: 30000 });
   const snap = await adminDb.collection('students').doc(minimalStudentId).get();
   assert(snap.data()?.registrationFileStatus === 'complete', 'C: status is not complete');
   assert(Array.isArray(snap.data()?.missingRegistrationFields) && snap.data().missingRegistrationFields.length === 0, 'C: missing fields not empty');
