@@ -54,6 +54,7 @@ export const ensureExpectedLessonPreparations = functions.https.onCall(async (da
   const itemsSnap = await db().collection('teachingPlanItems').where('schoolId', '==', schoolId).where('planId', '==', planId).limit(200).get();
   if (itemsSnap.empty) throw new functions.https.HttpsError('failed-precondition', 'Aucune séance planifiée.');
   let created = 0;
+  const templatesCreated = new Set<string>();
   const batch = db().batch();
   for (const itemSnap of itemsSnap.docs) {
     const item = itemSnap.data();
@@ -61,10 +62,13 @@ export const ensureExpectedLessonPreparations = functions.https.onCall(async (da
     const prepRef = db().collection('lessonPreparations').doc(preparationId);
     const templateRef = db().collection('lessonPreparationTemplates').doc(templateId(schoolId, plan.academicYearId, plan.classId, item.subjectId));
     const [existing, template] = await Promise.all([prepRef.get(), templateRef.get()]);
-    if (!template.exists) batch.create(templateRef, {
+    if (!template.exists && !templatesCreated.has(templateRef.id)) {
+      batch.create(templateRef, {
       ...baseTemplate(templateRef.id, schoolId, plan.academicYearId, plan.classId, item.subjectId, item.subjectName),
       createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
+      templatesCreated.add(templateRef.id);
+    }
     if (!existing.exists) {
       created += 1;
       batch.create(prepRef, {
