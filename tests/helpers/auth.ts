@@ -4,6 +4,17 @@ export async function loginAs(page: Page, email: string, password: string) {
   const logs: string[] = [];
   page.on('console', msg => logs.push(`[BROWSER] ${msg.text()}`));
 
+  const appUrl = process.env.STAGING_APP_URL;
+  const vercelBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (appUrl && vercelBypassSecret) {
+    const appOrigin = new URL(appUrl).origin;
+    await page.route(`${appOrigin}/**`, async route => {
+      await route.continue({
+        headers: { ...route.request().headers(), 'x-vercel-protection-bypass': vercelBypassSecret },
+      });
+    });
+  }
+
   await page.goto('/#/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
   
   // Remplissage du formulaire
