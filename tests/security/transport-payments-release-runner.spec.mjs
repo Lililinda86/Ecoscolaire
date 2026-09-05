@@ -564,7 +564,7 @@ const functionInventory = (generation = 'GEN_1', overrides = {}) => REQUIRED_STA
 });
 
 test('Staging deployment contract queries both generations and deploys versioned Functions explicitly', () => {
-  assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only firestore:rules,storage,functions:/);
+  assert.match(stagingDeploymentWorkflow, /firebase deploy --project .*--only firestore:rules,(?:firestore:indexes,)?storage,functions:/);
   assert.match(stagingDeploymentWorkflow, /functions:getStudentFinancialAccount/);
   assert.match(stagingDeploymentWorkflow, /functions:recordCashCollection/);
   assert.match(stagingDeploymentWorkflow, /functions:reverseCashCollection/);
