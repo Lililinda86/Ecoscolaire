@@ -37,6 +37,7 @@ export const getAppreciation = (score: number, max: number = 20) => {
 const Grades: React.FC = () => {
   const { db, saveStructuredGrades, currentUser, currentSchool, logAuditAction, isSchoolSuspended, firestoreError } = useAppContext();
   const { t } = useI18n();
+  const legacyGradeViewsEnabled: boolean = false;
 
   const [activeTab, setActiveTab] = useState<'individual'|'ranking'|'school'>('individual');
 
@@ -425,7 +426,7 @@ const Grades: React.FC = () => {
         <a className="button" href="#/report-cards">Ouvrir le module Bulletins</a>
         <p style={{ marginBottom: 0, marginTop: '.75rem' }}><small>Classement, mention et décision de passage restent différés jusqu’à validation de la politique ITALO.</small></p>
       </div>
-      {Boolean(false) && (<>
+      {legacyGradeViewsEnabled && (<>
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', overflowX: 'auto' }} className="no-print">
         <button className={activeTab === 'individual' ? '' : 'secondary'} style={{ border: activeTab === 'individual' ? '' : 'none', whiteSpace: 'nowrap' }} onClick={() => setActiveTab('individual')}>Bulletin Individuel</button>
         <button className={activeTab === 'ranking' ? '' : 'secondary'} style={{ border: activeTab === 'ranking' ? '' : 'none', whiteSpace: 'nowrap' }} onClick={() => setActiveTab('ranking')}><Trophy size={18} style={{marginRight:'0.5rem', verticalAlign:'middle'}}/> Palmarès (Classement par Classe)</button>

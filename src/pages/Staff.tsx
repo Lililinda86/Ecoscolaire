@@ -28,17 +28,7 @@ const StaffPage: React.FC = () => {
   const isAllowed = currentUser && ['owner', 'director', 'secretary', 'superAdmin'].includes(currentUser.role);
   const canWrite = Boolean(isAllowed);
   const canManageLinks = Boolean(currentUser && ['owner', 'director', 'superAdmin'].includes(currentUser.role));
-  if (!isAllowed) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#991b1b' }}>
-        <h2>Accès refusé</h2>
-        <p>Vous n'avez pas les autorisations nécessaires pour voir cette page.</p>
-        <button onClick={() => window.history.back()} style={{ marginTop: '1rem', padding: '0.75rem', background: '#dc2626', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
-          Retour
-        </button>
-      </div>
-    );
-  }
+
 
   // Filter staff tightly based on schoolId
   const schoolStaff = db.staff.filter(s => s.schoolId === currentSchool?.id);
@@ -92,7 +82,17 @@ const StaffPage: React.FC = () => {
     };
     void loadLinkState();
     return () => { cancelled = true; };
-  }, [canManageLinks, currentSchool?.id]);
+  }, [canManageLinks, currentSchool?.id]);  if (!isAllowed) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#991b1b' }}>
+        <h2>Accès refusé</h2>
+        <p>Vous n'avez pas les autorisations nécessaires pour voir cette page.</p>
+        <button onClick={() => window.history.back()} style={{ marginTop: '1rem', padding: '0.75rem', background: '#dc2626', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
+          Retour
+        </button>
+      </div>
+    );
+  }
 
   const handleOpenModal = (staff?: Staff) => {
     if (staff) {
