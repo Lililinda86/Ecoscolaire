@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import { pedagogyAiRuntimeSecrets } from './aiRuntime';
 import * as functions from 'firebase-functions';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { audit, PedagogyActor, requireId, requirePedagogyActor } from './authorization';
 import { admissibleTeachingContent } from './teachingEvidence';
 import { readClassPedagogyPolicy } from './classPolicies';
@@ -285,7 +285,7 @@ export const recordWeeklyAssessmentTeacherValidation = functions.https.onCall(as
     if (!selected.length || selected.some(subjectId => !subjects.includes(subjectId))) throw new functions.https.HttpsError('invalid-argument', 'Matière absente de cette évaluation.');
     for (const subjectId of selected) await responsibleTeacher(transaction, db(), { schoolId, academicYearId: assessment.academicYearId, classId: assessment.classId, subjectId }, teacherStaffId);
     const signatures: SubjectTeacherValidation[] = (assessment.teacherValidations || []).filter((item: SubjectTeacherValidation) => !selected.includes(item.subjectId));
-    signatures.push(...selected.map(subjectId => ({ subjectId, teacherStaffId, recordedBy: actor.uid, recordedAt: admin.firestore.Timestamp.now(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum })));
+    signatures.push(...selected.map(subjectId => ({ subjectId, teacherStaffId, recordedBy: actor.uid, recordedAt: Timestamp.now(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum })));
     const complete = allSubjectsValidated(subjects, signatures, assessment as { generationVersion: number });
     transaction.create(ref.collection('teacherDecisions').doc(), { schoolId, subjectIds: selected, teacherStaffId, recordedBy: actor.uid, recordedAt: FieldValue.serverTimestamp(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum });
     transaction.update(ref, {

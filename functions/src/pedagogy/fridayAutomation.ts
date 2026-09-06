@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import { pedagogyAiRuntimeSecrets } from './aiRuntime';
 import * as functions from 'firebase-functions';
 import { createHash, randomUUID } from 'node:crypto';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { activePedagogyDocument } from './scopes';
 import { mondayIso } from './ids';
@@ -76,7 +76,7 @@ export async function runPedagogyFriday(now = new Date()) {
           if (freshConfig.data()?.enabled !== true || freshConfig.data()?.version !== config.version ||
               previous?.status === 'succeeded' || (previous?.attempts || 0) >= 3 ||
               (previous?.leaseUntil?.toMillis?.() || 0) > now.getTime()) return false;
-          transaction.set(ref, { ...scope, status: 'processing', attempts: (previous?.attempts || 0) + 1, configurationVersion: config.version, lease, leaseUntil: admin.firestore.Timestamp.fromMillis(now.getTime() + 10 * 60_000), lastAttemptAt: FieldValue.serverTimestamp() }, { merge: true });
+          transaction.set(ref, { ...scope, status: 'processing', attempts: (previous?.attempts || 0) + 1, configurationVersion: config.version, lease, leaseUntil: Timestamp.fromMillis(now.getTime() + 10 * 60_000), lastAttemptAt: FieldValue.serverTimestamp() }, { merge: true });
           return true;
         });
         if (!claimed) continue;
@@ -91,7 +91,7 @@ export async function runPedagogyFriday(now = new Date()) {
         await db.runTransaction(async transaction => {
           const current = await transaction.get(ref);
           if (current.data()?.lease !== lease) return;
-          transaction.update(ref, { status, errorCode, assessmentId, leaseUntil: admin.firestore.Timestamp.fromMillis(0), completedAt: FieldValue.serverTimestamp(), scheduledFor: admin.firestore.Timestamp.fromDate(now) });
+          transaction.update(ref, { status, errorCode, assessmentId, leaseUntil: Timestamp.fromMillis(0), completedAt: FieldValue.serverTimestamp(), scheduledFor: Timestamp.fromDate(now) });
         });
         await configSnapshot.ref.update({ lastAttemptAt: FieldValue.serverTimestamp(), ...(status === 'succeeded' ? { lastSuccessAt: FieldValue.serverTimestamp(), lastError: null } : { lastError: errorCode }) });
         // At most three potentially slow provider requests per invocation. Other

@@ -48,7 +48,7 @@ function StudentPicker({ schoolId, academicYearId, classId, teachers }: { school
 
 function StudentProfile({ schoolId, academicYearId, classId, studentId, teachers }: { schoolId: string; academicYearId: string; classId: string; studentId: string; teachers: Array<{ id: string; name: string }> }) {
   const load = useCallback(async () => {
-    const read = (name: string) => readBoundedDocuments<Row>(query(collection(firestore, name), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), where('classId', '==', classId), where('studentId', '==', studentId)), 1000, name);
+    const read = (name: string) => readBoundedDocuments<Row>(query(collection(firestore, name), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), where('classId', '==', classId), where('studentId', '==', studentId), ...(name === 'grades' ? [where('pedagogySecretaryReadable', '==', true)] : [])), 1000, name);
     const [observations, grades, remediations] = await Promise.all([read('pedagogyObservations'), read('grades'), read('pedagogyRemediations')]);
     return { observations, grades, remediations };
   }, [schoolId, academicYearId, classId, studentId]);

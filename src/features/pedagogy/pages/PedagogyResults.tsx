@@ -100,7 +100,7 @@ function ResultRoster({ evaluation, canRecord, onDirty }: { evaluation: ResultEv
     const load = async () => {
       const page = await getDocs(query(collection(firestore, 'students'), where('schoolId', '==', evaluation.schoolId), where('academicYearId', '==', evaluation.academicYearId), where('classId', '==', evaluation.classId), orderBy(documentId()), ...(after ? [startAfter(after)] : []), limit(26)));
       const visible = page.docs.slice(0, 25);
-      const recorded = visible.length ? await getDocs(query(collection(firestore, 'grades'), where('schoolId', '==', evaluation.schoolId), where('evaluationId', '==', evaluation.id), where('studentId', 'in', visible.map(item => item.id)), limit(26))) : null;
+      const recorded = visible.length ? await getDocs(query(collection(firestore, 'grades'), where('schoolId', '==', evaluation.schoolId), where('evaluationId', '==', evaluation.id), where('pedagogySecretaryReadable', '==', true), where('studentId', 'in', visible.map(item => item.id)), limit(26))) : null;
       if (recorded && new Set(recorded.docs.map(item => item.data().studentId)).size !== recorded.size) throw new Error('Plusieurs résultats existent pour un élève : vérification administrative requise.');
       if (!alive) return;
       setPupils(visible.map(item => ({ id: item.id, name: String(item.data().name || item.id) })));

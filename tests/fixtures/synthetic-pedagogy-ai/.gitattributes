@@ -1,0 +1,3 @@
+# Preserve the reviewed byte hashes and PDF cross-reference offsets on Windows.
+*.pdf binary
+*.png binary

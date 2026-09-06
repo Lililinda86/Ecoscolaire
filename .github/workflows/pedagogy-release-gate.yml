@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -131,7 +131,7 @@ jobs:
           sudo apt-get install -y poppler-utils
           node scripts/verify-pedagogy-print.mjs
       - name: Pedagogy Firestore Rules
-        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "npx playwright test tests/security/pedagogy-rules.spec.mjs tests/security/pedagogy-lot-b-rules.spec.mjs tests/security/pedagogy-lot-c-rules.spec.mjs --config=playwright.rules.config.ts"
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "npx playwright test tests/security/pedagogy-rules.spec.mjs tests/security/pedagogy-lot-b-rules.spec.mjs tests/security/pedagogy-lot-c-rules.spec.mjs tests/security/grades-rules.spec.mjs --config=playwright.rules.config.ts"
       - name: Pedagogy Storage Rules
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only storage "npx playwright test tests/security/pedagogy-storage-rules.spec.mjs --config=playwright.rules.config.ts"
       - name: Pedagogy Lot A browser regression

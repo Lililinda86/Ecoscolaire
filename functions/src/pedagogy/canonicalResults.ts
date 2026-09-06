@@ -116,7 +116,7 @@ export const recordPedagogyResults = functions.https.onCall(async (raw, context)
       const grade = { id: gradeRefs[index].id, ...scope, evaluationId, periodId: evaluation.periodId, classSubjectId: evaluation.classSubjectId, studentId: row.studentId,
         teacherAssignmentId: assignment.id, teacherStaffId, teacherId: teacherStaffId, teacherUserId: assignment.teacherUserId || null,
         resultStatus: row.resultStatus, ...(row.score !== undefined ? { score: row.score } : {}), ...(row.comment ? { comment: row.comment } : {}),
-        maxScore: evaluation.maxScore, status: 'draft', version, pedagogyPublicationId: evaluation.pedagogyPublicationId,
+        maxScore: evaluation.maxScore, status: 'draft', version, pedagogyPublicationId: evaluation.pedagogyPublicationId, pedagogySecretaryReadable: true,
         correctionTeacherStaffId: teacherStaffId, correctionDate: raw.correctionDate, recordedBy: actor.uid,
         createdBy: previous?.createdBy || actor.uid, createdAt: previous?.createdAt || FieldValue.serverTimestamp(), updatedBy: actor.uid, updatedAt: FieldValue.serverTimestamp() };
       transaction.set(gradeRefs[index], grade);
