@@ -32,6 +32,23 @@ beforeEach(async () => {
   });
 });
 describe('Pedagogy Lot C protected weekly assessments', () => {
+  test('individual support and its history are private, server-written only', async () => {
+    const paths = ['pedagogyRemediations/support-a', 'pedagogyRemediations/support-a/history/1'];
+    await env.withSecurityRulesDisabled(async context => {
+      for (const path of [...paths, 'pedagogyRemediationRequests/receipt-a']) await setDoc(doc(context.firestore(), path), { schoolId: 'school-a', status: 'proposed' });
+    });
+    for (const uid of ['secretary-a', 'director-a', 'owner-a', 'super', 'teacher-a', 'board-a', 'secretary-b']) {
+      const db = env.authenticatedContext(uid).firestore();
+      for (const path of paths) {
+        if (['secretary-a', 'director-a', 'owner-a', 'super'].includes(uid)) await assertSucceeds(getDoc(doc(db, path)));
+        else await assertFails(getDoc(doc(db, path)));
+        await assertFails(setDoc(doc(db, path), { schoolId: 'school-a', status: 'reviewed' }));
+      }
+      await assertFails(getDoc(doc(db, 'pedagogyRemediationRequests/receipt-a')));
+      await assertFails(setDoc(doc(db, 'pedagogyRemediationRequests/forged'), { schoolId: 'school-a' }));
+    }
+    for (const path of paths) await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+  });
   test('secretary, director, owner and superAdmin can read same-school documents', async () => {
     for (const uid of ['secretary-a', 'director-a', 'owner-a', 'super']) {
       const db = env.authenticatedContext(uid).firestore();

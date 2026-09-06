@@ -38,6 +38,7 @@ import PedagogyAssessments from './features/pedagogy/pages/PedagogyAssessments';
 import PedagogyObservations from './features/pedagogy/pages/PedagogyObservations';
 import PedagogySettings from './features/pedagogy/pages/PedagogySettings';
 import PedagogyResults from './features/pedagogy/pages/PedagogyResults';
+import PedagogyStudentFollowUp from './features/pedagogy/pages/PedagogyStudentFollowUp';
 
 import Diagnostic from './pages/Diagnostic';
 
@@ -130,6 +131,7 @@ function App() {
         <Route path="/pedagogy/observations" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogyObservations /></Layout></ProtectedRoute>} />
         <Route path="/pedagogy/settings" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogySettings /></Layout></ProtectedRoute>} />
         <Route path="/pedagogy/results" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogyResults /></Layout></ProtectedRoute>} />
+        <Route path="/pedagogy/follow-up" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogyStudentFollowUp /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director']}><Layout><Settings /></Layout></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute requireSchool allowedRoles={['owner', 'director', 'accountant', 'secretary', 'superAdmin']}><Layout><Payments /></Layout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute allowedRoles={['superAdmin', 'owner', 'director']}><Layout><UsersManagement /></Layout></ProtectedRoute>} />

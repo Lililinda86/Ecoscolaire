@@ -1,6 +1,18 @@
 {
   "indexes": [
     {
+      "collectionGroup": "pedagogyObservations", "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "academicYearId", "order": "ASCENDING" }, { "fieldPath": "classId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "pedagogyRemediations", "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "academicYearId", "order": "ASCENDING" }, { "fieldPath": "classId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "grades", "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "academicYearId", "order": "ASCENDING" }, { "fieldPath": "classId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }]
+    },
+    {
       "collectionGroup": "evaluations",
       "queryScope": "COLLECTION",
       "fields": [

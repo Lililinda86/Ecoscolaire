@@ -83,6 +83,22 @@ Production is outside this work's authorization.
 
 ## Test privacy
 
+### Canonical results and individual support checkpoints
+
+- The complete Linux pedagogy gate and general CI passed for canonical results
+  on `4036be113b5a3ce3bcb21d620ea98fa370e44f4c`:
+  [run 34047266417](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34047266417).
+  This includes the secretary browser transfer/entry flow and exact synthetic
+  fixture cleanup. It is not a Staging validation.
+- Individual support adds a bounded pupil dossier, current/historical
+  observations, canonical results and an append-only action history. A proposal
+  is not an approval; approval is not completion; completion is not progress.
+  Teacher declarations and a distinct subsequent same-pupil/subject evidence
+  record are required for a reassessment. No mastery or diagnosis is inferred.
+- Twenty local transition tests passed. New support authorization, concurrent
+  request, stale-source, synthetic cleanup and browser scenarios await the
+  resulting commit's Linux execution. Real pedagogical review remains pending.
+
 The dedicated CI uses synthetic demo projects and no production credentials.
 Browser authentication traces and screenshots are disabled for the pedagogy
 release gate and the Staging configuration. Runtime-generated test passwords

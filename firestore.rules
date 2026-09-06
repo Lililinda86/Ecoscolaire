@@ -1325,6 +1325,15 @@ service cloud.firestore {
     match /pedagogyObservationBatches/{batchId} {
       allow read, write: if false;
     }
+    match /pedagogyRemediations/{id} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if false;
+      match /history/{version} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
+    }
+    match /pedagogyRemediationRequests/{id} { allow read, write: if false; }
 
     match /preparationUploads/{uploadId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);

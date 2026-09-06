@@ -9,6 +9,7 @@ export { savePedagogyClassPolicy } from './classPolicies';
 export { recordPedagogyObservations } from './observations';
 export { savePedagogyFridayConfiguration, pedagogyFridayScheduler } from './fridayAutomation';
 export { publishPedagogyAssessmentToGrades, recordPedagogyResults } from './canonicalResults';
+export { managePedagogyRemediation } from './remediations';
 
 export {
   ensureExpectedLessonPreparations,

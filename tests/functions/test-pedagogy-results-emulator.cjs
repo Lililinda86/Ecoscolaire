@@ -7,6 +7,7 @@ const { seedResultsFixture } = require('../helpers/pedagogy-results-fixture.cjs'
 const { publishPedagogyAssessmentToGrades, recordPedagogyResults } = require('../../functions/lib/pedagogy/canonicalResults');
 const { recordGradesBatch, manageEvaluation } = require('../../functions/lib/academic/manageGrades');
 const { normalizeCanonicalGrade } = require('../../functions/lib/academic/canonicalGradeCalculations');
+const { managePedagogyRemediation } = require('../../functions/lib/pedagogy/remediations');
 const db = admin.firestore();
 (async () => {
   const f = await seedResultsFixture(db, `pedagogy-results-${randomBytes(8).toString('hex')}`);
@@ -57,6 +58,30 @@ const db = admin.firestore();
     // editor moves on to a new draft; the immutable transferred version is used.
     await db.doc(`weeklyAssessments/${f.assessmentId}`).update({ status: 'needs_review', contentRevision: 1, teacherValidated: false });
     await recordPedagogyResults.run({ ...input, requestId: 'historical', rows: [{ ...rows[1], resultStatus: 'notEvaluated', expectedVersion: 1 }] }, context);
-    console.log('PEDAGOGY_RESULTS_EMULATOR: PASS; canonical evaluations/grades written intentionally; no parallel numeric registry; offline teacher, idempotency, zero/non-score distinction and history');
+    const proposal = { schoolId: f.schoolId, action: 'CREATE', requestId: 'support-proposal', sourceKind: 'grade', sourceId: corrected.id, activity: 'Synthetic targeted practice', reason: 'Synthetic contextual reason, not an inferred diagnosis', dueDate: '2026-09-06' };
+    const [case1, case2] = await Promise.all([managePedagogyRemediation.run(proposal, context), managePedagogyRemediation.run(proposal, context)]);
+    assert.equal(case1.remediationId, case2.remediationId); assert.equal(Number(case1.idempotent) + Number(case2.idempotent), 1);
+    const caseRef = db.doc(`pedagogyRemediations/${case1.remediationId}`);
+    assert.equal((await caseRef.get()).data().status, 'proposed'); assert.equal((await caseRef.get()).data().competencyId, null);
+    const follow = { schoolId: f.schoolId, remediationId: case1.remediationId, expectedVersion: 1, teacherStaffId: f.teacherId, declarationReceived: true, date: '2026-09-04', note: 'Entirely synthetic teacher declaration' };
+    await assert.rejects(managePedagogyRemediation.run({ ...follow, action: 'COMPLETE', requestId: 'skip-approval' }, context), error => error.code === 'failed-precondition');
+    await assert.rejects(managePedagogyRemediation.run({ ...follow, action: 'APPROVE', requestId: 'no-declaration', declarationReceived: false }, context), error => error.code === 'failed-precondition');
+    await assert.rejects(managePedagogyRemediation.run({ ...follow, action: 'APPROVE', requestId: 'other-school', schoolId: `${f.schoolId}-other` }, context), error => error.code === 'permission-denied');
+    await managePedagogyRemediation.run({ ...follow, action: 'APPROVE', requestId: 'approval' }, context);
+    await assert.rejects(managePedagogyRemediation.run({ ...follow, action: 'COMPLETE', requestId: 'stale-approval' }, context), error => error.code === 'aborted');
+    await managePedagogyRemediation.run({ ...follow, expectedVersion: 2, action: 'COMPLETE', requestId: 'completion' }, context);
+    await assert.rejects(managePedagogyRemediation.run({ ...follow, expectedVersion: 3, action: 'REVIEW', requestId: 'reuse-source', outcome: 'progress_observed', evidenceKind: 'grade', evidenceId: corrected.id }, context), error => error.code === 'failed-precondition');
+    const observationId = `${f.schoolId}-reassessment`;
+    await db.doc(`pedagogyObservations/${observationId}`).create({ schoolId: f.schoolId, academicYearId: f.academicYearId, classId: f.classId, studentId: f.pupilIds[0], subjectId: evaluation.subjectId, date: '2026-09-05', state: 'developing', objective: 'Synthetic follow-up objective', objectiveId: 'synthetic-objective', supersededBy: null });
+    await managePedagogyRemediation.run({ ...follow, expectedVersion: 3, action: 'REVIEW', requestId: 'review', date: '2026-09-05', outcome: 'continue_support', evidenceKind: 'observation', evidenceId: observationId }, context);
+    assert.equal((await caseRef.get()).data().status, 'reviewed'); assert.equal((await caseRef.get()).data().review.outcome, 'continue_support');
+    assert.equal((await caseRef.collection('history').get()).size, 4);
+    await db.doc(`pedagogyObservations/${observationId}`).update({ state: 'not_observed' });
+    await assert.rejects(managePedagogyRemediation.run({ ...proposal, requestId: 'not-observed', sourceKind: 'observation', sourceId: observationId }, context), error => error.code === 'failed-precondition');
+    await assert.rejects(managePedagogyRemediation.run({ ...proposal, requestId: 'absent-source', sourceId: grades.docs.find(item => item.data().studentId === f.pupilIds[2]).id }, context), error => error.code === 'failed-precondition');
+    const revised = await managePedagogyRemediation.run({ ...proposal, requestId: 'source-will-change' }, context);
+    await corrected.update({ score: 8, version: 3 });
+    await assert.rejects(managePedagogyRemediation.run({ ...follow, remediationId: revised.remediationId, action: 'APPROVE', requestId: 'changed-source' }, context), error => error.code === 'failed-precondition');
+    console.log('PEDAGOGY_RESULTS_EMULATOR: PASS; canonical grades, offline teacher, idempotency, history, support proposal/approval/completion/reassessment, no inferred mastery');
   } finally { await f.cleanup(); await admin.app().delete(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
