@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import yaml from 'js-yaml';
 import { assertReadOnlyRun, classifyReadOnlyRequest, selectReadOnlyPreview, redactReadOnlyError, FEATURE_REF } from '../helpers/maternelleReadOnly.mjs';
 
 const sha = 'a'.repeat(40);
@@ -56,4 +57,6 @@ test('workflow uses neither privileged service account nor data artifact export'
   assert.ok(!workflow.includes('upload-artifact'));
   assert.match(workflow, /branches: \[codex\/maternelle-labels-audit, staging\]/);
   assert.ok(!workflow.includes('pull_request_target'));
+  const parsed = yaml.load(workflow);
+  assert.equal(parsed.jobs['visual-readonly'].if, "github.ref == 'refs/heads/codex/maternelle-labels-audit' || contains(github.event.head_commit.message, 'Merge pull request #201 ')");
 });
