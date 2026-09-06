@@ -75,8 +75,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Synthetic canonical results and teacher-declared support
         run: npx playwright test tests/pedagogy-results-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
+      - name: Synthetic local file integrity, manual review and exact cleanup
+        run: npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
       - name: Exact checkpoint statement
         run: |
           printf 'STAGING_TECHNICAL_CHECKPOINT_SHA=%s\n' "$GITHUB_SHA"
-          echo 'Scope: synthetic canonical results, support workflow and fixture cleanup only.'
+          echo 'Scope: synthetic canonical results, support, local file integrity, manual review and fixture cleanup only.'
           echo 'REAL_AI_VERIFIED=NO; REAL_AUTOMATIONS_VERIFIED=NO; PEDAGOGICAL_REVIEW=PENDING; PRODUCT_COMPLETE=NO'
