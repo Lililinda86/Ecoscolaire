@@ -18,7 +18,7 @@ if (stagingRun && projectId !== 'ecoscolaire-staging') throw new Error('PRODUCTI
 const runId = `lot-c-${randomBytes(8).toString('hex')}`;
 const fixtureId = (name: string) => `${runId}-${name}`;
 const f = { uid: fixtureId('secretary'), email: `${runId}@example.invalid`, password: randomBytes(24).toString('base64url'), schoolId: fixtureId('school'), otherSchoolId: fixtureId('other'), yearId: fixtureId('year'), classId: fixtureId('class'), failClassId: fixtureId('fail-class'), weekId: fixtureId('week'), staffId: fixtureId('teacher') };
-const scoped = ['weeklyAssessments', 'assessmentItems', 'lessonPreparations', 'audit_logs'];
+const scoped = ['weeklyAssessments', 'assessmentItems', 'lessonPreparations', 'teacherAssignments', 'audit_logs'];
 const protectedCollections = ['students', 'payments', 'expenses', 'grades', 'gradesStrict', 'evaluations', 'buses', 'inventory', 'cashClosures'];
 
 test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
@@ -34,11 +34,13 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
         const snapshot = await firestore.collection(name).where('schoolId', '==', f.schoolId).get();
         if (name === 'weeklyAssessments') {
           for (const document of snapshot.docs) {
-            const revisions = await document.ref.collection('revisions').get();
-            const revisionsBatch = firestore.batch();
-            revisions.docs.forEach(revision => revisionsBatch.delete(revision.ref));
-            if (!revisions.empty) await revisionsBatch.commit();
-            expect((await document.ref.collection('revisions').get()).empty).toBe(true);
+            for (const nested of ['revisions', 'contentRevisions', 'teacherDecisions']) {
+              const revisions = await document.ref.collection(nested).get();
+              const revisionsBatch = firestore.batch();
+              revisions.docs.forEach(revision => revisionsBatch.delete(revision.ref));
+              if (!revisions.empty) await revisionsBatch.commit();
+              expect((await document.ref.collection(nested).get()).empty).toBe(true);
+            }
           }
         }
         const batch = firestore.batch(); snapshot.docs.forEach(document => batch.delete(document.ref)); if (!snapshot.empty) await batch.commit();
@@ -59,6 +61,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       set('classes', f.classId, { schoolId: f.schoolId, name: 'CE1 Lot C', type: 'francophone', section: 'francophone', isActive: true });
       set('classes', f.failClassId, { schoolId: f.schoolId, name: '[generator-fail] CE2', type: 'francophone', section: 'francophone', isActive: true });
       set('staff', f.staffId, { schoolId: f.schoolId, name: 'Mme Validation', role: 'teacher', status: 'active', isActive: true });
+      for (const subjectId of ['math', 'fr']) set('teacherAssignments', fixtureId(`assignment-${subjectId}`), { schoolId: f.schoolId, academicYearId: f.yearId, classId: f.classId, subjectId, teacherStaffId: f.staffId, status: 'active', isActive: true });
       set('teachingWeeks', f.weekId, { schoolId: f.schoolId, academicYearId: f.yearId, weekNumber: 1, weekStartDate: '2026-09-07', weekEndDate: '2026-09-13', status: 'open' });
       const confirmationFixture = (id: string, reviewData: Record<string, unknown>) => ({
         currentUploadId: `fixture-upload-${id}`, reviewData,
@@ -93,7 +96,15 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       const question = page.getByLabel('Question').first(); await question.fill('Question corrigée après retour enseignant');
       await page.getByRole('button', { name: 'Enregistrer les corrections' }).click(); await expect(page.getByText('Corrections enregistrées à la demande de l’enseignant.')).toBeVisible();
       await page.getByRole('combobox', { name: /^Enseignant/ }).selectOption(f.staffId); await page.getByRole('textbox', { name: /^Note/ }).fill('Accord reçu sur papier.');
+      await page.getByRole('checkbox', { name: 'Accord enseignant reçu pour cette version et ces matières' }).check();
       console.log('[Lot C] editing: saved');
+      await page.getByRole('combobox', { name: 'Matière à valider' }).selectOption('math');
+      await page.getByRole('checkbox', { name: 'Accord enseignant reçu pour cette version et ces matières' }).check();
+      await page.getByRole('button', { name: 'Enregistrer validation enseignant' }).click();
+      await expect(page.getByText('1/2 visa(s) par matière enregistrés pour cette version.')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Passer prête à imprimer' })).toHaveCount(0);
+      await page.getByRole('combobox', { name: 'Matière à valider' }).selectOption('fr');
+      await page.getByRole('checkbox', { name: 'Accord enseignant reçu pour cette version et ces matières' }).check();
       await page.getByRole('button', { name: 'Enregistrer validation enseignant' }).click(); await expect(page.getByText('Validation de l’enseignant enregistrée par la secrétaire.')).toBeVisible();
       await page.getByRole('button', { name: 'Passer prête à imprimer' }).click(); await expect(page.getByText('Évaluation prête à imprimer.')).toBeVisible();
       console.log('[Lot C] teacher validation: recorded');

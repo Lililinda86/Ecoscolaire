@@ -155,6 +155,8 @@ export interface WeeklyAssessment {
   status: WeeklyAssessmentStatus;
   generationStatus: 'pending' | 'processing' | 'succeeded' | 'failed';
   generationVersion: number;
+  contentRevision?: number;
+  teacherValidations?: Array<{ subjectId: string; teacherStaffId: string; generationVersion: number; contentRevision: number; sourceChecksum: string; recordedBy: string; note: string }>;
   title?: string;
   instructions?: string;
   durationMinutes: number;

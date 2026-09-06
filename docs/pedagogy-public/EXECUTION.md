@@ -56,6 +56,16 @@ Production is outside this work's authorization.
   explicitly identified emulator generator. Deployment and controlled real
   scheduler execution still require separate verification.
 
+- The complete dedicated Linux gate passed on
+  d919fdf2ffbd771741393ccf690cf41de9b82b48, including the synthetic Friday
+  authorization/concurrency/crash-recovery test:
+  [run 34045490384](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34045490384).
+- The next block binds teacher decisions to individual subjects, active teaching
+  assignments, generation/content revision and source state. Subject/correction
+  edits invalidate approvals and retain prior items and teacher decisions.
+  These new changes still require their own full gate; they do not transfer
+  assessments to the canonical grade registry yet.
+
 ## Test privacy
 
 The dedicated CI uses synthetic demo projects and no production credentials.

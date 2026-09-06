@@ -107,9 +107,10 @@ export const loadAssessmentItems = async (schoolId: string, assessmentId: string
 };
 export const ensureWeeklyAssessmentDraft = (scope: AssessmentScope) => call('ensureWeeklyAssessmentDraft', scope);
 export const generateWeeklyAssessment = (scope: AssessmentScope, regenerate = false, confirmRevision = false) => call('generateWeeklyAssessment', { ...scope, regenerate, confirmRevision });
-export const saveWeeklyAssessmentEdits = (schoolId: string, assessmentId: string, items: Array<Pick<AssessmentItem, 'id' | 'questionText' | 'instructions' | 'points' | 'order'>>, note: string) =>
-  call('saveWeeklyAssessmentEdits', { schoolId, assessmentId, items, note });
-export const recordWeeklyAssessmentTeacherValidation = (schoolId: string, assessmentId: string, teacherStaffId: string, note: string) =>
-  call('recordWeeklyAssessmentTeacherValidation', { schoolId, assessmentId, teacherStaffId, note });
-export const markWeeklyAssessmentReadyToPrint = (schoolId: string, assessmentId: string) =>
-  call('markWeeklyAssessmentReadyToPrint', { schoolId, assessmentId });
+const reviewVersion = (assessment: WeeklyAssessment) => ({ generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum });
+export const saveWeeklyAssessmentEdits = (schoolId: string, assessmentId: string, items: Array<Pick<AssessmentItem, 'id' | 'questionText' | 'instructions' | 'expectedAnswer' | 'correctionGuide' | 'points' | 'order'>>, note: string, assessment: WeeklyAssessment) =>
+  call('saveWeeklyAssessmentEdits', { schoolId, assessmentId, items, note, ...reviewVersion(assessment) });
+export const recordWeeklyAssessmentTeacherValidation = (schoolId: string, assessmentId: string, teacherStaffId: string, note: string, assessment: WeeklyAssessment, subjectId: string, declarationReceived: boolean) =>
+  call('recordWeeklyAssessmentTeacherValidation', { schoolId, assessmentId, teacherStaffId, note, subjectId, declarationReceived, ...reviewVersion(assessment) });
+export const markWeeklyAssessmentReadyToPrint = (schoolId: string, assessmentId: string, assessment: WeeklyAssessment) =>
+  call('markWeeklyAssessmentReadyToPrint', { schoolId, assessmentId, ...reviewVersion(assessment) });

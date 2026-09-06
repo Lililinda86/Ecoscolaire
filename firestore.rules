@@ -1343,6 +1343,14 @@ service cloud.firestore {
         allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
         allow write: if false;
       }
+      match /contentRevisions/{revisionId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
+      match /teacherDecisions/{decisionId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
     }
 
     match /pedagogyAiConfigurations/{id} { allow read, write: if false; }

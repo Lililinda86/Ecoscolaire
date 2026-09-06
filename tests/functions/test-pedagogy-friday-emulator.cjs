@@ -7,6 +7,7 @@ const admin = require('../../functions/node_modules/firebase-admin');
 admin.initializeApp({ projectId: 'demo-ecoscolaire' });
 const { savePedagogyFridayConfiguration, runPedagogyFriday } = require('../../functions/lib/pedagogy/fridayAutomation');
 const { reviewChecksum } = require('../../functions/lib/pedagogy/teachingEvidence');
+const { recordWeeklyAssessmentTeacherValidation, markWeeklyAssessmentReadyToPrint, saveWeeklyAssessmentEdits } = require('../../functions/lib/pedagogy/weeklyAssessments');
 const db = admin.firestore(), prefix = `friday-${randomBytes(8).toString('hex')}`;
 const schoolId = prefix, academicYearId = `${prefix}-year`, classId = `${prefix}-class`, weekId = `${prefix}-week`;
 const manifest = new Set();
@@ -20,6 +21,9 @@ const now = new Date('2026-09-04T09:00:00Z');
     await put('classes', classId, { schoolId, name: 'CE1', isActive: true });
     await put('teachingWeeks', weekId, { schoolId, academicYearId, status: 'open', weekStartDate: '2026-08-31', weekEndDate: '2026-09-04' });
     for (const role of ['director', 'secretary', 'boardViewer']) await put('users', `${prefix}-${role}`, { schoolId, role, isActive: true });
+    await put('staff', `${prefix}-teacher`, { schoolId, role: 'teacher', isActive: true });
+    await put('staff', `${prefix}-outsider`, { schoolId, role: 'teacher', isActive: true });
+    await put('teacherAssignments', `${prefix}-assignment`, { schoolId, academicYearId, classId, subjectId: 'synthetic-math', teacherStaffId: `${prefix}-teacher`, status: 'active', isActive: true });
     const reviewData = { lessonTitle: 'Synthetic addition', objective: 'Additionner', lessonSteps: 'Compter puis additionner.' };
     await put('lessonPreparations', `${prefix}-prep`, { schoolId, academicYearId, classId, weekId, subjectId: 'synthetic-math', subjectName: 'Mathématiques', version: 1, status: 'validated', currentUploadId: 'synthetic-upload', reviewData,
       teachingConfirmation: { id: 'synthetic-declaration', status: 'taught', effectiveDate: '2026-09-02', declaredByTeacherStaffId: 'synthetic-teacher', recordedBy: `${prefix}-secretary`, reviewChecksum: reviewChecksum({ currentUploadId: 'synthetic-upload', reviewData }), excerpts: [] } });
@@ -45,6 +49,21 @@ const now = new Date('2026-09-04T09:00:00Z');
     await runs.docs[0].ref.update({ status: 'processing', leaseUntil: admin.firestore.Timestamp.fromMillis(0) });
     assert.equal((await runPedagogyFriday(now)).attempts, 1);
     assert.equal((await assessments.docs[0].ref.get()).data().generationVersion, 1);
+    const assessment = (await assessments.docs[0].ref.get()).data();
+    const version = { generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum };
+    const decision = { schoolId, assessmentId: assessments.docs[0].id, ...version, teacherStaffId: `${prefix}-teacher`, declarationReceived: true, note: 'Synthetic received decision', subjectId: 'synthetic-math' };
+    await assert.rejects(recordWeeklyAssessmentTeacherValidation.run({ ...decision, declarationReceived: false }, context('secretary')), error => error.code === 'failed-precondition');
+    await assert.rejects(recordWeeklyAssessmentTeacherValidation.run({ ...decision, teacherStaffId: `${prefix}-outsider` }, context('secretary')), error => error.code === 'permission-denied');
+    await recordWeeklyAssessmentTeacherValidation.run(decision, context('secretary'));
+    await markWeeklyAssessmentReadyToPrint.run(decision, context('secretary'));
+    const items = (await db.collection('assessmentItems').where('schoolId', '==', schoolId).get()).docs.map(item => ({ ...item.data(), id: item.id, expectedAnswer: 'Synthetic corrected answer' }));
+    await saveWeeklyAssessmentEdits.run({ ...decision, items }, context('secretary'));
+    const corrected = (await assessments.docs[0].ref.get()).data();
+    assert.equal(corrected.status, 'needs_review'); assert.equal(corrected.teacherValidated, false);
+    assert.equal(corrected.contentRevision, 1); assert.deepEqual(corrected.teacherValidations, []);
+    await assert.rejects(recordWeeklyAssessmentTeacherValidation.run(decision, context('secretary')), error => error.code === 'aborted');
+    await db.doc(`lessonPreparations/${prefix}-prep`).update({ version: 2 });
+    await assert.rejects(recordWeeklyAssessmentTeacherValidation.run({ ...decision, contentRevision: 1 }, context('secretary')), error => error.code === 'failed-precondition');
     await savePedagogyFridayConfiguration.run({ ...input, expectedVersion: 1, policy: { ...input.policy, enabled: false } }, context('director'));
     assert.equal((await runPedagogyFriday(now)).attempts, 0);
     console.log('FRIDAY_EMULATOR: PASS; actual business workflow with explicit emulator generator; not a real provider or deployed scheduler proof');
@@ -53,7 +72,7 @@ const now = new Date('2026-09-04T09:00:00Z');
       const documents = await db.collection(name).where('schoolId', '==', schoolId).get();
       for (const document of documents.docs) {
         manifest.add(document.ref.path);
-        for (const nested of name === 'pedagogyFridayConfigurations' ? ['versions'] : name === 'weeklyAssessments' ? ['revisions'] : []) {
+        for (const nested of name === 'pedagogyFridayConfigurations' ? ['versions'] : name === 'weeklyAssessments' ? ['revisions', 'contentRevisions', 'teacherDecisions'] : []) {
           (await document.ref.collection(nested).get()).docs.forEach(item => manifest.add(item.ref.path));
         }
       }

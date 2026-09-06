@@ -5,6 +5,8 @@ import { audit, PedagogyActor, requireId, requirePedagogyActor } from './authori
 import { admissibleTeachingContent } from './teachingEvidence';
 import { readClassPedagogyPolicy } from './classPolicies';
 import { generateAssessmentContent } from './aiAssessment';
+import { responsibleTeacher } from './scopes';
+import { allSubjectsValidated, sameAssessmentReviewVersion, SubjectTeacherValidation } from './assessmentReview';
 import {
   assessmentId, coverageFor,
   fridayForWeek, sourceChecksum, ValidatedPreparationSource
@@ -144,6 +146,7 @@ export const generateWeeklyAssessmentForActor = async (raw: Data, schoolId: stri
       academicYearName: sources.academicYear.name || sources.identity.academicYearId, schoolName: sources.school.name || schoolId,
       status: 'generating', generationStatus: 'processing', generationVersion: version, generationStartedAt: FieldValue.serverTimestamp(),
       ...coverageFields(sources), teacherValidated: false, teacherValidationRecordedBy: null,
+      contentRevision: 0, teacherValidations: [],
       teacherValidationRecordedAt: null, teacherValidatedAt: null, teacherValidationNote: null,
       updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     };
@@ -207,13 +210,27 @@ export const generateWeeklyAssessmentForActor = async (raw: Data, schoolId: stri
   }
 };
 
-const itemEdit = (raw: unknown, index: number): { id: string; questionText: string; instructions: string; points: number; order: number } => {
+const itemEdit = (raw: unknown, index: number): { id: string; questionText: string; instructions: string; expectedAnswer: string; correctionGuide: string; points: number; order: number } => {
   if (!raw || typeof raw !== 'object') throw new functions.https.HttpsError('invalid-argument', `Question ${index + 1} invalide.`);
   const value = raw as Data;
   const points = Number(value.points);
   const order = Number(value.order);
   if (!Number.isFinite(points) || points <= 0 || points > 100 || !Number.isInteger(order) || order < 1 || order > 100) throw new functions.https.HttpsError('invalid-argument', 'Barème ou ordre invalide.');
-  return { id: documentId(value.id, 'itemId'), questionText: text(value.questionText, 'questionText'), instructions: text(value.instructions, 'instructions', 1000), points, order };
+  return { id: documentId(value.id, 'itemId'), questionText: text(value.questionText, 'questionText'), instructions: text(value.instructions, 'instructions', 1000), expectedAnswer: text(value.expectedAnswer, 'expectedAnswer', 5000), correctionGuide: text(value.correctionGuide, 'correctionGuide', 5000), points, order };
+};
+const assertReviewVersion = (raw: Data, assessment: Data) => {
+  if (!sameAssessmentReviewVersion(raw as { generationVersion: number }, assessment as { generationVersion: number })) throw new functions.https.HttpsError('aborted', 'Version modifiée : rechargez avant d’enregistrer une décision.');
+};
+const assessmentSubjects = (assessment: Data): string[] => (assessment.sections || []).map((section: Data) => String(section.subjectId));
+const assertCurrentTeachingVersions = async (transaction: admin.firestore.Transaction, assessment: Data) => {
+  const current = await transaction.get(db().collection('lessonPreparations').where('schoolId', '==', assessment.schoolId)
+    .where('academicYearId', '==', assessment.academicYearId).where('classId', '==', assessment.classId).where('weekId', '==', assessment.weekId).limit(251));
+  const saved = assessment.sourcePreparationVersions || {};
+  const admissible = current.docs.filter(document => !admissibleTeachingContent(document.data()).exclusion);
+  if (current.size > 250 || current.size !== assessment.expectedPreparationCount || admissible.length !== Object.keys(saved).length ||
+      admissible.some(document => Number(document.data().version || 1) !== saved[document.id])) {
+    throw new functions.https.HttpsError('failed-precondition', 'Les enseignements ont changé : générez et faites valider une nouvelle révision.');
+  }
 };
 
 export const saveWeeklyAssessmentEdits = functions.https.onCall(async (raw, context) => {
@@ -225,7 +242,8 @@ export const saveWeeklyAssessmentEdits = functions.https.onCall(async (raw, cont
   const ref = db().collection('weeklyAssessments').doc(id);
   await db().runTransaction(async transaction => {
     const assessment = schoolDocument(await transaction.get(ref), schoolId, 'Évaluation');
-    if (!['needs_review', 'failed'].includes(assessment.status)) throw new functions.https.HttpsError('failed-precondition', 'Le brouillon n’est pas modifiable dans cet état.');
+    assertReviewVersion(raw, assessment);
+    if (!['needs_review', 'teacher_validated', 'ready_to_print'].includes(assessment.status)) throw new functions.https.HttpsError('failed-precondition', 'Le brouillon n’est pas modifiable dans cet état.');
     if (edits.length !== Number(assessment.itemCount)) throw new functions.https.HttpsError('failed-precondition', 'Toutes les questions de la version courante sont requises.');
     const total = edits.reduce((sum, item) => sum + item.points, 0);
     if (Math.abs(total - Number(assessment.totalPoints)) > 0.0001) throw new functions.https.HttpsError('failed-precondition', `Le total doit rester égal à ${assessment.totalPoints}.`);
@@ -235,9 +253,15 @@ export const saveWeeklyAssessmentEdits = functions.https.onCall(async (raw, cont
       const edit = edits[index];
       const item = schoolDocument(itemSnap, schoolId, 'Question');
       if (item.weeklyAssessmentId !== id || item.generationVersion !== assessment.generationVersion) throw new functions.https.HttpsError('failed-precondition', 'Question hors de la version courante.');
-      transaction.update(itemRefs[index], { questionText: edit.questionText, instructions: edit.instructions, points: edit.points, order: edit.order, lastEditedBy: actor.uid, lastEditedAt: FieldValue.serverTimestamp(), editReason: optionalText(raw?.note, 1000) || 'Corrections enregistrées à la demande de l’enseignant.' });
+      transaction.update(itemRefs[index], { questionText: edit.questionText, instructions: edit.instructions, expectedAnswer: edit.expectedAnswer, correctionGuide: edit.correctionGuide, points: edit.points, order: edit.order, lastEditedBy: actor.uid, lastEditedAt: FieldValue.serverTimestamp(), editReason: optionalText(raw?.note, 1000) || 'Corrections enregistrées à la demande de l’enseignant.' });
     });
-    transaction.update(ref, { status: 'needs_review', lastEditedBy: actor.uid, lastEditedAt: FieldValue.serverTimestamp(), editReason: optionalText(raw?.note, 1000) || 'Corrections enregistrées à la demande de l’enseignant.', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
+    const contentRevision = Number(assessment.contentRevision || 0) + 1;
+    const sections = (assessment.sections || []).map((section: Data) => {
+      const sectionEdits = edits.filter((_, index) => itemSnaps[index].data()?.subjectId === section.subjectId);
+      return { ...section, points: sectionEdits.reduce((sum, edit) => sum + edit.points, 0), itemOrders: sectionEdits.map(edit => edit.order).sort((a, b) => a - b) };
+    });
+    transaction.create(ref.collection('contentRevisions').doc(`${assessment.generationVersion}-${contentRevision}`), { schoolId, generationVersion: assessment.generationVersion, contentRevision, previousItems: itemSnaps.map(item => ({ ...item.data(), id: item.id })), previousValidations: assessment.teacherValidations || [], recordedAt: FieldValue.serverTimestamp(), recordedBy: actor.uid });
+    transaction.update(ref, { status: 'needs_review', contentRevision, sections, teacherValidated: false, teacherValidations: [], teacherValidationNote: null, teacherValidationRecordedAt: null, lastEditedBy: actor.uid, lastEditedAt: FieldValue.serverTimestamp(), editReason: optionalText(raw?.note, 1000) || 'Corrections enregistrées à la demande de l’enseignant.', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     audit(transaction, actor, schoolId, 'weekly_assessment_edited', 'weeklyAssessment', id, { generationVersion: assessment.generationVersion, itemCount: edits.length });
   });
   return { assessmentId: id, status: 'needs_review' };
@@ -247,29 +271,43 @@ export const recordWeeklyAssessmentTeacherValidation = functions.https.onCall(as
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId);
   const id = documentId(raw?.assessmentId, 'assessmentId');
   const teacherStaffId = requireId(raw?.teacherStaffId, 'teacherStaffId');
-  const [teacherSnap] = await Promise.all([db().collection('staff').doc(teacherStaffId).get()]);
-  const teacher = schoolDocument(teacherSnap, schoolId, 'Enseignant');
-  if (teacher.role !== 'teacher') throw new functions.https.HttpsError('failed-precondition', 'Le membre du personnel sélectionné doit être enseignant.');
+  if (raw?.declarationReceived !== true) throw new functions.https.HttpsError('failed-precondition', 'La réception de la décision enseignant doit être confirmée.');
+  const note = text(raw?.note, 'Décision reçue', 1000);
   const ref = db().collection('weeklyAssessments').doc(id);
   await db().runTransaction(async transaction => {
     const assessment = schoolDocument(await transaction.get(ref), schoolId, 'Évaluation');
+    assertReviewVersion(raw, assessment);
     if (assessment.status !== 'needs_review') throw new functions.https.HttpsError('failed-precondition', 'Le brouillon doit être relu avant la validation enseignant.');
+    await assertCurrentTeachingVersions(transaction, assessment);
+    const subjects = assessmentSubjects(assessment);
+    const selected = raw.subjectId ? [requireId(raw.subjectId, 'subjectId')] : subjects;
+    if (!selected.length || selected.some(subjectId => !subjects.includes(subjectId))) throw new functions.https.HttpsError('invalid-argument', 'Matière absente de cette évaluation.');
+    for (const subjectId of selected) await responsibleTeacher(transaction, db(), { schoolId, academicYearId: assessment.academicYearId, classId: assessment.classId, subjectId }, teacherStaffId);
+    const signatures: SubjectTeacherValidation[] = (assessment.teacherValidations || []).filter((item: SubjectTeacherValidation) => !selected.includes(item.subjectId));
+    signatures.push(...selected.map(subjectId => ({ subjectId, teacherStaffId, recordedBy: actor.uid, recordedAt: admin.firestore.Timestamp.now(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum })));
+    const complete = allSubjectsValidated(subjects, signatures, assessment as { generationVersion: number });
+    transaction.create(ref.collection('teacherDecisions').doc(), { schoolId, subjectIds: selected, teacherStaffId, recordedBy: actor.uid, recordedAt: FieldValue.serverTimestamp(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum });
     transaction.update(ref, {
-      status: 'teacher_validated', teacherValidated: true, teacherValidatedAt: FieldValue.serverTimestamp(), teacherStaffId,
+      status: complete ? 'teacher_validated' : 'needs_review', teacherValidated: complete, teacherValidations: signatures, teacherValidatedAt: complete ? FieldValue.serverTimestamp() : null, teacherStaffId,
       teacherValidationRecordedBy: actor.uid, teacherValidationRecordedAt: FieldValue.serverTimestamp(), teacherValidationNote: optionalText(raw?.note, 1000),
       teacherValidationMeaning: 'Validation de l’enseignant enregistrée par la secrétaire.', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
     audit(transaction, actor, schoolId, 'weekly_assessment_teacher_validation_recorded', 'weeklyAssessment', id, { teacherStaffId, generationVersion: assessment.generationVersion });
   });
-  return { assessmentId: id, status: 'teacher_validated' };
+  return { assessmentId: id, status: (await ref.get()).data()?.status };
 });
 
 export const markWeeklyAssessmentReadyToPrint = functions.https.onCall(async (raw, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId);
   const id = documentId(raw?.assessmentId, 'assessmentId');
   const ref = db().collection('weeklyAssessments').doc(id);
+  const before = schoolDocument(await ref.get(), schoolId, 'Évaluation');
+  const sources = await readWeeklyAssessmentSources(before, schoolId);
   await db().runTransaction(async transaction => {
     const assessment = schoolDocument(await transaction.get(ref), schoolId, 'Évaluation');
+    assertReviewVersion(raw, assessment);
+    if (sources.checksum !== assessment.sourceChecksum || !allSubjectsValidated(assessmentSubjects(assessment), assessment.teacherValidations || [], assessment as { generationVersion: number })) throw new functions.https.HttpsError('failed-precondition', 'Sources modifiées ou visas par matière incomplets.');
+    await assertCurrentTeachingVersions(transaction, assessment);
     if (assessment.status !== 'teacher_validated' || assessment.teacherValidated !== true) throw new functions.https.HttpsError('failed-precondition', 'La validation de l’enseignant doit être enregistrée.');
     transaction.update(ref, { status: 'ready_to_print', readyToPrintAt: FieldValue.serverTimestamp(), readyToPrintBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     audit(transaction, actor, schoolId, 'weekly_assessment_ready_to_print', 'weeklyAssessment', id, { generationVersion: assessment.generationVersion });
