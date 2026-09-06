@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { transportPlanId } from './studentTransportPlan';
 import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -652,7 +653,7 @@ const resolveTransportFee = (student: Data, privateData: Data, classData: Data):
   } catch (error) {
     const code = error instanceof Error ? error.message : 'TRANSPORT_POLICY_INVALID';
     const messages: Record<string, string> = {
-      TRANSPORT_CLASS_NOT_SUPPORTED: 'Le transport payant ITALO est réservé au primaire.',
+      TRANSPORT_CLASS_NOT_SUPPORTED: 'Le transport payant ITALO concerne la maternelle et le primaire.',
       TRANSPORT_ZONE_REQUIRED: 'Le PK transport structuré doit être configuré.',
       TRANSPORT_ZONE_OUTSIDE_POLICY: 'Le PK transport est hors du périmètre tarifaire ITALO.'
     };
@@ -732,11 +733,12 @@ const requireTransportAllocationAmount = (allocation: Data): number => {
 };
 
 const buildTransportCollectionQuote = ({
-  fee, periods, benefits, payments, allocations, moratoriums, school, schoolId, academicYear, today
+  fee, periods, benefits, payments, allocations, moratoriums, school, schoolId, academicYear, today, periodFees
 }: {
   fee: TransportFeeResolution; periods: string[]; benefits: Data[]; payments: Data[];
   allocations: Data[]; moratoriums: Data[]; school: Data; schoolId: string;
   academicYear: string; today: string;
+  periodFees?: Record<string, number>;
 }): TransportCollectionQuote => {
   if (fee.state !== 'BILLABLE') return zeroTransportQuote(fee.state);
   const installmentAllocations = new Map<string, number>();
@@ -757,9 +759,10 @@ const buildTransportCollectionQuote = ({
       'FINANCIAL_HISTORY_INCONSISTENT');
   }
   const benefitPlanning = benefits.map(benefit => ({ ...benefit }));
-  const installments: TransportInstallmentSnapshot[] = periods.map(period => {
+  const installments: TransportInstallmentSnapshot[] = periods.filter(period => !periodFees || (periodFees[period] || 0) > 0).map(period => {
+    const monthlyGross = periodFees ? periodFees[period] : fee.monthlyGrossAmount;
     const legacyQuote = buildQuote({
-      gross: fee.monthlyGrossAmount, benefits: benefitPlanning, payments, moratoriums, school, schoolId, academicYear,
+      gross: monthlyGross, benefits: benefitPlanning, payments, moratoriums, school, schoolId, academicYear,
       type: 'transport', installment: null, period, today
     });
     for (const snapshot of legacyQuote.benefits) {
@@ -1513,14 +1516,27 @@ const readQuoteContext = async (
     .filter(item => item.schoolId === input.schoolId && item.studentId === input.studentId);
   let quote: CollectionQuote;
   if (input.type === 'transport') {
-    const fee = resolveTransportFee(student, privateData, classData);
+    const planSnap = await transaction.get(db.collection('studentTransportPlans').doc(transportPlanId(input.schoolId, input.studentId, input.academicYear)));
+    const plan = planSnap.data();
+    if (plan && (plan.schoolId !== input.schoolId || plan.studentId !== input.studentId || plan.academicYear !== input.academicYear)) {
+      throw httpsError('failed-precondition', 'Historique transport incohérent.', 'TRANSPORT_PLAN_INVALID');
+    }
+    const periodFees = plan?.periodFees as Record<string, number> | undefined;
+    const fee = resolveTransportFee(plan ? { ...student, usesTransport: plan.usesTransport } : student,
+      plan ? { ...privateData, transportZonePk: plan.zonePk } : privateData, classData);
+    if (periodFees && resolveCanonicalClassCycle(classData) !== 'secondary' && Object.values(periodFees).some(v => v > 0)) fee.state = 'BILLABLE';
+    // Nursery enrollment must be explicitly activated prospectively; no retroactive billing on rollout.
+    if (!plan && resolveCanonicalClassCycle(classData) === 'nursery') {
+      return { user, school: scheduleSchool, student, finance, benefits, payments, moratoriums, allocations,
+        quote: zeroTransportQuote('NOT_SUBSCRIBED'), classData, privateData, financeRef, financeSnap };
+    }
     if (fee.state !== 'BILLABLE') {
       quote = zeroTransportQuote(fee.state);
     } else if (!input.period) {
       quote = buildTransportCollectionQuote({
         fee, periods: resolveTransportBillingPeriods(school, input.academicYear), benefits, payments,
         allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
-        academicYear: input.academicYear, today: getDoualaDate()
+        academicYear: input.academicYear, today: getDoualaDate(), periodFees
       });
     } else {
       const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
@@ -1530,7 +1546,10 @@ const readQuoteContext = async (
         throw httpsError('failed-precondition', 'Ce mois ne fait pas partie du calendrier transport.',
           'TRANSPORT_PERIOD_NOT_BILLABLE');
       }
-      quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, fee),
+      if (periodFees && !(periodFees[input.period] > 0)) {
+        throw httpsError('failed-precondition', 'Ce mois ne fait pas partie de l’abonnement.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
+      }
+      quote = buildQuote({ gross: periodFees ? periodFees[input.period] : resolveGross(input.type, input.installment, finance, school, bus, fee),
         benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
         type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
     }

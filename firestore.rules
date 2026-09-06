@@ -617,7 +617,7 @@ service cloud.firestore {
         (canManageSchool(schoolId) && !isUpdatingSaasFields() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeAcademicYearId'])) ||
         (isAcademicCalendarPointerUpdate(schoolId) && !isUpdatingTransportPolicy())
       ) && (!isUpdatingTransportPolicy() || (isValidTransportPolicy() && (isOwner() || isSuperAdmin())))
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId', 'feeCatalog']);
 
       match /secrets/{secretId} {
         allow read: if false;
@@ -1446,6 +1446,16 @@ service cloud.firestore {
     }
 
     // --- FINANCE (PAYMENTS & EXPENSES) ---
+    match /studentFeeAssignments/{assignmentId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+        && (isOwner() || isDirector() || isSecretary() || isAccountant());
+      allow write: if false;
+    }
+    match /studentTransportPlans/{planId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+        && (isOwner() || isDirector() || isSecretary() || isAccountant());
+      allow write: if false;
+    }
     match /financialBenefits/{benefitId} {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||

@@ -1,3 +1,5 @@
+export { getSchoolFeeCatalog, manageSchoolFee } from './schoolFeeCatalog';
+export { setStudentTransportPlan } from './studentTransportPlan';
 import * as functions from 'firebase-functions';
 export * from './importStudents';
 export * from './academic/bulkAddSubjectsToClasses';

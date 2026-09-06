@@ -38,7 +38,7 @@ export const resolveItaloTransportFee = ({
   if (!usesTransport) {
     return { state: 'NOT_SUBSCRIBED', zonePk: null, monthlyGrossAmount: 0 };
   }
-  if (cycle !== 'primary') {
+  if (cycle !== 'primary' && cycle !== 'nursery') {
     throw new Error('TRANSPORT_CLASS_NOT_SUPPORTED');
   }
   if (typeof zonePk !== 'number' || !Number.isSafeInteger(zonePk)) {
