@@ -13,24 +13,26 @@ const states: Record<ObservationState, string> = { not_observed: 'Non observé',
 type Student = { id: string; name: string };
 export default function PedagogyObservations() {
   const { db, currentSchool } = useAppContext();
-  const year = db?.academicYears?.find(item => item.id === currentSchool?.activeAcademicYearId);
+  const year = db?.academicYears?.find(item => item.id === currentSchool?.activeAcademicYearId && item.schoolId === currentSchool?.id);
   const workspace = usePedagogyWorkspace(currentSchool?.id, year?.id);
-  const classes = useMemo(() => (db?.classes || []).filter(item => item.isActive !== false), [db?.classes]);
+  const classes = useMemo(() => (db?.classes || []).filter(item => item.schoolId === currentSchool?.id && item.isActive !== false), [db?.classes, currentSchool?.id]);
   const [classId, setClassId] = useState(''), [weekId, setWeekId] = useState('');
-  const selectedClassId = classId || classes[0]?.id || '';
+  const [dirty, setDirty] = useState(false);
+  const selectedClassId = classes.some(item => item.id === classId) ? classId : classes[0]?.id || '';
   const week = workspace.weeks.find(item => item.id === weekId) || workspace.weeks[0];
   const scopeKey = `${currentSchool?.id}:${year?.id}:${selectedClassId}:${week?.id}`;
   return <main className="pedagogy-page">
     <PedagogyHeader title="Activités et observations" description="Consignez les observations datées transmises par l’enseignant, sans note ni classement préscolaire." /><PedagogyNav />
     <section className="pedagogy-toolbar no-print">
-      <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option value={item.id} key={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
-      <label>Semaine<select value={week?.id || ''} onChange={event => setWeekId(event.target.value)}>{workspace.weeks.map(item => <option value={item.id} key={item.id}>S{item.weekNumber} · {item.weekStartDate}</option>)}</select></label>
+      <label>Classe<select disabled={dirty} value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option value={item.id} key={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
+      <label>Semaine<select disabled={dirty} value={week?.id || ''} onChange={event => setWeekId(event.target.value)}>{workspace.weeks.map(item => <option value={item.id} key={item.id}>S{item.weekNumber} · {item.weekStartDate}</option>)}</select></label>
     </section>
-    {currentSchool && year && week ? <ObservationRoster key={scopeKey} schoolId={currentSchool.id} academicYearId={year.id} classId={selectedClassId} weekStartDate={week.weekStartDate} teachers={(db?.staff || []).filter(item => item.role === 'teacher' && item.active !== false).map(item => ({ id: item.id, name: item.name || 'Enseignant' }))} /> : <p>Choisissez une année et une semaine pédagogique configurées.</p>}
+    {dirty && <p>Enregistrez ou effacez la saisie en cours avant de changer de classe ou de semaine.</p>}
+    {currentSchool && year && week ? <ObservationRoster key={scopeKey} onDirty={setDirty} schoolId={currentSchool.id} academicYearId={year.id} classId={selectedClassId} weekStartDate={week.weekStartDate} teachers={(db?.staff || []).filter(item => item.role === 'teacher' && item.active !== false).map(item => ({ id: item.id, name: item.name || 'Enseignant' }))} /> : <p>Choisissez une année et une semaine pédagogique configurées.</p>}
   </main>;
 }
 
-function ObservationRoster({ schoolId, academicYearId, classId, weekStartDate, teachers }: { schoolId: string; academicYearId: string; classId: string; weekStartDate: string; teachers: Array<{ id: string; name: string }> }) {
+function ObservationRoster({ schoolId, academicYearId, classId, weekStartDate, teachers, onDirty }: { schoolId: string; academicYearId: string; classId: string; weekStartDate: string; teachers: Array<{ id: string; name: string }>; onDirty: (dirty: boolean) => void }) {
   const preparations = useLessonPreparations(schoolId, academicYearId, weekStartDate, classId);
   const sources = preparations.preparations.filter(item => item.status === 'validated' && ['taught', 'partially_taught'].includes(item.teachingConfirmation?.status || ''));
   const [preparationId, setPreparationId] = useState(''), [teacherStaffId, setTeacherStaffId] = useState('');
@@ -38,7 +40,10 @@ function ObservationRoster({ schoolId, academicYearId, classId, weekStartDate, t
   const [students, setStudents] = useState<Student[]>([]), [cursor, setCursor] = useState(''), [hasMore, setHasMore] = useState(false);
   const [rows, setRows] = useState<Record<string, { state: ObservationState; comment: string }>>({});
   const [message, setMessage] = useState(''), [busy, setBusy] = useState(false), [received, setReceived] = useState(false);
-  const saving = useRef(false), request = useRef<{ signature: string; id: string } | null>(null);
+  const saving = useRef(false), pending = useRef<Record<string, unknown> | null>(null);
+  const [uncertain, setUncertain] = useState(false);
+  const dirty = Boolean(Object.keys(rows).length || objective || received || busy || uncertain);
+  useEffect(() => { onDirty(dirty); return () => onDirty(false); }, [dirty, onDirty]);
   const prep = sources.find(item => item.id === preparationId);
   useEffect(() => {
     let alive = true;
@@ -51,22 +56,28 @@ function ObservationRoster({ schoolId, academicYearId, classId, weekStartDate, t
     return () => { alive = false; };
   }, [schoolId, academicYearId, classId, cursor]);
   const save = async () => {
-    if (saving.current || !received || !prep || !teacherStaffId || !Object.keys(rows).length) return;
-    const payload = { schoolId, academicYearId, classId, preparationId, teacherStaffId, objective, date, declarationReceived: true, rows: Object.entries(rows).map(([studentId, row]) => ({ studentId, ...row })) };
-    const signature = JSON.stringify(payload);
-    if (request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
+    if (saving.current || !pending.current && (!received || !prep || !teacherStaffId || !Object.keys(rows).length)) return;
+    const payload = pending.current || { schoolId, academicYearId, classId, preparationId, teacherStaffId, objective, date, declarationReceived: true, requestId: crypto.randomUUID(), rows: Object.entries(rows).map(([studentId, row]) => ({ studentId, ...row })) };
+    pending.current = payload;
     saving.current = true; setBusy(true); setMessage('Enregistrement en cours…');
     try {
-      await httpsCallable(functions, 'recordPedagogyObservations')({ ...payload, requestId: request.current.id });
-      setRows({}); setReceived(false); request.current = null; setMessage('Observations enregistrées avec la provenance de l’enseignant.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Écriture non confirmée. Vous pouvez reprendre la saisie.'); }
+      await httpsCallable(functions, 'recordPedagogyObservations')(payload);
+      setRows({}); setReceived(false); setObjective(''); pending.current = null; setUncertain(false); setMessage('Observations enregistrées avec la provenance de l’enseignant.');
+    } catch (error) {
+      const code = (error as { code?: string }).code || '';
+      if (['functions/invalid-argument', 'functions/failed-precondition', 'functions/permission-denied', 'functions/aborted', 'functions/already-exists', 'functions/unauthenticated'].includes(code)) { pending.current = null; setUncertain(false); } else setUncertain(true);
+      setMessage(error instanceof Error ? error.message : 'Écriture non confirmée. Vous pouvez reprendre la même demande.');
+    }
     finally { saving.current = false; setBusy(false); }
   };
   return <section className="pedagogy-card">
     <p>Une observation décrit une situation. Elle ne suffit pas à conclure à une difficulté durable et ne constitue pas un diagnostic. « Non observé » n’est pas un échec.</p>
     {message && <p role="status" className="pedagogy-alert">{message}</p>}
-    <fieldset disabled={busy}>
-      <label>Activité enseignée<select value={preparationId} onChange={event => { setPreparationId(event.target.value); setObjective(''); setReceived(false); }}><option value="">Sélectionner un cours confirmé</option>{sources.map(item => <option key={item.id} value={item.id}>{item.subjectName} — {item.lessonTitle}</option>)}</select></label>
+    {uncertain && <p>Réponse incertaine : la reprise renverra exactement la même demande. Ne ressaisissez pas ces observations ailleurs.</p>}
+    {uncertain && <button disabled={busy} onClick={() => void save()}>Reprendre la même demande</button>}
+    {dirty && !busy && !uncertain && <button onClick={() => { setRows({}); setObjective(''); setReceived(false); pending.current = null; }}>Effacer la saisie non enregistrée</button>}
+    <fieldset disabled={busy || uncertain}>
+      <label>Activité enseignée<select disabled={Object.keys(rows).length > 0} value={preparationId} onChange={event => { setPreparationId(event.target.value); setObjective(''); setReceived(false); }}><option value="">Sélectionner un cours confirmé</option>{sources.map(item => <option key={item.id} value={item.id}>{item.subjectName} — {item.lessonTitle}</option>)}</select></label>
       {prep && <details open><summary>Contenu confirmé utilisable</summary><p style={{ whiteSpace: 'pre-wrap' }}>{prep.teachingConfirmation?.status === 'partially_taught' ? prep.teachingConfirmation.excerpts.join('\n') : [prep.reviewData?.lessonTitle, prep.reviewData?.objective, prep.reviewData?.lessonSteps].filter(Boolean).join('\n')}</p></details>}
       <label>Objectif observable, extrait exact du contenu confirmé<textarea value={objective} maxLength={1000} onChange={event => { setObjective(event.target.value); setReceived(false); }} /></label>
       <label>Enseignant déclarant<select value={teacherStaffId} onChange={event => { setTeacherStaffId(event.target.value); setReceived(false); }}><option value="">Sélectionner</option>{teachers.map(teacher => <option value={teacher.id} key={teacher.id}>{teacher.name}</option>)}</select></label>
