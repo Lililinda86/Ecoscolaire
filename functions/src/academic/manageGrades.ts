@@ -5,11 +5,11 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 type Data = Record<string, unknown>;
 type EvaluationAction = 'CREATE_DRAFT' | 'UPDATE_DRAFT' | 'OPEN' | 'LOCK' | 'PUBLISH' | 'CANCEL';
-type ResultStatus = 'scored' | 'absent' | 'excused' | 'notSubmitted';
+type ResultStatus = 'scored' | 'absent' | 'excused' | 'notSubmitted' | 'notEvaluated';
 
 const MANAGER_ROLES = new Set(['superAdmin', 'owner', 'director']);
 const EVALUATION_MUTATION_ROLES = new Set([...MANAGER_ROLES, 'teacher']);
-const RESULT_STATUSES = new Set<ResultStatus>(['scored', 'absent', 'excused', 'notSubmitted']);
+const RESULT_STATUSES = new Set<ResultStatus>(['scored', 'absent', 'excused', 'notSubmitted', 'notEvaluated']);
 const PROFILE_FIELDS = new Set(['title', 'type', 'date', 'maxScore', 'weight', 'testFixture', 'testRunId']);
 const MAX_BATCH_SIZE = 200;
 
@@ -80,7 +80,7 @@ const parseProfile = (raw: unknown): Data => {
   };
 };
 
-const canonicalGradeId = (evaluationId: string, studentId: string): string =>
+export const canonicalGradeId = (evaluationId: string, studentId: string): string =>
   `gr_${crypto.createHash('sha256').update(`${evaluationId}\u0000${studentId}`).digest('base64url')}`;
 
 const requestHash = (evaluationId: string, rows: Data[]): string => crypto.createHash('sha256')
@@ -109,10 +109,10 @@ const validateProductionFixture = (actor: Data, fixtureSource: Data) => {
   }
 };
 
-const assertEvaluationDependencies = async (
+export const assertEvaluationDependencies = async (
   transaction: admin.firestore.Transaction,
   db: admin.firestore.Firestore,
-  params: { schoolId: string; academicYearId: string; periodId: string; classId: string; subjectId: string; teacherAssignmentId: string; uid: string; role: string }
+  params: { schoolId: string; academicYearId: string; periodId: string; classId: string; subjectId: string; teacherAssignmentId: string; uid: string; role: string; offlineTeacherStaffId?: string }
 ) => {
   const { schoolId, academicYearId, periodId, classId, subjectId, teacherAssignmentId, uid, role } = params;
   const [yearSnap, periodSnap, classSnap, subjectSnap, assignmentSnap] = await Promise.all([
@@ -149,17 +149,23 @@ const assertEvaluationDependencies = async (
   const revisionId = cleanId(assignment.sourcePublishedRevisionId, 'sourcePublishedRevisionId');
   const classSubjectId = cleanId(assignment.sourceClassSubjectId, 'sourceClassSubjectId');
   const teacherStaffId = cleanShortId(assignment.teacherStaffId, 'teacherStaffId');
-  const teacherUserId = cleanShortId(assignment.teacherUserId, 'teacherUserId');
+  // Server-only capability used by the sourced pedagogy bridge after its
+  // teacher-decision checks. Generic callable payloads do not accept this field.
+  const offline = params.offlineTeacherStaffId !== undefined;
+  if (offline && (!['superAdmin', 'owner', 'director', 'secretary'].includes(role) || params.offlineTeacherStaffId !== teacherStaffId)) {
+    throw failure('permission-denied', 'Décision pédagogique hors responsabilité.', 'OFFLINE_TEACHER_MISMATCH');
+  }
+  const teacherUserId = offline ? null : cleanShortId(assignment.teacherUserId, 'teacherUserId');
   const [programSnap, classSubjectSnap, staffSnap, linkByUserSnap] = await Promise.all([
     transaction.get(db.collection('classPrograms').doc(programId)),
     transaction.get(db.collection('classSubjects').doc(classSubjectId)),
     transaction.get(db.collection('staff').doc(teacherStaffId)),
-    transaction.get(db.collection('staffUserLinkByUser').doc(teacherUserId)),
+    teacherUserId ? transaction.get(db.collection('staffUserLinkByUser').doc(teacherUserId)) : Promise.resolve(null),
   ]);
   const program = programSnap.data() as Data | undefined;
   const classSubject = classSubjectSnap.data() as Data | undefined;
   const staff = staffSnap.data() as Data | undefined;
-  const linkByUser = linkByUserSnap.data() as Data | undefined;
+  const linkByUser = linkByUserSnap?.data() as Data | undefined;
   if (!programSnap.exists || !program || program.schoolId !== schoolId || program.classId !== classId
       || program.status !== 'published' || program.publishedRevisionId !== revisionId) {
     throw failure('failed-precondition', 'Programme publié requis.', 'PROGRAM_NOT_PUBLISHED');
@@ -169,8 +175,9 @@ const assertEvaluationDependencies = async (
     throw failure('failed-precondition', 'Matière absente du programme publié.', 'SUBJECT_NOT_IN_PUBLISHED_PROGRAM');
   }
   if (!staffSnap.exists || !staff || staff.schoolId !== schoolId || !active(staff)
-      || !linkByUserSnap.exists || !linkByUser || linkByUser.schoolId !== schoolId
-      || linkByUser.staffId !== teacherStaffId || linkByUser.userId !== teacherUserId || linkByUser.isActive !== true) {
+      || (offline && staff.role !== 'teacher')
+      || (!offline && (!linkByUserSnap?.exists || !linkByUser || linkByUser.schoolId !== schoolId
+      || linkByUser.staffId !== teacherStaffId || linkByUser.userId !== teacherUserId || linkByUser.isActive !== true))) {
     throw failure('failed-precondition', 'Lien Staff/User canonique actif requis.', 'TEACHER_LINK_REQUIRED');
   }
   return { assignment, classSubjectId, programId, revisionId };
@@ -291,7 +298,7 @@ export const manageEvaluation = functions.https.onCall(async (raw, context) => {
   });
 });
 
-const parseGradeRows = (raw: unknown, maxScore: number): Data[] => {
+export const parseGradeRows = (raw: unknown, maxScore: number): Data[] => {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_BATCH_SIZE) {
     throw failure('invalid-argument', `Le lot doit contenir entre 1 et ${MAX_BATCH_SIZE} lignes.`, 'INVALID_BATCH_SIZE');
   }

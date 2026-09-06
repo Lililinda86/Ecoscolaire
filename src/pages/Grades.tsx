@@ -16,13 +16,7 @@ import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
 
 import { SubjectSelectDropdown } from '../components/SubjectSelectDropdown';
 
-export const ACADEMIC_CALENDAR_SETTINGS_HASH = '#/settings?section=academic-calendar';
-
-export const getCalendarActionUrl = (hasAcademicYears: boolean, hasSelectedYear: boolean, openPeriodsCount: number): string | null => {
-  if (!hasAcademicYears) return ACADEMIC_CALENDAR_SETTINGS_HASH;
-  if (hasSelectedYear && openPeriodsCount === 0) return ACADEMIC_CALENDAR_SETTINGS_HASH;
-  return null;
-};
+import { ACADEMIC_CALENDAR_SETTINGS_HASH } from '../utils/academicCalendarNavigation';
 
 export const getAppreciation = (score: number, max: number = 20) => {
   const normalized = (score / max) * 20;
@@ -57,7 +51,7 @@ const Grades: React.FC = () => {
   const [evaluationDate, setEvaluationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [evaluationMaxScore, setEvaluationMaxScore] = useState<string>('20');
   const [evaluationWeight, setEvaluationWeight] = useState<string>('1');
-  const [gradeEntryRows, setGradeEntryRows] = useState<Record<string, { score: string; resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted' }>>({});
+  const [gradeEntryRows, setGradeEntryRows] = useState<Record<string, { score: string; resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted' | 'notEvaluated' }>>({});
   const [gradeRequestId, setGradeRequestId] = useState<string>('');
   const [isSavingGrades, setIsSavingGrades] = useState(false);
 
@@ -133,7 +127,7 @@ const Grades: React.FC = () => {
     }));
   };
 
-  const handleUpdateGradeStatus = (studentId: string, resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted') => {
+  const handleUpdateGradeStatus = (studentId: string, resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted' | 'notEvaluated') => {
     setGradeEntryRows(rows => ({
       ...rows,
       [studentId]: { score: resultStatus === 'scored' ? (rows[studentId]?.score || '') : '', resultStatus }
@@ -916,7 +910,7 @@ const Grades: React.FC = () => {
                       if (gradeEntryRows[stu.id] !== undefined) {
                         currentVal = gradeEntryRows[stu.id].score;
                         const entryStatus = gradeEntryRows[stu.id].resultStatus;
-                        statusText = entryStatus === 'scored' ? 'Noté' : entryStatus === 'absent' ? 'Absent' : entryStatus === 'excused' ? 'Dispensé' : 'Non noté';
+                        statusText = entryStatus === 'scored' ? 'Noté' : entryStatus === 'absent' ? 'Absent' : entryStatus === 'excused' ? 'Dispensé' : entryStatus === 'notEvaluated' ? 'Non évalué' : 'Non remis';
                       } else if (existingGrade) {
                         if (existingGrade.resultStatus === 'scored') {
                           currentVal = existingGrade.score?.toString() || '';
@@ -932,8 +926,9 @@ const Grades: React.FC = () => {
                         <tr key={stu.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                           <td style={{ padding: '0.75rem 0' }}>{stu.name}</td>
                           <td style={{ padding: '0.75rem 0', textAlign: 'center' }}>
-                            <select aria-label={`Statut ${stu.name}`} value={gradeEntryRows[stu.id]?.resultStatus || (existingGrade?.resultStatus === 'exempt' ? 'excused' : existingGrade?.resultStatus) || 'notSubmitted'} onChange={event => handleUpdateGradeStatus(stu.id, event.target.value as 'scored' | 'absent' | 'excused' | 'notSubmitted')}>
-                              <option value="notSubmitted">Non noté</option>
+                            <select aria-label={`Statut ${stu.name}`} value={gradeEntryRows[stu.id]?.resultStatus || (existingGrade?.resultStatus === 'exempt' ? 'excused' : existingGrade?.resultStatus) || 'notSubmitted'} onChange={event => handleUpdateGradeStatus(stu.id, event.target.value as 'scored' | 'absent' | 'excused' | 'notSubmitted' | 'notEvaluated')}>
+                              <option value="notSubmitted">Non remis</option>
+                              <option value="notEvaluated">Non évalué</option>
                               <option value="scored">Noté</option>
                               <option value="absent">Absent</option>
                               <option value="excused">Dispensé</option>

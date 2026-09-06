@@ -25,6 +25,8 @@ beforeEach(async () => {
       setDoc(doc(db, 'pedagogyFridayConfigurations/school-a'), { schoolId: 'school-a', enabled: false }),
       setDoc(doc(db, 'pedagogyFridayConfigurations/school-a/versions/1'), { schoolId: 'school-a', enabled: false }),
       setDoc(doc(db, 'pedagogyFridayRuns/run-a'), { schoolId: 'school-a', status: 'succeeded' }),
+      setDoc(doc(db, 'pedagogyAssessmentPublications/publication-a'), { schoolId: 'school-a', items: ['Synthetic private correction'] }),
+      setDoc(doc(db, 'grades/grade-a/pedagogyHistory/entry-a'), { schoolId: 'school-a', previous: null }),
       setDoc(doc(db, 'assessmentItems', 'item-a'), { id: 'item-a', weeklyAssessmentId: 'assessment-a', schoolId: 'school-a', correctionGuide: 'Privé', expectedAnswer: 'Privé' })
     ]);
   });
@@ -35,7 +37,7 @@ describe('Pedagogy Lot C protected weekly assessments', () => {
       const db = env.authenticatedContext(uid).firestore();
       await assertSucceeds(getDoc(doc(db, 'weeklyAssessments', 'assessment-a'))); await assertSucceeds(getDoc(doc(db, 'assessmentItems', 'item-a')));
       await assertSucceeds(getDoc(doc(db, 'teachingConfirmations', 'confirmation-a')));
-      for (const path of ['pedagogyObservations/observation-a', 'pedagogyClassPolicies/policy-a', 'pedagogyClassPolicies/policy-a/versions/1', 'pedagogyFridayConfigurations/school-a', 'pedagogyFridayConfigurations/school-a/versions/1', 'pedagogyFridayRuns/run-a']) await assertSucceeds(getDoc(doc(db, path)));
+      for (const path of ['pedagogyObservations/observation-a', 'pedagogyClassPolicies/policy-a', 'pedagogyClassPolicies/policy-a/versions/1', 'pedagogyFridayConfigurations/school-a', 'pedagogyFridayConfigurations/school-a/versions/1', 'pedagogyFridayRuns/run-a', 'pedagogyAssessmentPublications/publication-a', 'grades/grade-a/pedagogyHistory/entry-a']) await assertSucceeds(getDoc(doc(db, path)));
     }
   });
   test('cross-school, teacher, boardViewer and anonymous cannot read raw assessment or correction guide', async () => {
@@ -43,7 +45,7 @@ describe('Pedagogy Lot C protected weekly assessments', () => {
       const db = env.authenticatedContext(uid).firestore();
       await assertFails(getDoc(doc(db, 'weeklyAssessments', 'assessment-a'))); await assertFails(getDoc(doc(db, 'assessmentItems', 'item-a')));
       await assertFails(getDoc(doc(db, 'teachingConfirmations', 'confirmation-a')));
-      for (const path of ['pedagogyObservations/observation-a', 'pedagogyClassPolicies/policy-a', 'pedagogyClassPolicies/policy-a/versions/1', 'pedagogyFridayConfigurations/school-a', 'pedagogyFridayConfigurations/school-a/versions/1', 'pedagogyFridayRuns/run-a']) await assertFails(getDoc(doc(db, path)));
+      for (const path of ['pedagogyObservations/observation-a', 'pedagogyClassPolicies/policy-a', 'pedagogyClassPolicies/policy-a/versions/1', 'pedagogyFridayConfigurations/school-a', 'pedagogyFridayConfigurations/school-a/versions/1', 'pedagogyFridayRuns/run-a', 'pedagogyAssessmentPublications/publication-a', 'grades/grade-a/pedagogyHistory/entry-a']) await assertFails(getDoc(doc(db, path)));
     }
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'assessmentItems', 'item-a')));
   });
@@ -56,7 +58,7 @@ describe('Pedagogy Lot C protected weekly assessments', () => {
       await assertFails(deleteDoc(doc(db, 'assessmentItems', 'item-a')));
       await assertFails(setDoc(doc(db, 'teachingConfirmations', 'forged'), { schoolId: 'school-a', status: 'taught' }));
       await assertFails(setDoc(doc(db, 'teachingConfirmationBatches', 'forged'), { schoolId: 'school-a' }));
-      for (const path of ['pedagogyObservations/forged', 'pedagogyClassPolicies/forged', 'pedagogyClassPolicies/policy-a/versions/2', 'pedagogyObservationBatches/forged', 'pedagogyFridayConfigurations/school-a', 'pedagogyFridayConfigurations/school-a/versions/2', 'pedagogyFridayRuns/run-a']) await assertFails(setDoc(doc(db, path), { schoolId: 'school-a', state: 'acquired' }));
+      for (const path of ['pedagogyObservations/forged', 'pedagogyClassPolicies/forged', 'pedagogyClassPolicies/policy-a/versions/2', 'pedagogyObservationBatches/forged', 'pedagogyFridayConfigurations/school-a', 'pedagogyFridayConfigurations/school-a/versions/2', 'pedagogyFridayRuns/run-a', 'pedagogyAssessmentPublications/publication-a', 'grades/grade-a/pedagogyHistory/entry-a', 'pedagogyResultBatches/forged']) await assertFails(setDoc(doc(db, path), { schoolId: 'school-a', state: 'acquired' }));
     }
   });
 });

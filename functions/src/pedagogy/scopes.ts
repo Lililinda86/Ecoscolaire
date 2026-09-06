@@ -10,7 +10,7 @@ export function boundedPedagogyText(value: unknown, label: string, max = 2000): 
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new functions.https.HttpsError('invalid-argument', `${label} requis (maximum ${max} caractères).`);
   return value.trim();
 }
-export async function responsibleTeacher(transaction: admin.firestore.Transaction, db: admin.firestore.Firestore, scope: { schoolId: string; academicYearId: string; classId: string; subjectId: string }, teacherStaffId: string) {
+export async function responsibleTeacher(transaction: admin.firestore.Transaction, db: admin.firestore.Firestore, scope: { schoolId: string; academicYearId: string; classId: string; subjectId: string }, teacherStaffId: string): Promise<PedagogyData & { id: string }> {
   const [staffSnap, assignments] = await Promise.all([
     transaction.get(db.collection('staff').doc(teacherStaffId)),
     transaction.get(db.collection('teacherAssignments').where('schoolId', '==', scope.schoolId).where('academicYearId', '==', scope.academicYearId).where('classId', '==', scope.classId).where('subjectId', '==', scope.subjectId).limit(21))

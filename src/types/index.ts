@@ -468,7 +468,7 @@ export interface Evaluation {
   testRunId?: string;
 }
 
-export type GradeResultStatus = 'scored' | 'absent' | 'excused' | 'exempt' | 'notSubmitted';
+export type GradeResultStatus = 'scored' | 'absent' | 'excused' | 'exempt' | 'notSubmitted' | 'notEvaluated';
 export type GradeStatus = 'draft' | 'submitted' | 'validated' | 'published' | 'locked';
 
 export interface LegacyGrade {

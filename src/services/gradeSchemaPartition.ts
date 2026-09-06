@@ -11,7 +11,7 @@ export const isStrictGradeDocument = (doc: unknown): doc is Grade => {
   const d = doc as Record<string, unknown>;
   const rStatus = d.resultStatus as string;
   const isScored = rStatus === 'scored';
-  const hasValidStatus = ['scored', 'absent', 'excused', 'exempt', 'notSubmitted'].includes(rStatus);
+  const hasValidStatus = ['scored', 'absent', 'excused', 'exempt', 'notSubmitted', 'notEvaluated'].includes(rStatus);
   
   return (
     typeof d.id === 'string' && d.id !== '' &&

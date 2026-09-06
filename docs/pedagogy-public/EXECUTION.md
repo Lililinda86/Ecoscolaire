@@ -66,6 +66,21 @@ Production is outside this work's authorization.
   These new changes still require their own full gate; they do not transfer
   assessments to the canonical grade registry yet.
 
+- The complete dedicated Linux gate passed for subject-specific approvals on
+  4f4e55cba6400affca432b00d7170c2d4e794cbd:
+  [run 34046030442](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34046030442).
+- The canonical-results block now transfers one approved immutable version to
+  one existing-registry evaluation per subject, then records received corrections
+  in canonical grades. The generic secretary mutation permissions remain unchanged.
+  The offline-teacher dependency capability is server-only and scoped to this
+  publication/decision workflow. Missing academic configuration is rejected.
+- Results distinguish explicit zero, absence, not evaluated, not submitted,
+  dispensation and missing rows. Corrections preserve history; gradesStrict remains
+  a projection. No competency is inferred from a global grade.
+- Local targeted canonical regression: 64 tests passed; unchanged calendar
+  navigation: 5 tests passed. New Linux Functions/Rules/browser scenarios are
+  added and await execution on the resulting commit.
+
 ## Test privacy
 
 The dedicated CI uses synthetic demo projects and no production credentials.
