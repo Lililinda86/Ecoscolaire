@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections]
   workflow_dispatch:
     inputs:
       expected_sha:

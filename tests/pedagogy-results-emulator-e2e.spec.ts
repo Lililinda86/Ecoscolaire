@@ -66,7 +66,8 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     }
     const observationId = `${f.schoolId}-browser-reassessment`;
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Douala' }).format(new Date());
-    await db.doc(`pedagogyObservations/${observationId}`).create({ schoolId: f.schoolId, academicYearId: f.academicYearId, classId: f.classId, studentId: f.pupilIds[0], subjectId: zeroGrade.subjectId, date: today, state: 'developing', objective: 'Synthetic reassessment objective', objectiveId: 'synthetic-objective', comment: 'Entirely synthetic browser fixture', supersededBy: null });
+    const observationPreparation = `${f.schoolId}-prep-${String(zeroGrade.subjectId).endsWith('-math') ? 'math' : 'english'}`;
+    await db.doc(`pedagogyObservations/${observationId}`).create({ schoolId: f.schoolId, academicYearId: f.academicYearId, classId: f.classId, studentId: f.pupilIds[0], subjectId: zeroGrade.subjectId, preparationId: observationPreparation, date: today, state: 'developing', objective: 'Synthetic objective', objectiveId: 'synthetic-objective', comment: 'Entirely synthetic browser fixture', supersededBy: null });
     await page.reload();
     await support.getByRole('combobox', { name: 'Nouvelle preuve après réalisation', exact: true }).selectOption(`observation:${observationId}`);
     await support.getByRole('textbox', { name: 'Compte rendu reçu de l’enseignant', exact: true }).fill('Entirely synthetic follow-up declaration');
@@ -78,6 +79,20 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     const cases = await db.collection('pedagogyRemediations').where('schoolId', '==', f.schoolId).get();
     expect(cases.size).toBe(1); expect(cases.docs[0].data().review.outcome).toBe('continue_support');
     expect((await cases.docs[0].ref.collection('history').get()).size).toBe(4);
+    await page.getByText('Rectifier cette observation sur déclaration reçue', { exact: true }).click();
+    await page.getByRole('combobox', { name: 'État rectifié', exact: true }).selectOption('acquired');
+    await page.getByRole('textbox', { name: 'Contexte corrigé et motif reçu', exact: true }).fill('Entirely synthetic correction received after reassessment');
+    await page.getByRole('combobox', { name: 'Enseignant déclarant la rectification', exact: true }).selectOption(f.teacherId);
+    await page.getByRole('checkbox', { name: 'J’ai reçu cette rectification de l’enseignant sélectionné.', exact: true }).check();
+    await expect(page.getByRole('combobox', { name: 'Élève suivi', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Enregistrer la rectification reçue', exact: true }).click();
+    await expect(page.getByText(/rectifiée, exclue des preuves courantes/)).toBeVisible();
+    const prior = (await db.doc(`pedagogyObservations/${observationId}`).get()).data()!;
+    expect(prior.state).toBe('developing'); expect(prior.supersededBy).toBeTruthy();
+    const corrected = (await db.doc(`pedagogyObservations/${prior.supersededBy}`).get()).data()!;
+    expect(corrected.state).toBe('acquired'); expect(corrected.supersedesId).toBe(observationId);
+    expect(corrected.studentId).toBe(f.pupilIds[0]); expect(corrected.preparationId).toBe(observationPreparation);
+    expect((await cases.docs[0].ref.get()).data()?.review).toEqual(cases.docs[0].data().review);
     for (const name of ['payments', 'expenses', 'cashClosures', 'buses', 'inventory']) expect((await db.collection(name).where('schoolId', '==', f.schoolId).get()).empty).toBe(true);
     console.log('LOT_D_BROWSER: canonical evaluation and grade writes expected and verified; no real pupil data or human approval');
   } finally {
