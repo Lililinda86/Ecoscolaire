@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { transportPlanId } from './studentTransportPlan';
 import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -471,6 +472,7 @@ export interface CollectionQuote extends PaymentScheduleSnapshot {
 
 export interface TransportInstallmentSnapshot extends CollectionQuote {
   period: string;
+  zonePk?: number | null;
   allocatedAmount: number;
 }
 
@@ -652,7 +654,7 @@ const resolveTransportFee = (student: Data, privateData: Data, classData: Data):
   } catch (error) {
     const code = error instanceof Error ? error.message : 'TRANSPORT_POLICY_INVALID';
     const messages: Record<string, string> = {
-      TRANSPORT_CLASS_NOT_SUPPORTED: 'Le transport payant ITALO est réservé au primaire.',
+      TRANSPORT_CLASS_NOT_SUPPORTED: 'Le transport payant ITALO concerne la maternelle et le primaire.',
       TRANSPORT_ZONE_REQUIRED: 'Le PK transport structuré doit être configuré.',
       TRANSPORT_ZONE_OUTSIDE_POLICY: 'Le PK transport est hors du périmètre tarifaire ITALO.'
     };
@@ -732,11 +734,13 @@ const requireTransportAllocationAmount = (allocation: Data): number => {
 };
 
 const buildTransportCollectionQuote = ({
-  fee, periods, benefits, payments, allocations, moratoriums, school, schoolId, academicYear, today
+  fee, periods, benefits, payments, allocations, moratoriums, school, schoolId, academicYear, today, periodFees, periodZonePks
 }: {
   fee: TransportFeeResolution; periods: string[]; benefits: Data[]; payments: Data[];
   allocations: Data[]; moratoriums: Data[]; school: Data; schoolId: string;
   academicYear: string; today: string;
+  periodFees?: Record<string, number>;
+  periodZonePks?: Record<string, number | null>;
 }): TransportCollectionQuote => {
   if (fee.state !== 'BILLABLE') return zeroTransportQuote(fee.state);
   const installmentAllocations = new Map<string, number>();
@@ -757,9 +761,12 @@ const buildTransportCollectionQuote = ({
       'FINANCIAL_HISTORY_INCONSISTENT');
   }
   const benefitPlanning = benefits.map(benefit => ({ ...benefit }));
-  const installments: TransportInstallmentSnapshot[] = periods.map(period => {
+  const installments: TransportInstallmentSnapshot[] = periods.filter(period => !periodFees || (periodFees[period] || 0) > 0).map(period => {
+    const monthlyGross = periodFees ? periodFees[period] : fee.monthlyGrossAmount;
     const legacyQuote = buildQuote({
-      gross: fee.monthlyGrossAmount, benefits: benefitPlanning, payments, moratoriums, school, schoolId, academicYear,
+      // V3 collection transport is accounted through its transport allocations, never twice.
+      gross: monthlyGross, benefits: benefitPlanning, payments: payments.filter(payment => payment.type !== 'collection'),
+      moratoriums, school, schoolId, academicYear,
       type: 'transport', installment: null, period, today
     });
     for (const snapshot of legacyQuote.benefits) {
@@ -784,6 +791,7 @@ const buildTransportCollectionQuote = ({
     });
     return {
       ...legacyQuote, ...schedule, period, allocatedAmount, previousPaid: paidAmount, remainingBalance,
+      zonePk: periodZonePks && period in periodZonePks ? periodZonePks[period] : fee.zonePk,
       status: remainingBalance === 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID'
     };
   });
@@ -1199,6 +1207,9 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       bus = busSnap.data() || {};
     }
     const overlappingPayment = paymentsSnap.docs.map(doc => doc.data()).some(payment => {
+      if (payment.type === 'collection' && isConfirmedPayment(payment) && payment.schoolId === benefit.schoolId && payment.academicYear === benefit.academicYear) {
+        return (Array.isArray(payment.lineItems) ? payment.lineItems : []).some((line: Data) => benefit.paymentType === 'TUITION' ? line.type === 'tuition' && (benefit.installment === 'ALL_TUITION' || line.installment === benefit.installment) : line.type === 'transport' && (!line.period || (String(line.period) >= String(benefit.transportStartPeriod) && String(line.period) <= String(benefit.transportEndPeriod))));
+      }
       if (!isConfirmedPayment(payment) || payment.schoolId !== benefit.schoolId
           || payment.academicYear !== benefit.academicYear) return false;
       if (benefit.paymentType === 'TUITION') {
@@ -1513,26 +1524,54 @@ const readQuoteContext = async (
     .filter(item => item.schoolId === input.schoolId && item.studentId === input.studentId);
   let quote: CollectionQuote;
   if (input.type === 'transport') {
-    const fee = resolveTransportFee(student, privateData, classData);
+    const planSnap = await transaction.get(db.collection('studentTransportPlans').doc(transportPlanId(input.schoolId, input.studentId, input.academicYear)));
+    const plan = planSnap.data();
+    if (plan && (plan.schoolId !== input.schoolId || plan.studentId !== input.studentId || plan.academicYear !== input.academicYear)) {
+      throw httpsError('failed-precondition', 'Historique transport incohérent.', 'TRANSPORT_PLAN_INVALID');
+    }
+    const periodFees = plan?.periodFees as Record<string, number> | undefined;
+    const periodZonePks = plan?.periodZonePks as Record<string, number | null> | undefined;
+    const billingPeriods = () => [...new Set([...resolveTransportBillingPeriods(school, input.academicYear),
+      ...Object.keys(periodFees || {})])].sort();
+    const fee = resolveTransportFee(plan ? { ...student, usesTransport: plan.usesTransport } : student,
+      plan ? { ...privateData, transportZonePk: plan.zonePk } : privateData, classData);
+    if (periodFees && resolveCanonicalClassCycle(classData) !== 'secondary' && Object.values(periodFees).some(v => v > 0)) fee.state = 'BILLABLE';
+    // Nursery enrollment must be explicitly activated prospectively; no retroactive billing on rollout.
+    if (!plan && resolveCanonicalClassCycle(classData) === 'nursery') {
+      return { user, school: scheduleSchool, student, finance, benefits, payments, moratoriums, allocations,
+        quote: zeroTransportQuote('NOT_SUBSCRIBED'), classData, privateData, financeRef, financeSnap };
+    }
     if (fee.state !== 'BILLABLE') {
       quote = zeroTransportQuote(fee.state);
     } else if (!input.period) {
       quote = buildTransportCollectionQuote({
-        fee, periods: resolveTransportBillingPeriods(school, input.academicYear), benefits, payments,
+        fee, periods: billingPeriods(), benefits, payments,
         allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
-        academicYear: input.academicYear, today: getDoualaDate()
+        academicYear: input.academicYear, today: getDoualaDate(), periodFees, periodZonePks
       });
     } else {
       const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
         ? school.transportPolicy as Data : {};
       if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID
-          && !resolveTransportBillingPeriods(school, input.academicYear).includes(input.period)) {
+          && !billingPeriods().includes(input.period)) {
         throw httpsError('failed-precondition', 'Ce mois ne fait pas partie du calendrier transport.',
           'TRANSPORT_PERIOD_NOT_BILLABLE');
       }
-      quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, fee),
-        benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
-        type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
+      if (periodFees && !(periodFees[input.period] > 0)) {
+        throw httpsError('failed-precondition', 'Ce mois ne fait pas partie de l’abonnement.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
+      }
+      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID) {
+        const annual = buildTransportCollectionQuote({ fee, periods: billingPeriods(),
+          benefits, payments, allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
+          academicYear: input.academicYear, today: getDoualaDate(), periodFees, periodZonePks });
+        const selected = annual.installments.find(item => item.period === input.period);
+        if (!selected) throw httpsError('failed-precondition', 'Mois non facturable.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
+        quote = selected;
+      } else {
+        quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, fee),
+          benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
+          type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
+      }
     }
   } else {
     quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, null, classData),

@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 const tests = [
+  'tests/functions/test-transport-paid-cycles.cjs',
   'tests/functions/test-import-job-processor.cjs',
   'tests/functions/test-student-import-sweeper.cjs',
   'tests/functions/test-student-import-lease.cjs',

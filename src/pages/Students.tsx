@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy, 
 import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClass } from '../utils/importUtils';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
+import { TransportTariffPreview } from '../components/TransportTariffPreview';
 import { sortClasses } from '../utils/sortClasses';
 import { getClassOptionLabel, getDisplayClassName } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
@@ -12,7 +13,8 @@ import * as XLSX from 'xlsx';
 import { getStudentLimit, isStudentLimitReached, getStudentLimitLabel } from '../utils/saas';
 import { normalizeParentEmails } from '../utils/emailHelpers';
 import { escapeCsvCell, sanitizeCsvFilenameSegment, getGuardianRelationshipLabel, getStudentStatusLabel } from '../utils/studentCsvExport';
-import { db as firestoreDb } from '../db/firebase';
+import { db as firestoreDb, functions } from '../db/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { resolveStudentEnrollmentAcademicYear } from '../utils/studentEnrollment';
 import {
@@ -697,6 +699,17 @@ const Students: React.FC = () => {
           transportNeighborhood: finalStudent.transportNeighborhood ?? '',
           transportPickupPoint: finalStudent.transportPickupPoint ?? ''
         };
+        if (currentSchool?.transportPolicy?.feePolicyId === 'ITALO_PK_2026' &&
+            (finalStudent.usesTransport || editingStudentOriginal?.usesTransport)) {
+          if (finalStudent.classId !== editingStudentOriginal?.classId &&
+              (finalStudent.usesTransport !== editingStudentOriginal?.usesTransport ||
+               finalStudent.transportZonePk !== editingStudentOriginal?.transportZonePk)) {
+            throw new Error('Pour préserver la tarification transport, le changement de classe doit être traité séparément de l’abonnement.');
+          }
+          await httpsCallable(functions, 'setStudentTransportPlan')({ schoolId: currentSchool.id,
+            studentId: finalStudent.id, usesTransport: finalStudent.usesTransport === true,
+            zonePk: finalStudent.transportZonePk ?? null });
+        }
         await updateStudentSeparatedData({
           firestore: firestoreDb,
           studentId: finalStudent.id,
@@ -770,7 +783,9 @@ const Students: React.FC = () => {
         const creationResult = await createStudentSecure({
           studentId,
           requestedMatricule: currentStudent.matricule,
-          studentData: schoolData,
+          // The server activates the new subscription prospectively after creation.
+          studentData: currentSchool.transportPolicy?.feePolicyId === 'ITALO_PK_2026'
+            ? { ...schoolData, usesTransport: false, transportStatus: 'none' } : schoolData,
           privateData: privateData as unknown as Record<string, unknown>,
           financeData: financeData as unknown as Record<string, unknown>,
           parentPrivateData: parentPrivateData as unknown as Record<string, unknown>,
@@ -778,6 +793,10 @@ const Students: React.FC = () => {
           confirmProbableDuplicate
         });
         finalStudent.academicYearId = creationResult.academicYearId;
+        if (finalStudent.usesTransport && currentSchool.transportPolicy?.feePolicyId === 'ITALO_PK_2026') {
+          await httpsCallable(functions, 'setStudentTransportPlan')({ schoolId: currentSchool.id,
+            studentId, usesTransport: true, zonePk: finalStudent.transportZonePk ?? null });
+        }
         finalStudent.registrationYear = creationResult.registrationYear;
         finalStudent.matricule = creationResult.matricule;
         finalStudent.matriculeNormalized = creationResult.matriculeNormalized;
@@ -2538,24 +2557,20 @@ const Students: React.FC = () => {
                       />
                       Utilise le transport scolaire
                     </label>
-                    <label>Zone structurée (PK)
-                      <input
+                    <label>Quartier / point de ramassage
+                      <select
                         data-testid="student-transport-zone-pk"
-                        type="number"
-                        min={14}
-                        max={42}
-                        step={1}
-                        inputMode="numeric"
                         disabled={isSaving || currentStudent.usesTransport !== true}
                         value={currentStudent.transportZonePk ?? ''}
                         onChange={event => setCurrentStudent(previous => ({
                           ...previous,
                           transportZonePk: event.target.value === '' ? undefined : Number(event.target.value)
                         }))}
-                        placeholder="14 à 42"
-                      />
+                      ><option value="">Choisir un PK</option>{Array.from({ length: 29 }, (_, i) => i + 14).map(pk => <option key={pk} value={pk}>PK{pk}</option>)}</select>
                     </label>
-                    <label>Quartier
+                    {currentStudent.usesTransport && currentSchool?.transportPolicy?.feePolicyId === 'ITALO_PK_2026' &&
+                      <TransportTariffPreview schoolId={currentSchool.id} classId={currentStudent.classId} zonePk={currentStudent.transportZonePk} />}
+                    <label>Précision du quartier (facultatif, sans effet sur le tarif)
                       <input
                         data-testid="student-transport-neighborhood"
                         type="text"
@@ -2568,7 +2583,7 @@ const Students: React.FC = () => {
                         placeholder="Quartier"
                       />
                     </label>
-                    <label>Point de ramassage
+                    <label>Précision du ramassage (facultatif)
                       <input
                         data-testid="student-transport-pickup-point"
                         type="text"
@@ -2586,7 +2601,8 @@ const Students: React.FC = () => {
                     <div>Transport : <strong>{currentStudent.usesTransport ? 'Oui' : 'Non'}</strong></div>
                     {currentStudent.usesTransport === true && (
                       <>
-                        <div>Zone / PK : <strong>{currentStudent.transportZonePk ?? 'À compléter'}</strong></div>
+                        <div>Quartier / point : <strong>PK{currentStudent.transportZonePk ?? ' — à compléter'}</strong></div>
+                        <p>Tarif calculé par le serveur. Les changements s’appliquent aux prochaines mensualités configurées ; les périodes déjà dues sont conservées.</p>
                         <div>Quartier : <strong>{currentStudent.transportNeighborhood || 'À compléter'}</strong></div>
                         <div>Point de ramassage : <strong>{currentStudent.transportPickupPoint || 'À compléter'}</strong></div>
                         <div>Statut Transport : <strong>{getTransportEnrollmentStatusLabel(resolveTransportEnrollmentStatus({
