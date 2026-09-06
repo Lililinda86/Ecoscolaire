@@ -32,3 +32,13 @@ execution proof are superseded by this correction.
 The failed Staging run cleaned its synthetic fixture successfully. A subsequent
 read-only check found no remaining Synthetic results school.
 No real pupil data or Production state was changed.
+
+## First verified executed C/D checkpoint
+
+On a444ef58cd361ec80017fa09061d243c3b33dd06,
+[run 34057580247](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34057580247)
+actually executed C (one passed, 18.9 seconds) and D (one passed, 17.3 seconds).
+C required a further modular Timestamp import fix, revealed only after removing
+the silent skip. Its cleanup completed. Full unit regression: 687 passed.
+This is Linux emulator validation with synthetic teacher decisions and a mock
+generator, NOT real OpenAI, real teacher approval or Staging deployment proof.

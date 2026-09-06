@@ -1,4 +1,4 @@
-import { requestStructuredPedagogyAi } from './aiGateway';
+import { requestPrivatePedagogyAi as requestStructuredPedagogyAi } from './aiPrivateClient';
 import { deterministicWeeklyAssessmentGenerator, QUESTION_TYPES, sourceChecksum, validateWeeklyAssessmentResult, WeeklyAssessmentGenerationInput } from './weeklyAssessmentGenerator';
 
 const text = { type: 'string' };

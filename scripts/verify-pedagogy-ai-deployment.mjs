@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const [functionFile, policyFile] = process.argv.slice(2);
+const fn = JSON.parse(await readFile(functionFile, 'utf8'));
+const policy = JSON.parse(await readFile(policyFile, 'utf8'));
+assert.equal(fn.status, 'ACTIVE');
+assert.equal(fn.serviceAccountEmail, 'pedagogy-ai-staging@ecoscolaire-staging.iam.gserviceaccount.com');
+assert.equal(fn.secretEnvironmentVariables?.length, 1);
+const secret = fn.secretEnvironmentVariables[0];
+assert.equal(secret.key, 'PEDAGOGY_OPENAI_API_KEY');
+assert.equal(secret.secret, 'PEDAGOGY_OPENAI_API_KEY');
+assert.ok(['ecoscolaire-staging', '411364288790'].includes(secret.projectId));
+assert.match(secret.version, /^\d+$/);
+const invokers = policy.bindings.filter(binding => binding.role === 'roles/cloudfunctions.invoker').flatMap(binding => binding.members);
+assert.deepEqual(invokers, ['serviceAccount:ecoscolaire-staging@appspot.gserviceaccount.com']);
+assert.ok(!policy.bindings.some(binding => binding.members.some(member => ['allUsers', 'allAuthenticatedUsers'].includes(member))));
+console.log('PRIVATE_AI_RUNTIME_AND_SECRET_BINDING_VERIFIED; secret value never read');

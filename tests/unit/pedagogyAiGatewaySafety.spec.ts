@@ -35,6 +35,14 @@ describe('gateway reservations with simulated transport, NOT real-provider proof
     vi.stubEnv('PEDAGOGY_OPENAI_API_KEY', 'synthetic-unit-value-not-a-key');
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+  it('reports observed tokens separately from a conservative cost estimate', async () => {
+    const response = { id: 'synthetic-response', model: configuration.model, status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: '{"draft":true}' }] }], usage: { input_tokens: 1000, output_tokens: 100 } };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(response) }));
+    const result = await requestStructuredPedagogyAi(school, request);
+    expect(result).toMatchObject({ inputTokens: 1000, outputTokens: 100, estimatedCostMicros: 560, costBasis: 'observed_tokens_uncached_list_price_upper_bound' });
+    expect(result).not.toHaveProperty('actualCostMicros');
+    expect(state.docs.get(ledger)?.reservedMicros).toBeGreaterThan(560);
+  });
   it('refuses a real-looking school or any non-Staging project before network', async () => {
     const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
     await expect(requestStructuredPedagogyAi('school-not-approved', request)).rejects.toThrow('AI_SYNTHETIC_TRIAL_SCOPE_REQUIRED');
