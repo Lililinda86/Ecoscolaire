@@ -7,6 +7,7 @@ import { deterministicPlanningGenerator, GeneratorSubject, GeneratorUnit } from 
 export { recordTeachingConfirmations } from './teachingConfirmations';
 export { savePedagogyClassPolicy } from './classPolicies';
 export { recordPedagogyObservations } from './observations';
+export { savePedagogyFridayConfiguration, pedagogyFridayScheduler } from './fridayAutomation';
 
 export {
   ensureExpectedLessonPreparations,

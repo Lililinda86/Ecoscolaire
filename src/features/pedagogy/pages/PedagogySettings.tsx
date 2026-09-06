@@ -5,6 +5,7 @@ import { db as firestore, functions } from '../../../db/firebase';
 import { useAppContext } from '../../../context/AppContext';
 import { getClassOptionLabel } from '../../../utils/classCatalog';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
+import { FridayConfiguration } from '../components/FridayConfiguration';
 import { defaultPedagogyPolicy, type PedagogyPolicy } from '../../../../functions/src/pedagogy/pedagogyPolicy';
 
 export default function PedagogySettings() {
@@ -18,6 +19,7 @@ export default function PedagogySettings() {
     <PedagogyHeader title="Paramètres pédagogiques" description="La direction définit le format et les seuils futurs. Chaque document conserve sa politique d’origine." /><PedagogyNav />
     <section className="pedagogy-toolbar"><label>Classe<select value={classroom?.id || ''} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option value={item.id} key={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label></section>
     {currentSchool && year && classroom ? <ClassPolicyEditor key={`${currentSchool.id}:${year.id}:${classroom.id}`} schoolId={currentSchool.id} academicYearId={year.id} classId={classroom.id} initial={defaultPedagogyPolicy(classroom)} canEdit={canEdit} /> : <p>Une classe et une année active configurée sont nécessaires.</p>}
+    {currentSchool && year && <FridayConfiguration key={`friday:${currentSchool.id}:${year.id}`} schoolId={currentSchool.id} academicYearId={year.id} classes={classes.map(item => ({ id: item.id, label: getClassOptionLabel(item, classes) }))} canEdit={canEdit} />}
   </main>;
 }
 

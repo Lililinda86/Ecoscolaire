@@ -1346,6 +1346,19 @@ service cloud.firestore {
     }
 
     match /pedagogyAiConfigurations/{id} { allow read, write: if false; }
+    match /pedagogyFridayConfigurations/{schoolId} {
+      allow get: if isAuthenticated() && isActive() && canManagePedagogy(schoolId);
+      allow list: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if false;
+      match /versions/{versionId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
+    }
+    match /pedagogyFridayRuns/{id} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if false;
+    }
     match /pedagogyAiOperations/{id} { allow read, write: if false; }
     match /pedagogyAiBudgets/{id} { allow read, write: if false; }
 

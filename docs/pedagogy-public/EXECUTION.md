@@ -43,6 +43,19 @@ Production is outside this work's authorization.
   failed at an ESM/CommonJS fixture import; its wire fixture is now independent.
   The corrected SHA still requires a fresh complete release gate.
 
+- The complete dedicated Linux release gate subsequently passed on
+  e3f61f8d9af66fa8dee35e1a036454203d2b992f:
+  [run 34045045860](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34045045860).
+  This is not Staging or real-provider evidence.
+- Follow-up work adds bounded paginated reads and interrupted-upload recovery,
+  with explicit overflow and no immutable-object overwrite.
+- Friday automation is implemented with explicit director activation, Douala
+  local time, open-week checks, stable school/year/class/week run keys, leases,
+  at most three attempts and no teacher approval/printing. It calls the manual
+  business generator. Tests cover concurrency and crash recovery using the
+  explicitly identified emulator generator. Deployment and controlled real
+  scheduler execution still require separate verification.
+
 ## Test privacy
 
 The dedicated CI uses synthetic demo projects and no production credentials.
