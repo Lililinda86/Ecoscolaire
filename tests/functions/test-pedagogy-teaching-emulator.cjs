@@ -5,6 +5,7 @@ const admin = require('../../functions/node_modules/firebase-admin');
 admin.initializeApp({ projectId: 'demo-ecoscolaire' });
 const { recordTeachingConfirmations } = require('../../functions/lib/pedagogy/teachingConfirmations');
 const { readWeeklyAssessmentSources } = require('../../functions/lib/pedagogy/weeklyAssessments');
+const { ensureTeachingWeeks } = require('../../functions/lib/pedagogy/index');
 const db = admin.firestore();
 const prefix = `teaching-${randomUUID()}`;
 const schoolId = prefix, academicYearId = `${prefix}-year`, classId = `${prefix}-class`, weekId = `${prefix}-week`, teacherId = `${prefix}-teacher`;
@@ -22,6 +23,16 @@ const expectCode = (operation, code) => assert.rejects(operation, error => error
     await put('staff', teacherId, { schoolId, role: 'teacher', isActive: true });
     await put('teacherAssignments', `${prefix}-assignment`, { schoolId, academicYearId, classId, subjectId: 'math', teacherStaffId: teacherId, status: 'active', isActive: true });
     for (const [suffix, role, tenant] of [['secretary', 'secretary', schoolId], ['director', 'director', schoolId], ['board', 'boardViewer', schoolId], ['teacher-user', 'teacher', schoolId], ['other', 'secretary', 'other-school']]) await put('users', `${prefix}-${suffix}`, { schoolId: tenant, role, isActive: true });
+    const calendarInput = { schoolId, academicYearId };
+    const ensured = await ensureTeachingWeeks.run(calendarInput, context(`${prefix}-secretary`));
+    assert.ok(ensured.createdCount > 0);
+    const firstWeek = db.collection('teachingWeeks').doc(ensured.firstWeekId);
+    await firstWeek.update({ status: 'closed', administrativeNote: 'Synthetic closed-week fixture' });
+    const closedBefore = (await firstWeek.get()).data();
+    const repeated = await Promise.all([ensureTeachingWeeks.run(calendarInput, context(`${prefix}-secretary`)), ensureTeachingWeeks.run(calendarInput, context(`${prefix}-secretary`))]);
+    assert.ok(repeated.every(result => result.createdCount === 0));
+    assert.deepEqual((await firstWeek.get()).data(), closedBefore, 'ensuring must not reopen or rewrite existing weeks');
+    await expectCode(ensureTeachingWeeks.run(calendarInput, context(`${prefix}-other`)), 'permission-denied');
     const prepId = `${prefix}-prep`;
     await put('lessonPreparations', prepId, { ...owned, subjectId: 'math', subjectName: 'Mathématiques', status: 'validated', version: 2, teacherStaffId: teacherId, currentUploadId: 'fixture-upload', reviewData: { lessonTitle: 'Fractions', objective: 'Partager', lessonSteps: 'Partager une unité. Comparer les fractions.' } });
     const sourceBefore = await readWeeklyAssessmentSources(owned, schoolId);
@@ -52,7 +63,7 @@ const expectCode = (operation, code) => assert.rejects(operation, error => error
     await expectCode(readWeeklyAssessmentSources(owned, schoolId), 'failed-precondition');
     console.log('TEACHING_CONFIRMATION_FUNCTIONS: PASS; concurrency, scope, spoofing, portions, history');
   } finally {
-    for (const collection of ['teachingConfirmations', 'teachingConfirmationBatches', 'audit_logs']) {
+    for (const collection of ['teachingWeeks', 'teachingConfirmations', 'teachingConfirmationBatches', 'audit_logs']) {
       const docs = await db.collection(collection).where('schoolId', '==', schoolId).get(); docs.forEach(doc => manifest.add(doc.ref.path));
     }
     const batch = db.batch(); for (const path of manifest) batch.delete(db.doc(path)); await batch.commit();

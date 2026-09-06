@@ -1,18 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useScopedResource } from './useScopedResource';
 import { loadLessonPreparations } from '../services/pedagogyService';
 import type { LessonPreparation } from '../types';
+const empty: LessonPreparation[] = [];
 
 export const useLessonPreparations = (schoolId?: string, academicYearId?: string, weekStartDate?: string, classId?: string) => {
-  const [preparations, setPreparations] = useState<LessonPreparation[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const refresh = useCallback(async () => {
-    if (!schoolId || !academicYearId || !weekStartDate) { setPreparations([]); return; }
-    setLoading(true); setError('');
-    try { setPreparations(await loadLessonPreparations(schoolId, academicYearId, weekStartDate, classId)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Préparations indisponibles.'); }
-    finally { setLoading(false); }
-  }, [schoolId, academicYearId, weekStartDate, classId]);
-  useEffect(() => { void refresh(); }, [refresh]);
-  return { preparations, loading, error, refresh };
+  const scope = schoolId && academicYearId && weekStartDate ? JSON.stringify([schoolId, academicYearId, weekStartDate, classId || null]) : null;
+  const load = useCallback(() => loadLessonPreparations(schoolId!, academicYearId!, weekStartDate!, classId), [schoolId, academicYearId, weekStartDate, classId]);
+  const resource = useScopedResource(scope, empty, load, 'Préparations indisponibles.');
+  return { preparations: resource.data, loading: resource.loading, error: resource.error, refresh: resource.refresh };
 };

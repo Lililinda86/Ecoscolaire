@@ -1,10 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { deleteApp, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { loginAs } from './helpers/auth';
-import { reviewChecksum } from '../functions/src/pedagogy/teachingEvidence';
+// Build the wire fixture independently; importing backend TS across its CommonJS
+// package boundary prevents Playwright's ESM test discovery on Linux.
+const reviewChecksum = (preparation: { currentUploadId: string; reviewData: Record<string, unknown> }) =>
+  createHash('sha256').update(JSON.stringify({
+    uploadId: preparation.currentUploadId,
+    review: ['lessonTitle', 'objective', 'prerequisites', 'materials', 'lessonSteps', 'assessment', 'differentiation'].map(field => [field, preparation.reviewData[field] || null])
+  })).digest('hex');
 
 const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire';
 const stagingRun = process.env.PEDAGOGY_STAGING_E2E === 'true';

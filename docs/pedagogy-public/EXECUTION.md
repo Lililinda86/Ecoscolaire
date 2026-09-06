@@ -34,6 +34,15 @@ No real AI verification, complete curriculum coverage, completed automation,
 Staging delivery or human pedagogical approval is claimed by this document.
 Production is outside this work's authorization.
 
+## Continuing regression work
+
+- Scope-keyed resources hide old school/year/class data and reject stale responses.
+- Ensuring teaching weeks preserves closed weeks and administrator adjustments.
+- First Linux run on the initial public checkpoint passed static gates, Functions
+  integration, Firestore/Storage Rules and A/B browser paths. C test discovery
+  failed at an ESM/CommonJS fixture import; its wire fixture is now independent.
+  The corrected SHA still requires a fresh complete release gate.
+
 ## Test privacy
 
 The dedicated CI uses synthetic demo projects and no production credentials.

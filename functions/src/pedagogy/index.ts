@@ -71,7 +71,9 @@ export const ensureTeachingWeeks = functions.https.onCall(async (data, context) 
   const academicYearId = requireId(data?.academicYearId, 'academicYearId');
   const yearSnap = await db().collection('academicYears').doc(academicYearId).get();
   const year = schoolData(yearSnap, schoolId, 'Année scolaire');
-  const periodsSnap = await db().collection('periods').where('academicYearId', '==', academicYearId).get();
+  if (!isActive(year) || year.status !== 'active') throw new functions.https.HttpsError('failed-precondition', 'Année scolaire inactive.');
+  const periodsSnap = await db().collection('periods').where('schoolId', '==', schoolId).where('academicYearId', '==', academicYearId).limit(101).get();
+  if (periodsSnap.size > 100) throw new functions.https.HttpsError('resource-exhausted', 'Trop de périodes : vérification administrative requise.');
   const periods = (periodsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Array<admin.firestore.DocumentData & { id: string }>).filter(period => period.schoolId === schoolId && isActive(period));
   let current = mondayIso(requiredText(year.startDate, 'startDate', 10));
   if (current < year.startDate) current = addDaysIso(current, 7);
@@ -82,17 +84,29 @@ export const ensureTeachingWeeks = functions.https.onCall(async (data, context) 
     current = addDaysIso(current, 7);
   }
   if (!weeks.length) throw new functions.https.HttpsError('failed-precondition', 'Aucune semaine ouvrée dans cette année.');
-  const batch = db().batch();
-  weeks.forEach(week => batch.set(db().collection('teachingWeeks').doc(week.id), {
-    ...week, schoolId, academicYearId, status: 'open', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
-  }, { merge: true }));
-  batch.create(db().collection('audit_logs').doc(), {
-    schoolId, action: 'TEACHING_WEEKS_ENSURED', actorUid: actor.uid, actorRole: actor.role,
-    targetType: 'academicYear', targetId: academicYearId, details: { weekCount: weeks.length },
-    timestamp: FieldValue.serverTimestamp(), createdAt: FieldValue.serverTimestamp(), canonicalBackendAudit: true
+  const createdCount = await db().runTransaction(async transaction => {
+    const currentYear = schoolData(await transaction.get(yearSnap.ref), schoolId, 'Année scolaire');
+    if (currentYear.status !== 'active' || !isActive(currentYear) || currentYear.startDate !== year.startDate || currentYear.endDate !== year.endDate) {
+      throw new functions.https.HttpsError('failed-precondition', 'Année modifiée : actualisez avant de réessayer.');
+    }
+    const refs = weeks.map(week => db().collection('teachingWeeks').doc(week.id));
+    const existing = await transaction.getAll(...refs);
+    let created = 0;
+    existing.forEach((snapshot, index) => {
+      if (snapshot.exists) {
+        const previous = schoolData(snapshot, schoolId, 'Semaine');
+        if (previous.academicYearId !== academicYearId) throw new functions.https.HttpsError('failed-precondition', 'Périmètre de semaine incohérent.');
+        // Ensuring the calendar must never reopen a closed/archived week or
+        // overwrite its dates, teacher decisions or administrator adjustments.
+        return;
+      }
+      transaction.create(refs[index], { ...weeks[index], schoolId, academicYearId, status: 'open', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
+      created += 1;
+    });
+    audit(transaction, actor, schoolId, 'TEACHING_WEEKS_ENSURED', 'academicYear', academicYearId, { weekCount: weeks.length, createdCount: created });
+    return created;
   });
-  await batch.commit();
-  return { weekCount: weeks.length, firstWeekId: weeks[0].id, lastWeekId: weeks[weeks.length - 1].id };
+  return { weekCount: weeks.length, createdCount, firstWeekId: weeks[0].id, lastWeekId: weeks[weeks.length - 1].id };
 });
 
 export const ensureTeachingPlanDraft = functions.https.onCall(async (data, context) => {
