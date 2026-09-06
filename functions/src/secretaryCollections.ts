@@ -1,3 +1,4 @@
+import { freezeObligations, readObligations, snapshotsFrom } from './financialObligationSnapshots';
 import * as admin from 'firebase-admin';
 import { transportPlanId } from './studentTransportPlan';
 import * as crypto from 'crypto';
@@ -255,6 +256,8 @@ const paymentDeadline = (
   installment: Installment | null,
   period: string | null
 ): string | null => {
+  const frozen = snapshotsFrom(school)[paymentTargetKey(type, installment, period)];
+  if (frozen) return frozen.originalDueDate;
   const deadlines = school.paymentDeadlines && typeof school.paymentDeadlines === 'object'
     ? school.paymentDeadlines as Data : {};
   let value: unknown;
@@ -557,7 +560,9 @@ const resolveGross = (
   const fees = school.globalFees && typeof school.globalFees === 'object' ? school.globalFees as Data : {};
   let gross: unknown;
   if (type === 'registration_fee') {
-    gross = finance.registrationFeeExpected;
+    const classRegistration = (school.classFees as Record<string, Data> | undefined)?.[String(classData.name)]?.registration;
+    gross = snapshotsFrom(finance).registration_fee?.grossExpectedAmount
+      ?? (typeof classRegistration === 'number' && classRegistration > 0 ? classRegistration : finance.registrationFeeExpected);
   } else if (type === 'tuition') {
     if (!installment) {
       throw httpsError('failed-precondition', 'La tranche de scolarité est requise.', 'INVALID_INSTALLMENT');
@@ -585,6 +590,8 @@ const readTuitionGross = (
   school: Data,
   classData: Data
 ): number | null => {
+  const frozen = snapshotsFrom(finance)[`tuition:${installment}`];
+  if (frozen) return frozen.grossExpectedAmount;
   const classFeesValue = school.classFees;
   if (classFeesValue !== undefined && classFeesValue !== null) {
     if (typeof classFeesValue !== 'object' || Array.isArray(classFeesValue)) {
@@ -644,12 +651,13 @@ export const resolveTuitionGross = (
   return gross;
 };
 
-const resolveTransportFee = (student: Data, privateData: Data, classData: Data): TransportFeeResolution => {
+const resolveTransportFee = (student: Data, privateData: Data, classData: Data, school: Data = {}): TransportFeeResolution => {
   try {
     return resolveItaloTransportFee({
       cycle: resolveCanonicalClassCycle(classData),
       usesTransport: student.usesTransport === true,
-      zonePk: privateData.transportZonePk
+      zonePk: privateData.transportZonePk,
+      rates: (school.transportPolicy as { pkRates?: { pk14To33: number; pk34To42: number } } | undefined)?.pkRates
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'TRANSPORT_POLICY_INVALID';
@@ -672,7 +680,7 @@ export const resolveTransportBenefitGross = ({
   if (policy.feePolicyId !== ITALO_TRANSPORT_FEE_POLICY_ID) {
     return resolveGross('transport', null, finance, school, bus);
   }
-  const fee = resolveTransportFee(student, privateData, classData);
+  const fee = resolveTransportFee(student, privateData, classData, school);
   if (fee.state === 'FREE_SECONDARY') {
     throw httpsError(
       'failed-precondition',
@@ -1261,7 +1269,8 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       }
       classData = classSnap.data() || {};
     }
-    const finance = resolveStudentFinanceData(studentSnap.data() || {}, financeSnap);
+    const finance = { ...resolveStudentFinanceData(studentSnap.data() || {}, financeSnap),
+      obligationSnapshots: await readObligations(transaction, db, String(benefit.schoolId), String(benefit.studentId), String(benefit.academicYear)) };
     const targetType = benefit.paymentType === 'TUITION' ? 'tuition' : 'transport';
     const targetInstallment = benefit.paymentType === 'TUITION' && benefit.installment !== 'ALL_TUITION'
       ? benefit.installment as Installment : null;
@@ -1486,8 +1495,9 @@ const readQuoteContext = async (
   const academicYearConfig = await validateCollectionAcademicYear(
     transaction, db, school, student, input.schoolId, input.academicYear
   );
-  const scheduleSchool = withAcademicYearTuitionDeadlines(school, academicYearConfig);
-  const finance = resolveStudentFinanceData(student, financeSnap);
+  const obligationSnapshots = await readObligations(transaction, db, input.schoolId, input.studentId, input.academicYear);
+  const scheduleSchool = { ...withAcademicYearTuitionDeadlines(school, academicYearConfig), obligationSnapshots };
+  const finance = { ...resolveStudentFinanceData(student, financeSnap), obligationSnapshots };
   const privateData = privateSnap.exists ? privateSnap.data() || {} : {};
   let bus: Data | null = null;
   if (input.type === 'transport' && typeof student.busId === 'string' && student.busId) {
@@ -1529,13 +1539,22 @@ const readQuoteContext = async (
     if (plan && (plan.schoolId !== input.schoolId || plan.studentId !== input.studentId || plan.academicYear !== input.academicYear)) {
       throw httpsError('failed-precondition', 'Historique transport incohérent.', 'TRANSPORT_PLAN_INVALID');
     }
-    const periodFees = plan?.periodFees as Record<string, number> | undefined;
-    const periodZonePks = plan?.periodZonePks as Record<string, number | null> | undefined;
+    let periodFees = plan?.periodFees as Record<string, number> | undefined;
+    let periodZonePks = plan?.periodZonePks as Record<string, number | null> | undefined;
+    const frozenMonths = Object.values(obligationSnapshots).filter(item => item.key.startsWith('transport:'));
+    if (frozenMonths.length) {
+      periodFees = { ...(periodFees || {}) }; periodZonePks = { ...(periodZonePks || {}) };
+      for (const item of frozenMonths) {
+        const period = item.key.slice('transport:'.length);
+        periodFees[period] = item.grossExpectedAmount;
+        periodZonePks[period] = typeof item.zonePk === 'number' ? item.zonePk : null;
+      }
+    }
     const billingPeriods = () => [...new Set([...resolveTransportBillingPeriods(school, input.academicYear),
       ...Object.keys(periodFees || {})])].sort();
     const fee = resolveTransportFee(plan ? { ...student, usesTransport: plan.usesTransport } : student,
-      plan ? { ...privateData, transportZonePk: plan.zonePk } : privateData, classData);
-    if (periodFees && resolveCanonicalClassCycle(classData) !== 'secondary' && Object.values(periodFees).some(v => v > 0)) fee.state = 'BILLABLE';
+      plan ? { ...privateData, transportZonePk: plan.zonePk } : privateData, classData, school);
+    if (periodFees && Object.values(periodFees).some(v => v > 0)) fee.state = 'BILLABLE';
     // Nursery enrollment must be explicitly activated prospectively; no retroactive billing on rollout.
     if (!plan && resolveCanonicalClassCycle(classData) === 'nursery') {
       return { user, school: scheduleSchool, student, finance, benefits, payments, moratoriums, allocations,
@@ -1924,6 +1943,14 @@ export const recordCashPayment = functions.https.onCall(async (raw, context) => 
 
     transaction.set(counterRef, { lastReceiptNumber: nextNumber }, { merge: true });
     transaction.create(paymentRef, paymentData);
+    const obligationQuotes = input.type === 'transport' && Array.isArray((quote as TransportCollectionQuote).installments)
+      ? (quote as TransportCollectionQuote).installments.map(item => ({ ...item, key: `transport:${item.period}`, type: 'transport', feeId: null }))
+      : [{ ...quote, key: paymentTargetKey(input.type, input.installment, input.period), type: input.type, period: input.period, feeId: null }];
+    freezeObligations(transaction, db, snapshotsFrom(finance), {
+      schoolId: input.schoolId, studentId: input.studentId, academicYear: input.academicYear,
+      classId: String(student.classId || ''), cycle: resolveCanonicalClassCycle(classData),
+      tariffVersion: String(school.financialTariffVersion || 'legacy-v3')
+    }, obligationQuotes);
     transaction.create(receiptRef, receiptData);
     transaction.set(cashLedgerRef, {
       id: cashLedgerId,

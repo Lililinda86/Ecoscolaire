@@ -185,6 +185,8 @@ try {
       await expect(navigation).not.toBeInViewport();
     }
     const amountInput = page.getByLabel('Montant reçu pour TEST excursion', { exact: true });
+    const group = amountInput.locator('xpath=ancestor::details[contains(@class,"account-fee-group")]');
+    if (await group.count() && !(await group.getAttribute('open') !== null)) await group.locator('summary').first().click();
     await amountInput.fill('1000');
     await expect(page.getByTestId('cash-payment-submit')).toBeEnabled();
     await amountInput.fill('');
@@ -219,7 +221,7 @@ try {
   console.log('STAGING FUNCTIONAL: PASS');
 } finally {
   if (browser) await browser.close();
-  const collections = ['studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
+  const collections = ['studentFinancialObligations', 'studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
     'paymentAllocations', 'transportPaymentAllocations', 'audit_logs', 'cashLedgerDays', 'cashClosures', 'studentPrivate', 'studentFinance',
     'studentParentPrivate', 'studentParentFinance', 'students', 'classes', 'academicYears'];
   // Allow fixture-only async projections to finish, then remove only this run's school data.

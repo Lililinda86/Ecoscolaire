@@ -1,3 +1,4 @@
+import { readObligations, snapshotsFrom } from './financialObligationSnapshots';
 import * as admin from 'firebase-admin';
 import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
@@ -137,6 +138,12 @@ const resolveOriginalDueDate = (
   installment: Installment | null,
   period: string | null
 ): string => {
+  const key = paymentType === 'tuition' ? `tuition:${installment}` : paymentType === 'transport' ? `transport:${period}` : 'registration_fee';
+  const frozen = snapshotsFrom(school)[key];
+  if (frozen) {
+    if (!frozen.originalDueDate) throw httpsError('failed-precondition', 'The obligation has no original deadline.', 'PAYMENT_DEADLINE_UNCONFIGURED');
+    return frozen.originalDueDate;
+  }
   const deadlines = school.paymentDeadlines && typeof school.paymentDeadlines === 'object'
     ? school.paymentDeadlines as Data : {};
   let raw: unknown;
@@ -199,7 +206,8 @@ const readContext = async (
       || year.active === false || year.isActive === false) {
     throw httpsError('failed-precondition', 'Academic year mismatch.', 'INVALID_ACADEMIC_YEAR');
   }
-  return { user, school: withAcademicYearTuitionDeadlines(school, year), student };
+  const obligationSnapshots = await readObligations(transaction, db, schoolId, studentId, academicYear);
+  return { user, school: { ...withAcademicYearTuitionDeadlines(school, year), obligationSnapshots }, student };
 };
 
 const sameTarget = (left: Data, right: Data): boolean =>
