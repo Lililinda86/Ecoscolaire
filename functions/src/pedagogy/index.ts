@@ -13,6 +13,15 @@ export {
   validateLessonPreparation
 } from './preparations';
 
+export {
+  ensureWeeklyAssessmentDraft,
+  generateWeeklyAssessment,
+  saveWeeklyAssessmentEdits,
+  recordWeeklyAssessmentTeacherValidation,
+  markWeeklyAssessmentReadyToPrint,
+  archiveWeeklyAssessment
+} from './weeklyAssessments';
+
 const db = () => admin.firestore();
 const requiredText = (value: unknown, name: string, max = 500): string => {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new functions.https.HttpsError('invalid-argument', `${name} invalide.`);

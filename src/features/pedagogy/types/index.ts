@@ -130,6 +130,72 @@ export interface LessonPreparation {
   version: number;
 }
 
+export type WeeklyAssessmentStatus = 'draft' | 'generating' | 'needs_review' | 'teacher_validated' | 'ready_to_print' | 'failed' | 'archived';
+export type AssessmentQuestionType = 'short_answer' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'exercise';
+
+export interface AssessmentSubjectSummary { id: string; name: string }
+
+export interface WeeklyAssessment {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  className: string;
+  weekId: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  fridayDate: string;
+  status: WeeklyAssessmentStatus;
+  generationStatus: 'pending' | 'processing' | 'succeeded' | 'failed';
+  generationVersion: number;
+  title?: string;
+  instructions?: string;
+  durationMinutes: number;
+  totalPoints: number;
+  coveredSubjects: AssessmentSubjectSummary[];
+  missingSubjects: AssessmentSubjectSummary[];
+  validatedPreparationCount: number;
+  expectedPreparationCount: number;
+  coveragePercent: number;
+  partial: boolean;
+  sourcePreparationIds?: string[];
+  sourcePreparationVersions?: Record<string, number>;
+  sourceChecksum?: string;
+  sourceSnapshot?: Array<Record<string, unknown>>;
+  teacherValidated?: boolean;
+  teacherStaffId?: string;
+  teacherValidationMeaning?: string;
+  teacherValidationNote?: string;
+  generationError?: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface AssessmentItem {
+  id: string;
+  weeklyAssessmentId: string;
+  schoolId: string;
+  academicYearId: string;
+  classId: string;
+  weekId: string;
+  subjectId: string;
+  classSubjectId: string;
+  sourceLessonPreparationIds: string[];
+  sourceCurriculumUnitIds: string[];
+  questionType: AssessmentQuestionType;
+  questionText: string;
+  instructions: string;
+  points: number;
+  expectedAnswer: string;
+  correctionGuide: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  order: number;
+  generationVersion: number;
+  lastEditedBy?: string;
+  lastEditedAt?: unknown;
+  editReason?: string;
+}
+
 export interface PedagogyWorkspace {
   programs: CurriculumProgram[];
   adoptions: SchoolCurriculumAdoption[];
