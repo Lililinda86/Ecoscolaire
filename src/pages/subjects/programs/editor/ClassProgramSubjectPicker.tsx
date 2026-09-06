@@ -3,6 +3,7 @@ import type { Subject, ClassSubject, ClassSection } from '../../../../types';
 import { normalizeClassSection, normalizeClassCycle } from '../../../../utils/classClassification';
 import { filterAvailableSubjectsForClass } from './classProgramSubjectFilters';
 import { sortClassesPedagogically, cleanClassName } from '../../../../utils/pedagogicalSort';
+import { getClassOptionLabel } from '../../../../utils/classCatalog';
 import styles from './ClassProgramSubjectPicker.module.css';
 
 const translateSectionLabel = (val: string): string => {
@@ -111,6 +112,15 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
       searchTerm
     });
   }, [catalogSubjects, activeSubjects, schoolId, currentClassSection, currentClassCycle, isSubjectFiltered, searchTerm]);
+
+  const classOptionLabels = useMemo(() => {
+    // Compare the same display-only names while preserving stored names and IDs.
+    const labelClasses = classes.map(c => ({
+      ...c,
+      name: cleanClassName(c.name, normalizeClassSection(c))
+    }));
+    return new Map(labelClasses.map(c => [c.id, getClassOptionLabel(c, labelClasses)]));
+  }, [classes]);
 
   // Available classes logic
   const availableClasses = useMemo(() => {
@@ -268,12 +278,13 @@ export const ClassProgramSubjectPicker: React.FC<ClassProgramSubjectPickerProps>
                 {availableClasses.map(c => {
                   const cSec = normalizeClassSection(c);
                   const cCyc = normalizeClassCycle(c);
-                  const displayName = cleanClassName(c.name, cSec);
+                  const displayName = classOptionLabels.get(c.id);
                   return (
                     <label key={c.id} className={styles.optionRow}>
                       <input
                         type="checkbox"
                         className={styles.checkbox}
+                        value={c.id}
                         checked={selectedClassIds.has(c.id)}
                         onChange={() => handleToggleClass(c.id)}
                         disabled={c.id !== classId}

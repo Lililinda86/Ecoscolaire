@@ -1,3 +1,5 @@
+import { normalizeFrancophoneMaternelleLevel } from './classCatalog';
+
 export function cleanClassName(name: string, section: string): string {
   if (!name || !section || section === 'unknown' || section === 'all') return name;
   const regex = new RegExp(section + '$', 'i');
@@ -11,9 +13,10 @@ export function getPedagogicalClassRank(className: string, section: string): num
   
   if (normSection === 'francophone' || normSection === 'all') {
     if (normName.includes('prematernelle')) return 1;
-    if (normName.includes('maternelle1')) return 2;
-    if (normName.includes('maternelle2')) return 3;
-    if (normName.includes('maternelle3')) return 4;
+    const maternelleLevel = normalizeFrancophoneMaternelleLevel(cleanedName);
+    if (maternelleLevel === 'fr-preschool-ps') return 2;
+    if (maternelleLevel === 'fr-preschool-ms') return 3;
+    if (maternelleLevel === 'fr-preschool-gs') return 4;
     if (normName.includes('sil')) return 5;
     if (normName.includes('cp')) return 6;
     if (normName.includes('ce1')) return 7;

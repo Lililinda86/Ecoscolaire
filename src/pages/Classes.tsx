@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { sortClasses } from '../utils/sortClasses';
 import { DEFAULT_CLASS_LEVELS } from '../constants/defaultClasses';
-import { buildStandardClassDocumentId, buildTechnicalSpecialtyDocumentId, buildTechnicalClassDocumentId, resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName, getDisplayClassName, normalizeTechnicalSpecialtyName, getTechnicalSpecialtyCanonicalKey, resolveClassActiveStatus } from '../utils/classCatalog';
+import { buildStandardClassDocumentId, buildTechnicalSpecialtyDocumentId, buildTechnicalClassDocumentId, resolveEducationType, getEducationTypeDisplayLabel, getSpecialtyName, getClassOptionLabel, getDisplayClassName, normalizeTechnicalSpecialtyName, getTechnicalSpecialtyCanonicalKey, resolveClassActiveStatus } from '../utils/classCatalog';
 import type { ClassSection, TechnicalSpecialty } from '../types';
 import Modal from '../components/Modal';
 import { ClassSearchPicker } from '../components/classes/ClassSearchPicker';
@@ -877,7 +877,7 @@ const Classes: React.FC = () => {
                             style={{ padding: '0.25rem', fontSize: '0.85rem' }}
                           >
                             {sortClasses(schoolClasses.filter(c => c.isActive !== false)).filter(c => (c.type || c.section) === s.section).map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
+                              <option key={c.id} value={c.id}>{getClassOptionLabel(c, schoolClasses)}</option>
                             ))}
                           </select>
                           {assignmentSubmittingStudentId === s.id && (
@@ -1008,7 +1008,7 @@ const Classes: React.FC = () => {
                         checked={isChecked}
                         onChange={() => handleToggleLevel(level.catalogLevelId)}
                       />
-                      {level.name}
+                      {getDisplayClassName(level.name)}
                     </label>
                   );
                 })}

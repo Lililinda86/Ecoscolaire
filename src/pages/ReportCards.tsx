@@ -5,6 +5,7 @@ import type { ReportCard, ReportCardSnapshot } from '../types';
 import { getSchoolReportCards, manageReportCard, ReportCardEngineError, type ReportCardAction } from '../services/reportCardFunctions';
 import { downloadReportCardPdf } from '../services/reportCardPdf';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
+import { getClassOptionLabel } from '../utils/classCatalog';
 
 const MANAGER_ROLES = new Set(['superAdmin', 'owner', 'director']);
 const statusLabels: Record<ReportCard['status'], string> = { draft: 'Brouillon', validated: 'Validé', published: 'Publié' };
@@ -143,7 +144,7 @@ const ReportCards: React.FC = () => {
           </label>
           <label>Classe
             <select data-testid="report-card-class" value={classId} onChange={event => setClassId(event.target.value)} disabled={!academicYearId}>
-              <option value="">Sélectionner</option>{classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}</option>)}
+              <option value="">Sélectionner</option>{classes.map(klass => <option key={klass.id} value={klass.id}>{getClassOptionLabel(klass, classes)}</option>)}
             </select>
           </label>
           <label>Élève

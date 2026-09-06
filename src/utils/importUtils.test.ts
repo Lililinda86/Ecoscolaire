@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getDefaultFeesForClass } from './importUtils';
+import { getDefaultFeesForClass, normalizeClassName } from './importUtils';
 import type { School } from '../types';
 
 describe('getDefaultFeesForClass', () => {
@@ -76,5 +76,19 @@ describe('getDefaultFeesForClass', () => {
     const result = getDefaultFeesForClass('Class 3', 'francophone', school);
     expect(result?.t2).toBeUndefined(); // Pas 0
     expect(result?.t3).toBeUndefined(); // Pas 0
+  });
+});
+
+describe('normalizeClassName maternelle aliases', () => {
+  it.each([
+    [['Maternelle 1', 'Petite Section', 'Petite section'], 'fr-preschool-ps'],
+    [['Maternelle 2', 'Moyenne Section', 'Moyenne section'], 'fr-preschool-ms'],
+    [['Maternelle 3', 'Grande Section', 'Grande section'], 'fr-preschool-gs']
+  ])('maps %j to the same stable catalog ID', (aliases, expectedId) => {
+    expect(aliases.map(alias => normalizeClassName(alias)?.matchedId)).toEqual([
+      expectedId,
+      expectedId,
+      expectedId
+    ]);
   });
 });

@@ -3,7 +3,8 @@ import React from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import StudentAccountBenefitsDrawer from '../../src/components/StudentAccountBenefitsDrawer';
 
 const drawerCss = readFileSync(resolve(process.cwd(), 'src/components/StudentAccountBenefitsDrawer.css'), 'utf8');
@@ -12,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   benefitDocs: [] as Array<{ id: string; data: () => Record<string, unknown> }>,
   moratoriumDocs: [] as Array<{ id: string; data: () => Record<string, unknown> }>,
   calls: [] as Array<{ name: string; payload: Record<string, unknown> }>,
-  responses: new Map<string, Record<string, unknown>>()
+  responses: new Map<string, Record<string, unknown>>(),
+  readGate: undefined as Promise<void> | undefined,
+  actionGate: undefined as Promise<void> | undefined
 }));
 
 vi.mock('../../src/db/firebase', () => ({ db: {}, functions: {} }));
@@ -20,13 +23,15 @@ vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, name: string) => name),
   where: vi.fn((...args) => args),
   query: vi.fn((...args) => args),
-  getDocs: vi.fn(async (queryValue: unknown[]) => ({
-    docs: queryValue[0] === 'financialBenefits' ? mocks.benefitDocs : mocks.moratoriumDocs
-  }))
+  getDocs: vi.fn(async (queryValue: unknown[]) => {
+    if (mocks.readGate) await mocks.readGate;
+    return { docs: queryValue[0] === 'financialBenefits' ? mocks.benefitDocs : mocks.moratoriumDocs };
+  })
 }));
 vi.mock('firebase/functions', () => ({
   httpsCallable: vi.fn((_functions, name: string) => async (payload: Record<string, unknown>) => {
     mocks.calls.push({ name, payload });
+    if (mocks.actionGate) await mocks.actionGate;
     return { data: mocks.responses.get(name) || { status: 'draft', benefitId: 'benefit-new', moratoriumId: 'moratorium-new' } };
   })
 }));
@@ -66,6 +71,12 @@ const renderDrawer = (role: 'secretary' | 'director' | 'accountant' = 'secretary
   return props;
 };
 
+const deferredRead = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+};
+
 describe('StudentAccountBenefitsDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,6 +84,8 @@ describe('StudentAccountBenefitsDrawer', () => {
     mocks.moratoriumDocs = [];
     mocks.calls = [];
     mocks.responses.clear();
+    mocks.readGate = undefined;
+    mocks.actionGate = undefined;
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
   });
 
@@ -95,13 +108,21 @@ describe('StudentAccountBenefitsDrawer', () => {
   });
 
   it('creates a scoped scholarship draft without applying a financial change', async () => {
+    const creationResponse = deferredRead();
+    mocks.actionGate = creationResponse.promise;
     renderDrawer('secretary');
     fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:T1' } });
     fireEvent.change(screen.getByLabelText(/^Montant/), { target: { value: '12000' } });
     fireEvent.change(screen.getByLabelText(/^Motif/), { target: { value: 'Bourse sociale documentée' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le brouillon' }));
 
-    await waitFor(() => expect(mocks.calls.some(call => call.name === 'createFinancialBenefit')).toBe(true));
+    try {
+      await waitFor(() => expect(mocks.calls.some(call => call.name === 'createFinancialBenefit')).toBe(true));
+      expect(screen.queryByText('Brouillon enregistré.')).toBeNull();
+    } finally {
+      // Recording the callable does not mean its response reached the UI.
+      creationResponse.resolve();
+    }
     const creation = mocks.calls.find(call => call.name === 'createFinancialBenefit');
     expect(creation?.payload).toMatchObject({
       schoolId: 'school-1',
@@ -114,7 +135,8 @@ describe('StudentAccountBenefitsDrawer', () => {
       value: 12000
     });
     expect(mocks.calls.some(call => call.name === 'submitFinancialBenefit')).toBe(false);
-    expect(screen.getByText('Brouillon enregistré.')).toBeTruthy();
+    expect(await screen.findByText('Brouillon enregistré.')).toBeTruthy();
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Enregistrer le brouillon' }) as HTMLButtonElement).disabled).toBe(false));
   });
 
   it('supports percentage, annual tuition scope and voucher reference validation', async () => {
@@ -152,30 +174,77 @@ describe('StudentAccountBenefitsDrawer', () => {
     });
   });
 
-  it('lets a director approve or reject pending requests and refreshes the financial account only on approval', async () => {
-    mocks.benefitDocs = [{
-      id: 'benefit-pending',
-      data: () => ({
-        schoolId: 'school-1', studentId: 'student-1', academicYear: '2026-2027',
-        benefitType: 'FAMILY_DISCOUNT', paymentType: 'TUITION', installment: 'T1',
-        mode: 'PERCENTAGE', value: 5, stackable: true, reason: 'Famille', status: 'pending'
-      })
-    }];
-    const onChanged = vi.fn();
-    renderDrawer('director', { onChanged });
+  describe('director decisions', () => {
+    beforeEach(() => {
+      mocks.benefitDocs = [{
+        id: 'benefit-pending',
+        data: () => ({
+          schoolId: 'school-1', studentId: 'student-1', academicYear: '2026-2027',
+          benefitType: 'FAMILY_DISCOUNT', paymentType: 'TUITION', installment: 'T1',
+          mode: 'PERCENTAGE', value: 5, stackable: true, reason: 'Famille', status: 'pending'
+        })
+      }];
+    });
 
-    expect(await screen.findByText('Réduction familiale')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Approuver' }));
-    await waitFor(() => expect(mocks.calls.some(call => call.name === 'approveFinancialBenefit')).toBe(true));
-    expect(onChanged).toHaveBeenCalledTimes(1);
+    it('exposes decision buttons only after pending requests have loaded', async () => {
+      const read = deferredRead();
+      mocks.readGate = read.promise;
+      const { onChanged } = renderDrawer('director');
+      const history = within(screen.getByRole('region', { name: 'Demandes de l’élève' }));
 
-    vi.spyOn(window, 'prompt').mockReturnValue('Pièce justificative manquante');
-    cleanup();
-    mocks.calls = [];
-    renderDrawer('director', { onChanged: vi.fn() });
-    await screen.findByText('Réduction familiale');
-    fireEvent.click(screen.getByRole('button', { name: 'Refuser' }));
-    await waitFor(() => expect(mocks.calls.some(call => call.name === 'rejectFinancialBenefit')).toBe(true));
+      try {
+        // The form option exists before the request: its text is not a readiness signal.
+        expect((await screen.findByText('Réduction familiale')).tagName).toBe('OPTION');
+        expect(history.getByRole('status').textContent).toBe('Chargement des demandes…');
+        expect(history.queryByRole('button', { name: 'Approuver' })).toBeNull();
+        expect(history.queryByRole('button', { name: 'Refuser' })).toBeNull();
+      } finally {
+        await act(async () => { read.resolve(); await read.promise; });
+      }
+
+      expect(await history.findByRole('button', { name: 'Approuver' })).toBeTruthy();
+      expect(await history.findByRole('button', { name: 'Refuser' })).toBeTruthy();
+      expect(history.getByText('Réduction familiale')).toBeTruthy();
+      expect(history.queryByRole('status')).toBeNull();
+      expect(onChanged).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { action: 'approve', button: 'Approuver', message: 'Demande approuvée.', refreshCount: 1 },
+      { action: 'reject', button: 'Refuser', message: 'Demande refusée.', refreshCount: 0 }
+    ] as const)('lets a director $action a pending request and refreshes the account only on approval', async ({ action, button, message, refreshCount }) => {
+      const user = userEvent.setup();
+      const onChanged = vi.fn();
+      const reason = 'Pièce justificative manquante';
+      if (action === 'reject') vi.spyOn(window, 'prompt').mockReturnValue(reason);
+      renderDrawer('director', { onChanged });
+      const history = within(screen.getByRole('region', { name: 'Demandes de l’élève' }));
+      const decisionButton = await history.findByRole('button', { name: button });
+      expect(history.getByText('Réduction familiale')).toBeTruthy();
+
+      const refresh = deferredRead();
+      mocks.readGate = refresh.promise;
+      try {
+        await user.click(decisionButton);
+        expect(await screen.findByText(message)).toBeTruthy();
+        expect(mocks.calls).toEqual([{
+          name: `${action}FinancialBenefit`,
+          payload: { benefitId: 'benefit-pending', ...(action === 'reject' ? { reason } : {}) }
+        }]);
+        expect(history.getByRole('status').textContent).toBe('Chargement des demandes…');
+        // A recorded callable does not mean the refresh or onChanged has completed.
+        expect(onChanged).not.toHaveBeenCalled();
+      } finally {
+        await act(async () => { refresh.resolve(); await refresh.promise; });
+      }
+
+      await waitFor(() => expect((history.getByRole('button', { name: 'Actualiser' }) as HTMLButtonElement).disabled).toBe(false));
+      expect(history.queryByRole('status')).toBeNull();
+      expect(screen.getByRole('status').textContent).toBe(message);
+      expect(onChanged).toHaveBeenCalledTimes(refreshCount);
+      expect(mocks.calls).toHaveLength(1);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 
   it('closes with Escape only when no unsaved information exists and restores focus', async () => {

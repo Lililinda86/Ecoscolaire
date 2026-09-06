@@ -139,15 +139,99 @@ export function buildTechnicalClassDocumentId(
   return `${cleanSchoolId}__${cleanCatalogLevelId}__technical__${encodeURIComponent(cleanSpecialtyId)}`;
 }
 
+export type FrancophoneMaternelleLevelId =
+  | 'fr-preschool-ps'
+  | 'fr-preschool-ms'
+  | 'fr-preschool-gs';
+
+const FRANCOPHONE_MATERNELLE_ALIASES: Record<string, FrancophoneMaternelleLevelId> = {
+  'maternelle 1': 'fr-preschool-ps',
+  'petite section': 'fr-preschool-ps',
+  'maternelle petite section': 'fr-preschool-ps',
+  'maternelle 2': 'fr-preschool-ms',
+  'moyenne section': 'fr-preschool-ms',
+  'maternelle moyenne section': 'fr-preschool-ms',
+  'maternelle 3': 'fr-preschool-gs',
+  'grande section': 'fr-preschool-gs',
+  'maternelle grande section': 'fr-preschool-gs'
+};
+
+const FRANCOPHONE_MATERNELLE_DISPLAY_NAMES: Record<FrancophoneMaternelleLevelId, string> = {
+  'fr-preschool-ps': 'Maternelle Petite Section',
+  'fr-preschool-ms': 'Maternelle Moyenne Section',
+  'fr-preschool-gs': 'Maternelle Grande Section'
+};
+
+export function normalizeFrancophoneMaternelleLevel(
+  name: string
+): FrancophoneMaternelleLevelId | null {
+  const normalized = (name || '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR');
+  return FRANCOPHONE_MATERNELLE_ALIASES[normalized] || null;
+}
+
 export function getDisplayClassName(name: string): string {
   const trimmed = (name || '').trim();
-  const lower = trimmed.toLowerCase();
+  const levelId = normalizeFrancophoneMaternelleLevel(trimmed);
+  return levelId ? FRANCOPHONE_MATERNELLE_DISPLAY_NAMES[levelId] : trimmed;
+}
 
-  if (lower === 'maternelle 1') return 'Petite Section';
-  if (lower === 'maternelle 2') return 'Moyenne Section';
-  if (lower === 'maternelle 3') return 'Grande Section';
+export type ClassOptionLabelItem = {
+  id: string;
+  name: string;
+  schoolId?: string;
+  section?: string;
+  type?: string;
+  language?: string;
+  level?: string;
+  campus?: string;
+  site?: string;
+};
 
-  return trimmed;
+const normalizeLabelPart = (value?: string): string =>
+  (value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+
+export function getClassOptionLabel(
+  classItem: ClassOptionLabelItem,
+  allClasses: ClassOptionLabelItem[]
+): string {
+  const displayName = getDisplayClassName(classItem.name);
+  const uniqueClasses = new Map<string, ClassOptionLabelItem>();
+
+  [...allClasses, classItem].forEach(item => {
+    if (item?.id) uniqueClasses.set(item.id, item);
+  });
+
+  const duplicates = [...uniqueClasses.values()].filter(item => {
+    const sameSchool = !classItem.schoolId || !item.schoolId || item.schoolId === classItem.schoolId;
+    return sameSchool && getDisplayClassName(item.name) === displayName;
+  });
+
+  if (duplicates.length <= 1) return displayName;
+
+  const candidateValues = [
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.section || item.type),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.language),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.level),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.campus),
+    (item: ClassOptionLabelItem) => normalizeLabelPart(item.site)
+  ];
+
+  for (const getCandidate of candidateValues) {
+    const values = duplicates.map(getCandidate);
+    const normalizedValues = values.map(value => value.toLocaleLowerCase('fr-FR'));
+    if (values.every(Boolean) && new Set(normalizedValues).size === duplicates.length) {
+      return `${displayName} · ${getCandidate(classItem)}`;
+    }
+  }
+
+  const ids = duplicates.map(item => normalizeLabelPart(item.id));
+  const maxLength = Math.max(...ids.map(id => id.length));
+  let suffixLength = Math.min(6, maxLength);
+  while (suffixLength < maxLength && new Set(ids.map(id => id.slice(-suffixLength))).size !== ids.length) {
+    suffixLength += 1;
+  }
+
+  return `${displayName} · ${normalizeLabelPart(classItem.id).slice(-suffixLength)}`;
 }
 
 export function resolveClassActiveStatus(cls?: { isActive?: boolean } | null): boolean {
