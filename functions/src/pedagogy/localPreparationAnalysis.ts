@@ -6,17 +6,21 @@ import { audit, requireId, requirePedagogyActor } from './authorization';
 import { scopedDocument } from './scopes';
 import { deterministicMockPreparationAnalyzer, validatePreparationAnalysis } from './preparationAnalyzer';
 import { permitsDemoPreparationAnalysis, verifyPreparationBytes } from './preparationFileIntegrity';
+import { pedagogyAiRuntimeEnabled, pedagogyAiRuntimeSecrets } from './aiRuntime';
+import { analyzeSyntheticPreparation } from './aiPreparation';
+import { assertApprovedSyntheticDocument } from './approvedSyntheticDocuments';
 
-// No document is sent to an external service here. Real OCR/provider processing
-// remains blocked pending specific authorization, secure configuration and tests.
-export const startLessonPreparationAnalysis = functions.runWith({ timeoutSeconds: 120, memory: '512MB' }).https.onCall(async (raw, context) => {
+// Only five byte-for-byte pinned synthetic fixtures may use the external provider.
+// The hash allowlist is checked here AND by the gateway's request builder.
+export const startLessonPreparationAnalysis = functions.runWith({ timeoutSeconds: 180, memory: '512MB', secrets: pedagogyAiRuntimeSecrets() }).https.onCall(async (raw, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId);
   const uploadId = requireId(raw?.uploadId, 'uploadId'), db = admin.firestore();
   const uploadRef = db.collection('preparationUploads').doc(uploadId);
   const upload = scopedDocument(await uploadRef.get(), schoolId, 'Dépôt');
   const prepRef = db.collection('lessonPreparations').doc(upload.preparationId);
   const demo = permitsDemoPreparationAnalysis({ emulator: process.env.FUNCTIONS_EMULATOR, projectId: admin.app().options.projectId || process.env.GCLOUD_PROJECT });
-  const analyzerVersion = demo ? 'mock-preparation-file-check-v2' : 'file-integrity-only-v2';
+  const trial = !demo && schoolId === 'pedagogy-ai-validation-20260906' && pedagogyAiRuntimeEnabled();
+  const analyzerVersion = demo ? 'mock-preparation-file-check-v2' : trial ? 'openai-synthetic-preparation-v1' : 'file-integrity-only-v2';
   const claim = await db.runTransaction(async transaction => {
     const [freshUpload, prepSnap] = await Promise.all([transaction.get(uploadRef), transaction.get(prepRef)]);
     const current = scopedDocument(freshUpload, schoolId, 'Dépôt'), prep = scopedDocument(prepSnap, schoolId, 'Préparation');
@@ -34,6 +38,7 @@ export const startLessonPreparationAnalysis = functions.runWith({ timeoutSeconds
   });
   if (claim.cached) return { preparationId: prepRef.id, uploadId, analysisId: claim.analysisId, analysisStatus: 'succeeded', idempotent: true };
   let result: ReturnType<typeof validatePreparationAnalysis> | null = null, errorCode = '', integrity: ReturnType<typeof verifyPreparationBytes> | null = null;
+  let providerReceipt: { operationId: string; model: string; protocolVersion: string } | null = null;
   try {
     const file = admin.storage().bucket().file(upload.storagePath);
     const [metadata] = await file.getMetadata();
@@ -41,10 +46,17 @@ export const startLessonPreparationAnalysis = functions.runWith({ timeoutSeconds
     // Pin the storage generation checked above; custom metadata is not a hash proof.
     const [bytes] = await admin.storage().bucket().file(upload.storagePath, { generation: metadata.generation }).download();
     integrity = verifyPreparationBytes(bytes, { size: upload.size, checksum: upload.checksum, mimeType: upload.mimeType });
-    if (!demo) throw new Error('AI_DOCUMENT_PROCESSING_REQUIRES_APPROVAL');
-    result = validatePreparationAnalysis(await deterministicMockPreparationAnalyzer.analyze({ preparationId: prepRef.id, uploadId, fileName: upload.originalFileName, mimeType: upload.mimeType, lessonTitle: claim.preparation.lessonTitle || null, subjectName: claim.preparation.subjectName || null, objective: claim.preparation.objective || null }));
+    if (trial) {
+      assertApprovedSyntheticDocument(bytes, upload.mimeType);
+      const analyzed = await analyzeSyntheticPreparation(schoolId, uploadId, upload.checksum, bytes, upload.mimeType);
+      result = analyzed.result;
+      providerReceipt = { operationId: analyzed.operationId, model: analyzed.model, protocolVersion: analyzed.protocolVersion };
+    } else {
+      if (!demo) throw new Error('AI_DOCUMENT_PROCESSING_REQUIRES_APPROVAL');
+      result = validatePreparationAnalysis(await deterministicMockPreparationAnalyzer.analyze({ preparationId: prepRef.id, uploadId, fileName: upload.originalFileName, mimeType: upload.mimeType, lessonTitle: claim.preparation.lessonTitle || null, subjectName: claim.preparation.subjectName || null, objective: claim.preparation.objective || null }));
+    }
   } catch (error) {
-    errorCode = error instanceof Error && /^(UPLOAD|MOCK|AI|INVALID_ANALYSIS)_[A-Z_]+$/.test(error.message) ? error.message : 'PREPARATION_FILE_CHECK_FAILED';
+    errorCode = error instanceof Error && /^(UPLOAD|MOCK|AI|INVALID_ANALYSIS)_[A-Z_0-9]+$/.test(error.message) ? error.message : 'PREPARATION_FILE_CHECK_FAILED';
   }
   const analysisStatus = result ? 'succeeded' : 'failed';
   await db.runTransaction(async transaction => {
@@ -55,7 +67,7 @@ export const startLessonPreparationAnalysis = functions.runWith({ timeoutSeconds
     transaction.create(db.collection('preparationAnalyses').doc(claim.analysisId), {
       id: claim.analysisId, schoolId, preparationId: prepRef.id, uploadId, analyzerVersion, attempt: claim.attempt, schemaVersion: 'preparation-analysis-v1',
       status: analysisStatus, result, errorCode: errorCode || null, fileIntegrity: integrity, appliedToCurrentPreparation: current,
-      processingMode: demo ? 'demo_mock' : 'local_integrity_only', createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid
+      processingMode: demo ? 'demo_mock' : trial ? 'synthetic_provider_attempt' : 'local_integrity_only', providerReceipt, createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid
     });
     transaction.update(uploadRef, { status: result ? 'analyzed' : 'analysis_failed', analysisLeaseUntil: 0, analysisCompletedAt: FieldValue.serverTimestamp() });
     if (current) transaction.update(prepRef, { status: 'needs_review', analysisStatus, currentAnalysisId: claim.analysisId, ...(result ? { extractedData: result, analysisError: FieldValue.delete() } : { analysisError: errorCode }), updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
