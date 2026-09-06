@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict');
+const { recoverHistoricalTariffs } = require('../../functions/lib/legacyObligationTariffs');
+const scope = { schoolId: 'test-school', studentId: 'test-student', academicYear: '2026-2027', classId: 'test-class' };
+const payment = { ...scope, id: 'old', type: 'tuition', installment: 'T1', amount: 1000, grossExpectedAmount: 60000, date: '2026-09-01' };
+assert.equal(recoverHistoricalTariffs({}, [payment], scope)['tuition:T1'].grossExpectedAmount, 60000);
+assert.deepEqual(recoverHistoricalTariffs({}, [{ ...payment, grossExpectedAmount: undefined, netExpectedAmount: 48000 }], scope), {}, 'never use paid/net as gross');
+assert.deepEqual(recoverHistoricalTariffs({}, [{ ...payment, schoolId: 'foreign' }], scope), {});
+assert.deepEqual(recoverHistoricalTariffs({}, [{ ...payment, academicYear: '2025-2026' }], scope), {});
+const established = { 'tuition:T1': { grossExpectedAmount: 55000 } };
+assert.equal(recoverHistoricalTariffs(established, [payment], scope)['tuition:T1'].grossExpectedAmount, 55000);
+console.log('PASS historical gross-only fallback, snapshot priority, school/year isolation');

@@ -380,6 +380,7 @@ const StudentAccountCollection: React.FC<Props> = ({
                   <strong>{line.label}</strong>
                   <div className="obligation-status-group">
                     <span className={`account-status status-${statusLabel(line).toLowerCase().replace(/\s+/g, '-')}`}>{statusLabel(line)}</span>
+                    {line.status === 'PARTIAL' && <span className="account-status">PARTIELLEMENT PAYÉ</span>}
                     {statusDueDate(line) && <span className="status-due-date">
                       {statusDueLabel(line)} : <strong>{formatDueDate(statusDueDate(line))}</strong>
                     </span>}

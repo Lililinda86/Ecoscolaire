@@ -68,6 +68,12 @@ async function student(suffix) {
   assert.equal(line(await account(first), 'tuition:T1').grossExpectedAmount, 60000, 'class change preserves established tuition');
   await db.collection('academicYears').doc(yearId).update({ tuitionPaymentDeadlines: { T1: '2026-11-01', T2: '2027-02-01', T3: '2027-05-01' } });
   assert.equal(line(await account(first), 'tuition:T1').originalDueDate, '2026-10-01');
+  const { readFrozenFinance } = require('../../functions/lib/frozenFinanceProjection');
+  const frozenFinance = await db.runTransaction(async tx => readFrozenFinance(tx, db,
+    (await tx.get(db.collection('students').doc(first))).data(), await tx.get(db.collection('studentFinance').doc(first))));
+  assert.equal(frozenFinance.feeT1, 60000, 'legacy entry points read the established gross tariff');
+  await db.collection('schools').doc(schoolId).update({ 'transportPolicy.feePolicyId': null, 'transportPolicy.billingPeriods': [] });
+  assert.equal(line(await account(first), 'transport:2026-10').grossExpectedAmount, 4000, 'disabling policy cannot hide established debt');
   assert.equal(JSON.stringify((await db.collection('payments').doc(paid.paymentId).get()).data()), paymentBefore);
   assert.equal(JSON.stringify((await db.collection('receipts').doc(paid.receiptId).get()).data()), receiptBefore);
   console.log('PASS immutable tuition, transport, uniforms, class/PK changes, new obligations, original dates, RBAC and historical receipts');
