@@ -77,7 +77,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       console.log('[Lot C] ready and final print: confirmed');
       await page.getByRole('button', { name: 'Corrigé / Guide de correction' }).click(); await expect(page.getByRole('heading', { name: 'CORRIGÉ / GUIDE DE CORRECTION' })).toBeVisible(); await expect(page.getByText('Réponse attendue').first()).toBeVisible();
       console.log('[Lot C] correction guide: confirmed');
-      await page.reload(); await expect(page.getByText('Question corrigée après retour enseignant')).toBeVisible(); await expect(page.getByText('Validation de l’enseignant enregistrée par la secrétaire')).toBeVisible();
+      await page.reload(); await expect(page.getByLabel('Question').first()).toHaveValue('Question corrigée après retour enseignant'); await expect(page.getByText('Validation de l’enseignant enregistrée par la secrétaire').first()).toBeVisible();
       console.log('[Lot C] reload: persisted');
       await page.getByRole('button', { name: 'Générer maintenant' }).click(); await expect(page.getByText('Évaluation générée.')).toBeVisible();
       expect((await firestore.collection('weeklyAssessments').where('schoolId', '==', f.schoolId).where('classId', '==', f.classId).get()).size).toBe(1);
