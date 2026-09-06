@@ -1540,6 +1540,20 @@ const readQuoteContext = async (
       throw httpsError('failed-precondition', 'Historique transport incohérent.', 'TRANSPORT_PLAN_INVALID');
     }
     let periodFees = plan?.periodFees as Record<string, number> | undefined;
+    const fee = resolveTransportFee(plan ? { ...student, usesTransport: plan.usesTransport } : student,
+      plan ? { ...privateData, transportZonePk: plan.zonePk } : privateData, classData, school);
+    const configuredPeriods = (school.transportPolicy as Data | undefined)?.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID
+      ? resolveTransportBillingPeriods(school, input.academicYear) : input.period ? [input.period] : [];
+    if (!plan && Object.keys(obligationSnapshots).some(key => key.startsWith('transport:'))) {
+      periodFees = Object.fromEntries(configuredPeriods.map(period => [period, fee.monthlyGrossAmount]));
+    } else if (plan && fee.state === 'BILLABLE') {
+      periodFees = { ...(periodFees || {}) };
+      for (const period of configuredPeriods) {
+        if (!(period in periodFees) && period >= String(plan.effectivePeriod || '') && period >= getDoualaDate().slice(0, 7)) {
+          periodFees[period] = fee.monthlyGrossAmount;
+        }
+      }
+    }
     let periodZonePks = plan?.periodZonePks as Record<string, number | null> | undefined;
     const frozenMonths = Object.values(obligationSnapshots).filter(item => item.key.startsWith('transport:'));
     if (frozenMonths.length) {
@@ -1552,8 +1566,6 @@ const readQuoteContext = async (
     }
     const billingPeriods = () => [...new Set([...resolveTransportBillingPeriods(school, input.academicYear),
       ...Object.keys(periodFees || {})])].sort();
-    const fee = resolveTransportFee(plan ? { ...student, usesTransport: plan.usesTransport } : student,
-      plan ? { ...privateData, transportZonePk: plan.zonePk } : privateData, classData, school);
     if (periodFees && Object.values(periodFees).some(v => v > 0)) fee.state = 'BILLABLE';
     // Nursery enrollment must be explicitly activated prospectively; no retroactive billing on rollout.
     if (!plan && resolveCanonicalClassCycle(classData) === 'nursery') {

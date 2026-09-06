@@ -160,6 +160,36 @@ try {
     allocations: [{ type: 'tuition', installment: 'T3', amount: 1000 }] });
 
   browser = await chromium.launch();
+  const schoolBeforeRevision = (await db.collection('schools').doc(schoolId).get()).data();
+  const revised = { globalFees: { feeT1: 0, feeT2: 0, feeT3: 0, feeTransport: 0, feeUniforms: 0 },
+    classFees: structuredClone(schoolBeforeRevision.classFees),
+    transportPolicy: { ...schoolBeforeRevision.transportPolicy, pkRates: { pk14To33: 4500, pk34To42: 5500 }, billingPeriods: [...schoolBeforeRevision.transportPolicy.billingPeriods, '2026-12'] } };
+  revised.classFees.CP.t1 = 65000; revised.classFees.CP.tuition = 155000;
+  const reviseTariffs = { action: 'configure', academicYear: year, expectedVersion: null, reason: 'Validation isolée des snapshots', configuration: revised };
+  await denied(call('manageSchoolFee', reviseTariffs));
+  await call('manageSchoolFee', reviseTariffs, 'director');
+  const afterRevision = await account(studentId);
+  assert.equal(afterRevision.lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 60000);
+  assert.equal(afterRevision.lines.find(l => l.key === 'tuition:T1').netExpectedAmount, 50000);
+  assert.equal(afterRevision.lines.find(l => l.key === transport.key).grossExpectedAmount, 4000);
+  assert.equal(afterRevision.lines.find(l => l.key === 'transport:2026-12').grossExpectedAmount, 5500);
+  assert.equal(afterRevision.lines.find(l => l.key === 'tuition:T2').effectiveDueDate, '2027-02-10');
+  await call('manageSchoolFee', { action: 'revise', feeId, expectedAmount: 15000, amount: 18000, reason: 'Nouvelle version test' }, 'director');
+  assert.equal((await account(studentId)).lines.find(l => l.feeId === feeId).grossExpectedAmount, 15000);
+  const newStudentId = `${schoolId}-new-obligation`;
+  await seed('students', newStudentId, { id: newStudentId, schoolId, classId: `${schoolId}-primary`, academicYearId: yearId, academicYear: year,
+    usesTransport: false, name: 'ALLFEES Nouvelle obligation', matricule: 'AF-NEW', schoolingStatus: 'active', gender: 'M', section: 'francophone' });
+  await seed('studentPrivate', newStudentId, { id: newStudentId, studentId: newStudentId, schoolId, transportZonePk: null });
+  await seed('studentFinance', newStudentId, { id: newStudentId, studentId: newStudentId, schoolId, registrationFeeExpected: 15000 });
+  const newAccount = await account(newStudentId);
+  assert.equal(newAccount.lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 65000);
+  assert.equal(newAccount.lines.find(l => l.feeId === feeId).grossExpectedAmount, 18000);
+  assert.equal(newAccount.lines.some(l => l.type === 'transport'), false);
+  await db.collection('students').doc(studentId).update({ classId: `${schoolId}-nursery` });
+  assert.equal((await account(studentId)).lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 60000);
+  await db.collection('students').doc(studentId).update({ classId: `${schoolId}-primary` });
+  assert.deepEqual((await db.collection('receipts').doc(payment.receiptId).get()).data(), receipt.data());
+  pass('TARIFF VERSIONS / IMMUTABLE TUITION / NEW OBLIGATIONS / IMMUTABLE TRANSPORT / IMMUTABLE UNIFORMS / CLASS CHANGE / NO TRANSPORT');
   const context = await browser.newContext();
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -234,6 +264,9 @@ try {
     await pause(2000);
   }
   await db.collection('counters').doc(`receipts_${schoolId}`).delete();
+  const versions = db.collection('schools').doc(schoolId).collection('financialTariffVersions');
+  for (const version of (await versions.get()).docs) await version.ref.delete();
+  assert.equal((await versions.get()).size, 0);
   for (const ref of refs.reverse()) {
     const snap = await ref.get();
     if (snap.exists) { assert.equal(snap.data().testRunId, runId); await ref.delete(); }

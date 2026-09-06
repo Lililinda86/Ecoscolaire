@@ -105,13 +105,17 @@ service cloud.firestore {
 
     function isValidTransportPolicy() {
       let policy = request.resource.data.get('transportPolicy', {});
-      let validKeys = policy.keys().hasOnly(['secretaryManageAll', 'feePolicyId', 'billingPeriods']);
+      let validKeys = policy.keys().hasOnly(['secretaryManageAll', 'feePolicyId', 'billingPeriods', 'pkRates']);
       let validTypes = (!('secretaryManageAll' in policy) || policy.secretaryManageAll is bool)
         && (!('feePolicyId' in policy) || policy.feePolicyId == null
           || policy.feePolicyId == 'ITALO_PK_2026')
         && (!('billingPeriods' in policy)
           || (policy.billingPeriods is list && policy.billingPeriods.size() <= 24));
-      return validKeys && validTypes;
+      let validRates = !('pkRates' in policy) || (policy.pkRates is map
+        && policy.pkRates.keys().hasOnly(['pk14To33', 'pk34To42'])
+        && policy.pkRates.pk14To33 is int && policy.pkRates.pk14To33 > 0
+        && policy.pkRates.pk34To42 is int && policy.pkRates.pk34To42 > 0);
+      return validKeys && validTypes && validRates;
     }
 
     function isValidTuitionPaymentDeadlines(data) {
