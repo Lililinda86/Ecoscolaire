@@ -6,6 +6,144 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, within, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ClassProgramSubjectPicker } from '../../src/pages/subjects/programs/editor/ClassProgramSubjectPicker';
+import type { ClassSection } from '../../src/types';
+
+describe('ClassProgramSubjectPicker class labels', () => {
+  afterEach(cleanup);
+
+  const levels = [
+    { id: 'ps', number: 1, section: 'Petite' },
+    { id: 'ms', number: 2, section: 'Moyenne' },
+    { id: 'gs', number: 3, section: 'Grande' },
+  ];
+
+  const renderClasses = (classes: ClassSection[], currentClass = classes[0]) => render(
+    <ClassProgramSubjectPicker
+      schoolId="school-1"
+      classId={currentClass.id}
+      selectedClass={currentClass}
+      classes={classes}
+      catalogSubjects={[]}
+      activeSubjects={[]}
+      onBulkSelect={vi.fn()}
+      onClose={vi.fn()}
+    />
+  );
+
+  const classInputs = () => within(screen.getByTestId('classes-scroll-container'))
+    .getAllByRole<HTMLInputElement>('checkbox');
+  const classLabels = () => classInputs()
+    .map(input => input.nextElementSibling?.firstElementChild?.textContent || '');
+
+  for (const level of levels) {
+    const displayName = `Maternelle ${level.section} Section`;
+
+    it.each([
+      { variant: 'plain aliases', firstSuffix: '', secondSuffix: '' },
+      { variant: 'section-suffixed aliases', firstSuffix: 'francophone', secondSuffix: 'francophone' },
+      { variant: 'mixed plain and section-suffixed aliases', firstSuffix: '', secondSuffix: 'francophone' },
+    ])(`disambiguates ${level.id} $variant without changing the source classes`, ({ firstSuffix, secondSuffix }) => {
+      const classes: ClassSection[] = [
+        { id: `class-${level.id}-a`, name: `Maternelle ${level.number}${firstSuffix}`, type: 'francophone' },
+        { id: `class-${level.id}-b`, name: `${level.section} Section${secondSuffix}`, type: 'francophone' },
+      ];
+      // Legacy suffixed names carry their cycle explicitly.
+      if (firstSuffix || secondSuffix) classes.forEach(item => { item.cycle = 'preschool'; });
+      const original = JSON.stringify(classes);
+      renderClasses(classes);
+
+      expect(classInputs()).toHaveLength(2);
+      const labels = classLabels();
+      expect(labels[0]).not.toBe(labels[1]);
+      expect(labels.every(label => label.startsWith(displayName + ' · '))).toBe(true);
+      // The existing pedagogical sort puts Grande Section before Maternelle 3.
+      expect(classInputs().map(input => input.value).sort()).toEqual(classes.map(item => item.id).sort());
+      classInputs().forEach((input, index) => {
+        expect(labels[index]).toBe(displayName + ' · ' + input.value.slice(-6));
+      });
+      expect(JSON.stringify(classes)).toBe(original);
+    });
+
+    it.each(['', 'francophone'])(`does not suffix a single ${level.id} class (%s)`, suffix => {
+      const item: ClassSection = {
+        id: `class-${level.id}-only`, name: `Maternelle ${level.number}${suffix}`,
+        type: 'francophone', cycle: 'preschool',
+      };
+      renderClasses([item]);
+      expect(classInputs()).toHaveLength(1);
+      expect(classLabels()).toEqual([displayName]);
+      expect(classInputs()[0].value).toBe(item.id);
+    });
+  }
+
+  it('keeps disambiguation stable when searching and reordering the class source', async () => {
+    const user = userEvent.setup();
+    const classes: ClassSection[] = [
+      { id: 'class-ps-a', name: 'Maternelle 1francophone', type: 'francophone', cycle: 'preschool' },
+      { id: 'class-ps-b', name: 'Petite Sectionfrancophone', type: 'francophone', cycle: 'preschool' },
+    ];
+    const props = {
+      schoolId: 'school-1', classId: classes[0].id, selectedClass: classes[0],
+      catalogSubjects: [], activeSubjects: [], onBulkSelect: vi.fn(), onClose: vi.fn(),
+    };
+    const view = render(<ClassProgramSubjectPicker {...props} classes={classes} />);
+    const initialInputs = classInputs();
+    const initialLabels = classLabels();
+    view.rerender(<ClassProgramSubjectPicker {...props} classes={[...classes].reverse()} />);
+    expect(classLabels()).toEqual(initialLabels);
+    classInputs().forEach((input, index) => expect(input).toBe(initialInputs[index]));
+    await user.type(screen.getByPlaceholderText('Rechercher une classe...'), 'Petite');
+    expect(classInputs().map(input => input.value)).toEqual(['class-ps-b']);
+    expect(classLabels()).toEqual([initialLabels[1]]);
+  });
+
+  it.each([0, 1])('submits the original ID for duplicate class %i', async currentIndex => {
+    const user = userEvent.setup();
+    const classes: ClassSection[] = [
+      { id: 'class-ps-a', name: 'Maternelle 1francophone', type: 'francophone', cycle: 'preschool' },
+      { id: 'class-ps-b', name: 'Petite Sectionfrancophone', type: 'francophone', cycle: 'preschool' },
+    ];
+    const onBulkSelect = vi.fn();
+    render(
+      <ClassProgramSubjectPicker
+        schoolId="school-1"
+        classId={classes[currentIndex].id}
+        selectedClass={classes[currentIndex]}
+        classes={classes}
+        catalogSubjects={[{ id: 'subject-a', name: 'Lecture', schoolId: 'school-1', section: 'francophone', cycles: ['nursery'] }]}
+        activeSubjects={[]}
+        onBulkSelect={onBulkSelect}
+        onClose={vi.fn()}
+      />
+    );
+    expect(classInputs().map(input => input.value)).toEqual(['class-ps-a', 'class-ps-b']);
+    expect(classInputs().filter(input => input.checked).map(input => input.value)).toEqual([classes[currentIndex].id]);
+    await user.click(screen.getByRole('button', { name: 'Continuer vers les matières' }));
+    await user.click(within(screen.getByTestId('subjects-scroll-container')).getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Ajouter 1 matière à 1 classe' }));
+    expect(onBulkSelect).toHaveBeenCalledExactlyOnceWith([classes[currentIndex].id], ['subject-a']);
+  });
+
+  it.each([
+    ...['Pré-maternelle', 'SIL', 'CP', 'CE1', 'CE2', 'CM1', 'CM2']
+      .map(name => ({ name, type: 'francophone' as const })),
+    ...['Pre-Nursery', 'Nursery 1', 'Nursery 2', 'Nursery 3',
+      'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6',
+      'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Lower Sixth', 'Upper Sixth']
+      .map(name => ({ name, type: 'anglophone' as const })),
+  ])('preserves the non-maternelle label $name', ({ name, type }) => {
+    renderClasses([{ id: 'unchanged-class', name, type }]);
+    expect(classLabels()).toEqual([name]);
+  });
+
+  it.each([
+    { name: 'CE1francophone', type: 'francophone' as const, expected: 'CE1' },
+    { name: 'Class 1anglophone', type: 'anglophone' as const, expected: 'Class 1' },
+  ])('preserves existing section cleanup for $name', ({ name, type, expected }) => {
+    renderClasses([{ id: 'cleaned-class', name, type }]);
+    expect(classLabels()).toEqual([expected]);
+  });
+});
 
 describe('ClassProgramSubjectPicker UX', () => {
   const mockClasses = [
