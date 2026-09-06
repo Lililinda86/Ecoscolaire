@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { monthlyLines } from './studentAccountCollections';
 import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -72,7 +73,7 @@ export const reverseCashCollection = functions.https.onCall(async (raw, context)
     const academicYear = collectionInternals.requireAcademicYear(original.academicYear);
     const originalAmount = collectionInternals.requireMoney(original.amount, 'payment.amount');
     const { lines: currentLines, base } = await buildAccountLines(transaction, db, uid, schoolId, studentId, academicYear);
-    const currentByKey = new Map(currentLines.map(line => [line.key, line]));
+    const currentByKey = new Map([...currentLines, ...monthlyLines(currentLines)].map(line => [line.key, line]));
     const reversalLines: Data[] = (original.lineItems as Data[]).map((line, sequence): Data => {
       const key = collectionInternals.requireText(line.key, `lineItems[${sequence}].key`, 1, 160);
       const amount = collectionInternals.requireMoney(line.amount, `lineItems[${sequence}].amount`);
@@ -158,7 +159,8 @@ export const reverseCashCollection = functions.https.onCall(async (raw, context)
       collectionInternals.buildCanonicalTransportProjection(base.finance, transportQuote,
         reversedTransportAllocations.map(allocation => ({ kind: allocation.kind as 'INSTALLMENT' | 'CREDIT',
           period: typeof allocation.period === 'string' ? allocation.period : null,
-          amount: -Number(allocation.amount) })), Number(transportLine.newPaid)));
+          amount: -Number(allocation.amount) })), transportQuote.previousPaid +
+          reversalLines.filter(line => line.type === 'transport').reduce((sum, line) => sum + Number(line.amount), 0)));
     const uniform = reversalLines.find(line => line.type === 'uniforms');
     if (uniform) Object.assign(financePatch, { uniformExpected: uniform.netExpectedAmount,
       uniformPaid: uniform.newPaid, uniformStatus: uniform.newPaid === 0 ? 'unpaid' : 'partial' });

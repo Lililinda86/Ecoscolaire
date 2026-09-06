@@ -780,6 +780,8 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      <SchoolFeeCatalog />
+
       <div className="card">
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-color)' }}>
           ⚙️ Comptabilité : Frais par Défaut

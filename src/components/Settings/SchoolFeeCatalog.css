@@ -1,0 +1,9 @@
+.school-fee-catalog { margin-block: 1.5rem; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 12px; max-width: 100%; }
+.school-fee-catalog summary { cursor: pointer; padding-block: .75rem; font-weight: 600; }
+.school-fee-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: .85rem; }
+.school-fee-catalog label { display: flex; flex-direction: column; gap: .35rem; margin-block: .5rem; min-width: 0; }
+.school-fee-catalog label:has(input[type=checkbox]) { flex-direction: row; align-items: center; }
+.school-fee-catalog input:not([type=checkbox]), .school-fee-catalog select, .school-fee-catalog textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: .6rem; }
+.school-fee-catalog button { min-height: 44px; white-space: normal; margin-block: .5rem; }
+.school-fee-list { padding: 0; list-style: none; display: grid; gap: .75rem; }
+.school-fee-list li { display: flex; flex-direction: column; gap: .3rem; border-top: 1px solid #e2e8f0; padding-top: .75rem; overflow-wrap: anywhere; }
