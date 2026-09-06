@@ -1,6 +1,8 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { createHash } from 'crypto';
+import { resolveCanonicalClassCycle } from './classCycle';
+import { resolveItaloTransportFee } from './transportPaymentPolicy';
 
 type Data = Record<string, unknown>;
 export interface SchoolFee extends Data {
@@ -24,7 +26,7 @@ export const schoolFees = (school: Data): Data[] => Array.isArray(school.feeCata
 export const appliesToStudent = (fee: SchoolFee, student: Data, classData: Data, year: string): boolean =>
   fee.academicYear === year && fee.active &&
   (!fee.classIds.length || fee.classIds.includes(String(student.classId))) &&
-  (!fee.cycles.length || fee.cycles.includes(String(classData.cycle || classData.level))) &&
+  (!fee.cycles.length || fee.cycles.includes(resolveCanonicalClassCycle(classData))) &&
   (!fee.studentIds.length || fee.studentIds.includes(String(student.id)));
 
 export const feeAssignmentId = (schoolId: string, studentId: string, year: string, feeId: string): string =>
@@ -44,7 +46,18 @@ async function authorize(tx: admin.firestore.Transaction, db: admin.firestore.Fi
 export const getSchoolFeeCatalog = functions.https.onCall(async (raw, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentification requise.');
   const schoolId = id(raw?.schoolId); const db = admin.firestore();
-  return db.runTransaction(async tx => ({ fees: schoolFees((await authorize(tx, db, context.auth!.uid, schoolId, false)).data() || {}) }));
+  return db.runTransaction(async tx => {
+    const school = await authorize(tx, db, context.auth!.uid, schoolId, false);
+    let transportTariff = null;
+    if (raw.classId) {
+      const cls = await tx.get(db.collection('classes').doc(id(raw.classId)));
+      if (!cls.exists || cls.data()?.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Classe hors établissement.');
+      if (school.data()?.transportPolicy?.feePolicyId !== 'ITALO_PK_2026') throw fail('Politique transport non configurée.');
+      if (!Number.isSafeInteger(raw.zonePk) || raw.zonePk < 14 || raw.zonePk > 42) throw fail('Choisir un point PK14 à PK42.');
+      transportTariff = resolveItaloTransportFee({ cycle: resolveCanonicalClassCycle(cls.data() || {}), usesTransport: true, zonePk: raw.zonePk });
+    }
+    return { fees: schoolFees(school.data() || {}), transportTariff };
+  });
 });
 
 export const manageSchoolFee = functions.https.onCall(async (raw, context) => {

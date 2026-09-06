@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, HeartPulse, FileSpreadsheet, Printer, Send, Copy, 
 import { normalizeCameroonPhoneNumber, normalizeClassName, getDefaultFeesForClass } from '../utils/importUtils';
 import type { Student, SectionType } from '../types';
 import Modal from '../components/Modal';
+import { TransportTariffPreview } from '../components/TransportTariffPreview';
 import { sortClasses } from '../utils/sortClasses';
 import { getClassOptionLabel, getDisplayClassName } from '../utils/classCatalog';
 import SchoolDocumentHeader from '../components/SchoolDocumentHeader';
@@ -2567,6 +2568,8 @@ const Students: React.FC = () => {
                         }))}
                       ><option value="">Choisir un PK</option>{Array.from({ length: 29 }, (_, i) => i + 14).map(pk => <option key={pk} value={pk}>PK{pk}</option>)}</select>
                     </label>
+                    {currentStudent.usesTransport && currentSchool?.transportPolicy?.feePolicyId === 'ITALO_PK_2026' &&
+                      <TransportTariffPreview schoolId={currentSchool.id} classId={currentStudent.classId} zonePk={currentStudent.transportZonePk} />}
                     <label>Précision du quartier (facultatif, sans effet sur le tarif)
                       <input
                         data-testid="student-transport-neighborhood"

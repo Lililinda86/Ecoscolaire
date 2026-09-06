@@ -147,6 +147,15 @@ try {
   const historical = (await account(studentId)).lines.find(line => line.key === transport.key);
   assert.equal(historical.grossExpectedAmount, 4000); assert.match(historical.label, /PK18/);
   pass('MULTI-FEE / PARTIAL PAYMENT / RECEIPT / IDEMPOTENCY / HISTORICAL RATE');
+  const legacyStudent = students.secondary18;
+  const legacy = await call('recordCashPayment', { requestId: `legacy-${runId}`, studentId: legacyStudent, academicYear: year,
+    type: 'tuition', installment: 'T3', amount: 1000 });
+  assert.equal((await account(legacyStudent)).lines.find(line => line.key === 'tuition:T3').previousPaid, 1000);
+  const legacyReceipt = await db.collection('receipts').doc(legacy.receiptId).get();
+  assert.equal(legacyReceipt.data().schoolId, schoolId);
+  assert.equal(legacyReceipt.data().amount, 1000);
+  assert.ok(legacyReceipt.data().receiptNumber);
+  pass('LEGACY PAYMENTS / LEGACY RECEIPTS');
 
   browser = await chromium.launch();
   const context = await browser.newContext();
@@ -166,7 +175,6 @@ try {
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.getByText('TEST excursion', { exact: true }).first().waitFor();
-    const modal = page.locator('.account-collection');
     // All relevant controls must remain inside the viewport; no horizontal page overflow.
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
     assert.equal(await page.getByTestId('cash-payment-student').isVisible(), true);
@@ -176,11 +184,13 @@ try {
       assert.ok(left && right && right.x >= left.x + left.width - 1, 'desktop panels must be side by side');
     }
     await page.screenshot({ path: `all-fees-${width}.png`, fullPage: true });
-    void modal;
     pass(`RESPONSIVE ${width}`);
   }
-  await page.getByTestId('cash-payment-student').selectOption(students.secondary18);
-  await page.getByText('ALLFEES secondary PK18', { exact: true }).first().waitFor();
+  await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/getStudentFinancialAccount') && response.request().postDataJSON()?.data?.studentId === students.secondary18),
+    page.getByTestId('cash-payment-student').selectOption(students.secondary18)
+  ]);
+  await page.locator('.student-identity').getByText('ALLFEES secondary PK18', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   pass('ENCAISSEMENT UI / STUDENT SWITCH');
   await browser.close(); browser = undefined;
