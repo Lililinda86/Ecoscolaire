@@ -18,7 +18,7 @@ export function TransportTariffPreview({ schoolId, classId, zonePk }: { schoolId
     return () => { active = false; };
   }, [schoolId, classId, zonePk, key]);
   return <p aria-live="polite" data-testid="student-transport-tariff">
-    Tarif mensuel : {tariff === null ? (error || 'Sélectionnez la classe et le PK pour obtenir le tarif serveur.') : `${formatCurrency(tariff)} FCFA — calculé automatiquement`}
+    Tarif mensuel : {tariff === null ? (error || 'Sélectionnez la classe et le PK pour obtenir le tarif serveur.') : `${formatCurrency(tariff)} — calculé automatiquement`}
     <br /><small>Un nouvel abonnement ou un changement de PK prend effet sur les prochaines mensualités non payées. Les mensualités historiques sont conservées.</small>
   </p>;
 }
