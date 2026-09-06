@@ -96,7 +96,7 @@ describe('StudentAccountBenefitsDrawer', () => {
 
   it('creates a scoped scholarship draft without applying a financial change', async () => {
     renderDrawer('secretary');
-    fireEvent.change(screen.getByLabelText('S’applique à'), { target: { value: 'tuition:T1' } });
+    fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:T1' } });
     fireEvent.change(screen.getByLabelText(/^Montant/), { target: { value: '12000' } });
     fireEvent.change(screen.getByLabelText(/^Motif/), { target: { value: 'Bourse sociale documentée' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le brouillon' }));
@@ -121,7 +121,7 @@ describe('StudentAccountBenefitsDrawer', () => {
     renderDrawer('secretary');
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'DISCOUNT_VOUCHER' } });
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'PERCENTAGE' } });
-    fireEvent.change(screen.getByLabelText('S’applique à'), { target: { value: 'tuition:ALL_TUITION' } });
+    fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:ALL_TUITION' } });
     fireEvent.change(screen.getByLabelText(/^Pourcentage/), { target: { value: '10' } });
     fireEvent.change(screen.getByLabelText(/^Motif/), { target: { value: 'Bon familial annuel' } });
     fireEvent.click(screen.getByRole('button', { name: 'Soumettre pour approbation' }));
@@ -138,7 +138,7 @@ describe('StudentAccountBenefitsDrawer', () => {
   it('creates and submits a moratorium while keeping the amount explicitly unchanged', async () => {
     renderDrawer('secretary');
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'MORATORIUM' } });
-    fireEvent.change(screen.getByLabelText('S’applique à'), { target: { value: 'tuition:T1' } });
+    fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:T1' } });
 
     expect(screen.getByDisplayValue('05/09/2026')).toBeTruthy();
     expect(screen.getByText('Montant dû inchangé.')).toBeTruthy();
@@ -202,5 +202,71 @@ describe('StudentAccountBenefitsDrawer', () => {
     expect(drawerCss).toMatch(/justify-content:\s*flex-end/);
     expect(drawerCss).toMatch(/width:\s*min\(560px,\s*94vw\)/);
     expect(drawerCss).toMatch(/@media\s*\(max-width:\s*560px\)[\s\S]*\.advantage-drawer\s*\{[^}]*width:\s*100vw/);
+  });
+
+  it.each([
+    ['SCHOLARSHIP', "Ex. bourse accordée pour l'année scolaire"],
+    ['FAMILY_DISCOUNT', 'Ex. famille ayant plusieurs enfants inscrits'],
+    ['DISCOUNT_VOUCHER', 'Ex. bon de réduction accordé à cette famille'],
+    ['EXCEPTIONAL_DISCOUNT', 'Indiquez la raison de cette remise exceptionnelle'],
+    ['MORATORIUM', "Indiquez la raison du report d'échéance"]
+  ])('provides a contextual mandatory reason for %s', (type, placeholder) => {
+    renderDrawer();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: type } });
+    expect(screen.getByPlaceholderText(placeholder)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:T1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le brouillon' }));
+    expect(screen.getByRole('alert').textContent).toContain('motif est obligatoire');
+    expect(mocks.calls).toEqual([]);
+  });
+
+  it('shows the server balance, the simpler stacking label and an informational preview', () => {
+    renderDrawer('secretary', { targets: targets.map(t => ({ ...t, netExpectedAmount: 60000, remainingBalance: 48000 })) });
+    expect(screen.getByRole('option', { name: /Scolarité T1 — reste 48/ })).toBeTruthy();
+    expect(screen.getByLabelText('Peut être cumulé avec un autre avantage')).toBeTruthy();
+    expect(screen.getByText("L'application vérifiera automatiquement si le cumul est autorisé.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:T1' } });
+    fireEvent.change(screen.getByLabelText(/^Montant/), { target: { value: '12000' } });
+    expect(screen.getByRole('region', { name: 'Aperçu' })).toBeTruthy();
+    expect(mocks.calls).toEqual([]);
+  });
+
+  it('hides financial amount and stacking inputs for moratorium without changing its payload', () => {
+    renderDrawer();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'MORATORIUM' } });
+    expect(screen.queryByLabelText('Mode')).toBeNull();
+    expect(screen.queryByLabelText(/^Montant/)).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByLabelText('Nouvelle échéance')).toBeTruthy();
+  });
+
+  it.each(['secretary', 'owner'] as const)('preserves pending request permissions for %s', async role => {
+    mocks.benefitDocs = [{ id: 'pending', data: () => ({ studentId: 'student-1', academicYear: '2026-2027', benefitType: 'SCHOLARSHIP', mode: 'FIXED_AMOUNT', value: 1000, installment: 'T1', status: 'pending' }) }];
+    const onChanged = vi.fn();
+    renderDrawer('secretary', { currentRole: role, onChanged });
+    await screen.findByText('EN ATTENTE');
+    expect(screen.getByText('Frais concerné : Scolarité T1')).toBeTruthy();
+    if (role === 'secretary') {
+      expect(screen.queryByRole('button', { name: 'Approuver' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Refuser' })).toBeNull();
+      expect(mocks.calls).toEqual([]);
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'Approuver' }));
+      await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+      expect(mocks.calls).toEqual([{ name: 'approveFinancialBenefit', payload: { benefitId: 'pending' } }]);
+    }
+  });
+
+  it.each(['FAMILY_DISCOUNT', 'EXCEPTIONAL_DISCOUNT'])('submits %s through the unchanged approval workflow', async benefitType => {
+    const props = renderDrawer();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: benefitType } });
+    fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:T1' } });
+    fireEvent.change(screen.getByLabelText(/^Montant/), { target: { value: '12000' } });
+    fireEvent.change(screen.getByLabelText(/^Motif/), { target: { value: 'Motif documenté' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Soumettre pour approbation' }));
+    await waitFor(() => expect(mocks.calls).toHaveLength(2));
+    expect(mocks.calls.map(c => c.name)).toEqual(['createFinancialBenefit', 'submitFinancialBenefit']);
+    expect(mocks.calls[0].payload.benefitType).toBe(benefitType);
+    expect(props.onChanged).not.toHaveBeenCalled();
   });
 });
