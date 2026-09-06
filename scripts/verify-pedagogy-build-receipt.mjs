@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+const { STAGING_APP_URL, EXPECTED_STAGING_SHA, VERCEL_AUTOMATION_BYPASS_SECRET } = process.env;
+assert.match(EXPECTED_STAGING_SHA || '', /^[a-f0-9]{40}$/);
+const url = new URL(STAGING_APP_URL);
+assert.equal(url.protocol, 'https:');
+assert.match(url.hostname, /^ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$/);
+assert.equal(url.username + url.password + url.search + url.hash, '');
+const response = await fetch(new URL('/build-receipt.json', url), { redirect: 'error', signal: AbortSignal.timeout(30000), headers: VERCEL_AUTOMATION_BYPASS_SECRET ? { 'x-vercel-protection-bypass': VERCEL_AUTOMATION_BYPASS_SECRET } : {} });
+assert.equal(response.status, 200, 'Build receipt unavailable.');
+const receipt = await response.json();
+assert.equal(receipt.sha, EXPECTED_STAGING_SHA, 'Frontend SHA mismatch.');
+assert.equal(receipt.mode, 'staging', 'Frontend build mode mismatch.');
+assert.equal(receipt.firebaseProjectId, 'ecoscolaire-staging', 'Frontend Firebase target mismatch.');
+console.log(`Frontend receipt verified for exact Staging SHA ${receipt.sha}.`);

@@ -171,6 +171,8 @@ jobs:
     environment: staging
     env:
       FIREBASE_PROJECT_ID: ecoscolaire-staging
+      # Provider access stays disabled until a separately approved secure setup.
+      PEDAGOGY_AI_SECRET_BINDING_ENABLED: 'false'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -242,7 +244,7 @@ jobs:
             us-central1
 
       - name: Deploy Firebase Backend
-        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only firestore:rules,firestore:indexes,storage,functions:approveFinancialBenefit,functions:approveTuitionDiscount,functions:archiveClassProgram,functions:archiveWeeklyAssessment,functions:assignStudentToClass,functions:bulkAddSubjectsToClasses,functions:campayWebhook,functions:cancelFinancialBenefit,functions:closeCashDrawer,functions:createExpense,functions:createFinancialBenefit,functions:createLessonPreparationUpload,functions:createSaaSCheckout,functions:createStudentSecure,functions:createTuitionDiscount,functions:dailySubscriptionCheck,functions:deactivateTeacherAssignment,functions:enforceStudentSaasLimits,functions:ensureClassProgramDraft,functions:ensureExpectedLessonPreparations,functions:ensureWeeklyAssessmentDraft,functions:generateWeeklyAssessment,functions:getBoardViewerGovernanceSummary,functions:getCollectionQuote,functions:getStudentFinancialAccount,functions:getTeacherAssignmentCandidates,functions:initiatePayment,functions:linkStaffToUser,functions:manageAcademicPeriod,functions:manageEvaluation,functions:manageReportCard,functions:manageStaff,functions:manageTeacherAssignment,functions:markWeeklyAssessmentReadyToPrint,functions:mockConfirmPayment,functions:onPaymentCreated,functions:processStudentImportJob,functions:publishClassProgramDraft,functions:recordAuthenticatedAudit,functions:recordCashCollection,functions:recordCashPayment,functions:recordGradesBatch,functions:recordStudentAttendance,functions:recordWeeklyAssessmentTeacherValidation,functions:reverseCashCollection,functions:reverseExpense,functions:reversePayment,functions:saveLessonPreparationReview,functions:saveWeeklyAssessmentEdits,functions:seedDefaultSubjectCatalog,functions:setPrimaryTeacherAssignment,functions:startLessonPreparationAnalysis,functions:sweepZombieImportJobs,functions:unlinkStaffFromUser,functions:updateAcademicYearBounds,functions:updateClassProgramDraft,functions:updateStudentFinancialStatus,functions:validateLessonPreparation,functions:verifySaaSPayment,functions:submitFinancialBenefit,functions:rejectFinancialBenefit,functions:createPaymentMoratorium,functions:submitPaymentMoratorium,functions:approvePaymentMoratorium,functions:rejectPaymentMoratorium --non-interactive
+        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only firestore:rules,firestore:indexes,storage,functions:approveFinancialBenefit,functions:approveTuitionDiscount,functions:archiveClassProgram,functions:archiveWeeklyAssessment,functions:assignStudentToClass,functions:bulkAddSubjectsToClasses,functions:campayWebhook,functions:cancelFinancialBenefit,functions:closeCashDrawer,functions:createExpense,functions:createFinancialBenefit,functions:createLessonPreparationUpload,functions:createSaaSCheckout,functions:createStudentSecure,functions:createTuitionDiscount,functions:dailySubscriptionCheck,functions:deactivateTeacherAssignment,functions:enforceStudentSaasLimits,functions:ensureClassProgramDraft,functions:ensureExpectedLessonPreparations,functions:ensureWeeklyAssessmentDraft,functions:generateWeeklyAssessment,functions:getBoardViewerGovernanceSummary,functions:getCollectionQuote,functions:getStudentFinancialAccount,functions:getTeacherAssignmentCandidates,functions:initiatePayment,functions:linkStaffToUser,functions:manageAcademicPeriod,functions:manageEvaluation,functions:manageReportCard,functions:manageStaff,functions:manageTeacherAssignment,functions:markWeeklyAssessmentReadyToPrint,functions:mockConfirmPayment,functions:onPaymentCreated,functions:processStudentImportJob,functions:publishClassProgramDraft,functions:recordAuthenticatedAudit,functions:recordCashCollection,functions:recordCashPayment,functions:recordGradesBatch,functions:recordStudentAttendance,functions:recordWeeklyAssessmentTeacherValidation,functions:reverseCashCollection,functions:reverseExpense,functions:reversePayment,functions:saveLessonPreparationReview,functions:saveWeeklyAssessmentEdits,functions:seedDefaultSubjectCatalog,functions:setPrimaryTeacherAssignment,functions:startLessonPreparationAnalysis,functions:sweepZombieImportJobs,functions:unlinkStaffFromUser,functions:updateAcademicYearBounds,functions:updateClassProgramDraft,functions:updateStudentFinancialStatus,functions:validateLessonPreparation,functions:verifySaaSPayment,functions:submitFinancialBenefit,functions:rejectFinancialBenefit,functions:createPaymentMoratorium,functions:submitPaymentMoratorium,functions:approvePaymentMoratorium,functions:rejectPaymentMoratorium,functions:adoptCurriculumProgram,functions:ensureTeachingWeeks,functions:ensureTeachingPlanDraft,functions:generateTeachingPlanProposal,functions:saveTeachingPlanAdjustments,functions:recordTeacherPlanValidation,functions:archiveTeachingPlan,functions:recordTeachingConfirmations,functions:savePedagogyClassPolicy,functions:recordPedagogyObservations,functions:savePedagogyFridayConfiguration,functions:pedagogyFridayScheduler,functions:publishPedagogyAssessmentToGrades,functions:recordPedagogyResults,functions:managePedagogyRemediation --non-interactive
 
       - name: Verify advantage workflow Functions are ACTIVE
         shell: bash
@@ -255,6 +257,15 @@ jobs:
               echo "Required Staging Function is not ACTIVE: $function_name"
               exit 1
             fi
+          done
+      - name: Verify new pedagogy Functions are ACTIVE
+        shell: bash
+        run: |
+          set -euo pipefail
+          for function_name in recordTeachingConfirmations savePedagogyClassPolicy recordPedagogyObservations savePedagogyFridayConfiguration pedagogyFridayScheduler publishPedagogyAssessmentToGrades recordPedagogyResults managePedagogyRemediation; do
+            status="$(gcloud functions describe "$function_name" --project "$FIREBASE_PROJECT_ID" --region us-central1 --format='value(status)')"
+            printf '%s: %s\n' "$function_name" "$status"
+            test "$status" = ACTIVE
           done
   lot1-staging-ui:
     if: >-

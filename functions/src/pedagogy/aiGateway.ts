@@ -2,10 +2,12 @@ import * as admin from 'firebase-admin';
 import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { buildPedagogyAiRequest, parsePedagogyAiResponse, PEDAGOGY_AI_PROTOCOL_VERSION, StructuredPedagogyRequest, validateAiConfiguration } from './aiProtocol';
+import { pedagogyAiRuntimeEnabled } from './aiRuntime';
 
 // Server-only collections. Secrets, prompts, file contents and pupil data never enter logs.
 // Uncertain paid requests are not replayed automatically: the reservation remains consumed.
 export async function requestStructuredPedagogyAi(schoolId: string, request: StructuredPedagogyRequest) {
+  if (!pedagogyAiRuntimeEnabled()) throw new Error('AI_RUNTIME_DISABLED');
   const db = admin.firestore();
   const configSnap = await db.collection('pedagogyAiConfigurations').doc(schoolId).get();
   const config = validateAiConfiguration(configSnap.data());

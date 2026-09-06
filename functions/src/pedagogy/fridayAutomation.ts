@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { pedagogyAiRuntimeSecrets } from './aiRuntime';
 import * as functions from 'firebase-functions';
 import { createHash, randomUUID } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -103,5 +104,5 @@ export async function runPedagogyFriday(now = new Date()) {
   }
 }
 
-export const pedagogyFridayScheduler = functions.runWith({ timeoutSeconds: 540, memory: '512MB', secrets: ['PEDAGOGY_OPENAI_API_KEY'] })
+export const pedagogyFridayScheduler = functions.runWith({ timeoutSeconds: 540, memory: '512MB', secrets: pedagogyAiRuntimeSecrets() })
   .pubsub.schedule('every 15 minutes').timeZone(FRIDAY_TIME_ZONE).onRun(async () => { await runPedagogyFriday(); });

@@ -83,6 +83,19 @@ Production is outside this work's authorization.
 
 ## Test privacy
 
+- Actual-byte integrity and explicit retry passed the complete Linux gate on
+  `32adf2c` ([run 34048774617](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34048774617)).
+- Staging deployment now includes the new pedagogy Functions. AI runtime access
+  is disabled by default; no provider secret is required for this disabled mode.
+  `PEDAGOGY_AI_SECRET_BINDING_ENABLED=true` is a deployment capability only,
+  not budget/privacy authority; existing private configuration checks still apply.
+  The document-processing refusal remains in force and no file provider was added.
+- A dedicated exact-Staging validation requires successful backend deployment,
+  matching immutable Vercel deployment metadata and a frontend build receipt
+  containing only SHA, build mode and Firebase project ID. Its current scope is
+  synthetic canonical results/support/cleanup, not real AI or full product acceptance.
+  Eleven local AI runtime/protocol tests passed; deployment has not yet occurred.
+
 - Individual support passed the complete Linux gate on
   `90a687ce4c7806bcbfee4ce89859567f4b521164`:
   [run 34048406159](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34048406159).
