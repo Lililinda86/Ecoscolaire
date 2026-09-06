@@ -18,6 +18,7 @@ const tests = [
   'tests/functions/test-staff-user-links.cjs',
   'tests/functions/test-manage-grades-contracts.cjs',
   'tests/functions/test-pedagogy-preparations.cjs',
+  'tests/functions/test-pedagogy-weekly-assessments.cjs',
 ];
 
 for (const testFile of tests) {
