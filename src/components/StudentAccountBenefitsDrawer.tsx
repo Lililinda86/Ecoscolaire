@@ -6,6 +6,7 @@ import { db, functions } from '../db/firebase';
 import type { FinancialBenefit, FinancialBenefitMode, FinancialBenefitType, GlobalRole } from '../types';
 import { formatCurrency } from '../utils/paymentReceipt';
 import './StudentAccountBenefitsDrawer.css';
+import AdvantageRequestPreview from './AdvantageRequestPreview';
 
 export interface AdvantageTarget {
   key: string;
@@ -15,6 +16,8 @@ export interface AdvantageTarget {
   period: string | null;
   originalDueDate: string | null;
   effectiveDueDate: string | null;
+  netExpectedAmount?: number;
+  remainingBalance?: number;
 }
 
 type WorkflowStatus = 'draft' | 'pending' | 'approved' | 'applied' | 'settled' | 'rejected' | 'cancelled';
@@ -52,6 +55,14 @@ const typeLabels: Record<DrawerType, string> = {
   DISCOUNT_VOUCHER: 'Bon de réduction',
   EXCEPTIONAL_DISCOUNT: 'Remise exceptionnelle',
   MORATORIUM: 'Moratoire'
+};
+
+const reasonPlaceholders: Record<DrawerType, string> = {
+  SCHOLARSHIP: "Ex. bourse accordée pour l'année scolaire",
+  FAMILY_DISCOUNT: 'Ex. famille ayant plusieurs enfants inscrits',
+  DISCOUNT_VOUCHER: 'Ex. bon de réduction accordé à cette famille',
+  EXCEPTIONAL_DISCOUNT: 'Indiquez la raison de cette remise exceptionnelle',
+  MORATORIUM: "Indiquez la raison du report d'échéance"
 };
 
 const statusLabels: Record<WorkflowStatus, string> = {
@@ -118,7 +129,7 @@ const StudentAccountBenefitsDrawer: React.FC<Props> = ({
 
   const dirty = Boolean(value || targetKey || validFrom || validUntil || reference || newDueDate || reason);
 
-  const benefitTargets = useMemo(() => {
+  const benefitTargets = useMemo<AdvantageTarget[]>(() => {
     const scoped = targets.filter(item =>
       item.type === 'tuition' || (item.type === 'transport' && Boolean(item.period)));
     return targets.some(item => item.type === 'tuition')
@@ -414,10 +425,12 @@ const StudentAccountBenefitsDrawer: React.FC<Props> = ({
                 </select>
               </label>}
 
-              <label className="wide-field">S’applique à
+              <label className="wide-field">Frais concerné
                 <select value={targetKey} onChange={event => setTargetKey(event.target.value)}>
                   <option value="">-- Sélectionner une échéance --</option>
-                  {selectableTargets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}
+                  {selectableTargets.map(target => <option key={target.key} value={target.key}>
+                    {target.label}{target.remainingBalance !== undefined ? ` — reste ${formatCurrency(target.remainingBalance)}` : ''}
+                  </option>)}
                 </select>
               </label>
 
@@ -428,7 +441,7 @@ const StudentAccountBenefitsDrawer: React.FC<Props> = ({
                     <span>Seule la date d’exigibilité est modifiée après approbation.</span>
                   </div>
                   <label>Échéance actuelle
-                    <input value={formatDate(selectedTarget?.originalDueDate)} readOnly />
+                    <input value={formatDate(selectedTarget?.effectiveDueDate || selectedTarget?.originalDueDate)} readOnly />
                   </label>
                   <label>Nouvelle échéance
                     <input type="date" value={newDueDate} min={selectedTarget?.originalDueDate || undefined}
@@ -455,16 +468,19 @@ const StudentAccountBenefitsDrawer: React.FC<Props> = ({
                   </label>
                   <label className="checkbox-field wide-field">
                     <input type="checkbox" checked={stackable} onChange={event => setStackable(event.target.checked)} />
-                    Cumulable selon les règles du moteur financier
+                    Peut être cumulé avec un autre avantage
                   </label>
+                  <small className="wide-field">L'application vérifiera automatiquement si le cumul est autorisé.</small>
                 </>
               )}
 
               <label className="wide-field">Motif
                 <textarea rows={4} maxLength={500} value={reason} onChange={event => setReason(event.target.value)}
-                  aria-describedby="advantage-reason-help" />
+                  placeholder={reasonPlaceholders[drawerType]} aria-describedby="advantage-reason-help" />
                 <small id="advantage-reason-help">Obligatoire pour garantir la traçabilité.</small>
               </label>
+              <AdvantageRequestPreview target={selectedTarget} moratorium={drawerType === 'MORATORIUM'}
+                mode={mode} value={value} newDueDate={newDueDate} />
               <div className="advantage-form-actions wide-field">
                 <button type="button" className="secondary" disabled={busy} onClick={() => void save(false)}>
                   Enregistrer le brouillon
@@ -490,7 +506,7 @@ const StudentAccountBenefitsDrawer: React.FC<Props> = ({
               <div>
                 <strong>{record.type}</strong>
                 <span>{record.detail}</span>
-                <small>{record.scope}</small>
+                <small>Frais concerné : {record.scope}</small>
               </div>
               <div className="advantage-record-state">
                 <span className={`workflow-badge status-${record.status}`}>

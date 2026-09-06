@@ -54,7 +54,7 @@ jobs:
         run: npm run test:vercel-build
 
       - name: Secretary collections UI tests
-        run: npx vitest run tests/unit/FinancialBenefitsPanel.spec.tsx tests/unit/StudentAccountBenefitsDrawer.spec.tsx tests/unit/paymentReceipt.spec.ts tests/unit/studentAccountReceipt.spec.ts tests/unit/StudentAccountCollection.spec.tsx tests/unit/TeacherAssignmentsPanel.spec.tsx tests/unit/TuitionDeadlineSettings.spec.tsx
+        run: npx vitest run tests/unit/FinancialBenefitsPanel.spec.tsx tests/unit/StudentAccountBenefitsDrawer.spec.tsx tests/unit/AdvantageRequestPreview.spec.tsx tests/unit/paymentReceipt.spec.ts tests/unit/studentAccountReceipt.spec.ts tests/unit/StudentAccountCollection.spec.tsx tests/unit/TeacherAssignmentsPanel.spec.tsx tests/unit/TuitionDeadlineSettings.spec.tsx
 
   functions-ci:
     if: github.event_name == 'push'
