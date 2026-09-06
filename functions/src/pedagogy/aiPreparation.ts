@@ -1,4 +1,4 @@
-import { requestStructuredPedagogyAi } from './aiGateway';
+import { requestPrivatePedagogyAi as requestStructuredPedagogyAi } from './aiPrivateClient';
 import { validatePreparationAnalysis } from './preparationAnalyzer';
 const nullableText = { type: ['string', 'null'] };
 const texts = { type: 'array', items: { type: 'string' } };

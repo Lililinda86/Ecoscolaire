@@ -1,7 +1,8 @@
 # Bounded synthetic AI trial
 
 This is an execution safety boundary, not a successful live-provider report.
-Runtime remains disabled until private Staging configuration is ready.
+Runtime activation is restricted to a private Staging gateway; deployment and
+real-provider validation still require their own final-SHA evidence.
 
 - Destination: api.openai.com, Responses and input-token counting endpoints only.
 - Exact model: gpt-4.1-mini-2025-04-14; no substitution.
@@ -29,8 +30,17 @@ reservations and refusal before generation when preflight exceeds reservation.
 Simulated transport tests are NOT real AI validation. Linux CI and the actual
 limited trial must still produce evidence tied to their final SHA.
 
-The empty Secret Manager container is infrastructure only, not an operational
-provider credential. Never add a key value to the repository or CI logs.
+Secret Manager has an enabled version (metadata checked, value never retrieved).
+The user reports a USD 5 monthly project hard limit; this does not expand the
+separately authorized USD 2 / ten-call application trial.
+
+Only the dedicated gateway runtime identity receives secretAccessor on this
+single secret. It receives Firestore get/list/create/update and transaction
+permissions, but no document deletion, Auth or Storage permissions. The existing
+Functions call its IAM-private endpoint using their service identity. The
+gateway repeats the exact-school, model, document-hash and budget checks.
+No secret value is copied to the repository, developer environment or CI.
+Do not infer successful provider connectivity from enabled secret metadata.
 
 ## Sources and reproduction
 

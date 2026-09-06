@@ -6,13 +6,13 @@ import { audit, requireId, requirePedagogyActor } from './authorization';
 import { scopedDocument } from './scopes';
 import { deterministicMockPreparationAnalyzer, validatePreparationAnalysis } from './preparationAnalyzer';
 import { permitsDemoPreparationAnalysis, verifyPreparationBytes } from './preparationFileIntegrity';
-import { pedagogyAiRuntimeEnabled, pedagogyAiRuntimeSecrets } from './aiRuntime';
+import { pedagogyAiRuntimeEnabled } from './aiRuntime';
 import { analyzeSyntheticPreparation } from './aiPreparation';
 import { assertApprovedSyntheticDocument } from './approvedSyntheticDocuments';
 
 // Only five byte-for-byte pinned synthetic fixtures may use the external provider.
 // The hash allowlist is checked here AND by the gateway's request builder.
-export const startLessonPreparationAnalysis = functions.runWith({ timeoutSeconds: 180, memory: '512MB', secrets: pedagogyAiRuntimeSecrets() }).https.onCall(async (raw, context) => {
+export const startLessonPreparationAnalysis = functions.runWith({ timeoutSeconds: 180, memory: '512MB' }).https.onCall(async (raw, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId);
   const uploadId = requireId(raw?.uploadId, 'uploadId'), db = admin.firestore();
   const uploadRef = db.collection('preparationUploads').doc(uploadId);
