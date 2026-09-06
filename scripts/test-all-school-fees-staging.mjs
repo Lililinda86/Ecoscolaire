@@ -176,7 +176,7 @@ try {
   await page.getByRole('heading', { name: 'Frais à régler', exact: true }).waitFor({ timeout: 30000 });
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
-    if (width <= 900) {
+    if (width <= 640) {
       const navigation = page.getByTestId('sidebar');
       if ((await navigation.getAttribute('class')).includes('sidebar-open')) {
         await navigation.locator('.sidebar-close-button').click();
