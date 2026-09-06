@@ -22,13 +22,14 @@ export async function publishFinancialTariffs(tx: admin.firestore.Transaction, d
   if (!classes || typeof classes !== 'object' || Array.isArray(classes) || Object.keys(classes).length > 300) throw fail('Barème par classe invalide.');
   const classFees: Data = {};
   for (const [name, value] of Object.entries(classes)) {
-    if (!name.trim() || name.length > 120 || !value || typeof value !== 'object' || Array.isArray(value)) throw fail('Classe invalide.');
+    if (!name.trim() || ['__proto__', 'prototype', 'constructor'].includes(name) || name.length > 120 || !value || typeof value !== 'object' || Array.isArray(value)) throw fail('Classe invalide.');
     const fields = value as Data;
     const fee = Object.fromEntries(Object.entries(fields).map(([key, amount]) => {
       if (!['registration', 'tuition', 't1', 't2', 't3'].includes(key)) throw fail('Champ tarifaire invalide.');
       return [key, money(amount)];
     }));
     const installments = Number(fee.t1 || 0) + Number(fee.t2 || 0) + Number(fee.t3 || 0);
+    if (!Number.isSafeInteger(installments)) throw fail('Total annuel trop élevé.');
     if (fee.tuition !== undefined && installments > 0 && installments !== fee.tuition) throw fail('Le total T1/T2/T3 doit correspondre à la scolarité annuelle.');
     classFees[name] = fee;
   }

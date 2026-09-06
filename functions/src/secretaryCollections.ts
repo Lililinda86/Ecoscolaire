@@ -1,3 +1,4 @@
+import { recoverHistoricalTariffs } from './legacyObligationTariffs';
 import { freezeObligations, readObligations, snapshotsFrom } from './financialObligationSnapshots';
 import * as admin from 'firebase-admin';
 import { transportPlanId } from './studentTransportPlan';
@@ -1495,7 +1496,8 @@ const readQuoteContext = async (
   const academicYearConfig = await validateCollectionAcademicYear(
     transaction, db, school, student, input.schoolId, input.academicYear
   );
-  const obligationSnapshots = await readObligations(transaction, db, input.schoolId, input.studentId, input.academicYear);
+  const obligationSnapshots = recoverHistoricalTariffs(await readObligations(transaction, db, input.schoolId, input.studentId, input.academicYear),
+    paymentsSnap.docs.map(doc => doc.data()), { schoolId: input.schoolId, studentId: input.studentId, academicYear: input.academicYear, classId: String(student.classId || '') });
   const scheduleSchool = { ...withAcademicYearTuitionDeadlines(school, academicYearConfig), obligationSnapshots };
   const finance = { ...resolveStudentFinanceData(student, financeSnap), obligationSnapshots };
   const privateData = privateSnap.exists ? privateSnap.data() || {} : {};
@@ -1564,9 +1566,12 @@ const readQuoteContext = async (
         periodZonePks[period] = typeof item.zonePk === 'number' ? item.zonePk : null;
       }
     }
-    const billingPeriods = () => [...new Set([...resolveTransportBillingPeriods(school, input.academicYear),
+    const billingPeriods = () => [...new Set([...configuredPeriods,
       ...Object.keys(periodFees || {})])].sort();
     if (periodFees && Object.values(periodFees).some(v => v > 0)) fee.state = 'BILLABLE';
+    if (fee.state === 'BILLABLE' && !input.period && !billingPeriods().length) {
+      throw httpsError('failed-precondition', 'Aucun calendrier transport actif.', 'TRANSPORT_FEE_POLICY_NOT_CONFIGURED');
+    }
     // Nursery enrollment must be explicitly activated prospectively; no retroactive billing on rollout.
     if (!plan && resolveCanonicalClassCycle(classData) === 'nursery') {
       return { user, school: scheduleSchool, student, finance, benefits, payments, moratoriums, allocations,
@@ -1591,7 +1596,7 @@ const readQuoteContext = async (
       if (periodFees && !(periodFees[input.period] > 0)) {
         throw httpsError('failed-precondition', 'Ce mois ne fait pas partie de l’abonnement.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
       }
-      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID) {
+      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID || periodFees) {
         const annual = buildTransportCollectionQuote({ fee, periods: billingPeriods(),
           benefits, payments, allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
           academicYear: input.academicYear, today: getDoualaDate(), periodFees, periodZonePks });

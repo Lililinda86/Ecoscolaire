@@ -239,6 +239,39 @@ try {
   await page.locator('.student-identity').getByText('ALLFEES secondary PK18', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   pass('ENCAISSEMENT UI / STUDENT SWITCH');
+  const directorContext = await browser.newContext();
+  const settingsPage = await directorContext.newPage();
+  settingsPage.on('pageerror', error => errors.push(error.message));
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) await settingsPage.route(`${origin}/**`, route => route.continue({ headers: { ...route.request().headers(),
+    'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
+  await settingsPage.goto(`${origin}/#/login`, { waitUntil: 'domcontentloaded' });
+  await settingsPage.getByTestId('login-email').fill(users.director.email);
+  await settingsPage.getByTestId('login-password').fill(users.director.password);
+  await settingsPage.getByTestId('login-submit').click();
+  await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
+  await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
+  await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
+  await settingsPage.getByLabel('PK14 à PK33 — FCFA / mois').fill('4600');
+  await settingsPage.getByLabel('Motif de la modification tarifaire').fill('Validation UI de la publication prospective');
+  settingsPage.once('dialog', dialog => dialog.accept());
+  await settingsPage.getByRole('button', { name: 'Enregistrer les tarifs', exact: true }).click();
+  await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().transportPolicy.pkRates.pk14To33).toBe(4600);
+  assert.equal((await account(studentId)).lines.find(l => l.key === transport.key).grossExpectedAmount, 4000);
+  pass('PARAMETERS DIRECTOR SAVE / HISTORICAL OBLIGATION PRESERVED');
+  for (const width of [360, 768, 1440]) {
+    await settingsPage.setViewportSize({ width, height: 1000 });
+    if (width <= 640) {
+      const sidebar = settingsPage.getByTestId('sidebar');
+      if ((await sidebar.getAttribute('class')).includes('sidebar-open')) await sidebar.locator('.sidebar-close-button').click();
+      await expect(sidebar).not.toBeInViewport();
+    }
+    await expect(settingsPage.getByLabel('PK14 à PK33 — FCFA / mois')).toHaveValue('4600');
+    await expect(settingsPage.getByLabel('PK34 à PK42 — FCFA / mois')).toHaveValue('5500');
+    assert.equal(await settingsPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await settingsPage.screenshot({ path: `all-fees-settings-${width}.png`, fullPage: true });
+    pass(`PARAMETERS ${width}`);
+  }
+  assert.deepEqual(errors, []);
   await browser.close(); browser = undefined;
   await call('manageSchoolFee', { action: 'archive', feeId }, 'director');
   assert.equal((await account(studentId)).lines.find(line => line.feeId === feeId).remainingBalance, 10000);

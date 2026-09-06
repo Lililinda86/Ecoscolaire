@@ -1,3 +1,4 @@
+import { financialSettingsPayload, stableConfiguration } from '../utils/financialSettingsPayload';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../db/firebase';
 import './Settings.css';
@@ -6,7 +7,7 @@ import { SchoolFeeCatalog } from '../components/Settings/SchoolFeeCatalog';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Edit2, Trash2, BookOpen } from 'lucide-react';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
@@ -20,7 +21,7 @@ import {
 } from '../utils/tuitionDeadlines';
 
 const Settings: React.FC = () => {
-  const { db, safeMergeDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, updateLocalState, currentUser } = useAppContext();
   const navigate = useNavigate();
   const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as 'francophone' | 'anglophone' });
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
@@ -113,6 +114,7 @@ const Settings: React.FC = () => {
   const [tariffReason, setTariffReason] = useState('');
 
   const canEditFees = ['owner', 'director', 'superAdmin'].includes(currentUser?.role || '');
+  const canEditInstitution = ['owner', 'superAdmin'].includes(currentUser?.role || '');
   const [draftClassFees, setDraftClassFees] = useState<Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }>>({});
 
   // 3. Draft initialization strategy: Keep track of initialized school id via ref to avoid overwriting modified drafts on contextual reload of db.school.
@@ -227,7 +229,7 @@ const Settings: React.FC = () => {
     return amount;
   };
 
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = async (financialOnly = false) => {
     if (!db.school || isSaving) return;
 
     // 1. Validation Name
@@ -259,7 +261,7 @@ const Settings: React.FC = () => {
     }
 
     // 4. Validation Cycles
-    if (draftEducationCycles.length === 0) {
+    if (!financialOnly && draftEducationCycles.length === 0) {
       alert("Vous devez sélectionner au moins un cycle scolaire pour l'établissement.");
       return;
     }
@@ -368,9 +370,9 @@ const Settings: React.FC = () => {
       }
       updatedSchool.classFees = classFeesToSave;
 
-      const tariffConfiguration = { globalFees: updatedSchool.globalFees, classFees: updatedSchool.classFees, transportPolicy: updatedSchool.transportPolicy };
-      const originalConfiguration = { globalFees: db.school.globalFees, classFees: db.school.classFees, transportPolicy: db.school.transportPolicy };
-      if (JSON.stringify(tariffConfiguration) !== JSON.stringify(originalConfiguration)) {
+      const tariffConfiguration = financialSettingsPayload(updatedSchool);
+      const originalConfiguration = financialSettingsPayload(db.school);
+      if (stableConfiguration(tariffConfiguration) !== stableConfiguration(originalConfiguration)) {
         if (!tariffReason.trim()) throw new Error('Indiquez le motif de la nouvelle version tarifaire.');
         const response = await httpsCallable<Record<string, unknown>, { version: string }>(functions, 'manageSchoolFee')({
           schoolId: db.school.id, action: 'configure', academicYear: db.school.academicYear,
@@ -379,16 +381,15 @@ const Settings: React.FC = () => {
         updatedSchool.financialTariffVersion = response.data.version;
       }
       const metadata = Object.fromEntries(Object.entries(updatedSchool).filter(([key]) => !['globalFees', 'classFees', 'transportPolicy', 'financialTariffVersion', 'feeCatalog'].includes(key)));
-      await setDoc(doc(firestoreDb, 'schools', db.school.id), metadata, { merge: true });
-      if (draftTransportPolicy !== (db.school.transportPolicy?.secretaryManageAll === true)) {
+      if (!financialOnly && canEditInstitution) await setDoc(doc(firestoreDb, 'schools', db.school.id), metadata, { merge: true });
+      if (!financialOnly && canEditInstitution && draftTransportPolicy !== (db.school.transportPolicy?.secretaryManageAll === true)) {
         await updateDoc(doc(firestoreDb, 'schools', db.school.id), { 'transportPolicy.secretaryManageAll': draftTransportPolicy });
       }
-      await safeMergeDB({
-        ...db,
-        school: updatedSchool
-      });
+      const saved = await getDoc(doc(firestoreDb, 'schools', db.school.id));
+      const savedSchool = { ...saved.data(), id: db.school.id } as School;
+      updateLocalState({ school: savedSchool });
       alert("Paramètres enregistrés avec succès.");
-      initDraftsFromSchool(updatedSchool);
+      initDraftsFromSchool(savedSchool);
     } catch (err) {
       console.error(err);
       alert(err instanceof Error ? err.message : "Une erreur est survenue lors de l'enregistrement.");
@@ -502,8 +503,8 @@ const Settings: React.FC = () => {
         <h1>Paramètres</h1>
         <button
           type="button"
-          onClick={handleSaveChanges}
-          disabled={isSaving}
+          onClick={() => void handleSaveChanges()}
+          disabled={isSaving || !canEditInstitution}
           style={{ background: 'var(--primary-color)', color: 'white', padding: '0.6rem 1.5rem', fontWeight: 600 }}
         >
           {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
@@ -859,6 +860,8 @@ const Settings: React.FC = () => {
       <SchoolFeeCatalog />
       <section className="card" id="financial-tariff-version"><h2>Finances &amp; tarifs</h2><p>Les tarifs ci-dessous s’appliquent uniquement aux nouvelles obligations. Toute dette déjà établie conserve son tarif, même future et impayée.</p>
         <label>Motif de la modification tarifaire<textarea value={tariffReason} maxLength={500} onChange={e => setTariffReason(e.target.value)} placeholder="Ex. barème validé par la direction pour les nouvelles obligations" /></label>
+        <button type="button" disabled={isSaving || !canEditFees} onClick={() => void handleSaveChanges(true)}>Enregistrer les tarifs</button>
+        {!canEditInstitution && <p>Vous pouvez publier les tarifs. Les informations générales de l’établissement restent réservées au propriétaire.</p>}
       </section>
       <div className="card">
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-color)' }}>

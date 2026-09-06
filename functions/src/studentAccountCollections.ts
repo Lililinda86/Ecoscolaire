@@ -30,6 +30,7 @@ interface RequestedLine {
 interface AccountLine extends CollectionQuote {
   category?: string;
   tariffVersion?: string;
+  zonePk?: number | null;
   key: string;
   type: AccountLineType;
   label: string;
@@ -261,7 +262,9 @@ export const accountGroups = (lines: AccountLine[]) => {
   };
   return definitions.flatMap(([key, label]) => {
     const items = lines.filter(line => groupKey(line) === key);
-    return items.length ? [{ key, label, lineKeys: items.map(line => line.key), totals: accountTotals(items) }] : [];
+    const transportRates = key === 'transport' ? [...new Map(items.map(line => [`${line.zonePk}:${line.grossExpectedAmount}`,
+      { zonePk: line.zonePk ?? null, monthlyAmount: line.grossExpectedAmount }])).values()] : [];
+    return items.length ? [{ key, label, lineKeys: items.map(line => line.key), totals: accountTotals(items), transportRates }] : [];
   });
 };
 
