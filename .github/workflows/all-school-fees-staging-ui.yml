@@ -11,7 +11,6 @@ on:
 permissions:
   actions: read
   contents: read
-  id-token: write
 jobs:
   all-fees-staging:
     if: github.ref == 'refs/heads/staging'
@@ -51,8 +50,7 @@ jobs:
           echo 'TARGET_DEPLOYMENT_VERIFIED=true' >> "$GITHUB_ENV"
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/411364288790/locations/global/workloadIdentityPools/italo-transport-staging/providers/github-ecoscolaire-staging
-          service_account: italo-transport-runner-staging@ecoscolaire-staging.iam.gserviceaccount.com
+          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node scripts/test-all-school-fees-staging.mjs
