@@ -69,6 +69,13 @@ jobs:
       - name: Teaching confirmation Functions authorization and concurrency
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs"
       - run: npx playwright install --with-deps chromium
+      - name: Synthetic bilingual A4 print regression
+        env:
+          PEDAGOGY_PDFTOTEXT: pdftotext
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+          node scripts/verify-pedagogy-print.mjs
       - name: Pedagogy Firestore Rules
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "npx playwright test tests/security/pedagogy-rules.spec.mjs tests/security/pedagogy-lot-b-rules.spec.mjs tests/security/pedagogy-lot-c-rules.spec.mjs --config=playwright.rules.config.ts"
       - name: Pedagogy Storage Rules

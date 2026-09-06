@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import SchoolDocumentHeader from '../../../components/SchoolDocumentHeader';
+import { AssessmentPrint } from '../components/AssessmentPrint';
 import { useAppContext } from '../../../context/AppContext';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { useLessonPreparations } from '../hooks/useLessonPreparations';
@@ -138,15 +138,6 @@ export default function PedagogyAssessments() {
       {assessment.status === 'teacher_validated' && <button className="pedagogy-button" disabled={busy || sourceChanged} onClick={ready}>Passer prête à imprimer</button>}
       <div className="pedagogy-actions"><button className="pedagogy-button pedagogy-button--secondary" onClick={() => print('student')}>{assessment.status === 'ready_to_print' && !sourceChanged ? 'Imprimer version finale' : 'Imprimer brouillon'}</button><button className="pedagogy-button pedagogy-button--secondary" onClick={() => print('correction')}>Corrigé / Guide de correction</button></div>
     </section>}
-    {assessment && items.length > 0 && <section id="weekly-assessment-print" className="pedagogy-a4">
-      <SchoolDocumentHeader school={currentSchool} documentTitle={printMode === 'correction' ? 'Corrigé / Guide de correction' : 'Évaluation'} />
-      {printMode === 'student' && (assessment.status !== 'ready_to_print' || sourceChanged) && <div className="assessment-watermark">BROUILLON — À VALIDER PAR L’ENSEIGNANT</div>}
-      <h2>{printMode === 'correction' ? 'CORRIGÉ / GUIDE DE CORRECTION' : 'ÉVALUATION HEBDOMADAIRE'}</h2>
-      <div className="assessment-meta"><span>Classe<br /><strong>{assessment.className}</strong></span><span>Date<br /><strong>{assessment.fridayDate}</strong></span><span>Durée<br /><strong>{assessment.durationMinutes} min</strong></span><span>Barème<br /><strong>/{assessment.totalPoints}</strong></span></div>
-      {printMode === 'student' && <p>Nom et prénom de l’élève : ______________________________________________</p>}
-      <p>{assessment.instructions}</p>
-      {items.map(item => <article className="assessment-question" key={item.id}><h3>{item.order}. {item.questionText} <small>({item.points} pt{item.points > 1 ? 's' : ''})</small></h3><p>{item.instructions}</p>{printMode === 'correction' ? <><strong>Réponse attendue</strong><p>{item.expectedAnswer}</p><strong>Consignes de correction</strong><p>{item.correctionGuide}</p></> : <div className="assessment-answer-lines" />}</article>)}
-      <p className="assessment-total">Total : {total}/{assessment.totalPoints}</p><footer className="assessment-footer"><span>Semaine du {assessment.weekStartDate}</span><span>Page 1</span></footer>
-    </section>}
+    {assessment && items.length > 0 && <AssessmentPrint school={currentSchool} assessment={assessment} items={items} mode={printMode} sourceChanged={Boolean(sourceChanged)} language={classes.find(item => item.id === selectedClassId)?.type === 'anglophone' ? 'en' : 'fr'} academicYearLabel={year?.name || ''} />}
   </main>;
 }
