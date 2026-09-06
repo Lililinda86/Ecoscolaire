@@ -156,6 +156,8 @@ try {
   assert.equal(legacyReceipt.data().amount, 1000);
   assert.ok(legacyReceipt.data().receiptNumber);
   pass('LEGACY PAYMENTS / LEGACY RECEIPTS');
+  await call('recordCashCollection', { requestId: `retained-${runId}`, studentId, academicYear: year,
+    allocations: [{ type: 'tuition', installment: 'T3', amount: 1000 }] });
 
   browser = await chromium.launch();
   const context = await browser.newContext();
@@ -198,6 +200,9 @@ try {
   assert.equal((await account(studentId)).lines.find(line => line.feeId === feeId).remainingBalance, 10000);
   await call('reverseCashCollection', { collectionId: payment.collectionId, requestId: `reverse-${runId}`, reason: 'Nettoyage du test Staging' }, 'director');
   assert.equal((await account(studentId)).lines.find(line => line.feeId === feeId).remainingBalance, 15000);
+  await pause(3000);
+  assert.equal((await db.collection('studentFinance').doc(studentId).get()).data().tuitionPaid, 1000,
+    'another V3 payment remains reflected after an atomic reversal');
   pass('ARCHIVE / REVERSAL');
   console.log('STAGING FUNCTIONAL: PASS');
 } finally {

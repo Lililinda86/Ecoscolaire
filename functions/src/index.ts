@@ -1204,8 +1204,9 @@ export const updateStudentFinancialStatus = functions.firestore
   .onWrite(async (change) => {
     const paymentData = change.after.exists ? change.after.data() : change.before.data();
     if (!paymentData || !paymentData.studentId) return null;
-    if (!change.before.exists && (paymentData.byRecordCashPayment || paymentData.bycampayWebhook)) {
-      console.log('Skipping legacy financial status recalculation for atomic payment creation');
+    if (!change.before.exists && (paymentData.byRecordCashPayment || paymentData.bycampayWebhook || paymentData.byReversePayment)) {
+      // Cash collections and their compensating entries already update projections in one transaction.
+      console.log('Skipping legacy financial status recalculation for atomic payment creation or reversal');
       return null;
     }
 
