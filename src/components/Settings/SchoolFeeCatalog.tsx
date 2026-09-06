@@ -15,6 +15,7 @@ export function SchoolFeeCatalog() {
   const [amount, setAmount] = useState(''); const [description, setDescription] = useState('');
   const [mandatory, setMandatory] = useState(true); const [dueDate, setDueDate] = useState('');
   const [classIds, setClassIds] = useState<string[]>([]); const [cycles, setCycles] = useState<string[]>([]);
+  const [studentIds, setStudentIds] = useState<string[]>([]);
   const [feeId, setFeeId] = useState(() => crypto.randomUUID());
   const [assignFee, setAssignFee] = useState(''); const [studentId, setStudentId] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
@@ -40,8 +41,8 @@ export function SchoolFeeCatalog() {
     <p>Scolarité et calendrier Transport : utilisez les sections existantes ci-dessous. Le catalogue complète les tenues, autres frais et frais ponctuels.</p>
     <p>Maternelle et primaire : PK14–PK33 = 4 000 FCFA/mois ; PK34–PK42 = 5 000 FCFA/mois. Secondaire : gratuit. PK désigne le quartier / point de ramassage.</p>
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
-    {canManage && <details><summary>Créer un frais / une nouvelle version</summary>
-      <form onSubmit={async e => { e.preventDefault(); if (await run({ action: 'create', feeId, fee: { label, category, amount: Number(amount), description, mandatory, dueDate: dueDate || null, academicYear: school.academicYear, classIds, cycles, studentIds: [] } })) { setFeeId(crypto.randomUUID()); setLabel(''); setAmount(''); } }}>
+    {canManage && <details><summary>Créer un nouveau frais</summary>
+      <form onSubmit={async e => { e.preventDefault(); if (await run({ action: 'create', feeId, fee: { label, category, amount: Number(amount), description, mandatory, dueDate: dueDate || null, academicYear: school.academicYear, classIds, cycles, studentIds } })) { setFeeId(crypto.randomUUID()); setLabel(''); setAmount(''); } }}>
         <div className="school-fee-grid">
           <label>Nom du frais<input required maxLength={120} value={label} onChange={e => setLabel(e.target.value)} /></label>
           <label>Catégorie<select value={category} onChange={e => setCategory(e.target.value)}>{Object.entries(categories).map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label>
@@ -54,7 +55,8 @@ export function SchoolFeeCatalog() {
         <p>{mandatory ? 'Affectation automatique aux élèves du périmètre sélectionné.' : 'Aucune dette sans affectation explicite à un élève.'}</p>
         <fieldset><legend>Cycles concernés — aucun filtre = tous</legend>{Object.entries({ nursery: 'Maternelle', primary: 'Primaire', secondary: 'Secondaire' }).map(([key, text]) => <label key={key}><input type="checkbox" checked={cycles.includes(key)} onChange={e => setCycles(old => e.target.checked ? [...old, key] : old.filter(c => c !== key))} />{text}</label>)}</fieldset>
         <label>Classes concernées — aucune sélection = toutes<select multiple value={classIds} onChange={e => setClassIds(Array.from(e.target.selectedOptions, o => o.value))}>{db.classes.filter(c => c.schoolId === school.id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-        <p>Après publication, le tarif est figé pour protéger les dettes, paiements et reçus. Pour changer le montant, créez une nouvelle version.</p>
+        <label>Élèves concernés — aucune sélection = tous<select multiple value={studentIds} onChange={e => setStudentIds(Array.from(e.target.selectedOptions, o => o.value))}>{db.students.filter(s => s.schoolId === school.id).map(s => <option key={s.id} value={s.id}>{s.name} — {s.matricule}</option>)}</select></label>
+        <p>Après publication, le tarif est figé. Un nouveau frais crée une obligation supplémentaire ; il ne remplace ni n’annule une dette existante. Désactiver arrête uniquement les nouvelles affectations.</p>
         <button disabled={busy} type="submit">Publier le frais</button>
       </form>
     </details>}

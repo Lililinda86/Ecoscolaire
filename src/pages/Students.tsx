@@ -700,6 +700,11 @@ const Students: React.FC = () => {
         };
         if (currentSchool?.transportPolicy?.feePolicyId === 'ITALO_PK_2026' &&
             (finalStudent.usesTransport || editingStudentOriginal?.usesTransport)) {
+          if (finalStudent.classId !== editingStudentOriginal?.classId &&
+              (finalStudent.usesTransport !== editingStudentOriginal?.usesTransport ||
+               finalStudent.transportZonePk !== editingStudentOriginal?.transportZonePk)) {
+            throw new Error('Pour préserver la tarification transport, le changement de classe doit être traité séparément de l’abonnement.');
+          }
           await httpsCallable(functions, 'setStudentTransportPlan')({ schoolId: currentSchool.id,
             studentId: finalStudent.id, usesTransport: finalStudent.usesTransport === true,
             zonePk: finalStudent.transportZonePk ?? null });
@@ -777,7 +782,9 @@ const Students: React.FC = () => {
         const creationResult = await createStudentSecure({
           studentId,
           requestedMatricule: currentStudent.matricule,
-          studentData: schoolData,
+          // The server activates the new subscription prospectively after creation.
+          studentData: currentSchool.transportPolicy?.feePolicyId === 'ITALO_PK_2026'
+            ? { ...schoolData, usesTransport: false, transportStatus: 'none' } : schoolData,
           privateData: privateData as unknown as Record<string, unknown>,
           financeData: financeData as unknown as Record<string, unknown>,
           parentPrivateData: parentPrivateData as unknown as Record<string, unknown>,
