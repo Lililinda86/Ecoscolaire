@@ -125,10 +125,21 @@ test('seven exact-SHA authenticated screens are read-only for the existing TEST 
     stage = 'Grades';
     await navigate('grades', /^Notes & Bulletins$/);
     const ranking = page.getByRole('button', { name: /Palmarès/ });
+    const enterGrades = page.getByRole('button', { name: 'Saisir des Notes' });
+    const configuration = page.getByTestId('grades-configuration-required');
     if (await ranking.isVisible()) await ranking.click();
-    else {
-      await expect(page.getByRole('button', { name: 'Saisir des Notes' })).toBeEnabled();
-      await page.getByRole('button', { name: 'Saisir des Notes' }).click();
+    else if (await configuration.isVisible()) {
+      await expect(enterGrades).toBeDisabled();
+      const reasons = await configuration.locator('li').allTextContents();
+      expect(reasons.length).toBeGreaterThan(0);
+      for (const reason of reasons) expect(['Aucune année scolaire active.', 'Aucune période ouverte.', 'Aucun programme publié.', 'Aucune affectation ACTIVE.']).toContain(reason);
+      expect(process.env.MATERNELLE_EMULATOR_VALIDATED, 'Configured Grades selector must pass authenticated emulator coverage first').toBe('true');
+      report.gradesCoverage = 'Staging authenticated configuration guard + authenticated emulator configured selector';
+      report.preExistingGradesConfiguration = reasons;
+      await capture('Grades', configuration);
+    } else {
+      await expect(enterGrades).toBeEnabled();
+      await enterGrades.click();
       for (const label of ['Année Scolaire', 'Période']) {
         const select = page.locator('.form-group').filter({ has: page.locator('label').filter({ hasText: new RegExp(`^${label}$`) }) }).locator('select');
         await expect(select).toBeVisible();
@@ -139,8 +150,10 @@ test('seven exact-SHA authenticated screens are read-only for the existing TEST 
         }
       }
     }
-    await assertOptions(classSelect(), classes, true);
-    await capture('Grades', classSelect());
+    if (!screens.Grades) {
+      await assertOptions(classSelect(), classes, true);
+      await capture('Grades', classSelect());
+    }
 
     stage = 'ReportCards';
     await navigate('report-cards', /^Bulletins scolaires$/);

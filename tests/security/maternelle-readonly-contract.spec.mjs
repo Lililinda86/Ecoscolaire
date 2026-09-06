@@ -58,5 +58,8 @@ test('workflow uses neither privileged service account nor data artifact export'
   assert.match(workflow, /branches: \[codex\/maternelle-labels-audit, staging\]/);
   assert.ok(!workflow.includes('pull_request_target'));
   const parsed = yaml.load(workflow);
+  const emulatorStep = parsed.jobs['visual-readonly'].steps.find(step => step.id === 'configured-emulator');
+  assert.match(emulatorStep.run, /--project demo-maternelle-pr201 --only firestore,auth/);
+  assert.equal(emulatorStep.env, undefined);
   assert.equal(parsed.jobs['visual-readonly'].if, "github.ref == 'refs/heads/codex/maternelle-labels-audit' || contains(github.event.head_commit.message, 'Merge pull request #201 ')");
 });
