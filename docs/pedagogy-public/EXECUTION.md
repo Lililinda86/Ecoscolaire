@@ -83,6 +83,21 @@ Production is outside this work's authorization.
 
 ## Test privacy
 
+- Individual support passed the complete Linux gate on
+  `90a687ce4c7806bcbfee4ce89859567f4b521164`:
+  [run 34048406159](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34048406159).
+  An earlier frontend type-inference failure was corrected and the full
+  repository typecheck rerun. These are technical synthetic tests only.
+- Preparation file checks now verify actual downloaded bytes, size, SHA-256 and
+  format signatures with pinned Storage generation. This is not OCR or semantic
+  document validation. A lease and explicit bounded retry preserve each attempt.
+  Demo analysis is restricted to an explicit demo emulator project; live
+  environments return a manual-review fallback, never a mock success.
+- External document processing is blocked pending explicit payload/destination
+  authority and private provider/budget configuration. No file-input provider
+  patch was applied and no document was sent. Thirteen local preparation tests
+  passed; the new browser integrity/retry checks await Linux execution.
+
 ### Canonical results and individual support checkpoints
 
 - The complete Linux pedagogy gate and general CI passed for canonical results

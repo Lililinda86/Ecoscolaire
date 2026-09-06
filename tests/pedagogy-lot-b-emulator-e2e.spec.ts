@@ -85,7 +85,12 @@ test.describe('Lot B — préparations de cours', () => {
       if (stagingRun) console.info('[Lot B staging] browser: PDF import opened');
       await page.locator('input[type=file]').setInputFiles({ name: 'preparation.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 Lot B') });
       await page.getByRole('button', { name: 'Déposer et analyser' }).click();
-      await expect(page.getByText(/Analyse terminée/)).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText(stagingRun ? /Analyse échouée/ : /Analyse terminée/).first()).toBeVisible({ timeout: 20_000 });
+      const initialAnalyses = await firestore.collection('preparationAnalyses').where('schoolId', '==', fixture.schoolId).get();
+      expect(initialAnalyses.size).toBe(1);
+      expect(initialAnalyses.docs[0].data().fileIntegrity?.size).toBe(Buffer.byteLength('%PDF-1.4 Lot B'));
+      expect(initialAnalyses.docs[0].data().processingMode).toBe(stagingRun ? 'local_integrity_only' : 'demo_mock');
+      if (stagingRun) expect(initialAnalyses.docs[0].data().errorCode).toBe('AI_DOCUMENT_PROCESSING_REQUIRES_APPROVAL');
       await expect(page.getByRole('heading', { name: 'Relecture structurée' })).toBeVisible();
       if (stagingRun) console.info('[Lot B staging] browser: PDF analysis done');
       await page.getByLabel('Matériel').fill('Ardoise et craie');
@@ -106,6 +111,11 @@ test.describe('Lot B — préparations de cours', () => {
       await page.locator('input[type=file]').setInputFiles({ name: 'analysis-fail.png', mimeType: 'image/png', buffer: Buffer.from([137, 80, 78, 71]) });
       await page.getByRole('button', { name: 'Déposer et analyser' }).click();
       await expect(page.getByText(/Analyse échouée/).first()).toBeVisible({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Reprendre le contrôle du même fichier', exact: true }).click();
+      await expect(page.getByText(/Analyse indisponible/).first()).toBeVisible();
+      const failedAnalyses = (await firestore.collection('preparationAnalyses').where('schoolId', '==', fixture.schoolId).get()).docs.filter(item => item.data().errorCode === 'UPLOAD_SIGNATURE_MISMATCH');
+      expect(failedAnalyses).toHaveLength(2);
+      expect(failedAnalyses.map(item => item.data().attempt).sort()).toEqual([1, 2]);
       await page.getByLabel('Objectif').fill('Correction manuelle après échec');
       await page.getByRole('button', { name: 'Enregistrer les corrections' }).click();
       await expect(page.getByText('Corrections enregistrées.')).toBeVisible();
@@ -119,7 +129,7 @@ test.describe('Lot B — préparations de cours', () => {
       await page.getByLabel('Objectif').first().fill('Consolider');
       await page.locator('input[type=file]').setInputFiles({ name: 'photo.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([255, 216, 255]) });
       await page.getByRole('button', { name: 'Déposer et analyser' }).click();
-      await expect(page.getByText(/Analyse terminée/)).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText(stagingRun ? /Analyse échouée/ : /Analyse terminée/).first()).toBeVisible({ timeout: 20_000 });
       if (stagingRun) console.info('[Lot B staging] browser: manual preparation done');
       expect((await firestore.collection('lessonPreparations').where('schoolId', '==', fixture.schoolId).where('source', '==', 'manual_unplanned').get()).size).toBe(1);
       expect(await countProtected()).toEqual(before);

@@ -35,10 +35,13 @@ export default function PedagogyPreparationImport() {
   const [loadedPreparation, setLoadedPreparation] = useState<LessonPreparation>();
   const selectedClassId = classId || classes[0]?.id || '';
   const selectedWeekStartDate = weekStartDate || workspace.weeks[0]?.weekStartDate || '';
-  const selected = manual ? undefined : loadedPreparation?.id === preparationId ? loadedPreparation : state.preparations.find(item => item.id === preparationId);
+  const candidate = loadedPreparation?.id === preparationId ? loadedPreparation : state.preparations.find(item => item.id === preparationId);
+  const selected = manual || candidate?.schoolId !== currentSchool?.id || candidate?.academicYearId !== year?.id ? undefined : candidate;
   useEffect(() => {
     if (!currentSchool?.id || !preparationId) return;
-    void loadLessonPreparation(currentSchool.id, preparationId).then(setLoadedPreparation).catch(() => undefined);
+    let alive = true;
+    void loadLessonPreparation(currentSchool.id, preparationId).then(value => { if (alive) setLoadedPreparation(value); }).catch(() => undefined);
+    return () => { alive = false; };
   }, [currentSchool?.id, preparationId]);
   useEffect(() => {
     if (!selected) return;
@@ -76,6 +79,16 @@ export default function PedagogyPreparationImport() {
     catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Correction impossible.'); }
     finally { setBusy(false); }
   };
+  const retryAnalysis = async () => {
+    if (!currentSchool?.id || !selected?.currentUploadId || busy) return;
+    setBusy(true); setMessage('Reprise explicite du contrôle du fichier…');
+    try {
+      const response = await startLessonPreparationAnalysis(currentSchool.id, selected.currentUploadId, true);
+      await state.refresh(); setLoadedPreparation(await loadLessonPreparation(currentSchool.id, selected.id));
+      setMessage(response.analysisStatus === 'failed' ? `Analyse indisponible (${response.errorCode || 'échec'}). La relecture manuelle reste possible.` : 'Analyse terminée : relecture requise.');
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Reprise impossible.'); }
+    finally { setBusy(false); }
+  };
   const validate = async () => {
     if (!currentSchool?.id || !preparationId) return;
     setBusy(true);
@@ -85,9 +98,10 @@ export default function PedagogyPreparationImport() {
   };
   const field = (key: keyof PreparationReview, label: string) => <label>{label}<textarea value={review[key]} onChange={event => setReview(value => ({ ...value, [key]: event.target.value }))} /></label>;
   return <main className="pedagogy-page">
-    <PedagogyHeader title="Importer et relire" description="PDF, JPEG ou PNG (10 Mio maximum). L’analyse déterministe ne remplit jamais un champ absent sans le signaler." />
+    <PedagogyHeader title="Importer et relire" description="PDF, JPEG ou PNG (10 Mio maximum). L’intégrité du fichier est contrôlée ; l’IA documentaire réelle reste indisponible tant que son autorisation et sa configuration ne sont pas validées." />
     <PedagogyNav />
     {message && <div className="pedagogy-alert">{message}</div>}
+    {selected && ['failed', 'processing'].includes(selected.analysisStatus) && selected.status !== 'validated' && <div className="pedagogy-alert"><p>{selected.analysisError || 'Analyse en cours : la reprise sera refusée tant que le délai de traitement n’est pas expiré.'}</p><button disabled={busy} onClick={() => void retryAnalysis()}>Reprendre le contrôle du même fichier</button></div>}
     <section className="pedagogy-card">
       <div className="pedagogy-card-title"><div><h2>Original immuable</h2><p>Un même contenu conserve le même identifiant; l’écrasement et la suppression sont interdits.</p></div><Link to="/pedagogy/preparations">Retour au suivi</Link></div>
       <label className="pedagogy-check"><input type="checkbox" checked={manual} onChange={event => setManual(event.target.checked)} /> Préparation manuelle non planifiée</label>

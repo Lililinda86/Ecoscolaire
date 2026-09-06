@@ -52,7 +52,7 @@ export const loadPreparationTemplates = async (schoolId: string, academicYearId:
 };
 
 export const ensureExpectedLessonPreparations = (schoolId: string, planId: string) => call<{ schoolId: string; planId: string }, { planId: string; expectedCount: number; createdCount: number }>('ensureExpectedLessonPreparations', { schoolId, planId });
-export const startLessonPreparationAnalysis = (schoolId: string, uploadId: string) => call<{ schoolId: string; uploadId: string }, { preparationId: string; analysisStatus: 'succeeded' | 'failed'; fallback?: string }>('startLessonPreparationAnalysis', { schoolId, uploadId });
+export const startLessonPreparationAnalysis = (schoolId: string, uploadId: string, retry = false) => call<{ schoolId: string; uploadId: string; retry: boolean }, { preparationId: string; analysisStatus: 'succeeded' | 'failed'; fallback?: string; errorCode?: string }>('startLessonPreparationAnalysis', { schoolId, uploadId, retry });
 export const saveLessonPreparationReview = (schoolId: string, preparationId: string, review: PreparationReview) => call('saveLessonPreparationReview', { schoolId, preparationId, review });
 export const validateLessonPreparation = (schoolId: string, preparationId: string) => call('validateLessonPreparation', { schoolId, preparationId });
 export const recordTeachingConfirmations = (input: { schoolId: string; academicYearId: string; classId: string; weekId: string; requestId: string; declarations: Array<{ preparationId: string; teacherStaffId: string; expectedVersion: number; status: TeachingState; effectiveDate: string; excerpts: string[]; note: string }> }) =>

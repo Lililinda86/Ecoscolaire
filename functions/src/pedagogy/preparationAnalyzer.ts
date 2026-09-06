@@ -39,6 +39,7 @@ export const validatePreparationAnalysis = (value: unknown): PreparationAnalysis
   const raw = value as Record<string, unknown>;
   if (raw.schemaVersion !== 'preparation-analysis-v1') throw new Error('INVALID_ANALYSIS_SCHEMA');
   if (!Array.isArray(raw.prerequisites) || !Array.isArray(raw.materials) || !Array.isArray(raw.lessonSteps) || !Array.isArray(raw.warnings)) throw new Error('INVALID_ANALYSIS_SCHEMA');
+  if (raw.prerequisites.length > 30 || raw.materials.length > 30 || raw.warnings.length > 30 || raw.lessonSteps.length > 20) throw new Error('INVALID_ANALYSIS_SCHEMA');
   const stringList = (items: unknown[], max: number): string[] => items.map(item => {
     if (typeof item !== 'string' || !item.trim() || item.length > max) throw new Error('INVALID_ANALYSIS_SCHEMA');
     return item.trim();
@@ -52,7 +53,7 @@ export const validatePreparationAnalysis = (value: unknown): PreparationAnalysis
     if (!title) throw new Error('INVALID_ANALYSIS_SCHEMA');
     return { title, durationMinutes: duration === null || duration === undefined ? null : duration as number, description: nullableText(step.description, 1000) };
   });
-  if (typeof raw.confidence !== 'number' || raw.confidence < 0 || raw.confidence > 1) throw new Error('INVALID_ANALYSIS_SCHEMA');
+  if (typeof raw.confidence !== 'number' || !Number.isFinite(raw.confidence) || raw.confidence < 0 || raw.confidence > 1) throw new Error('INVALID_ANALYSIS_SCHEMA');
   return {
     schemaVersion: 'preparation-analysis-v1',
     lessonTitle: nullableText(raw.lessonTitle, 500),
