@@ -6,6 +6,7 @@ admin.initializeApp({ projectId: 'demo-ecoscolaire' });
 const { recordTeachingConfirmations } = require('../../functions/lib/pedagogy/teachingConfirmations');
 const { readWeeklyAssessmentSources } = require('../../functions/lib/pedagogy/weeklyAssessments');
 const { ensureTeachingWeeks } = require('../../functions/lib/pedagogy/index');
+const { createLessonPreparationUpload } = require('../../functions/lib/pedagogy/preparations');
 const db = admin.firestore();
 const prefix = `teaching-${randomUUID()}`;
 const schoolId = prefix, academicYearId = `${prefix}-year`, classId = `${prefix}-class`, weekId = `${prefix}-week`, teacherId = `${prefix}-teacher`;
@@ -44,6 +45,8 @@ const expectCode = (operation, code) => assert.rejects(operation, error => error
     assert.equal(one.recordedCount, 1); assert.equal(two.recordedCount, 1); assert.equal(Number(one.idempotent) + Number(two.idempotent), 1);
     const updated = (await db.collection('lessonPreparations').doc(prepId).get()).data();
     assert.equal(updated.version, 3);
+    await expectCode(createLessonPreparationUpload.run({ schoolId, preparationId: prepId, checksum: 'a'.repeat(64), mimeType: 'application/pdf', size: 50, fileName: 'synthetic-replacement.pdf' }, context(`${prefix}-secretary`)), 'failed-precondition');
+    assert.deepEqual((await db.collection('lessonPreparations').doc(prepId).get()).data(), updated, 'Replacing a validated/taught source must not destroy evidence');
     assert.equal(updated.teachingConfirmation.recordedBy, `${prefix}-secretary`);
     assert.equal(updated.teachingConfirmation.declaredByTeacherStaffId, teacherId);
     assert.ok(updated.teachingConfirmation.recordedAt.toDate() instanceof Date);

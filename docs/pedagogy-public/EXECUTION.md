@@ -128,6 +128,18 @@ Production is outside this work's authorization.
   resulting commit's Linux execution. Real pedagogical review remains pending.
 
 The dedicated CI uses synthetic demo projects and no production credentials.
+The combined upstream transport/fees and pedagogy checkpoint
+`19cc437014e99ce9f3603356b8e5256665651a34` passed the complete
+[Linux gate](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34049479805).
+The bilingual A4 regression renders the real React component with 24 synthetic
+questions in each of four student/correction PDFs. Local A4 dimensions and all
+24 page counters were checked; representative first/middle/last pages were
+visually inspected. Responsive widths 360, 768 and 1440 passed. No PDFs or school
+data are exported. CI repeats the render and checks extracted pagination.
+Preparation replacement now preserves reviewed/validated/taught evidence;
+new documents require a distinct preparation after review. Seven local unit
+tests and Functions typechecking passed; the transaction regression awaits CI.
+
 Browser authentication traces and screenshots are disabled for the pedagogy
 release gate and the Staging configuration. Runtime-generated test passwords
 must never be printed. Local validation logs remain ignored.

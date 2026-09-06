@@ -134,15 +134,23 @@ export const createLessonPreparationUpload = functions.https.onCall(async (data,
   const uploadRef = db().collection('preparationUploads').doc(uploadId);
   return db().runTransaction(async transaction => {
     const existing = await transaction.get(uploadRef);
-    if (existing.exists) return { preparationId, uploadId, storagePath: existing.data()?.storagePath, created: false };
+    if (existing.exists) {
+      const upload = existing.data()!;
+      if (upload.schoolId !== schoolId || upload.preparationId !== preparationId || upload.checksum !== checksum || upload.size !== size || upload.mimeType !== mimeType) throw new functions.https.HttpsError('already-exists', 'Un fichier différent utilise déjà cet identifiant.');
+      return { preparationId, uploadId, storagePath: upload.storagePath, created: false };
+    }
     const currentPrep = await transaction.get(prepRef);
+    if (currentPrep.exists) {
+      const current = schoolDocument(currentPrep, schoolId, 'Préparation');
+      if (!['expected', 'uploaded'].includes(current.status) || current.analysisStatus === 'processing' || current.reviewData || current.teachingConfirmation) throw new functions.https.HttpsError('failed-precondition', 'Une préparation analysée, relue ou validée ne peut pas être remplacée. Conservez cette preuve et créez une nouvelle préparation pour le document corrigé.');
+    }
     if (!currentPrep.exists) transaction.create(prepRef, { ...preparation, createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     transaction.create(uploadRef, {
       id: uploadId, schoolId, preparationId, academicYearId: preparation!.academicYearId, classId: preparation!.classId,
       storagePath, originalFileName, mimeType, size, checksum, immutable: true, status: 'awaiting_upload',
       createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid
     });
-    transaction.set(prepRef, { status: 'uploaded', analysisStatus: 'pending', currentUploadId: uploadId, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid }, { merge: true });
+    transaction.set(prepRef, { status: 'uploaded', analysisStatus: 'pending', currentUploadId: uploadId, currentAnalysisId: FieldValue.delete(), extractedData: FieldValue.delete(), analysisError: FieldValue.delete(), version: (currentPrep.data()?.version || 1) + 1, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid }, { merge: true });
     audit(transaction, actor, schoolId, 'preparation_upload_registered', 'preparationUpload', uploadId, { preparationId, mimeType, size, checksum });
     return { preparationId, uploadId, storagePath, created: true };
   });
@@ -166,7 +174,7 @@ export const saveLessonPreparationReview = functions.https.onCall(async (data, c
   await db().runTransaction(async transaction => {
     const current = schoolDocument(await transaction.get(ref), schoolId, 'Préparation');
     if (!['uploaded', 'needs_review'].includes(current.status) || current.analysisStatus === 'processing') throw new functions.https.HttpsError('failed-precondition', 'Préparation non révisable pendant une analyse en cours.');
-    transaction.update(ref, { status: 'needs_review', reviewData: reviewPayload(data?.review), reviewedAt: FieldValue.serverTimestamp(), reviewedBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
+    transaction.update(ref, { status: 'needs_review', reviewData: reviewPayload(data?.review), version: (current.version || 1) + 1, reviewedAt: FieldValue.serverTimestamp(), reviewedBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     audit(transaction, actor, schoolId, 'preparation_review_saved', 'lessonPreparation', preparationId, { analysisStatus: current.analysisStatus });
   });
   return { preparationId, status: 'needs_review' };
