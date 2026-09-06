@@ -8,16 +8,15 @@ export function useScopedResource<T>(scope: string | null, empty: T, load: () =>
   const fetchResource = useCallback(async () => {
     if (!scope || activeScope.current !== scope) return;
     const request = ++sequence.current;
-    try {
-      const data = await load();
+    await Promise.resolve().then(load).then(data => {
       if (request === sequence.current && activeScope.current === scope) {
         setState({ scope, data, loading: false, error: '' });
       }
-    } catch (cause) {
+    }).catch(cause => {
       if (request === sequence.current && activeScope.current === scope) {
         setState({ scope, data: empty, loading: false, error: cause instanceof Error ? cause.message : fallback });
       }
-    }
+    });
   }, [scope, empty, load, fallback]);
   const refresh = useCallback(async () => {
     if (!scope || activeScope.current !== scope) return;
