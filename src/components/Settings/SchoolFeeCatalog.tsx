@@ -39,7 +39,7 @@ export function SchoolFeeCatalog() {
   return <section className="school-fee-catalog" aria-labelledby="fee-catalog-title">
     <h2 id="fee-catalog-title">Frais &amp; tarifs — Catalogue</h2>
     <p>Scolarité et calendrier Transport : utilisez les sections existantes ci-dessous. Le catalogue complète les tenues, autres frais et frais ponctuels.</p>
-    <p>Maternelle et primaire : PK14–PK33 = 4 000 FCFA/mois ; PK34–PK42 = 5 000 FCFA/mois. Secondaire : gratuit. PK désigne le quartier / point de ramassage.</p>
+    <p>Transport : consultez le barème actif dans Paramètres → Transport. PK désigne le quartier / point de ramassage ; le secondaire reste gratuit.</p>
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     {canManage && <details><summary>Créer un nouveau frais</summary>
       <form onSubmit={async e => { e.preventDefault(); if (await run({ action: 'create', feeId, fee: { label, category, amount: Number(amount), description, mandatory, dueDate: dueDate || null, academicYear: school.academicYear, classIds, cycles, studentIds } })) { setFeeId(crypto.randomUUID()); setLabel(''); setAmount(''); } }}>

@@ -26,11 +26,12 @@ export interface TransportAllocationPlan {
 }
 
 export const resolveItaloTransportFee = ({
-  cycle, usesTransport, zonePk
+  cycle, usesTransport, zonePk, rates
 }: {
   cycle: TransportCycle;
   usesTransport: boolean;
   zonePk: unknown;
+  rates?: { pk14To33: number; pk34To42: number };
 }): TransportFeeResolution => {
   if (cycle === 'secondary') {
     return { state: 'FREE_SECONDARY', zonePk: null, monthlyGrossAmount: 0 };
@@ -45,10 +46,14 @@ export const resolveItaloTransportFee = ({
     throw new Error('TRANSPORT_ZONE_REQUIRED');
   }
   if (zonePk >= 14 && zonePk <= 33) {
-    return { state: 'BILLABLE', zonePk, monthlyGrossAmount: 4000 };
+    const amount = rates === undefined ? 4000 : rates.pk14To33;
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('TRANSPORT_RATE_INVALID');
+    return { state: 'BILLABLE', zonePk, monthlyGrossAmount: amount };
   }
   if (zonePk >= 34 && zonePk <= 42) {
-    return { state: 'BILLABLE', zonePk, monthlyGrossAmount: 5000 };
+    const amount = rates === undefined ? 5000 : rates.pk34To42;
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('TRANSPORT_RATE_INVALID');
+    return { state: 'BILLABLE', zonePk, monthlyGrossAmount: amount };
   }
   throw new Error('TRANSPORT_ZONE_OUTSIDE_POLICY');
 };

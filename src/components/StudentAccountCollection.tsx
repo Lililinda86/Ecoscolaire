@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AccountFeeGroups, type AccountFeeGroup } from './AccountFeeGroups';
 import { httpsCallable } from 'firebase/functions';
 import { jsPDF } from 'jspdf';
 import { CheckCircle, FileDown, Plus, Printer, RefreshCw, Search } from 'lucide-react';
@@ -34,6 +35,7 @@ interface AccountLine {
 }
 
 interface StudentAccount {
+  groups?: AccountFeeGroup[];
   student: { id: string; name: string; matricule: string; classId: string; className: string };
   school: { id: string; name: string };
   academicYear: string;
@@ -359,7 +361,7 @@ const StudentAccountCollection: React.FC<Props> = ({
             <h3 id="obligations-title">Frais à régler</h3>
             <div className="obligation-list">
               {payableLines.length === 0 && <p className="no-fees">Aucun frais à régler pour cet élève.</p>}
-              {payableLines.map(line => <article className="obligation-row" key={line.key}>
+              <AccountFeeGroups key={studentId} groups={account.groups} lines={account.groups ? account.lines : payableLines} renderLine={line => <article className="obligation-row" key={line.key}>
                 <div className="obligation-main">
                   <strong>{line.label}</strong>
                   <div className="obligation-status-group">
@@ -385,13 +387,13 @@ const StudentAccountCollection: React.FC<Props> = ({
                     disabled={!line.selectable} value={amounts[line.key] || ''}
                     onChange={event => setAmounts(previous => ({ ...previous, [line.key]: event.target.value }))}
                     aria-label={`Montant reçu pour ${line.label}`} placeholder="0" /></label>
-                  <button type="button" className="secondary settle-button"
+                  <button type="button" className="secondary settle-button" disabled={!line.selectable}
                     onClick={() => setAmounts(previous => ({ ...previous, [line.key]: String(line.remainingBalance) }))}>
                     Solder {formatCurrency(line.remainingBalance)}
                   </button></div>
-              </article>)}
+              </article>} />
             </div>
-            {settledLines.length > 0 && <details className="settled-fees"><summary>Frais soldés ({settledLines.length})</summary>
+            {!account.groups && settledLines.length > 0 && <details className="settled-fees"><summary>Frais soldés ({settledLines.length})</summary>
               <div>{settledLines.map(line => <div className="settled-fee" key={line.key}>
                 <strong>{line.label}</strong>
                 <span>Échéance initiale : {line.originalDueDate ? formatDueDate(line.originalDueDate) : 'Non configurée'}</span>

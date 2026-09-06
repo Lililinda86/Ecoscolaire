@@ -1,0 +1,11 @@
+.financial-settings-page { min-width: 0; }
+.settings-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .6rem; margin: 1rem 0 1.5rem; }
+.settings-sections button { text-align: left; background: #eef5f7; color: #174758; border: 1px solid #d7e4e9; padding: .8rem; }
+.financial-settings-page h2[id], .financial-settings-page section[id] { scroll-margin-top: 1rem; }
+.financial-settings-page textarea { width: 100%; max-width: 100%; }
+@media (max-width: 768px) {
+  .financial-settings-page .page-header { flex-wrap: wrap; gap: .7rem; }
+  .financial-settings-page .card > div[style*="display: flex"] { flex-wrap: wrap; }
+  .financial-settings-page .card > form { flex-wrap: wrap; }
+  .financial-settings-page input, .financial-settings-page select { max-width: 100%; min-width: 0; }
+}

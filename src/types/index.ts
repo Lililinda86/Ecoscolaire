@@ -16,6 +16,7 @@ export interface CycleAccreditationNumbers {
 }
 
 export interface School {
+  financialTariffVersion?: string;
   updatedAt?: string;
   updatedBy?: string;
   version?: number;
@@ -75,6 +76,7 @@ export interface School {
   };
   transportPolicy?: {
     feePolicyId?: 'ITALO_PK_2026' | null;
+    pkRates?: { pk14To33: number; pk34To42: number };
     billingPeriods?: string[];
     secretaryManageAll?: boolean;
   };
