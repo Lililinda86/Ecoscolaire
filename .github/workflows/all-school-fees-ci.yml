@@ -33,4 +33,4 @@ jobs:
       - run: npm install -g firebase-tools@15.25.0
       - run: firebase emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-all-school-fees.cjs && node tests/functions/test-student-account-collections.cjs && node tests/functions/test-financial-advantage-workflow.cjs && node tests/security/all-school-fees-rules.mjs"
       - run: npx vitest run tests/unit/StudentAccountCollection.spec.tsx tests/unit/StudentAccountBenefitsDrawer.spec.tsx tests/unit/AdvantageRequestPreview.spec.tsx tests/unit/studentAccountReceipt.spec.ts
-      - run: npx vitest run tests/unit/TransportTariffPreview.spec.tsx
+      - run: npx vitest run tests/unit/TransportTariffPreview.spec.tsx tests/unit/SchoolFeeCatalog.spec.tsx
