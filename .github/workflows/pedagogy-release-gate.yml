@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -14,7 +14,7 @@ on:
         required: false
         type: string
       confirmation:
-        description: RUN_PEDAGOGY_STAGING_SYNTHETIC to enable exact Staging validation
+        description: RUN_PEDAGOGY_STAGING_SYNTHETIC or RECOVER_SYNTHETIC_RESULTS_34053765899
         required: false
         type: string
 
@@ -22,6 +22,34 @@ permissions:
   contents: read
 
 jobs:
+  recover-interrupted-synthetic-checkpoint:
+    if: github.ref == 'refs/heads/staging' && inputs.confirmation == 'RECOVER_SYNTHETIC_RESULTS_34053765899'
+    needs: [static-gates, emulator-gates]
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 10
+    concurrency:
+      group: pedagogy-staging-synthetic-validation
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+        working-directory: functions
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+      - name: Recover only the interrupted synthetic results fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PEDAGOGY_RECOVERY_CONFIRMATION: ${{ inputs.confirmation }}
+        run: node scripts/recover-pedagogy-results-checkpoint.mjs --delete-exact-fixture
   exact-staging:
     if: github.ref == 'refs/heads/staging' && inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC'
     needs: [static-gates, emulator-gates]

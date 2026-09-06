@@ -61,7 +61,7 @@ function StudentProfile({ schoolId, academicYearId, classId, studentId, teachers
     <p>Compétences : données insuffisantes en l’absence de rattachement pédagogique explicite. Les notes ci-dessous sont les notes canoniques, pas un registre parallèle. « Acquis » dans une observation décrit cette situation, pas un acquis durable.</p>
     {resource.loading && <p>Chargement du dossier…</p>}{resource.error && <p role="alert">{resource.error}</p>}
     <h2>Preuves et historique d’observation</h2>
-    {resource.data.observations.map(item => <p key={item.id}>{String(item.date)} · {String(item.objective)} · {stateLabels[String(item.state)]} · {String(item.comment)}{item.supersededBy ? ' — rectifiée, exclue des preuves courantes' : ''}</p>)}
+    {resource.data.observations.map(item => <article key={item.id}><p>{String(item.date)} · {String(item.objective)} · {stateLabels[String(item.state)]} · {String(item.comment)}{item.supersededBy ? ' — rectifiée, exclue des preuves courantes' : ''}</p>{!item.supersededBy && Boolean(item.preparationId && item.objective && item.studentId) && <ObservationCorrectionForm schoolId={schoolId} academicYearId={academicYearId} classId={classId} original={item} teachers={teachers} onSaved={resource.refresh} />}</article>)}
     {resource.data.grades.map(item => <p key={item.id}>{String(item.subjectId)} · {item.resultStatus === 'scored' ? `${item.score}/${item.maxScore}` : stateLabels[String(item.resultStatus)] || 'Statut non calculable'} · version {String(item.version)}</p>)}
     {!resource.loading && !resource.error && !resource.data.observations.length && !resource.data.grades.length && <p>Aucune preuve saisie. Ce n’est pas un résultat nul.</p>}
     {!resource.loading && !resource.error && <RemediationForm schoolId={schoolId} evidence={evidence} teachers={teachers} onSaved={resource.refresh} />}
@@ -111,5 +111,53 @@ function RemediationForm({ schoolId, evidence, teachers, current, onSaved }: { s
     {uncertain && <p>Réponse incertaine : reprendre enverra exactement la même demande, sans créer de doublon.</p>}
     {dirty && !busy && !uncertain && <button onClick={clear}>Effacer la saisie non enregistrée</button>}
     <button disabled={busy || !uncertain && (!note || (!current && (!selected || !activity)) || Boolean(current && (!teacherId || !received || action === 'REVIEW' && !selected)))} onClick={() => void save()}>{uncertain ? 'Reprendre la même demande' : !current ? 'Enregistrer la proposition' : action === 'APPROVE' ? 'Consigner l’accord enseignant' : action === 'COMPLETE' ? 'Consigner la réalisation' : action === 'CANCEL' ? 'Consigner l’annulation' : 'Consigner la réévaluation'}</button>
+  </details>;
+}
+
+export function ObservationCorrectionForm({ schoolId, academicYearId, classId, original, teachers, onSaved }: {
+  schoolId: string; academicYearId: string; classId: string; original: Row;
+  teachers: Array<{ id: string; name: string }>; onSaved: () => Promise<void>;
+}) {
+  const initialState = String(original.state), initialDate = String(original.date);
+  const [state, setState] = useState(initialState), [date, setDate] = useState(initialDate);
+  const [note, setNote] = useState(''), [teacherId, setTeacherId] = useState(''), [received, setReceived] = useState(false);
+  const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [message, setMessage] = useState('');
+  const saving = useRef(false), pending = useRef<Record<string, unknown> | null>(null);
+  const { mark, ids } = useContext(DraftContext), formId = 'rectify:' + original.id;
+  const anotherDraft = ids.some(id => id !== formId);
+  const dirty = Boolean(note || teacherId || received || busy || uncertain || state !== initialState || date !== initialDate);
+  useEffect(() => { mark(formId, dirty); return () => mark(formId, false); }, [formId, dirty, mark]);
+  const clear = () => { setState(initialState); setDate(initialDate); setNote(''); setTeacherId(''); setReceived(false); };
+  const save = async () => {
+    if (saving.current || anotherDraft || !pending.current && (!received || !teacherId || !note.trim())) return;
+    const payload = pending.current || { schoolId, academicYearId, classId, preparationId: original.preparationId,
+      teacherStaffId: teacherId, objective: original.objective, date, declarationReceived: true,
+      requestId: crypto.randomUUID(), rows: [{ studentId: original.studentId, state, comment: note, supersedesId: original.id }] };
+    pending.current = payload; saving.current = true; setBusy(true);
+    let saved = false;
+    try {
+      await httpsCallable(functions, 'recordPedagogyObservations')(payload);
+      pending.current = null; setUncertain(false); clear(); saved = true;
+      setMessage('Rectification enregistrée. L’observation précédente reste dans l’historique.');
+    } catch (error) {
+      const code = (error as { code?: string }).code || '';
+      if (['functions/invalid-argument', 'functions/failed-precondition', 'functions/permission-denied', 'functions/aborted', 'functions/already-exists', 'functions/unauthenticated', 'functions/not-found'].includes(code)) { pending.current = null; setUncertain(false); } else setUncertain(true);
+      setMessage(error instanceof Error ? error.message : 'Rectification non confirmée.');
+    } finally { saving.current = false; setBusy(false); }
+    if (saved) await onSaved();
+  };
+  return <details className="pedagogy-template-section"><summary>Rectifier cette observation sur déclaration reçue</summary>
+    <p>L’élève, la matière, le cours et l’objectif restent identiques. L’ancienne observation est conservée ; elle n’est plus comptée parmi les preuves courantes.</p>
+    {message && <p role="status">{message}</p>}
+    <fieldset disabled={busy || uncertain || anotherDraft}>
+      <label>État rectifié<select aria-label="État rectifié" value={state} onChange={event => { setState(event.target.value); setReceived(false); }}>{['not_observed', 'discovering', 'developing', 'acquired'].map(value => <option key={value} value={value}>{stateLabels[value]}</option>)}</select></label>
+      <label>Date d’observation rectifiée<input type="date" value={date} onChange={event => { setDate(event.target.value); setReceived(false); }} /></label>
+      <label>Contexte corrigé et motif reçu<textarea maxLength={2000} value={note} onChange={event => { setNote(event.target.value); setReceived(false); }} /></label>
+      <label>Enseignant déclarant la rectification<select aria-label="Enseignant déclarant la rectification" value={teacherId} onChange={event => { setTeacherId(event.target.value); setReceived(false); }}><option value="">Sélectionner</option>{teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label>
+      <label><input type="checkbox" checked={received} onChange={event => setReceived(event.target.checked)} /> J’ai reçu cette rectification de l’enseignant sélectionné.</label>
+    </fieldset>
+    {uncertain && <p>Réponse incertaine : reprendre conservera exactement la même demande de rectification.</p>}
+    {dirty && !busy && !uncertain && <button onClick={clear}>Effacer la rectification non enregistrée</button>}
+    <button disabled={busy || anotherDraft || !uncertain && (!received || !teacherId || !note.trim())} onClick={() => void save()}>{uncertain ? 'Reprendre la même rectification' : 'Enregistrer la rectification reçue'}</button>
   </details>;
 }

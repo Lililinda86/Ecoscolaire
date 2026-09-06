@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import fixture from './helpers/pedagogy-results-fixture.cjs';
 import { loginAs } from './helpers/auth';
@@ -13,7 +13,7 @@ test('Lot D: secretary transfers subject assessments and records received canoni
   test.skip(!staging && !(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST && process.env.FUNCTIONS_EMULATOR_HOST), 'Full emulators or explicit Staging required.');
   test.setTimeout(180_000);
   const prefix = `pedagogy-results-${randomBytes(8).toString('hex')}`;
-  const app = initializeApp({ projectId }, prefix), db = getFirestore(app), auth = getAuth(app);
+  const app = initializeApp({ projectId }, prefix), db = initializeFirestore(app, { preferRest: staging }), auth = getAuth(app);
   const f = await fixture.seedResultsFixture(db, prefix);
   let createdAuth = false;
   try {
@@ -27,8 +27,14 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     await page.getByRole('checkbox', { name: 'Confirmer le transfert de cette version pour la période sélectionnée' }).check();
     await page.getByRole('button', { name: 'Transférer vers la saisie des résultats' }).click();
     await expect(page.getByText(/Transfert enregistré : une évaluation canonique par matière/)).toBeVisible();
-    expect((await db.collection('evaluations').where('schoolId', '==', f.schoolId).get()).size).toBe(2);
-    expect((await db.collection('grades').where('schoolId', '==', f.schoolId).get()).size).toBe(0);
+    await test.step('Verify canonical transfer without automatic grades', async () => {
+      expect((await db.collection('evaluations').where('schoolId', '==', f.schoolId).get()).size).toBe(2);
+      expect((await db.collection('grades').where('schoolId', '==', f.schoolId).get()).size).toBe(0);
+    }, { timeout: 20_000 });
+    console.log('LOT_D_PHASE: canonical transfer reads verified');
+    await test.step('Wait for synthetic pupil results controls', async () => {
+      await expect(page.getByRole('combobox', { name: 'Résultat Synthetic pupil 1', exact: true })).toBeVisible({ timeout: 20_000 });
+    }, { timeout: 25_000 });
     await page.getByRole('combobox', { name: 'Résultat Synthetic pupil 1', exact: true }).selectOption('scored');
     await page.getByRole('spinbutton', { name: 'Score Synthetic pupil 1', exact: true }).fill('0');
     await page.getByRole('combobox', { name: 'Résultat Synthetic pupil 2', exact: true }).selectOption('absent');
@@ -66,7 +72,8 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     }
     const observationId = `${f.schoolId}-browser-reassessment`;
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Douala' }).format(new Date());
-    await db.doc(`pedagogyObservations/${observationId}`).create({ schoolId: f.schoolId, academicYearId: f.academicYearId, classId: f.classId, studentId: f.pupilIds[0], subjectId: zeroGrade.subjectId, date: today, state: 'developing', objective: 'Synthetic reassessment objective', objectiveId: 'synthetic-objective', comment: 'Entirely synthetic browser fixture', supersededBy: null });
+    const observationPreparation = `${f.schoolId}-prep-${String(zeroGrade.subjectId).endsWith('-math') ? 'math' : 'english'}`;
+    await db.doc(`pedagogyObservations/${observationId}`).create({ schoolId: f.schoolId, academicYearId: f.academicYearId, classId: f.classId, studentId: f.pupilIds[0], subjectId: zeroGrade.subjectId, preparationId: observationPreparation, date: today, state: 'developing', objective: 'Synthetic objective', objectiveId: 'synthetic-objective', comment: 'Entirely synthetic browser fixture', supersededBy: null });
     await page.reload();
     await support.getByRole('combobox', { name: 'Nouvelle preuve après réalisation', exact: true }).selectOption(`observation:${observationId}`);
     await support.getByRole('textbox', { name: 'Compte rendu reçu de l’enseignant', exact: true }).fill('Entirely synthetic follow-up declaration');
@@ -78,11 +85,27 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     const cases = await db.collection('pedagogyRemediations').where('schoolId', '==', f.schoolId).get();
     expect(cases.size).toBe(1); expect(cases.docs[0].data().review.outcome).toBe('continue_support');
     expect((await cases.docs[0].ref.collection('history').get()).size).toBe(4);
+    await page.getByText('Rectifier cette observation sur déclaration reçue', { exact: true }).click();
+    await page.getByRole('combobox', { name: 'État rectifié', exact: true }).selectOption('acquired');
+    await page.getByRole('textbox', { name: 'Contexte corrigé et motif reçu', exact: true }).fill('Entirely synthetic correction received after reassessment');
+    await page.getByRole('combobox', { name: 'Enseignant déclarant la rectification', exact: true }).selectOption(f.teacherId);
+    await page.getByRole('checkbox', { name: 'J’ai reçu cette rectification de l’enseignant sélectionné.', exact: true }).check();
+    await expect(page.getByRole('combobox', { name: 'Élève suivi', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Enregistrer la rectification reçue', exact: true }).click();
+    await expect(page.getByText(/rectifiée, exclue des preuves courantes/)).toBeVisible();
+    const prior = (await db.doc(`pedagogyObservations/${observationId}`).get()).data()!;
+    expect(prior.state).toBe('developing'); expect(prior.supersededBy).toBeTruthy();
+    const corrected = (await db.doc(`pedagogyObservations/${prior.supersededBy}`).get()).data()!;
+    expect(corrected.state).toBe('acquired'); expect(corrected.supersedesId).toBe(observationId);
+    expect(corrected.studentId).toBe(f.pupilIds[0]); expect(corrected.preparationId).toBe(observationPreparation);
+    expect((await cases.docs[0].ref.get()).data()?.review).toEqual(cases.docs[0].data().review);
     for (const name of ['payments', 'expenses', 'cashClosures', 'buses', 'inventory']) expect((await db.collection(name).where('schoolId', '==', f.schoolId).get()).empty).toBe(true);
     console.log('LOT_D_BROWSER: canonical evaluation and grade writes expected and verified; no real pupil data or human approval');
   } finally {
-    await f.cleanup();
-    if (createdAuth) await auth.deleteUser(f.secretaryId);
-    await deleteApp(app);
+    const cleanupErrors: unknown[] = [];
+    try { await f.cleanup(); } catch (error) { cleanupErrors.push(error); }
+    try { if (createdAuth) await auth.deleteUser(f.secretaryId); } catch (error) { cleanupErrors.push(error); }
+    try { await deleteApp(app); } catch (error) { cleanupErrors.push(error); }
+    expect(cleanupErrors, 'Synthetic fixture cleanup incomplete').toEqual([]);
   }
 });
