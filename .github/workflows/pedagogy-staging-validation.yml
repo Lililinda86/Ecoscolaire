@@ -1,6 +1,17 @@
 name: Pedagogy exact Staging validation
 
 on:
+  workflow_call:
+    inputs:
+      expected_sha:
+        required: true
+        type: string
+      app_url:
+        required: true
+        type: string
+      confirmation:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       expected_sha:

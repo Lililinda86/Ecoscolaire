@@ -2,13 +2,39 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library]
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Optional exact Staging SHA for live synthetic validation
+        required: false
+        type: string
+      app_url:
+        description: Optional immutable Staging Preview URL
+        required: false
+        type: string
+      confirmation:
+        description: RUN_PEDAGOGY_STAGING_SYNTHETIC to enable exact Staging validation
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 jobs:
+  exact-staging:
+    if: github.ref == 'refs/heads/staging' && inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC'
+    needs: [static-gates, emulator-gates]
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+    uses: ./.github/workflows/pedagogy-staging-validation.yml
+    with:
+      expected_sha: ${{ inputs.expected_sha }}
+      app_url: ${{ inputs.app_url }}
+      confirmation: ${{ inputs.confirmation }}
+    secrets: inherit
   static-gates:
     name: Pedagogy static gates
     runs-on: ubuntu-latest
