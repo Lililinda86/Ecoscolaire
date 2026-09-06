@@ -15,7 +15,7 @@ async function student(suffix) {
   const id = `${schoolId}-${suffix}`;
   await seed('students', id, { id, classId, academicYearId: yearId, academicYear: year, usesTransport: true, name: suffix });
   await seed('studentPrivate', id, { studentId: id, transportZonePk: 18 });
-  await seed('studentFinance', id, { studentId: id, registrationFeeExpected: 15000 });
+  await seed('studentFinance', id, { id, studentId: id, registrationFeeExpected: 15000 });
   return id;
 }
 (async () => {
@@ -28,6 +28,8 @@ async function student(suffix) {
   await seed('academicYears', yearId, { name: year, status: 'active', tuitionPaymentDeadlines: { T1: '2026-10-01', T2: '2027-01-01', T3: '2027-04-01' } });
   await seed('classes', classId, { name: 'CP', cycle: 'primary' });
   const first = await student('existing');
+  const catalogId = `${schoolId}-uniform`;
+  await call('manageSchoolFee', { action: 'create', feeId: catalogId, fee: { label: 'Tenue versionnée', category: 'uniform', description: 'Test', academicYear: year, amount: 10000, mandatory: true, classIds: [], cycles: [], studentIds: [], dueDate: null } });
   await call('setStudentTransportPlan', { studentId: first, usesTransport: true, zonePk: 18 });
   const before = await account(first);
   assert.equal(line(before, 'tuition:T1').grossExpectedAmount, 60000);
@@ -55,9 +57,12 @@ async function student(suffix) {
   assert.equal(line(await account(first), 'transport:2026-10').grossExpectedAmount, 4000, 'PK change cannot reprice existing months');
   assert.match(line(await account(first), 'transport:2026-10').label, /PK18/);
   const second = await student('new');
+  await call('manageSchoolFee', { action: 'revise', feeId: catalogId, expectedAmount: 10000, amount: 12000, reason: 'Revision test' });
+  assert.equal(line(await account(first), `other:${catalogId}`).grossExpectedAmount, 10000);
   const newAccount = await account(second);
   assert.equal(line(newAccount, 'tuition:T1').grossExpectedAmount, 65000);
   assert.equal(line(newAccount, 'uniforms').grossExpectedAmount, 12000);
+  assert.equal(line(newAccount, `other:${catalogId}`).grossExpectedAmount, 12000);
   await seed('classes', `${classId}-new`, { name: 'New class', cycle: 'primary' });
   await db.collection('students').doc(first).update({ classId: `${classId}-new` });
   assert.equal(line(await account(first), 'tuition:T1').grossExpectedAmount, 60000, 'class change preserves established tuition');

@@ -34,14 +34,14 @@ export const snapshotsFrom = (source: Data): Record<string, ObligationSnapshot> 
 export function freezeObligations(tx: admin.firestore.Transaction, db: admin.firestore.Firestore,
   existing: Record<string, ObligationSnapshot>, scope: { schoolId: string; studentId: string; academicYear: string;
     classId: string; cycle: string; tariffVersion: string },
-  lines: Array<{ key: string; type: string; category?: string; grossExpectedAmount: number; netExpectedAmount: number;
+  lines: Array<{ key: string; type: string; label?: string; tariffVersion?: string; category?: string; grossExpectedAmount: number; netExpectedAmount: number;
     originalDueDate: string | null; period: string | null; feeId: string | null; zonePk?: number | null }>) {
   for (const line of lines) {
     if (existing[line.key] || line.grossExpectedAmount <= 0) continue;
     // Aggregate transport is not an obligation: freeze its individual monthly lines instead.
     if (line.type === 'transport' && !line.period) continue;
     tx.create(db.collection('studentFinancialObligations').doc(obligationId(scope.schoolId, scope.studentId, scope.academicYear, line.key)), {
-      ...scope, key: line.key, category: line.category || line.type,
+      ...scope, key: line.key, label: line.label || line.key, tariffVersion: line.tariffVersion || scope.tariffVersion, category: line.category || line.type,
       grossExpectedAmount: line.grossExpectedAmount, netExpectedAmountAtCreation: line.netExpectedAmount,
       originalDueDate: line.originalDueDate, period: line.period, feeId: line.feeId, zonePk: line.zonePk ?? null,
       createdAt: admin.firestore.FieldValue.serverTimestamp()

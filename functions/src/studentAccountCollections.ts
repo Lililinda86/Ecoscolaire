@@ -29,6 +29,7 @@ interface RequestedLine {
 
 interface AccountLine extends CollectionQuote {
   category?: string;
+  tariffVersion?: string;
   key: string;
   type: AccountLineType;
   label: string;
@@ -231,6 +232,7 @@ export const buildAccountLines = async (
     const dueDate = fee.dueDate;
     const overdue = !!dueDate && dueDate < today && quote.remainingBalance > 0;
     lines.push({ ...quote, key, type: 'other', label: fee.label, category: fee.category, installment: null, period: null, feeId: fee.id,
+      tariffVersion: String(fee.versionId || fee.id),
       originalDueDate: dueDate, effectiveDueDate: dueDate, nextDueDate: quote.remainingBalance > 0 ? dueDate : null,
       overdue, dueStatus: quote.remainingBalance === 0 ? 'PAID' : !dueDate ? 'UNCONFIGURED' : overdue ? 'OVERDUE' : dueDate > today ? 'NOT_DUE' : 'DUE_TODAY',
       selectable: quote.remainingBalance > 0 });
@@ -290,6 +292,13 @@ export const getStudentFinancialAccount = functions.https.onCall(async (raw, con
 });
 
 export const recordCashCollection = functions.https.onCall(async (raw, context) => {
+  const receiptSummary = (receipt: Data) => ({
+    schoolName: receipt.schoolName || '', studentName: receipt.studentName || '',
+    matricule: receipt.studentRegistrationNumber || '', className: receipt.className || '',
+    academicYear: receipt.academicYear || '', issuedAt: receipt.issuedAt || receipt.paymentDate || receipt.date || '',
+    cashier: receipt.collectedByName || receipt.collectedByUserId || '',
+    accountRemainingBalance: receipt.accountRemainingBalance ?? null
+  });
   if (!context.auth?.uid) throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
   const source = (raw || {}) as Data;
   const schoolId = collectionInternals.requireId(source.schoolId, 'schoolId');
@@ -323,7 +332,7 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
       const receipt = receiptSnap.data() || {};
       return { collectionId, paymentId: collectionId, receiptId: collectionId,
         receiptNumber: receipt.receiptNumber, amount: receipt.amount, lineItems: receipt.lineItems || [],
-        remainingBalance: receipt.remainingBalance, idempotentReplay: true };
+        remainingBalance: receipt.remainingBalance, receipt: receiptSummary(receipt), idempotentReplay: true };
     }
 
     const { lines: accountLines, base, pendingFees } = await buildAccountLines(transaction, db, uid, schoolId, studentId, academicYear);
@@ -406,7 +415,8 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
       studentName: base.student.name || '', studentRegistrationNumber: base.student.matricule || '',
       classId: base.student.classId || '', className: base.classData.name || '', schoolName: base.school.name || 'EcoScolaire',
       collectedByUserId: uid, collectedByName: base.user.name || base.user.displayName || base.user.email || uid,
-      paymentDate: date };
+      paymentDate: date, issuedAt: new Date().toISOString(),
+      accountRemainingBalance: accountTotals(accountLines).totalRemaining - lineItems.reduce((sum, line) => sum + line.allocatedAmount, 0) };
     transaction.create(paymentRef, paymentData);
     writePendingFees(transaction, pendingFees);
     freezeObligations(transaction, db, snapshotsFrom(base.finance), {
@@ -498,6 +508,6 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
     transaction.create(db.collection('audit_logs').doc(), { ...collectionInternals.auditData(
       'RECEIPT_CREATED', schoolId, uid, 'RECEIPT', collectionId, { receiptNumber }), ...fixture });
     return { collectionId, paymentId: collectionId, receiptId: collectionId, receiptNumber,
-      amount: total, lineItems, remainingBalance, idempotentReplay: false };
+      amount: total, lineItems, remainingBalance, receipt: receiptSummary(receiptData), idempotentReplay: false };
   });
 });
