@@ -58,5 +58,7 @@ jobs:
         if: always()
         with:
           name: all-fees-responsive-staging
-          path: all-fees-*.png
+          path: |
+            all-fees-*.png
+            all-fees-receipt.pdf
           if-no-files-found: ignore

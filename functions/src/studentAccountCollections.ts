@@ -1,3 +1,5 @@
+import { freezeObligations, snapshotsFrom } from './financialObligationSnapshots';
+import { resolveCanonicalClassCycle } from './classCycle';
 import * as admin from 'firebase-admin';
 import { readStudentFees, writePendingFees, PendingFeeAssignment } from './studentFeeAssignments';
 import * as crypto from 'crypto';
@@ -26,6 +28,9 @@ interface RequestedLine {
 }
 
 interface AccountLine extends CollectionQuote {
+  category?: string;
+  tariffVersion?: string;
+  zonePk?: number | null;
   key: string;
   type: AccountLineType;
   label: string;
@@ -205,7 +210,7 @@ export const buildAccountLines = async (
   }
   const payments = base.payments.filter(payment => payment.schoolId === schoolId && payment.academicYear === academicYear);
   const globalFees = base.school.globalFees && typeof base.school.globalFees === 'object' ? base.school.globalFees as Data : {};
-  const uniformGross = base.finance.feeUniforms ?? globalFees.feeUniforms;
+  const uniformGross = snapshotsFrom(base.finance).uniforms?.grossExpectedAmount ?? base.finance.feeUniforms ?? globalFees.feeUniforms;
   if (typeof uniformGross === 'number' && Number.isSafeInteger(uniformGross) && uniformGross > 0) {
     const quote = simpleQuote(uniformGross, payments.reduce((sum, payment) =>
       collectionInternals.safeAdd(sum, paymentLineAmount(payment, 'uniforms'), 'uniformPaid'), 0));
@@ -214,7 +219,7 @@ export const buildAccountLines = async (
   }
   for (const fee of configuredOtherFees(base.school, base.student, base.classData)) {
     const key = `other:${fee.id}`;
-    const quote = simpleQuote(fee.amount, payments.reduce((sum, payment) =>
+    const quote = simpleQuote(snapshotsFrom(base.finance)[key]?.grossExpectedAmount ?? fee.amount, payments.reduce((sum, payment) =>
       collectionInternals.safeAdd(sum, paymentLineAmount(payment, key), 'otherFeePaid'), 0));
     lines.push({ ...quote, key, type: 'other', label: fee.label, installment: null,
       period: null, feeId: fee.id, selectable: quote.remainingBalance > 0 });
@@ -227,7 +232,8 @@ export const buildAccountLines = async (
     const today = collectionInternals.getDoualaDate();
     const dueDate = fee.dueDate;
     const overdue = !!dueDate && dueDate < today && quote.remainingBalance > 0;
-    lines.push({ ...quote, key, type: 'other', label: fee.label, installment: null, period: null, feeId: fee.id,
+    lines.push({ ...quote, key, type: 'other', label: fee.label, category: fee.category, installment: null, period: null, feeId: fee.id,
+      tariffVersion: String(fee.versionId || fee.id),
       originalDueDate: dueDate, effectiveDueDate: dueDate, nextDueDate: quote.remainingBalance > 0 ? dueDate : null,
       overdue, dueStatus: quote.remainingBalance === 0 ? 'PAID' : !dueDate ? 'UNCONFIGURED' : overdue ? 'OVERDUE' : dueDate > today ? 'NOT_DUE' : 'DUE_TODAY',
       selectable: quote.remainingBalance > 0 });
@@ -242,6 +248,26 @@ export const monthlyLines = (lines: AccountLine[]): AccountLine[] => lines.flatM
     label: `Transport — ${item.period}${item.zonePk == null ? '' : ` — PK${item.zonePk}`}`, selectable: item.remainingBalance > 0 }));
 });
 
+export const accountGroups = (lines: AccountLine[]) => {
+  const definitions = [
+    ['registration', 'Inscription'], ['tuition', 'Scolarité'], ['transport', 'Transport'],
+    ['uniforms', 'Tenues'], ['activities', 'Activités & événements'], ['other', 'Autres frais']
+  ];
+  const groupKey = (line: AccountLine): string => {
+    if (line.type === 'registration_fee') return 'registration';
+    if (line.type === 'tuition' || line.type === 'transport') return line.type;
+    if (line.type === 'uniforms' || ['uniform', 'sports_uniform'].includes(line.category || '')) return 'uniforms';
+    if (['activity', 'excursion', 'event', 'photo', 'exam'].includes(line.category || '')) return 'activities';
+    return 'other';
+  };
+  return definitions.flatMap(([key, label]) => {
+    const items = lines.filter(line => groupKey(line) === key);
+    const transportRates = key === 'transport' ? [...new Map(items.map(line => [`${line.zonePk}:${line.grossExpectedAmount}`,
+      { zonePk: line.zonePk ?? null, monthlyAmount: line.grossExpectedAmount }])).values()] : [];
+    return items.length ? [{ key, label, lineKeys: items.map(line => line.key), totals: accountTotals(items), transportRates }] : [];
+  });
+};
+
 export const getStudentFinancialAccount = functions.https.onCall(async (raw, context) => {
   if (!context.auth?.uid) throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
   const source = (raw || {}) as Data;
@@ -252,18 +278,30 @@ export const getStudentFinancialAccount = functions.https.onCall(async (raw, con
   return db.runTransaction(async transaction => {
     const { lines, base, pendingFees } = await buildAccountLines(transaction, db, context.auth!.uid, schoolId, studentId, academicYear);
     writePendingFees(transaction, pendingFees);
+    freezeObligations(transaction, db, snapshotsFrom(base.finance), {
+      schoolId, studentId, academicYear, classId: String(base.student.classId || ''),
+      cycle: resolveCanonicalClassCycle(base.classData), tariffVersion: String(base.school.financialTariffVersion || 'legacy-v3')
+    }, monthlyLines(lines));
     return {
       student: { id: studentId, name: base.student.name || '', matricule: base.student.matricule || '',
         classId: base.student.classId || '', className: base.classData.name || '' },
       school: { id: schoolId, name: base.school.name || 'EcoScolaire' },
       academicYear,
       totals: accountTotals(lines),
+      groups: accountGroups(source.monthlyTransport === true ? monthlyLines(lines) : lines),
       lines: source.monthlyTransport === true ? monthlyLines(lines) : lines
     };
   });
 });
 
 export const recordCashCollection = functions.https.onCall(async (raw, context) => {
+  const receiptSummary = (receipt: Data) => ({
+    schoolName: receipt.schoolName || '', studentName: receipt.studentName || '',
+    matricule: receipt.studentRegistrationNumber || '', className: receipt.className || '',
+    academicYear: receipt.academicYear || '', issuedAt: receipt.issuedAt || receipt.paymentDate || receipt.date || '',
+    cashier: receipt.collectedByName || receipt.collectedByUserId || '',
+    accountRemainingBalance: receipt.accountRemainingBalance ?? null
+  });
   if (!context.auth?.uid) throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
   const source = (raw || {}) as Data;
   const schoolId = collectionInternals.requireId(source.schoolId, 'schoolId');
@@ -297,7 +335,7 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
       const receipt = receiptSnap.data() || {};
       return { collectionId, paymentId: collectionId, receiptId: collectionId,
         receiptNumber: receipt.receiptNumber, amount: receipt.amount, lineItems: receipt.lineItems || [],
-        remainingBalance: receipt.remainingBalance, idempotentReplay: true };
+        remainingBalance: receipt.remainingBalance, receipt: receiptSummary(receipt), idempotentReplay: true };
     }
 
     const { lines: accountLines, base, pendingFees } = await buildAccountLines(transaction, db, uid, schoolId, studentId, academicYear);
@@ -380,9 +418,14 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
       studentName: base.student.name || '', studentRegistrationNumber: base.student.matricule || '',
       classId: base.student.classId || '', className: base.classData.name || '', schoolName: base.school.name || 'EcoScolaire',
       collectedByUserId: uid, collectedByName: base.user.name || base.user.displayName || base.user.email || uid,
-      paymentDate: date };
+      paymentDate: date, issuedAt: new Date().toISOString(),
+      accountRemainingBalance: accountTotals(accountLines).totalRemaining - lineItems.reduce((sum, line) => sum + line.allocatedAmount, 0) };
     transaction.create(paymentRef, paymentData);
     writePendingFees(transaction, pendingFees);
+    freezeObligations(transaction, db, snapshotsFrom(base.finance), {
+      schoolId, studentId, academicYear, classId: String(base.student.classId || ''),
+      cycle: resolveCanonicalClassCycle(base.classData), tariffVersion: String(base.school.financialTariffVersion || 'legacy-v3')
+    }, monthlyLines(accountLines));
     transaction.create(receiptRef, receiptData);
     transaction.set(counterRef, { lastReceiptNumber: nextNumber }, { merge: true });
     transaction.set(cashLedgerRef, { id: cashLedgerId, schoolId, date, status: 'open',
@@ -468,6 +511,6 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
     transaction.create(db.collection('audit_logs').doc(), { ...collectionInternals.auditData(
       'RECEIPT_CREATED', schoolId, uid, 'RECEIPT', collectionId, { receiptNumber }), ...fixture });
     return { collectionId, paymentId: collectionId, receiptId: collectionId, receiptNumber,
-      amount: total, lineItems, remainingBalance, idempotentReplay: false };
+      amount: total, lineItems, remainingBalance, receipt: receiptSummary(receiptData), idempotentReplay: false };
   });
 });

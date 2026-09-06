@@ -76,6 +76,9 @@
 .student-account-success { min-width: min(720px, 82vw); text-align: center; color: #166534; }
 .student-account-receipt { display: grid; gap: .55rem; margin: 1rem auto; padding: 1.25rem; max-width: 600px; color: #0f172a; text-align: left; border: 1px solid #cbd5e1; border-radius: 10px; background: white; }
 .student-account-receipt h3, .student-account-receipt p { text-align: center; margin: .15rem; }
+ .student-account-receipt { overflow-wrap: anywhere; }
+ .student-account-receipt .receipt-line { flex-wrap: wrap; }
+ .student-account-receipt .receipt-line > span { min-width: 0; flex: 1 1 160px; }
 .account-actions { display: flex; gap: .65rem; justify-content: center; flex-wrap: wrap; }
 .account-actions button { display: inline-flex; gap: .4rem; align-items: center; }
 @media (max-width: 900px) {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AccountFeeGroups, type AccountFeeGroup } from './AccountFeeGroups';
 import { httpsCallable } from 'firebase/functions';
 import { jsPDF } from 'jspdf';
 import { CheckCircle, FileDown, Plus, Printer, RefreshCw, Search } from 'lucide-react';
@@ -34,6 +35,7 @@ interface AccountLine {
 }
 
 interface StudentAccount {
+  groups?: AccountFeeGroup[];
   student: { id: string; name: string; matricule: string; classId: string; className: string };
   school: { id: string; name: string };
   academicYear: string;
@@ -42,6 +44,7 @@ interface StudentAccount {
 }
 
 interface CollectionResult {
+  receipt?: { schoolName: string; studentName: string; matricule: string; className: string; academicYear: string; issuedAt: string; cashier: string; accountRemainingBalance: number | null };
   collectionId: string;
   paymentId: string;
   receiptId: string;
@@ -49,7 +52,7 @@ interface CollectionResult {
   amount: number;
   remainingBalance: number;
   idempotentReplay: boolean;
-  lineItems: Array<{ key: string; label: string; amount: number; remainingBalance: number }>;
+  lineItems: Array<{ key: string; label: string; amount: number; remainingBalance: number; grossExpectedAmount?: number; netExpectedAmount?: number; discountAmount?: number }>;
 }
 
 interface Props {
@@ -245,12 +248,23 @@ const StudentAccountCollection: React.FC<Props> = ({
   const downloadPdf = () => {
     if (!result || !account) return;
     const pdf = new jsPDF();
-    const rows = [account.school.name, `Reçu ${result.receiptNumber}`, `${account.student.name} — ${account.student.className}`,
-      `Année scolaire ${account.academicYear}`, '', ...result.lineItems.map(line => `${line.label}: ${formatCurrency(line.amount)}`),
-      '', `TOTAL: ${formatCurrency(result.amount)}`, 'Mode: Espèces', `Reste du compte: ${formatCurrency(account.totals.totalRemaining)}`,
+    const rows = [result.receipt?.schoolName || account.school.name, `Reçu ${result.receiptNumber}`, `${result.receipt?.studentName || account.student.name} — ${result.receipt?.className || account.student.className}`,
+      `Année scolaire ${result.receipt?.academicYear || account.academicYear}`,
+      `Matricule : ${result.receipt?.matricule || account.student.matricule}`,
+      `Date serveur : ${result.receipt?.issuedAt || 'Voir reçu enregistré'}`,
+      `Caissier : ${result.receipt?.cashier || 'Voir reçu enregistré'}`, '',
+      ...result.lineItems.flatMap(line => [line.label, ...(line.netExpectedAmount === undefined ? [] : [`Montant attendu : ${formatCurrency(line.netExpectedAmount)}`]), `Versé : ${formatCurrency(line.amount)} — Reste : ${formatCurrency(line.remainingBalance)}`]),
+      '', `TOTAL: ${formatCurrency(result.amount)}`, 'Mode: Espèces', `Reste sur les frais du reçu: ${formatCurrency(result.remainingBalance)}`,
       `Opération: ${result.collectionId}`];
     pdf.setFont('helvetica', 'normal');
-    rows.forEach((row, index) => pdf.text(row, 18, 20 + index * 8));
+    let y = 20;
+    for (const row of rows) {
+      const wrapped = pdf.splitTextToSize(row, 172) as string[];
+      for (const text of wrapped) {
+        if (y > 275) { pdf.addPage(); y = 20; }
+        pdf.text(text, 18, y); y += 8;
+      }
+    }
     pdf.save(`${result.receiptNumber}.pdf`);
   };
 
@@ -269,8 +283,10 @@ const StudentAccountCollection: React.FC<Props> = ({
       {result.idempotentReplay && <p className="account-notice">Cette demande avait déjà été traitée : aucun doublon n’a été créé.</p>}
       <div className="student-account-receipt">
         <h3>{account.school.name}</h3>
-        <p>{account.student.name} · {account.student.className} · {formatSchoolYear(account.academicYear)}</p>
-        {result.lineItems.map(line => <div className="receipt-line" key={line.key}><span>{line.label}</span><strong>{formatCurrency(line.amount)}</strong></div>)}
+        <p>{result.receipt?.studentName || account.student.name} · {result.receipt?.className || account.student.className} · {formatSchoolYear(result.receipt?.academicYear || account.academicYear)}</p>
+        <p>Matricule : {result.receipt?.matricule || account.student.matricule}</p>
+        {result.receipt && <p>Date serveur : {result.receipt.issuedAt} · Caissier : {result.receipt.cashier}</p>}
+        {result.lineItems.map(line => <div className="receipt-line" key={line.key}><span>{line.label}{line.netExpectedAmount !== undefined && <small> · Attendu : {formatCurrency(line.netExpectedAmount)}</small>}<small> · Reste : {formatCurrency(line.remainingBalance)}</small>{!!line.discountAmount && <small> · Avantage : {formatCurrency(line.discountAmount)}</small>}</span><strong>Versé : {formatCurrency(line.amount)}</strong></div>)}
         <div className="receipt-total"><span>Total reçu — Espèces</span><strong>{formatCurrency(result.amount)}</strong></div>
         <small>Opération : {result.collectionId}</small>
       </div>
@@ -359,11 +375,12 @@ const StudentAccountCollection: React.FC<Props> = ({
             <h3 id="obligations-title">Frais à régler</h3>
             <div className="obligation-list">
               {payableLines.length === 0 && <p className="no-fees">Aucun frais à régler pour cet élève.</p>}
-              {payableLines.map(line => <article className="obligation-row" key={line.key}>
+              <AccountFeeGroups key={studentId} groups={account.groups} lines={account.groups ? account.lines : payableLines} renderLine={line => <article className="obligation-row" key={line.key}>
                 <div className="obligation-main">
                   <strong>{line.label}</strong>
                   <div className="obligation-status-group">
                     <span className={`account-status status-${statusLabel(line).toLowerCase().replace(/\s+/g, '-')}`}>{statusLabel(line)}</span>
+                    {line.status === 'PARTIAL' && <span className="account-status">PARTIELLEMENT PAYÉ</span>}
                     {statusDueDate(line) && <span className="status-due-date">
                       {statusDueLabel(line)} : <strong>{formatDueDate(statusDueDate(line))}</strong>
                     </span>}
@@ -385,13 +402,13 @@ const StudentAccountCollection: React.FC<Props> = ({
                     disabled={!line.selectable} value={amounts[line.key] || ''}
                     onChange={event => setAmounts(previous => ({ ...previous, [line.key]: event.target.value }))}
                     aria-label={`Montant reçu pour ${line.label}`} placeholder="0" /></label>
-                  <button type="button" className="secondary settle-button"
+                  <button type="button" className="secondary settle-button" disabled={!line.selectable}
                     onClick={() => setAmounts(previous => ({ ...previous, [line.key]: String(line.remainingBalance) }))}>
                     Solder {formatCurrency(line.remainingBalance)}
                   </button></div>
-              </article>)}
+              </article>} />
             </div>
-            {settledLines.length > 0 && <details className="settled-fees"><summary>Frais soldés ({settledLines.length})</summary>
+            {!account.groups && settledLines.length > 0 && <details className="settled-fees"><summary>Frais soldés ({settledLines.length})</summary>
               <div>{settledLines.map(line => <div className="settled-fee" key={line.key}>
                 <strong>{line.label}</strong>
                 <span>Échéance initiale : {line.originalDueDate ? formatDueDate(line.originalDueDate) : 'Non configurée'}</span>

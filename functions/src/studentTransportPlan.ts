@@ -1,3 +1,4 @@
+import { readObligations } from './financialObligationSnapshots';
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { createHash } from 'crypto';
@@ -16,7 +17,8 @@ export const revisePeriodFees = (previous: Record<string, number>, periods: stri
   const result = { ...previous };
   for (const period of periods) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('INVALID_TRANSPORT_PERIOD');
-    if (period >= effectivePeriod) result[period] = amount;
+    // An established positive monthly obligation is immutable, even when future and unpaid.
+    if (period >= effectivePeriod && !(result[period] > 0)) result[period] = amount;
   }
   return result;
 };
@@ -46,7 +48,7 @@ export const setStudentTransportPlan = functions.https.onCall(async (raw, contex
     if (school.transportPolicy?.feePolicyId !== 'ITALO_PK_2026' || !Array.isArray(periods) || !periods.length || new Set(periods).size !== periods.length) throw new functions.https.HttpsError('failed-precondition', 'Configurer les mois facturables.');
     const zonePk = raw.zonePk ?? null;
     if (raw.usesTransport && (!Number.isSafeInteger(zonePk) || zonePk < 14 || zonePk > 42)) throw new functions.https.HttpsError('invalid-argument', 'Choisir un point PK14 à PK42.');
-    const fee = resolveItaloTransportFee({ cycle, usesTransport: raw.usesTransport, zonePk });
+    const fee = resolveItaloTransportFee({ cycle, usesTransport: raw.usesTransport, zonePk, rates: school.transportPolicy?.pkRates });
     const ref = db.collection('studentTransportPlans').doc(transportPlanId(schoolId, studentId, year.name));
     const planSnap = await tx.get(ref); const plan = planSnap.data() || {};
     const [allocations, payments] = await Promise.all([
@@ -60,7 +62,7 @@ export const setStudentTransportPlan = functions.https.onCall(async (raw, contex
       for (const l of Array.isArray(p.lineItems) ? p.lineItems : []) if (l.type === 'transport' && typeof l.period === 'string') protectedPeriods.add(l.period);
     } }
     if (planSnap.exists && (plan.schoolId !== schoolId || plan.studentId !== studentId || plan.academicYear !== year.name)) throw new functions.https.HttpsError('failed-precondition', 'Historique incohérent.');
-    if (planSnap.exists && plan.usesTransport === raw.usesTransport && plan.zonePk === zonePk) return { monthlyGrossAmount: fee.monthlyGrossAmount, effectivePeriod: plan.effectivePeriod, replay: true };
+    if (planSnap.exists && plan.usesTransport === raw.usesTransport && plan.zonePk === zonePk && periods.every((p: string) => Object.prototype.hasOwnProperty.call(plan.periodFees || {}, p))) return { monthlyGrossAmount: fee.monthlyGrossAmount, effectivePeriod: plan.effectivePeriod, replay: true };
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Douala', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     const effectivePeriod = prospectivePeriod(today);
     let previous: Record<string, number> = plan.periodFees || {};
@@ -72,9 +74,16 @@ export const setStudentTransportPlan = functions.https.onCall(async (raw, contex
       periodZonePks = Object.fromEntries(periods.map((period: string) => [period, privateData.transportZonePk ?? null]));
     }
     const periodFees = revisePeriodFees(previous, periods.filter((p: string) => !protectedPeriods.has(p)), effectivePeriod, fee.monthlyGrossAmount);
+    const obligations = await readObligations(tx, db, schoolId, studentId, year.name);
+    for (const obligation of Object.values(obligations).filter(o => o.key.startsWith('transport:'))) {
+      const period = obligation.key.slice('transport:'.length);
+      previous[period] = obligation.grossExpectedAmount;
+      periodFees[period] = obligation.grossExpectedAmount;
+      periodZonePks[period] = typeof obligation.zonePk === 'number' ? obligation.zonePk : null;
+    }
     for (const period of Object.keys(periodFees)) {
       if (!(period in periodZonePks)) periodZonePks[period] = plan.zonePk ?? privateData.transportZonePk ?? null;
-      if (period >= effectivePeriod && !protectedPeriods.has(period)) periodZonePks[period] = zonePk;
+      if (period >= effectivePeriod && !protectedPeriods.has(period) && !(previous[period] > 0)) periodZonePks[period] = zonePk;
     }
     const change: Data = { effectivePeriod, zonePk, usesTransport: raw.usesTransport, monthlyGrossAmount: fee.monthlyGrossAmount, actorId: context.auth!.uid, at: today };
     tx.set(ref, { schoolId, studentId, academicYear: year.name, periodFees, periodZonePks, usesTransport: raw.usesTransport, zonePk, effectivePeriod,

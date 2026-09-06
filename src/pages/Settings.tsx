@@ -1,9 +1,13 @@
+import { financialSettingsPayload, stableConfiguration } from '../utils/financialSettingsPayload';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../db/firebase';
+import './Settings.css';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SchoolFeeCatalog } from '../components/Settings/SchoolFeeCatalog';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Edit2, Trash2, BookOpen } from 'lucide-react';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
 import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
@@ -17,7 +21,7 @@ import {
 } from '../utils/tuitionDeadlines';
 
 const Settings: React.FC = () => {
-  const { db, safeMergeDB, currentUser } = useAppContext();
+  const { db, safeMergeDB, updateLocalState, currentUser } = useAppContext();
   const navigate = useNavigate();
   const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as 'francophone' | 'anglophone' });
   const [isSubjModalOpen, setSubjModalOpen] = useState(false);
@@ -106,8 +110,11 @@ const Settings: React.FC = () => {
   const [draftTransportPolicy, setDraftTransportPolicy] = useState(false);
   const [draftItaloTransportEnabled, setDraftItaloTransportEnabled] = useState(false);
   const [draftTransportBillingPeriods, setDraftTransportBillingPeriods] = useState('');
+  const [draftPkRates, setDraftPkRates] = useState({ pk14To33: '4000', pk34To42: '5000' });
+  const [tariffReason, setTariffReason] = useState('');
 
-  const canEditFees = ['owner', 'superAdmin'].includes(currentUser?.role || '');
+  const canEditFees = ['owner', 'director', 'superAdmin'].includes(currentUser?.role || '');
+  const canEditInstitution = ['owner', 'superAdmin'].includes(currentUser?.role || '');
   const [draftClassFees, setDraftClassFees] = useState<Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }>>({});
 
   // 3. Draft initialization strategy: Keep track of initialized school id via ref to avoid overwriting modified drafts on contextual reload of db.school.
@@ -146,6 +153,7 @@ const Settings: React.FC = () => {
       setDraftTransportPolicy(school.transportPolicy?.secretaryManageAll === true);
       setDraftItaloTransportEnabled(school.transportPolicy?.feePolicyId === 'ITALO_PK_2026');
       setDraftTransportBillingPeriods((school.transportPolicy?.billingPeriods || []).join(', '));
+      setDraftPkRates({ pk14To33: String(school.transportPolicy?.pkRates?.pk14To33 ?? 4000), pk34To42: String(school.transportPolicy?.pkRates?.pk34To42 ?? 5000) });
       
       const feesInit: Record<string, { registration?: string; tuition?: string; t1?: string; t2?: string; t3?: string }> = {};
       if (school.classFees) {
@@ -221,7 +229,7 @@ const Settings: React.FC = () => {
     return amount;
   };
 
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = async (financialOnly = false) => {
     if (!db.school || isSaving) return;
 
     // 1. Validation Name
@@ -253,7 +261,7 @@ const Settings: React.FC = () => {
     }
 
     // 4. Validation Cycles
-    if (draftEducationCycles.length === 0) {
+    if (!financialOnly && draftEducationCycles.length === 0) {
       alert("Vous devez sélectionner au moins un cycle scolaire pour l'établissement.");
       return;
     }
@@ -336,7 +344,8 @@ const Settings: React.FC = () => {
           ...(db.school.transportPolicy || {}),
           secretaryManageAll: draftTransportPolicy,
           feePolicyId: draftItaloTransportEnabled ? ('ITALO_PK_2026' as const) : null,
-          billingPeriods: draftItaloTransportEnabled ? normalizedTransportPeriods : []
+          billingPeriods: draftItaloTransportEnabled ? normalizedTransportPeriods : [],
+          pkRates: { pk14To33: normalizeFee('PK14–PK33', draftPkRates.pk14To33), pk34To42: normalizeFee('PK34–PK42', draftPkRates.pk34To42) }
         }
       };
 
@@ -361,16 +370,29 @@ const Settings: React.FC = () => {
       }
       updatedSchool.classFees = classFeesToSave;
 
-      await setDoc(doc(firestoreDb, 'schools', db.school.id), updatedSchool, { merge: true });     
-      await safeMergeDB({
-        ...db,
-        school: updatedSchool
-      });
+      const tariffConfiguration = financialSettingsPayload(updatedSchool);
+      const originalConfiguration = financialSettingsPayload(db.school);
+      if (stableConfiguration(tariffConfiguration) !== stableConfiguration(originalConfiguration)) {
+        if (!tariffReason.trim()) throw new Error('Indiquez le motif de la nouvelle version tarifaire.');
+        const response = await httpsCallable<Record<string, unknown>, { version: string }>(functions, 'manageSchoolFee')({
+          schoolId: db.school.id, action: 'configure', academicYear: db.school.academicYear,
+          expectedVersion: db.school.financialTariffVersion || null, reason: tariffReason, configuration: tariffConfiguration
+        });
+        updatedSchool.financialTariffVersion = response.data.version;
+      }
+      const metadata = Object.fromEntries(Object.entries(updatedSchool).filter(([key]) => !['globalFees', 'classFees', 'transportPolicy', 'financialTariffVersion', 'feeCatalog'].includes(key)));
+      if (!financialOnly && canEditInstitution) await setDoc(doc(firestoreDb, 'schools', db.school.id), metadata, { merge: true });
+      if (!financialOnly && canEditInstitution && draftTransportPolicy !== (db.school.transportPolicy?.secretaryManageAll === true)) {
+        await updateDoc(doc(firestoreDb, 'schools', db.school.id), { 'transportPolicy.secretaryManageAll': draftTransportPolicy });
+      }
+      const saved = await getDoc(doc(firestoreDb, 'schools', db.school.id));
+      const savedSchool = { ...saved.data(), id: db.school.id } as School;
+      updateLocalState({ school: savedSchool });
       alert("Paramètres enregistrés avec succès.");
-      initDraftsFromSchool(updatedSchool);
+      initDraftsFromSchool(savedSchool);
     } catch (err) {
       console.error(err);
-      alert("Une erreur est survenue lors de l'enregistrement.");
+      alert(err instanceof Error ? err.message : "Une erreur est survenue lors de l'enregistrement.");
       if (db.school) initDraftsFromSchool(db.school);
     } finally {
       setIsSaving(false);
@@ -476,13 +498,13 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container financial-settings-page">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>Paramètres</h1>
         <button
           type="button"
-          onClick={handleSaveChanges}
-          disabled={isSaving}
+          onClick={() => void handleSaveChanges()}
+          disabled={isSaving || !canEditInstitution}
           style={{ background: 'var(--primary-color)', color: 'white', padding: '0.6rem 1.5rem', fontWeight: 600 }}
         >
           {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
@@ -490,7 +512,8 @@ const Settings: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginBottom: '2rem' }}>
-        <h2>Informations de l'Établissement</h2>
+        <nav className="settings-sections" aria-label="Sections des paramètres">{[['institution', 'Établissement'], ['cycles-classes', 'Cycles & classes'], ['academic-calendar', 'Année académique'], ['financial-tariff-version', 'Finances & tarifs'], ['transport-configuration', 'Transport'], ['documents-receipts', 'Documents & reçus'], ['school-policies', 'Politiques'], ['roles-validations', 'Rôles & validations']].map(([id, label]) => <button type="button" key={id} onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })}>{label}</button>)}</nav>
+        <h2 id="institution">Informations de l'Établissement</h2>
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div style={{ flex: 1 }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nom de l'école</label>
@@ -523,7 +546,7 @@ const Settings: React.FC = () => {
 
         <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
 
-        <h2>Cycles proposés par l'établissement</h2>
+        <h2 id="cycles-classes">Cycles proposés par l'établissement</h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
           Les cycles sélectionnés décrivent l’établissement. Les classes sont gérées séparément dans le module Classes.
         </p>
@@ -816,7 +839,7 @@ const Settings: React.FC = () => {
           
           <div style={{ flex: 1 }}>
             <h3 style={{ color: 'var(--primary-color)', margin: '0 0 1rem 0' }}>Rafraîchir (Nouvelle Année)</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>Efface les historiques de présence, notes et paiements, mais <strong>conserve tous les élèves et classes</strong> pour la rentrée prochaine.</p>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>Réinitialise les données pédagogiques courantes et <strong>conserve les paiements, reçus, élèves et classes</strong>.</p>
             <button onClick={handleNewAcademicYear} style={{ background: 'var(--primary-color)' }}>
               Passer à la Nouvelle Année
             </button>
@@ -835,12 +858,17 @@ const Settings: React.FC = () => {
       />
 
       <SchoolFeeCatalog />
+      <section className="card" id="financial-tariff-version"><h2>Finances &amp; tarifs</h2><p>Les tarifs ci-dessous s’appliquent uniquement aux nouvelles obligations. Toute dette déjà établie conserve son tarif, même future et impayée.</p>
+        <label>Motif de la modification tarifaire<textarea value={tariffReason} maxLength={500} onChange={e => setTariffReason(e.target.value)} placeholder="Ex. barème validé par la direction pour les nouvelles obligations" /></label>
+        <button type="button" disabled={isSaving || !canEditFees} onClick={() => void handleSaveChanges(true)}>Enregistrer les tarifs</button>
+        {!canEditInstitution && <p>Vous pouvez publier les tarifs. Les informations générales de l’établissement restent réservées au propriétaire.</p>}
+      </section>
       <div className="card">
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-color)' }}>
           ⚙️ Comptabilité : Frais par Défaut
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-          Définissez les montants attendus par défaut. Ils s'appliqueront automatiquement à tous les élèves lors des encaissements (sauf si vous avez défini un montant spécifique dans le dossier de l'élève).
+          Tarifs de secours pour les nouvelles obligations. Le barème par classe est prioritaire pour la scolarité. Les obligations existantes et les reçus ne sont jamais recalculés.
         </p>
         
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', background: '#f8f9fa', padding: '1rem', borderRadius: '5px' }}>
@@ -937,7 +965,11 @@ const Settings: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginBottom: '2rem' }}>
-        <h2>Politiques d'établissement</h2>
+        <h2 id="school-policies">Politiques d'établissement</h2>
+        <h3 id="roles-validations">Rôles &amp; validations</h3>
+        <p>La secrétaire consulte les tarifs, encaisse et soumet les demandes d’avantages. La direction et le propriétaire approuvent ou refusent selon leurs droits. Les tarifs officiels ne sont pas modifiables pendant l’encaissement.</p>
+        <h3 id="documents-receipts">Documents &amp; reçus</h3>
+        <p>Chaque encaissement génère un reçu global ventilé, imprimable et téléchargeable en PDF. Les anciens paiements et reçus restent consultables depuis Encaissement.</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
           <input
             type="checkbox"
@@ -962,8 +994,13 @@ const Settings: React.FC = () => {
             Activer la politique ITALO PK14–PK42
           </label>
           <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>
-            Primaire PK14–33 : 4 000 FCFA/mois · PK34–42 : 5 000 FCFA/mois · Secondaire : gratuit.
+            Maternelle et primaire : transport payant selon le point PK. Secondaire : gratuit. Les mensualités déjà établies restent inchangées.
           </p>
+          <h3 id="transport-configuration">Transport — tarifs des nouvelles mensualités</h3>
+          <div className="school-fee-grid">
+            <label>PK14 à PK33 — FCFA / mois<input type="number" min="1" step="1" value={draftPkRates.pk14To33} disabled={!canEditFees} onChange={e => setDraftPkRates(p => ({ ...p, pk14To33: e.target.value }))} /></label>
+            <label>PK34 à PK42 — FCFA / mois<input type="number" min="1" step="1" value={draftPkRates.pk34To42} disabled={!canEditFees} onChange={e => setDraftPkRates(p => ({ ...p, pk34To42: e.target.value }))} /></label>
+          </div>
           <label style={{ display: 'block', maxWidth: 640 }}>
             Mois facturables explicites
             <textarea

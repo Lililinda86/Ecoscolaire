@@ -160,6 +160,36 @@ try {
     allocations: [{ type: 'tuition', installment: 'T3', amount: 1000 }] });
 
   browser = await chromium.launch();
+  const schoolBeforeRevision = (await db.collection('schools').doc(schoolId).get()).data();
+  const revised = { globalFees: { feeT1: 0, feeT2: 0, feeT3: 0, feeTransport: 0, feeUniforms: 0 },
+    classFees: structuredClone(schoolBeforeRevision.classFees),
+    transportPolicy: { ...schoolBeforeRevision.transportPolicy, pkRates: { pk14To33: 4500, pk34To42: 5500 }, billingPeriods: [...schoolBeforeRevision.transportPolicy.billingPeriods, '2026-12'] } };
+  revised.classFees.CP.t1 = 65000; revised.classFees.CP.tuition = 155000;
+  const reviseTariffs = { action: 'configure', academicYear: year, expectedVersion: null, reason: 'Validation isolée des snapshots', configuration: revised };
+  await denied(call('manageSchoolFee', reviseTariffs));
+  await call('manageSchoolFee', reviseTariffs, 'director');
+  const afterRevision = await account(studentId);
+  assert.equal(afterRevision.lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 60000);
+  assert.equal(afterRevision.lines.find(l => l.key === 'tuition:T1').netExpectedAmount, 50000);
+  assert.equal(afterRevision.lines.find(l => l.key === transport.key).grossExpectedAmount, 4000);
+  assert.equal(afterRevision.lines.find(l => l.key === 'transport:2026-12').grossExpectedAmount, 5500);
+  assert.equal(afterRevision.lines.find(l => l.key === 'tuition:T2').effectiveDueDate, '2027-02-10');
+  await call('manageSchoolFee', { action: 'revise', feeId, expectedAmount: 15000, amount: 18000, reason: 'Nouvelle version test' }, 'director');
+  assert.equal((await account(studentId)).lines.find(l => l.feeId === feeId).grossExpectedAmount, 15000);
+  const newStudentId = `${schoolId}-new-obligation`;
+  await seed('students', newStudentId, { id: newStudentId, schoolId, classId: `${schoolId}-primary`, academicYearId: yearId, academicYear: year,
+    usesTransport: false, name: 'ALLFEES Nouvelle obligation', matricule: 'AF-NEW', schoolingStatus: 'active', gender: 'M', section: 'francophone' });
+  await seed('studentPrivate', newStudentId, { id: newStudentId, studentId: newStudentId, schoolId, transportZonePk: null });
+  await seed('studentFinance', newStudentId, { id: newStudentId, studentId: newStudentId, schoolId, registrationFeeExpected: 15000 });
+  const newAccount = await account(newStudentId);
+  assert.equal(newAccount.lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 65000);
+  assert.equal(newAccount.lines.find(l => l.feeId === feeId).grossExpectedAmount, 18000);
+  assert.equal(newAccount.lines.some(l => l.type === 'transport'), false);
+  await db.collection('students').doc(studentId).update({ classId: `${schoolId}-nursery` });
+  assert.equal((await account(studentId)).lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 60000);
+  await db.collection('students').doc(studentId).update({ classId: `${schoolId}-primary` });
+  assert.deepEqual((await db.collection('receipts').doc(payment.receiptId).get()).data(), receipt.data());
+  pass('TARIFF VERSIONS / IMMUTABLE TUITION / NEW OBLIGATIONS / IMMUTABLE TRANSPORT / IMMUTABLE UNIFORMS / CLASS CHANGE / NO TRANSPORT');
   const context = await browser.newContext();
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -185,6 +215,8 @@ try {
       await expect(navigation).not.toBeInViewport();
     }
     const amountInput = page.getByLabel('Montant reçu pour TEST excursion', { exact: true });
+    const group = amountInput.locator('xpath=ancestor::details[contains(@class,"account-fee-group")]');
+    if (await group.count() && !(await group.getAttribute('open') !== null)) await group.locator('summary').first().click();
     await amountInput.fill('1000');
     await expect(page.getByTestId('cash-payment-submit')).toBeEnabled();
     await amountInput.fill('');
@@ -207,6 +239,56 @@ try {
   await page.locator('.student-identity').getByText('ALLFEES secondary PK18', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   pass('ENCAISSEMENT UI / STUDENT SWITCH');
+  await page.getByTestId('cash-payment-student').selectOption(studentId);
+  const uiAmount = page.getByLabel('Montant reçu pour TEST excursion', { exact: true });
+  await uiAmount.waitFor({ state: 'attached', timeout: 30000 });
+  const uiGroup = uiAmount.locator('xpath=ancestor::details[contains(@class,"account-fee-group")]');
+  if (await uiGroup.getAttribute('open') === null) await uiGroup.locator('summary').first().click();
+  await uiAmount.fill('1000');
+  await page.getByTestId('cash-payment-submit').click();
+  await page.getByRole('heading', { name: 'Encaissement enregistré ✓', exact: true }).waitFor({ timeout: 30000 });
+  await expect(page.locator('.student-account-receipt')).toContainText('Validation secretary');
+  await expect(page.locator('.student-account-receipt')).toContainText('Matricule');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Télécharger PDF' }).click();
+  const download = await downloadPromise;
+  assert.equal(await download.failure(), null);
+  await download.saveAs('all-fees-receipt.pdf');
+  assert.equal((await account(studentId)).lines.find(l => l.feeId === `${schoolId}-excursion`).previousPaid, 1000);
+  pass('AUTOMATIC RECEIPT UI / PDF DOWNLOAD / UI PARTIAL PAYMENT');
+  const directorContext = await browser.newContext();
+  const settingsPage = await directorContext.newPage();
+  settingsPage.on('pageerror', error => errors.push(error.message));
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) await settingsPage.route(`${origin}/**`, route => route.continue({ headers: { ...route.request().headers(),
+    'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
+  await settingsPage.goto(`${origin}/#/login`, { waitUntil: 'domcontentloaded' });
+  await settingsPage.getByTestId('login-email').fill(users.director.email);
+  await settingsPage.getByTestId('login-password').fill(users.director.password);
+  await settingsPage.getByTestId('login-submit').click();
+  await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
+  await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
+  await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
+  await settingsPage.getByLabel('PK14 à PK33 — FCFA / mois').fill('4600');
+  await settingsPage.getByLabel('Motif de la modification tarifaire').fill('Validation UI de la publication prospective');
+  settingsPage.once('dialog', dialog => dialog.accept());
+  await settingsPage.getByRole('button', { name: 'Enregistrer les tarifs', exact: true }).click();
+  await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().transportPolicy.pkRates.pk14To33).toBe(4600);
+  assert.equal((await account(studentId)).lines.find(l => l.key === transport.key).grossExpectedAmount, 4000);
+  pass('PARAMETERS DIRECTOR SAVE / HISTORICAL OBLIGATION PRESERVED');
+  for (const width of [360, 768, 1440]) {
+    await settingsPage.setViewportSize({ width, height: 1000 });
+    if (width <= 640) {
+      const sidebar = settingsPage.getByTestId('sidebar');
+      if ((await sidebar.getAttribute('class')).includes('sidebar-open')) await sidebar.locator('.sidebar-close-button').click();
+      await expect(sidebar).not.toBeInViewport();
+    }
+    await expect(settingsPage.getByLabel('PK14 à PK33 — FCFA / mois')).toHaveValue('4600');
+    await expect(settingsPage.getByLabel('PK34 à PK42 — FCFA / mois')).toHaveValue('5500');
+    assert.equal(await settingsPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await settingsPage.screenshot({ path: `all-fees-settings-${width}.png`, fullPage: true });
+    pass(`PARAMETERS ${width}`);
+  }
+  assert.deepEqual(errors, []);
   await browser.close(); browser = undefined;
   await call('manageSchoolFee', { action: 'archive', feeId }, 'director');
   assert.equal((await account(studentId)).lines.find(line => line.feeId === feeId).remainingBalance, 10000);
@@ -219,7 +301,7 @@ try {
   console.log('STAGING FUNCTIONAL: PASS');
 } finally {
   if (browser) await browser.close();
-  const collections = ['studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
+  const collections = ['studentFinancialObligations', 'studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
     'paymentAllocations', 'transportPaymentAllocations', 'audit_logs', 'cashLedgerDays', 'cashClosures', 'studentPrivate', 'studentFinance',
     'studentParentPrivate', 'studentParentFinance', 'students', 'classes', 'academicYears'];
   // Allow fixture-only async projections to finish, then remove only this run's school data.
@@ -232,6 +314,9 @@ try {
     await pause(2000);
   }
   await db.collection('counters').doc(`receipts_${schoolId}`).delete();
+  const versions = db.collection('schools').doc(schoolId).collection('financialTariffVersions');
+  for (const version of (await versions.get()).docs) await version.ref.delete();
+  assert.equal((await versions.get()).size, 0);
   for (const ref of refs.reverse()) {
     const snap = await ref.get();
     if (snap.exists) { assert.equal(snap.data().testRunId, runId); await ref.delete(); }

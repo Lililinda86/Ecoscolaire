@@ -1,3 +1,4 @@
+import { publishFinancialTariffs } from './financialTariffConfiguration';
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { createHash } from 'crypto';
@@ -54,17 +55,19 @@ export const getSchoolFeeCatalog = functions.https.onCall(async (raw, context) =
       if (!cls.exists || cls.data()?.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Classe hors établissement.');
       if (school.data()?.transportPolicy?.feePolicyId !== 'ITALO_PK_2026') throw fail('Politique transport non configurée.');
       if (!Number.isSafeInteger(raw.zonePk) || raw.zonePk < 14 || raw.zonePk > 42) throw fail('Choisir un point PK14 à PK42.');
-      transportTariff = resolveItaloTransportFee({ cycle: resolveCanonicalClassCycle(cls.data() || {}), usesTransport: true, zonePk: raw.zonePk });
+      transportTariff = resolveItaloTransportFee({ cycle: resolveCanonicalClassCycle(cls.data() || {}), usesTransport: true, zonePk: raw.zonePk, rates: school.data()?.transportPolicy?.pkRates });
     }
-    return { fees: schoolFees(school.data() || {}), transportTariff };
+    return { fees: schoolFees(school.data() || {}), transportTariff, configuration: { globalFees: school.data()?.globalFees || {},
+      classFees: school.data()?.classFees || {}, transportPolicy: school.data()?.transportPolicy || {}, version: school.data()?.financialTariffVersion || null } };
   });
 });
 
 export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentification requise.');
-  const schoolId = id(raw?.schoolId); const feeId = id(raw?.feeId); const db = admin.firestore();
+  const schoolId = id(raw?.schoolId); const feeId = raw?.action === 'configure' ? 'configuration' : id(raw?.feeId); const db = admin.firestore();
   return db.runTransaction(async tx => {
     const school = await authorize(tx, db, context.auth!.uid, schoolId, true);
+    if (raw.action === 'configure') return publishFinancialTariffs(tx, db, school, context.auth!.uid, raw);
     const entries = schoolFees(school.data() || {});
     const existing = entries.find(f => f.id === feeId);
     if (raw.action === 'create') {
@@ -89,6 +92,21 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       }
       if (entries.length >= 200) throw fail('Catalogue limité à 200 versions.');
       tx.update(school.ref, { feeCatalog: [...entries, fee] });
+    } else if (raw.action === 'revise') {
+      if (!existing || existing.schemaVersion !== 2 || existing.active !== true) throw fail('Frais actif requis.');
+      if (existing.amount !== raw.expectedAmount) throw fail('Le tarif a changé. Rechargez le catalogue.');
+      if (!Number.isSafeInteger(raw.amount) || raw.amount <= 0) throw fail('Montant entier positif requis.');
+      if (typeof raw.reason !== 'string' || !raw.reason.trim() || raw.reason.length > 500) throw fail('Motif requis.');
+      if (raw.amount === existing.amount) return { feeId, replay: true };
+      const versionId = createHash('sha256').update(JSON.stringify([schoolId, feeId, existing.versionId || 'initial', raw.amount])).digest('hex');
+      const next = { ...existing, amount: raw.amount, versionId };
+      // Stable fee identity: existing student assignments retain their old full snapshot.
+      // A revision is never a second compulsory charge on already-assigned students.
+      tx.create(school.ref.collection('financialTariffVersions').doc(versionId), {
+        feeId, academicYear: existing.academicYear, previous: existing, next,
+        reason: raw.reason.trim(), actorId: context.auth!.uid, effectiveAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      tx.update(school.ref, { feeCatalog: entries.map(f => f.id === feeId ? next : f) });
     } else if (raw.action === 'archive') {
       if (!existing || existing.schemaVersion !== 2) throw fail('Frais versionné requis.');
       if (existing.active === false) return { feeId, replay: true };

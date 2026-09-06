@@ -5,7 +5,7 @@ import { useAppContext } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/paymentReceipt';
 import './SchoolFeeCatalog.css';
 
-interface Fee { id: string; label: string; amount: number; category?: string; mandatory?: boolean; active?: boolean; academicYear?: string; dueDate?: string | null; schemaVersion?: number }
+interface Fee { id: string; label: string; amount: number; category?: string; mandatory?: boolean; active?: boolean; academicYear?: string; dueDate?: string | null; schemaVersion?: number; versionId?: string }
 const categories = { uniform: 'Tenue scolaire', sports_uniform: 'Tenue de sport', books: 'Livres', supplies: 'Fournitures', exam: "Frais d’examen", canteen: 'Cantine', activity: 'Activité', excursion: 'Excursion', event: 'Fête / événement', photo: 'Photo scolaire', contribution: 'Contribution', exceptional: 'Frais exceptionnel', other: 'Autre' };
 export function SchoolFeeCatalog() {
   const { db, currentUser } = useAppContext();
@@ -18,6 +18,7 @@ export function SchoolFeeCatalog() {
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [feeId, setFeeId] = useState(() => crypto.randomUUID());
   const [assignFee, setAssignFee] = useState(''); const [studentId, setStudentId] = useState('');
+  const [reviseFee, setReviseFee] = useState(''); const [reviseAmount, setReviseAmount] = useState(''); const [reviseReason, setReviseReason] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
   const canManage = ['owner', 'director', 'superAdmin'].includes(currentUser?.role || '');
   const load = useCallback(async () => {
@@ -39,7 +40,7 @@ export function SchoolFeeCatalog() {
   return <section className="school-fee-catalog" aria-labelledby="fee-catalog-title">
     <h2 id="fee-catalog-title">Frais &amp; tarifs — Catalogue</h2>
     <p>Scolarité et calendrier Transport : utilisez les sections existantes ci-dessous. Le catalogue complète les tenues, autres frais et frais ponctuels.</p>
-    <p>Maternelle et primaire : PK14–PK33 = 4 000 FCFA/mois ; PK34–PK42 = 5 000 FCFA/mois. Secondaire : gratuit. PK désigne le quartier / point de ramassage.</p>
+    <p>Transport : consultez le barème actif dans Paramètres → Transport. PK désigne le quartier / point de ramassage ; le secondaire reste gratuit.</p>
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     {canManage && <details><summary>Créer un nouveau frais</summary>
       <form onSubmit={async e => { e.preventDefault(); if (await run({ action: 'create', feeId, fee: { label, category, amount: Number(amount), description, mandatory, dueDate: dueDate || null, academicYear: school.academicYear, classIds, cycles, studentIds } })) { setFeeId(crypto.randomUUID()); setLabel(''); setAmount(''); } }}>
@@ -62,6 +63,14 @@ export function SchoolFeeCatalog() {
     </details>}
     <ul className="school-fee-list">{fees.map(fee => <li key={fee.id}><strong>{fee.label}</strong><span>{formatCurrency(fee.amount)} · {fee.mandatory === false ? 'Facultatif' : 'Obligatoire'} · {fee.active === false ? 'INACTIF' : 'ACTIF'}{fee.academicYear ? ` · ${fee.academicYear}` : ' · historique'}</span>{fee.dueDate && <span>Échéance : {fee.dueDate}</span>}{canManage && fee.schemaVersion === 2 && fee.active !== false && <button disabled={busy} type="button" onClick={() => void run({ action: 'archive', feeId: fee.id })}>Désactiver les nouvelles affectations</button>}</li>)}</ul>
     {canManage && <form onSubmit={e => { e.preventDefault(); void run({ action: 'assign', feeId: assignFee, studentId }); }}>
+      <h3>Nouvelle version d’un tarif</h3>
+      <p>Modifie uniquement les nouvelles obligations. Aucun supplément automatique pour les élèves déjà concernés par une obligation de ce frais.</p>
+      <div className="school-fee-grid">
+        <label>Frais à réviser<select value={reviseFee} onChange={e => { setReviseFee(e.target.value); setReviseAmount(String(fees.find(f => f.id === e.target.value)?.amount || '')); }}><option value="">Choisir</option>{fees.filter(f => f.schemaVersion === 2 && f.active !== false).map(f => <option key={f.id} value={f.id}>{f.label} — {formatCurrency(f.amount)}</option>)}</select></label>
+        <label>Nouveau tarif (FCFA)<input type="number" min="1" step="1" value={reviseAmount} onChange={e => setReviseAmount(e.target.value)} /></label>
+        <label>Motif de la révision<textarea maxLength={500} value={reviseReason} onChange={e => setReviseReason(e.target.value)} /></label>
+      </div>
+      <button type="button" disabled={busy || !reviseFee || !reviseReason.trim() || !reviseAmount} onClick={() => void run({ action: 'revise', feeId: reviseFee, amount: Number(reviseAmount), expectedAmount: fees.find(f => f.id === reviseFee)?.amount, reason: reviseReason })}>Publier la nouvelle version</button>
       <h3>Affecter un frais facultatif</h3><div className="school-fee-grid">
         <label>Frais facultatif<select required value={assignFee} onChange={e => setAssignFee(e.target.value)}><option value="">Choisir un frais</option>{fees.filter(f => f.schemaVersion === 2 && f.active !== false && !f.mandatory && f.academicYear === school.academicYear).map(f => <option key={f.id} value={f.id}>{f.label}</option>)}</select></label>
         <label>Élève concerné<select required value={studentId} onChange={e => setStudentId(e.target.value)}><option value="">Choisir un élève</option>{db.students.filter(s => s.schoolId === school.id).map(s => <option key={s.id} value={s.id}>{s.name} — {s.matricule}</option>)}</select></label>

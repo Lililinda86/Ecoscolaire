@@ -105,13 +105,17 @@ service cloud.firestore {
 
     function isValidTransportPolicy() {
       let policy = request.resource.data.get('transportPolicy', {});
-      let validKeys = policy.keys().hasOnly(['secretaryManageAll', 'feePolicyId', 'billingPeriods']);
+      let validKeys = policy.keys().hasOnly(['secretaryManageAll', 'feePolicyId', 'billingPeriods', 'pkRates']);
       let validTypes = (!('secretaryManageAll' in policy) || policy.secretaryManageAll is bool)
         && (!('feePolicyId' in policy) || policy.feePolicyId == null
           || policy.feePolicyId == 'ITALO_PK_2026')
         && (!('billingPeriods' in policy)
           || (policy.billingPeriods is list && policy.billingPeriods.size() <= 24));
-      return validKeys && validTypes;
+      let validRates = !('pkRates' in policy) || (policy.pkRates is map
+        && policy.pkRates.keys().hasOnly(['pk14To33', 'pk34To42'])
+        && policy.pkRates.pk14To33 is int && policy.pkRates.pk14To33 > 0
+        && policy.pkRates.pk34To42 is int && policy.pkRates.pk34To42 > 0);
+      return validKeys && validTypes && validRates;
     }
 
     function isValidTuitionPaymentDeadlines(data) {
@@ -617,7 +621,9 @@ service cloud.firestore {
         (canManageSchool(schoolId) && !isUpdatingSaasFields() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeAcademicYearId'])) ||
         (isAcademicCalendarPointerUpdate(schoolId) && !isUpdatingTransportPolicy())
       ) && (!isUpdatingTransportPolicy() || (isValidTransportPolicy() && (isOwner() || isSuperAdmin())))
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId', 'feeCatalog']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['schoolId', 'feeCatalog', 'globalFees', 'classFees', 'financialTariffVersion'])
+        && (!isUpdatingTransportPolicy() || request.resource.data.get('transportPolicy', {}).diff(resource.data.get('transportPolicy', {})).affectedKeys().hasOnly(['secretaryManageAll']));
+      match /financialTariffVersions/{versionId} { allow read: if isAuthenticated() && isActive() && hasSchoolAccess(schoolId) && (isOwner() || isDirector() || isSecretary() || isAccountant()); allow write: if false; }
 
       match /secrets/{secretId} {
         allow read: if false;
@@ -1520,6 +1526,11 @@ service cloud.firestore {
     }
 
     // --- FINANCE (PAYMENTS & EXPENSES) ---
+    match /studentFinancialObligations/{obligationId} {
+      allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
+        && (isOwner() || isDirector() || isSecretary() || isAccountant());
+      allow write: if false;
+    }
     match /studentFeeAssignments/{assignmentId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
         && (isOwner() || isDirector() || isSecretary() || isAccountant());

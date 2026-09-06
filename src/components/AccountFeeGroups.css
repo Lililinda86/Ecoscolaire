@@ -1,0 +1,8 @@
+.account-fee-group { border: 1px solid var(--border-color, #dbe4e8); border-radius: 12px; background: #fff; overflow: hidden; min-width: 0; }
+.account-fee-group > summary { padding: 1rem; cursor: pointer; color: #163e4c; }
+.account-fee-group > summary > strong { font-size: 1.05rem; }
+.fee-group-totals { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .86rem; margin: .6rem 0; }
+.fee-group-toggle { font-size: .8rem; color: #426373; }
+.fee-group-lines { display: grid; gap: .75rem; padding: 0 .75rem .75rem; }
+.account-fee-group[open] > summary { border-bottom: 1px solid #e5edf0; margin-bottom: .75rem; }
+@media (max-width: 480px) { .fee-group-totals { display: grid; gap: .3rem; } .account-fee-group > summary { padding: .8rem; } .fee-group-lines { padding: 0 .4rem .4rem; } }

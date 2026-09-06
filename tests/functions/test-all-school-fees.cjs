@@ -14,7 +14,7 @@ async function seed(collection, key, data) { const ref = db.collection(collectio
 const students = {};
 (async () => {
   assert.equal(prospectivePeriod('2026-12-15'), '2027-01');
-  assert.deepEqual(revisePeriodFees({ '2026-09': 4000, '2026-10': 4000 }, ['2026-09', '2026-10'], '2026-10', 5000), { '2026-09': 4000, '2026-10': 5000 });
+  assert.deepEqual(revisePeriodFees({ '2026-09': 4000, '2026-10': 4000 }, ['2026-09', '2026-10', '2026-11'], '2026-10', 5000), { '2026-09': 4000, '2026-10': 4000, '2026-11': 5000 });
   await seed('users', secretaryId, { schoolId, role: 'secretary', isActive: true });
   await seed('users', directorId, { schoolId, role: 'director', isActive: true });
   await seed('schools', schoolId, { name: 'All fees emulator', academicYear, activeAcademicYearId: yearId, active: true, subscriptionStatus: 'active',
@@ -101,7 +101,7 @@ const students = {};
   assert.equal(account.lines.find(l => l.key === transport.key).remainingBalance, 4000);
   console.log('PASS all school fee categories, optional assignment, immutable rates, cycles, monthly transport, partial multi-fee receipt and reversal');
 })().finally(async () => {
-  for (const collection of ['studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts', 'paymentAllocations', 'transportPaymentAllocations', 'audit_logs', 'cashLedgerDays', 'cashClosures']) {
+  for (const collection of ['studentFinancialObligations', 'studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts', 'paymentAllocations', 'transportPaymentAllocations', 'audit_logs', 'cashLedgerDays', 'cashClosures']) {
     const snap = await db.collection(collection).where('schoolId', '==', schoolId).get();
     for (const doc of snap.docs) await doc.ref.delete();
   }
