@@ -32,7 +32,7 @@ export const setStudentTransportPlan = functions.https.onCall(async (raw, contex
       tx.get(db.collection('students').doc(studentId)), tx.get(db.collection('studentPrivate').doc(studentId))
     ]);
     const user = userSnap.data() || {}; const school = schoolSnap.data() || {}; const student = studentSnap.data() || {}; const privateData = privateSnap.data() || {};
-    if ((!user.active && !user.isActive) || user.status === 'inactive' || !['owner', 'director', 'secretary', 'superAdmin'].includes(user.role) || (user.role !== 'superAdmin' && user.schoolId !== schoolId) || student.schoolId !== schoolId || privateData.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Accès refusé.');
+    if ((user.active !== true && user.isActive !== true) || user.status === 'inactive' || !['owner', 'director', 'secretary', 'superAdmin'].includes(user.role) || (user.role !== 'superAdmin' && user.schoolId !== schoolId) || student.schoolId !== schoolId || privateData.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Accès refusé.');
     if (!schoolSnap.exists || school.active === false || school.subscriptionStatus === 'suspended') throw new functions.https.HttpsError('failed-precondition', 'École indisponible.');
     const [classSnap, yearSnap] = await Promise.all([tx.get(db.collection('classes').doc(String(student.classId))), tx.get(db.collection('academicYears').doc(String(student.academicYearId)))]);
     const classData = classSnap.data() || {}; const year = yearSnap.data() || {};

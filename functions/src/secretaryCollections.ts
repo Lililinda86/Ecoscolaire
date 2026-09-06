@@ -762,7 +762,9 @@ const buildTransportCollectionQuote = ({
   const installments: TransportInstallmentSnapshot[] = periods.filter(period => !periodFees || (periodFees[period] || 0) > 0).map(period => {
     const monthlyGross = periodFees ? periodFees[period] : fee.monthlyGrossAmount;
     const legacyQuote = buildQuote({
-      gross: monthlyGross, benefits: benefitPlanning, payments, moratoriums, school, schoolId, academicYear,
+      // V3 collection transport is accounted through its transport allocations, never twice.
+      gross: monthlyGross, benefits: benefitPlanning, payments: payments.filter(payment => payment.type !== 'collection'),
+      moratoriums, school, schoolId, academicYear,
       type: 'transport', installment: null, period, today
     });
     for (const snapshot of legacyQuote.benefits) {
@@ -1202,6 +1204,9 @@ export const approveFinancialBenefit = functions.https.onCall(async (raw, contex
       bus = busSnap.data() || {};
     }
     const overlappingPayment = paymentsSnap.docs.map(doc => doc.data()).some(payment => {
+      if (payment.type === 'collection' && isConfirmedPayment(payment) && payment.schoolId === benefit.schoolId && payment.academicYear === benefit.academicYear) {
+        return (Array.isArray(payment.lineItems) ? payment.lineItems : []).some((line: Data) => benefit.paymentType === 'TUITION' ? line.type === 'tuition' && (benefit.installment === 'ALL_TUITION' || line.installment === benefit.installment) : line.type === 'transport' && (!line.period || (String(line.period) >= String(benefit.transportStartPeriod) && String(line.period) <= String(benefit.transportEndPeriod))));
+      }
       if (!isConfirmedPayment(payment) || payment.schoolId !== benefit.schoolId
           || payment.academicYear !== benefit.academicYear) return false;
       if (benefit.paymentType === 'TUITION') {
@@ -1549,9 +1554,18 @@ const readQuoteContext = async (
       if (periodFees && !(periodFees[input.period] > 0)) {
         throw httpsError('failed-precondition', 'Ce mois ne fait pas partie de l’abonnement.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
       }
-      quote = buildQuote({ gross: periodFees ? periodFees[input.period] : resolveGross(input.type, input.installment, finance, school, bus, fee),
-        benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
-        type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
+      if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID) {
+        const annual = buildTransportCollectionQuote({ fee, periods: resolveTransportBillingPeriods(school, input.academicYear),
+          benefits, payments, allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
+          academicYear: input.academicYear, today: getDoualaDate(), periodFees });
+        const selected = annual.installments.find(item => item.period === input.period);
+        if (!selected) throw httpsError('failed-precondition', 'Mois non facturable.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
+        quote = selected;
+      } else {
+        quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, fee),
+          benefits, payments, moratoriums, school: scheduleSchool, schoolId: input.schoolId, academicYear: input.academicYear,
+          type: input.type, installment: input.installment, period: input.period, today: getDoualaDate() });
+      }
     }
   } else {
     quote = buildQuote({ gross: resolveGross(input.type, input.installment, finance, school, bus, null, classData),
