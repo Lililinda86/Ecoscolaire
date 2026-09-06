@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import fixture from './helpers/pedagogy-results-fixture.cjs';
 import { loginAs } from './helpers/auth';
@@ -13,7 +13,7 @@ test('Lot D: secretary transfers subject assessments and records received canoni
   test.skip(!staging && !(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST && process.env.FUNCTIONS_EMULATOR_HOST), 'Full emulators or explicit Staging required.');
   test.setTimeout(180_000);
   const prefix = `pedagogy-results-${randomBytes(8).toString('hex')}`;
-  const app = initializeApp({ projectId }, prefix), db = getFirestore(app), auth = getAuth(app);
+  const app = initializeApp({ projectId }, prefix), db = initializeFirestore(app, { preferRest: staging }), auth = getAuth(app);
   const f = await fixture.seedResultsFixture(db, prefix);
   let createdAuth = false;
   try {
@@ -27,8 +27,14 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     await page.getByRole('checkbox', { name: 'Confirmer le transfert de cette version pour la période sélectionnée' }).check();
     await page.getByRole('button', { name: 'Transférer vers la saisie des résultats' }).click();
     await expect(page.getByText(/Transfert enregistré : une évaluation canonique par matière/)).toBeVisible();
-    expect((await db.collection('evaluations').where('schoolId', '==', f.schoolId).get()).size).toBe(2);
-    expect((await db.collection('grades').where('schoolId', '==', f.schoolId).get()).size).toBe(0);
+    await test.step('Verify canonical transfer without automatic grades', async () => {
+      expect((await db.collection('evaluations').where('schoolId', '==', f.schoolId).get()).size).toBe(2);
+      expect((await db.collection('grades').where('schoolId', '==', f.schoolId).get()).size).toBe(0);
+    }, { timeout: 20_000 });
+    console.log('LOT_D_PHASE: canonical transfer reads verified');
+    await test.step('Wait for synthetic pupil results controls', async () => {
+      await expect(page.getByRole('combobox', { name: 'Résultat Synthetic pupil 1', exact: true })).toBeVisible({ timeout: 20_000 });
+    }, { timeout: 25_000 });
     await page.getByRole('combobox', { name: 'Résultat Synthetic pupil 1', exact: true }).selectOption('scored');
     await page.getByRole('spinbutton', { name: 'Score Synthetic pupil 1', exact: true }).fill('0');
     await page.getByRole('combobox', { name: 'Résultat Synthetic pupil 2', exact: true }).selectOption('absent');
@@ -96,8 +102,10 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     for (const name of ['payments', 'expenses', 'cashClosures', 'buses', 'inventory']) expect((await db.collection(name).where('schoolId', '==', f.schoolId).get()).empty).toBe(true);
     console.log('LOT_D_BROWSER: canonical evaluation and grade writes expected and verified; no real pupil data or human approval');
   } finally {
-    await f.cleanup();
-    if (createdAuth) await auth.deleteUser(f.secretaryId);
-    await deleteApp(app);
+    const cleanupErrors: unknown[] = [];
+    try { await f.cleanup(); } catch (error) { cleanupErrors.push(error); }
+    try { if (createdAuth) await auth.deleteUser(f.secretaryId); } catch (error) { cleanupErrors.push(error); }
+    try { await deleteApp(app); } catch (error) { cleanupErrors.push(error); }
+    expect(cleanupErrors, 'Synthetic fixture cleanup incomplete').toEqual([]);
   }
 });
