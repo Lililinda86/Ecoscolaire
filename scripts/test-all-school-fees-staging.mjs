@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { initializeApp, applicationDefault, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 
 const project = 'ecoscolaire-staging';
 assert.equal(process.env.VITE_FIREBASE_PROJECT_ID, project);
@@ -156,6 +156,8 @@ try {
   assert.equal(legacyReceipt.data().amount, 1000);
   assert.ok(legacyReceipt.data().receiptNumber);
   pass('LEGACY PAYMENTS / LEGACY RECEIPTS');
+  await call('recordCashCollection', { requestId: `retained-${runId}`, studentId, academicYear: year,
+    allocations: [{ type: 'tuition', installment: 'T3', amount: 1000 }] });
 
   browser = await chromium.launch();
   const context = await browser.newContext();
@@ -174,6 +176,18 @@ try {
   await page.getByRole('heading', { name: 'Frais à régler', exact: true }).waitFor({ timeout: 30000 });
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
+    if (width <= 640) {
+      const navigation = page.getByTestId('sidebar');
+      if ((await navigation.getAttribute('class')).includes('sidebar-open')) {
+        await navigation.locator('.sidebar-close-button').click();
+      }
+      // Resizing from desktop animates the closed drawer out; do not capture an intermediate frame.
+      await expect(navigation).not.toBeInViewport();
+    }
+    const amountInput = page.getByLabel('Montant reçu pour TEST excursion', { exact: true });
+    await amountInput.fill('1000');
+    await expect(page.getByTestId('cash-payment-submit')).toBeEnabled();
+    await amountInput.fill('');
     await page.getByText('TEST excursion', { exact: true }).first().waitFor();
     // All relevant controls must remain inside the viewport; no horizontal page overflow.
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
@@ -198,6 +212,9 @@ try {
   assert.equal((await account(studentId)).lines.find(line => line.feeId === feeId).remainingBalance, 10000);
   await call('reverseCashCollection', { collectionId: payment.collectionId, requestId: `reverse-${runId}`, reason: 'Nettoyage du test Staging' }, 'director');
   assert.equal((await account(studentId)).lines.find(line => line.feeId === feeId).remainingBalance, 15000);
+  await pause(3000);
+  assert.equal((await db.collection('studentFinance').doc(studentId).get()).data().tuitionPaid, 1000,
+    'another V3 payment remains reflected after an atomic reversal');
   pass('ARCHIVE / REVERSAL');
   console.log('STAGING FUNCTIONAL: PASS');
 } finally {
