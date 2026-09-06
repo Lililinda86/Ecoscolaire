@@ -10,7 +10,9 @@ const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire'
 const staging = process.env.PEDAGOGY_STAGING_E2E === 'true';
 if (!['demo-ecoscolaire', 'ecoscolaire-staging'].includes(projectId) || staging && projectId !== 'ecoscolaire-staging') throw new Error('Production forbidden.');
 test('Lot D: secretary transfers subject assessments and records received canonical results', async ({ page }) => {
-  test.skip(!staging && !(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST && process.env.FUNCTIONS_EMULATOR_HOST), 'Full emulators or explicit Staging required.');
+  const emulator = projectId === 'demo-ecoscolaire' && Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  if (process.env.CI && !staging && !emulator) throw new Error('CI emulator configuration missing; refusing a skipped success.');
+  test.skip(!staging && !emulator, 'Full emulators or explicit Staging required.');
   test.setTimeout(180_000);
   const prefix = `pedagogy-results-${randomBytes(8).toString('hex')}`;
   const app = initializeApp({ projectId }, prefix), db = initializeFirestore(app, { preferRest: staging }), auth = getAuth(app);

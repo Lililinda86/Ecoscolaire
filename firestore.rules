@@ -1450,6 +1450,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isActive() && (
         isSuperAdmin() ||
         ((isOwner() || isDirector()) && hasSchoolAccess(resource.data.schoolId)) ||
+        (isSecretary() && hasSchoolAccess(resource.data.schoolId) && resource.data.get('pedagogySecretaryReadable', false) == true) ||
         (isTeacher() && hasSchoolAccess(resource.data.schoolId) && resource.data.teacherUserId == request.auth.uid)
       );
       // Canonical batch writes are exclusively managed by recordGradesBatch.

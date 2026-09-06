@@ -22,7 +22,8 @@ const scoped = ['weeklyAssessments', 'assessmentItems', 'lessonPreparations', 't
 const protectedCollections = ['students', 'payments', 'expenses', 'grades', 'gradesStrict', 'evaluations', 'buses', 'inventory', 'cashClosures'];
 
 test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
-  const emulatorRun = Boolean(process.env.FIRESTORE_EMULATOR_HOST) && Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST) && Boolean(process.env.FUNCTIONS_EMULATOR_HOST);
+  const emulatorRun = projectId === 'demo-ecoscolaire' && Boolean(process.env.FIRESTORE_EMULATOR_HOST) && Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  if (process.env.CI && !stagingRun && !emulatorRun) throw new Error('CI emulator configuration missing; refusing a skipped success.');
   test.skip(!emulatorRun && !stagingRun, 'Émulateurs complets ou staging explicite requis.');
   test.setTimeout(stagingRun ? 360_000 : 150_000);
   test('génère, relit, valide et imprime sans inventer ni modifier les domaines protégés', async ({ page }) => {

@@ -21,6 +21,8 @@ beforeEach(async () => {
       ...['owner', 'director', 'secretary', 'teacher', 'teacher2', 'accountant', 'parent', 'student', 'driver', 'boardViewer'].map(role =>
         setDoc(doc(db, 'users', `grades-${role}`), { role: role === 'teacher2' ? 'teacher' : role, schoolId: 'school-a', isActive: true })),
       setDoc(doc(db, 'users', 'grades-owner-b'), { role: 'owner', schoolId: 'school-b', isActive: true }),
+      setDoc(doc(db, 'users', 'grades-secretary-b'), { role: 'secretary', schoolId: 'school-b', isActive: true }),
+      setDoc(doc(db, 'grades', 'grade-pedagogy'), { schoolId: 'school-a', studentId: 'student-a', evaluationId: 'eval-a', pedagogySecretaryReadable: true, pedagogyPublicationId: 'synthetic-publication' }),
       setDoc(doc(db, 'evaluations', 'eval-a'), { id: 'eval-a', schoolId: 'school-a', teacherUserId: 'grades-teacher', status: 'open' }),
       setDoc(doc(db, 'grades', 'grade-a'), { id: 'grade-a', schoolId: 'school-a', teacherUserId: 'grades-teacher', studentId: 'student-a', evaluationId: 'eval-a' }),
       setDoc(doc(db, 'gradeBatchRequests', 'request-a'), { schoolId: 'school-a', actorUid: 'grades-teacher' }),
@@ -29,6 +31,20 @@ beforeEach(async () => {
 });
 
 describe('Grades and Evaluations backend-only privacy', () => {
+  test('secretary reads only explicitly scoped backend pedagogy results, never general raw grades', async () => {
+    const db = env.authenticatedContext('grades-secretary').firestore();
+    await assertSucceeds(getDoc(doc(db, 'grades', 'grade-pedagogy')));
+    await assertSucceeds(getDocs(query(collection(db, 'grades'), where('schoolId', '==', 'school-a'), where('pedagogySecretaryReadable', '==', true))));
+    await assertSucceeds(getDocs(query(collection(db, 'grades'), where('schoolId', '==', 'school-a'), where('evaluationId', '==', 'eval-a'), where('pedagogySecretaryReadable', '==', true), where('studentId', 'in', ['student-a']))));
+    await assertFails(getDocs(query(collection(db, 'grades'), where('schoolId', '==', 'school-a'))));
+    await assertFails(getDoc(doc(db, 'grades', 'grade-a')));
+    for (const uid of ['grades-secretary-b', 'grades-boardViewer', 'grades-parent']) {
+      await assertFails(getDoc(doc(env.authenticatedContext(uid).firestore(), 'grades', 'grade-pedagogy')));
+    }
+    await assertFails(updateDoc(doc(db, 'grades', 'grade-a'), { pedagogySecretaryReadable: true }));
+    await assertFails(setDoc(doc(db, 'grades', 'forged-pedagogy'), { schoolId: 'school-a', pedagogySecretaryReadable: true }));
+    await assertFails(updateDoc(doc(db, 'grades', 'grade-pedagogy'), { score: 10 }));
+  });
   test('scopes evaluation reads to oversight, secretary and owning teacher', async () => {
     for (const role of ['owner', 'director', 'secretary', 'teacher']) {
       await assertSucceeds(getDoc(doc(env.authenticatedContext(`grades-${role}`).firestore(), 'evaluations', 'eval-a')));
