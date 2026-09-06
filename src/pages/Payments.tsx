@@ -2300,6 +2300,7 @@ const Payments: React.FC = () => {
         <StudentAccountCollection students={db.students} school={currentSchool!}
           initialStudentId={currentPayment.studentId}
           classNamesById={Object.fromEntries(db.classes.map(item => [item.id, item.name]))}
+          currentRole={currentUser.role}
           onClose={() => setModalOpen(false)}
           onCompleted={() => setQuoteRefresh(value => value + 1)} />
         {legacyPaymentFormEnabled && (

@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { jsPDF } from 'jspdf';
-import { CheckCircle, FileDown, Printer, RefreshCw, Search } from 'lucide-react';
+import { CheckCircle, FileDown, Plus, Printer, RefreshCw, Search } from 'lucide-react';
 import { functions } from '../db/firebase';
-import type { School, Student } from '../types';
+import type { GlobalRole, School, Student } from '../types';
 import { formatCurrency } from '../utils/paymentReceipt';
+import StudentAccountBenefitsDrawer from './StudentAccountBenefitsDrawer';
 import './StudentAccountCollection.css';
 
 type AccountStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
@@ -56,6 +57,7 @@ interface Props {
   school: School;
   initialStudentId?: string;
   classNamesById?: Record<string, string>;
+  currentRole?: GlobalRole;
   onClose: () => void;
   onCompleted?: (result: CollectionResult) => void;
 }
@@ -114,10 +116,12 @@ const StudentAccountCollection: React.FC<Props> = ({
   school,
   initialStudentId,
   classNamesById = {},
+  currentRole = 'secretary',
   onClose,
   onCompleted
 }) => {
   const [studentId, setStudentId] = useState(initialStudentId || '');
+  const [benefitsOpen, setBenefitsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [account, setAccount] = useState<StudentAccount | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
@@ -208,6 +212,7 @@ const StudentAccountCollection: React.FC<Props> = ({
     setError('');
     setLoadFailed(false);
     attemptRef.current = null;
+    setBenefitsOpen(false);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -323,6 +328,18 @@ const StudentAccountCollection: React.FC<Props> = ({
           {account.totals.overdueAmount > 0 && <div className="summary-overdue"><span>En retard</span><strong>{formatCurrency(account.totals.overdueAmount)}</strong></div>}
         </div>
         <section className="account-benefits" aria-labelledby="benefits-title">
+          {['owner', 'director', 'secretary', 'superAdmin'].includes(currentRole) && (
+            <div className="account-benefits-actions">
+              <button type="button" className="secondary" onClick={() => setBenefitsOpen(true)}>
+                <Plus size={16} aria-hidden="true" />
+                {activeBenefits.length === 0 && moratoriumLines.length === 0
+                  ? 'Ajouter un avantage / aménagement' : 'Ajouter'}
+              </button>
+              {(activeBenefits.length > 0 || moratoriumLines.length > 0) && (
+                <button type="button" className="secondary" onClick={() => setBenefitsOpen(true)}>Voir / gérer</button>
+              )}
+            </div>
+          )}
           <div><h3 id="benefits-title">Avantages &amp; aménagements</h3>
             {activeBenefits.length === 0 && moratoriumLines.length === 0
               ? <p>Aucun avantage financier actif.</p>
@@ -402,6 +419,16 @@ const StudentAccountCollection: React.FC<Props> = ({
             <button type="button" className="secondary" onClick={onClose} disabled={saving}>Annuler</button>
           </aside>
         </div>
+        <StudentAccountBenefitsDrawer
+          open={benefitsOpen}
+          schoolId={school.id}
+          studentId={studentId}
+          academicYear={school.academicYear}
+          currentRole={currentRole}
+          targets={account.lines}
+          onClose={() => setBenefitsOpen(false)}
+          onChanged={() => loadAccount(studentId)}
+        />
       </>}
     </form>
   );

@@ -19,7 +19,7 @@
     "seed:pedagogy:dry-run": "node scripts/seed-pedagogy-curriculum.mjs",
     "test:secrets": "node scripts/check-staging-credential-regressions.mjs",
     "test:functions:secure-student": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"vitest run tests/functions/createStudentSecure.spec.ts --config vite.config.ts\"",
-    "test:functions:secretary-collections": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"node tests/functions/test-record-cash-payment-privacy.cjs && node tests/functions/test-secretary-collections-emulator.cjs && node tests/functions/test-student-account-collections.cjs && node tests/functions/test-cash-closure-integrity.cjs\"",
+    "test:functions:secretary-collections": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"node tests/functions/test-record-cash-payment-privacy.cjs && node tests/functions/test-secretary-collections-emulator.cjs && node tests/functions/test-student-account-collections.cjs && node tests/functions/test-financial-advantage-workflow.cjs && node tests/functions/test-cash-closure-integrity.cjs\"",
     "test:functions:boardviewer-governance": "npm --prefix functions run build && node tests/functions/test-boardviewer-governance.cjs",
     "test:functions:authenticated-audit": "npm --prefix functions run build && node tests/functions/test-authenticated-audit.cjs",
     "test:functions:expense-ledger": "npm --prefix functions run build && node tests/functions/test-expense-ledger.cjs",
