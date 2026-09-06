@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch, codex/pedagogy-private-ai-validation]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -14,7 +14,7 @@ on:
         required: false
         type: string
       confirmation:
-        description: RUN_PEDAGOGY_STAGING_SYNTHETIC or RECOVER_SYNTHETIC_RESULTS_34053765899
+        description: RUN_PEDAGOGY_STAGING_SYNTHETIC, RUN_PEDAGOGY_STAGING_AI_USD2 or RECOVER_SYNTHETIC_RESULTS_34053765899
         required: false
         type: string
 
@@ -51,7 +51,7 @@ jobs:
           PEDAGOGY_RECOVERY_CONFIRMATION: ${{ inputs.confirmation }}
         run: node scripts/recover-pedagogy-results-checkpoint.mjs --delete-exact-fixture
   exact-staging:
-    if: github.ref == 'refs/heads/staging' && inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC'
+    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2')
     needs: [static-gates, emulator-gates]
     permissions:
       contents: read
@@ -85,6 +85,8 @@ jobs:
         run: npx vitest run --config vitest.config.ts
       - name: Functions tests and build
         run: npm run test:functions
+      - name: Verify pinned AI fixtures without provider calls
+        run: node scripts/test-pedagogy-synthetic-ai-staging.mjs --check-only
       - name: Frontend build
         run: npm run build
         env:
