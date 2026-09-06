@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { getMetadata, ref, uploadBytes } from 'firebase/storage';
 import { db, functions, storage } from '../../../db/firebase';
 import type { CurriculumProgram, LessonPreparation, LessonPreparationTemplate, PedagogyWorkspace, PreparationReview, SchoolCurriculumAdoption, TeachingPlan, TeachingPlanItem, TeachingWeek } from '../types';
+import type { AssessmentItem, WeeklyAssessment } from '../types';
 
 const documents = <T>(snapshot: Awaited<ReturnType<typeof getDocs>>): T[] => snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Record<string, unknown>) } as T));
 
@@ -83,3 +84,23 @@ export const generateTeachingPlanProposal = (schoolId: string, planId: string) =
 export const saveTeachingPlanAdjustments = (schoolId: string, planId: string, adjustments: Array<Pick<TeachingPlanItem, 'id' | 'lessonTitle' | 'objective' | 'note'>>) => call('saveTeachingPlanAdjustments', { schoolId, planId, adjustments });
 export const recordTeacherPlanValidation = (schoolId: string, planId: string, teacherStaffId: string, note: string) => call('recordTeacherPlanValidation', { schoolId, planId, teacherStaffId, note });
 export const archiveTeachingPlan = (schoolId: string, planId: string) => call('archiveTeachingPlan', { schoolId, planId });
+
+export interface AssessmentScope { schoolId: string; academicYearId: string; classId: string; weekId: string }
+export const loadWeeklyAssessments = async (schoolId: string, academicYearId: string, weekId: string, classId?: string): Promise<WeeklyAssessment[]> => {
+  const clauses = [where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), where('weekId', '==', weekId)];
+  if (classId) clauses.push(where('classId', '==', classId));
+  const snapshot = await getDocs(query(collection(db, 'weeklyAssessments'), ...clauses, limit(100)));
+  return documents<WeeklyAssessment>(snapshot).sort((a, b) => a.className.localeCompare(b.className));
+};
+export const loadAssessmentItems = async (schoolId: string, assessmentId: string, generationVersion: number): Promise<AssessmentItem[]> => {
+  const snapshot = await getDocs(query(collection(db, 'assessmentItems'), where('schoolId', '==', schoolId), where('weeklyAssessmentId', '==', assessmentId), where('generationVersion', '==', generationVersion), limit(100)));
+  return documents<AssessmentItem>(snapshot).sort((a, b) => a.order - b.order);
+};
+export const ensureWeeklyAssessmentDraft = (scope: AssessmentScope) => call('ensureWeeklyAssessmentDraft', scope);
+export const generateWeeklyAssessment = (scope: AssessmentScope, regenerate = false, confirmRevision = false) => call('generateWeeklyAssessment', { ...scope, regenerate, confirmRevision });
+export const saveWeeklyAssessmentEdits = (schoolId: string, assessmentId: string, items: Array<Pick<AssessmentItem, 'id' | 'questionText' | 'instructions' | 'points' | 'order'>>, note: string) =>
+  call('saveWeeklyAssessmentEdits', { schoolId, assessmentId, items, note });
+export const recordWeeklyAssessmentTeacherValidation = (schoolId: string, assessmentId: string, teacherStaffId: string, note: string) =>
+  call('recordWeeklyAssessmentTeacherValidation', { schoolId, assessmentId, teacherStaffId, note });
+export const markWeeklyAssessmentReadyToPrint = (schoolId: string, assessmentId: string) =>
+  call('markWeeklyAssessmentReadyToPrint', { schoolId, assessmentId });
