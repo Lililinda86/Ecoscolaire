@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { initializeApp, applicationDefault, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 
 const project = 'ecoscolaire-staging';
 assert.equal(process.env.VITE_FIREBASE_PROJECT_ID, project);
@@ -176,6 +176,18 @@ try {
   await page.getByRole('heading', { name: 'Frais à régler', exact: true }).waitFor({ timeout: 30000 });
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
+    if (width <= 900) {
+      const navigation = page.getByTestId('sidebar');
+      if ((await navigation.getAttribute('class')).includes('sidebar-open')) {
+        await navigation.locator('.sidebar-close-button').click();
+      }
+      // Resizing from desktop animates the closed drawer out; do not capture an intermediate frame.
+      await expect(navigation).not.toBeInViewport();
+    }
+    const amountInput = page.getByLabel('Montant reçu pour TEST excursion', { exact: true });
+    await amountInput.fill('1000');
+    await expect(page.getByTestId('cash-payment-submit')).toBeEnabled();
+    await amountInput.fill('');
     await page.getByText('TEST excursion', { exact: true }).first().waitFor();
     // All relevant controls must remain inside the viewport; no horizontal page overflow.
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
