@@ -55,7 +55,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       await expect(page.getByText('Sciences manquante')).toBeVisible(); await expect(page.getByText('Évaluation partielle')).toBeVisible(); await expect(page.getByText('Interdit')).toHaveCount(0);
       await page.getByRole('button', { name: 'Générer maintenant' }).click();
       await expect(page.getByText('Évaluation générée.')).toBeVisible({ timeout: 25_000 });
-      await expect(page.getByText(/Version 1/)).toBeVisible(); await expect(page.getByText('20/20')).toBeVisible();
+      await expect(page.getByText(/Version 1/)).toBeVisible(); await expect(page.getByText('20/20', { exact: true })).toBeVisible();
       await expect(page.getByText('BROUILLON — À VALIDER PAR L’ENSEIGNANT')).toBeVisible();
       const assessmentId = `${f.schoolId}__${f.yearId}__${f.classId}__${f.weekId}`;
       expect((await firestore.collection('weeklyAssessments').where('schoolId', '==', f.schoolId).where('classId', '==', f.classId).get()).size).toBe(1);
