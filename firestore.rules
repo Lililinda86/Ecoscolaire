@@ -1309,6 +1309,16 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /weeklyAssessments/{assessmentId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow create, update, delete: if false;
+    }
+
+    match /assessmentItems/{itemId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow create, update, delete: if false;
+    }
+
     match /pedagogyPreparationStats/{statsId} {
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId)
         && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());

@@ -1,8 +1,8 @@
-name: Pedagogy Lots A + B Release Gate
+name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c]
   workflow_dispatch:
 
 permissions:
@@ -24,9 +24,9 @@ jobs:
       - name: Typecheck frontend and Functions
         run: npm run typecheck
       - name: Lint Pedagogy only
-        run: npx eslint "functions/src/pedagogy/**/*.ts" "src/features/pedagogy/**/*.{ts,tsx}" "tests/unit/pedagogyDomain.spec.ts" "tests/unit/pedagogyPreparations.spec.ts" "tests/security/pedagogy-rules.spec.mjs" "tests/security/pedagogy-lot-b-rules.spec.mjs" "tests/security/pedagogy-storage-rules.spec.mjs" "tests/pedagogy-lot-a-emulator-e2e.spec.ts" "tests/pedagogy-lot-b-emulator-e2e.spec.ts" --max-warnings=0
+        run: npx eslint "functions/src/pedagogy/**/*.ts" "src/features/pedagogy/**/*.{ts,tsx}" "tests/unit/pedagogyDomain.spec.ts" "tests/unit/pedagogyPreparations.spec.ts" "tests/unit/pedagogyWeeklyAssessments.spec.ts" "tests/security/pedagogy-rules.spec.mjs" "tests/security/pedagogy-lot-b-rules.spec.mjs" "tests/security/pedagogy-lot-c-rules.spec.mjs" "tests/security/pedagogy-storage-rules.spec.mjs" "tests/pedagogy-lot-a-emulator-e2e.spec.ts" "tests/pedagogy-lot-b-emulator-e2e.spec.ts" "tests/pedagogy-lot-c-emulator-e2e.spec.ts" --max-warnings=0
       - name: Pedagogy unit tests
-        run: npx vitest run tests/unit/pedagogyDomain.spec.ts tests/unit/pedagogyPreparations.spec.ts --config vitest.config.ts
+        run: npx vitest run tests/unit/pedagogyDomain.spec.ts tests/unit/pedagogyPreparations.spec.ts tests/unit/pedagogyWeeklyAssessments.spec.ts --config vitest.config.ts
       - name: Functions tests and build
         run: npm run test:functions
       - name: Frontend build
@@ -62,7 +62,7 @@ jobs:
       - run: npm --prefix functions run build
       - run: npx playwright install --with-deps chromium
       - name: Pedagogy Firestore Rules
-        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "npx playwright test tests/security/pedagogy-rules.spec.mjs tests/security/pedagogy-lot-b-rules.spec.mjs --config=playwright.rules.config.ts"
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "npx playwright test tests/security/pedagogy-rules.spec.mjs tests/security/pedagogy-lot-b-rules.spec.mjs tests/security/pedagogy-lot-c-rules.spec.mjs --config=playwright.rules.config.ts"
       - name: Pedagogy Storage Rules
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only storage "npx playwright test tests/security/pedagogy-storage-rules.spec.mjs --config=playwright.rules.config.ts"
       - name: Pedagogy Lot A browser regression
@@ -88,3 +88,16 @@ jobs:
           npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire
           --only firestore,auth,functions,storage
           "npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --workers=1"
+      - name: Pedagogy Lot C browser workflow
+        env:
+          VITE_USE_FIREBASE_EMULATORS: "true"
+          VITE_FIREBASE_API_KEY: emulator-api-key
+          VITE_FIREBASE_AUTH_DOMAIN: localhost
+          VITE_FIREBASE_PROJECT_ID: demo-ecoscolaire
+          VITE_FIREBASE_STORAGE_BUCKET: demo-ecoscolaire.appspot.com
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          VITE_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
+        run: >-
+          npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire
+          --only firestore,auth,functions
+          "npx playwright test tests/pedagogy-lot-c-emulator-e2e.spec.ts --workers=1"

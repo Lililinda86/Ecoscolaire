@@ -118,6 +118,35 @@
         { "fieldPath": "preparationId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "lessonPreparations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "weekId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "weeklyAssessments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "weekId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "assessmentItems",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "weeklyAssessmentId", "order": "ASCENDING" },
+        { "fieldPath": "generationVersion", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
