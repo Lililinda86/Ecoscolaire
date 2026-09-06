@@ -1,7 +1,8 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { createHash } from 'crypto';
-import { resolveItaloTransportFee, TransportCycle } from './transportPaymentPolicy';
+import { resolveItaloTransportFee } from './transportPaymentPolicy';
+import { resolveCanonicalClassCycle } from './classCycle';
 
 type Data = Record<string, unknown>;
 export const transportPlanId = (schoolId: string, studentId: string, year: string): string =>
@@ -37,7 +38,7 @@ export const setStudentTransportPlan = functions.https.onCall(async (raw, contex
     const [classSnap, yearSnap] = await Promise.all([tx.get(db.collection('classes').doc(String(student.classId))), tx.get(db.collection('academicYears').doc(String(student.academicYearId)))]);
     const classData = classSnap.data() || {}; const year = yearSnap.data() || {};
     if (classData.schoolId !== schoolId || year.schoolId !== schoolId || year.name !== school.academicYear || student.academicYearId !== school.activeAcademicYearId) throw new functions.https.HttpsError('failed-precondition', 'Classe ou année invalide.');
-    const cycle = (classData.cycle || ({ maternelle: 'nursery', primaire: 'primary', secondaire: 'secondary' } as Record<string, string>)[classData.level] || classData.level) as TransportCycle;
+    const cycle = resolveCanonicalClassCycle(classData);
     const periods = school.transportPolicy?.billingPeriods;
     if (Array.isArray(periods) && periods.some((p: unknown) => typeof p !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(p) || p < `${String(year.name).slice(0, 4)}-09` || p > `${String(year.name).slice(5)}-08`)) {
       throw new functions.https.HttpsError('failed-precondition', 'Mois hors année scolaire.');
