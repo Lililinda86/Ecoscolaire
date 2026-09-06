@@ -67,7 +67,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       expect((await firestore.collection('assessmentItems').where('weeklyAssessmentId', '==', assessmentId).get()).docs.every(document => document.data().subjectId !== 'science')).toBe(true);
       const question = page.getByLabel('Question').first(); await question.fill('Question corrigée après retour enseignant');
       await page.getByRole('button', { name: 'Enregistrer les corrections' }).click(); await expect(page.getByText('Corrections enregistrées à la demande de l’enseignant.')).toBeVisible();
-      await page.getByLabel('Enseignant', { exact: true }).selectOption(f.staffId); await page.getByLabel('Note', { exact: true }).fill('Accord reçu sur papier.');
+      await page.getByRole('combobox', { name: /^Enseignant/ }).selectOption(f.staffId); await page.getByRole('textbox', { name: /^Note/ }).fill('Accord reçu sur papier.');
       console.log('[Lot C] editing: saved');
       await page.getByRole('button', { name: 'Enregistrer validation enseignant' }).click(); await expect(page.getByText('Validation de l’enseignant enregistrée par la secrétaire.')).toBeVisible();
       await page.getByRole('button', { name: 'Passer prête à imprimer' }).click(); await expect(page.getByText('Évaluation prête à imprimer.')).toBeVisible();
@@ -86,7 +86,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       await firestore.collection('lessonPreparations').doc('lot-c-prep-science').update({ status: 'validated', reviewData: { lessonTitle: 'Sciences', objective: 'Observer', lessonSteps: 'Expérience' }, version: 3 });
       await page.reload(); await expect(page.getByText('Une nouvelle préparation validée est disponible.')).toBeVisible(); await expect(page.getByText(/Version 1/)).toBeVisible();
       console.log('[Lot C] source change: detected');
-      await page.getByLabel('Classe', { exact: true }).selectOption(f.failClassId); await expect(page.getByText('1/1', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Générer maintenant' }).click();
+      await page.getByRole('combobox', { name: /^Classe/ }).selectOption(f.failClassId); await expect(page.getByText('1/1', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Générer maintenant' }).click();
       await expect(page.getByText(/Génération impossible : MOCK_WEEKLY_ASSESSMENT_FAILURE/)).toBeVisible({ timeout: 25_000 }); await expect(page.getByText(/vous pouvez réessayer/i)).toBeVisible();
       expect(await countProtected()).toEqual(before);
       console.log('[Lot C] generator failure fallback: confirmed');
