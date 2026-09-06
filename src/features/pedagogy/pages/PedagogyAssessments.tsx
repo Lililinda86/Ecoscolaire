@@ -9,6 +9,9 @@ import {
   markWeeklyAssessmentReadyToPrint, recordWeeklyAssessmentTeacherValidation, saveWeeklyAssessmentEdits
 } from '../services/pedagogyService';
 import type { AssessmentItem, WeeklyAssessment } from '../types';
+import { getClassOptionLabel } from '../../../utils/classCatalog';
+import { localEducationStage } from '../../../../functions/src/pedagogy/pedagogyPolicy';
+import { Link } from 'react-router-dom';
 
 const labels: Record<WeeklyAssessment['status'], string> = {
   draft: 'Brouillon vide', generating: 'Génération…', needs_review: 'À faire valider', teacher_validated: 'Validée enseignant',
@@ -26,6 +29,7 @@ export default function PedagogyAssessments() {
   const [classId, setClassId] = useState('');
   const [weekId, setWeekId] = useState('');
   const selectedClassId = classId || classes[0]?.id || '';
+  const preschool = ['pre_nursery', 'preschool'].includes(localEducationStage(classes.find(item => item.id === selectedClassId) || {}));
   const selectedWeek = workspace.weeks.find(item => item.id === weekId) || workspace.weeks[0];
   const preparations = useLessonPreparations(currentSchool?.id, year?.id, selectedWeek?.weekStartDate || '', selectedClassId);
   const [assessments, setAssessments] = useState<WeeklyAssessment[]>([]);
@@ -46,7 +50,7 @@ export default function PedagogyAssessments() {
   }, [scope]);
   useEffect(() => { void refresh().catch(error => setMessage(error instanceof Error ? error.message : 'Chargement impossible.')); }, [refresh]);
 
-  const validated = preparations.preparations.filter(item => item.status === 'validated');
+  const validated = preparations.preparations.filter(item => item.status === 'validated' && item.currentUploadId && ['taught', 'partially_taught'].includes(item.teachingConfirmation?.status || ''));
   const expected = preparations.preparations;
   const covered = [...new Map(validated.map(item => [item.subjectId, item.subjectName])).entries()];
   const missing = [...new Map(expected.filter(item => !covered.some(([id]) => id === item.subjectId)).map(item => [item.subjectId, item.subjectName])).entries()];
@@ -73,22 +77,24 @@ export default function PedagogyAssessments() {
   const total = items.reduce((sum, item) => sum + Number(item.points), 0);
 
   return <main className="pedagogy-page">
-    <PedagogyHeader title="Évaluations du vendredi" description="Générez uniquement à partir des préparations reçues, relues et validées pendant la semaine." />
+    <PedagogyHeader title="Évaluations du vendredi" description="Préparez les évaluations à partir des cours reçus, vérifiés et confirmés comme enseignés pour la semaine sélectionnée." />
     <PedagogyNav />
     {(message || preparations.error) && <div className={`pedagogy-alert${preparations.error ? ' pedagogy-alert--error' : ''}`}>{preparations.error || message}</div>}
     <section className="pedagogy-toolbar no-print">
-      <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label>Classe<select value={selectedClassId} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
       <label>Semaine<select value={selectedWeek?.id || ''} onChange={event => setWeekId(event.target.value)}>{workspace.weeks.map(item => <option key={item.id} value={item.id}>S{item.weekNumber} · {item.weekStartDate}</option>)}</select></label>
-      <button className="pedagogy-button" disabled={!scope || !validated.length || busy} onClick={() => generate(false)}>Générer maintenant</button>
-      {assessment?.generationVersion > 0 && <button className="pedagogy-button pedagogy-button--secondary" disabled={busy} onClick={() => generate(true)}>Régénérer brouillon</button>}
+      <button className="pedagogy-button" disabled={preschool || !scope || !validated.length || busy} onClick={() => generate(false)}>Générer maintenant</button>
+      {assessment?.generationVersion > 0 && <button className="pedagogy-button pedagogy-button--secondary" disabled={preschool || busy} onClick={() => generate(true)}>Régénérer brouillon</button>}
     </section>
+    {preschool && <p className="pedagogy-alert">Cette classe suit un parcours sans note ni classement. <Link to="/pedagogy/observations">Ouvrir les activités et observations</Link>.</p>}
     <section className="pedagogy-card no-print">
       <h2>Couverture des préparations</h2>
-      <p><strong>{validated.length}/{expected.length}</strong> préparation(s) validée(s) · {expected.length ? Math.round(validated.length * 100 / expected.length) : 0}%</p>
+      <p><strong>{validated.length}/{expected.length}</strong> cours confirmé(s) exploitable(s) · {expected.length ? Math.round(validated.length * 100 / expected.length) : 0}% des préparations attendues. Un cours partiellement enseigné ne couvre pas toute sa matière.</p>
       <div className="assessment-coverage">{covered.map(([id, name]) => <span className="assessment-chip" key={id}>{name}</span>)}{missing.map(([id, name]) => <span className="assessment-chip assessment-chip--missing" key={id}>{name} manquante</span>)}</div>
-      {!!missing.length && <div className="assessment-warning"><strong>Évaluation partielle</strong><br />{missing.map(([, name]) => name).join(', ')} non incluse(s) : aucune préparation validée.</div>}
-      {sourceChanged && <div className="assessment-warning"><strong>Une nouvelle préparation validée est disponible.</strong><br />Le brouillon n’a pas été modifié automatiquement. Il peut être actualisé par une régénération explicite.</div>}
-      {!validated.length && <p>Aucune préparation validée : aucune question ne peut être inventée.</p>}
+      {validated.length < expected.length && <div className="assessment-warning"><strong>Évaluation partielle</strong><br />{expected.filter(item => !validated.some(source => source.id === item.id)).map(item => `${item.subjectName} — ${item.lessonTitle || 'Leçon à préciser'}`).join(', ')} : cours exclus faute de confirmation exploitable.</div>}
+      {validated.some(item => item.teachingConfirmation?.status === 'partially_taught') && <p>Enseignements partiels : seules les portions confirmées sont incluses.</p>}
+      {sourceChanged && <div className="assessment-warning"><strong>Les cours confirmés ont changé.</strong><br />Le brouillon n’a pas été modifié automatiquement. Il peut être actualisé par une régénération explicite.</div>}
+      {!validated.length && <p>Aucun cours confirmé exploitable</p>}
     </section>
     {assessment && <section className="pedagogy-card no-print">
       <div className="pedagogy-card-title"><div><h2>{assessment.title || 'Évaluation hebdomadaire'}</h2><p>Version {assessment.generationVersion} · <span className={`pedagogy-status pedagogy-status--${assessment.status}`}>{labels[assessment.status]}</span></p></div><strong>{total}/{assessment.totalPoints}</strong></div>

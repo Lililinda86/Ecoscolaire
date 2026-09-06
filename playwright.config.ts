@@ -11,8 +11,8 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:5173',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    trace: process.env.PEDAGOGY_SAFE_CI === 'true' ? 'off' : 'on-first-retry',
+    screenshot: process.env.PEDAGOGY_SAFE_CI === 'true' ? 'off' : 'only-on-failure',
   },
   projects: [
     {

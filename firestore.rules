@@ -1299,6 +1299,33 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /teachingConfirmations/{confirmationId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if false;
+    }
+
+    match /teachingConfirmationBatches/{batchId} {
+      allow read, write: if false;
+    }
+
+    match /pedagogyClassPolicies/{policyId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if false;
+      match /versions/{versionId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
+    }
+
+    match /pedagogyObservations/{observationId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if false;
+    }
+
+    match /pedagogyObservationBatches/{batchId} {
+      allow read, write: if false;
+    }
+
     match /preparationUploads/{uploadId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
       allow create, update, delete: if false;
@@ -1312,7 +1339,15 @@ service cloud.firestore {
     match /weeklyAssessments/{assessmentId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
       allow create, update, delete: if false;
+      match /revisions/{revisionId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
     }
+
+    match /pedagogyAiConfigurations/{id} { allow read, write: if false; }
+    match /pedagogyAiOperations/{id} { allow read, write: if false; }
+    match /pedagogyAiBudgets/{id} { allow read, write: if false; }
 
     match /assessmentItems/{itemId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);

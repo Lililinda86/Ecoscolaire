@@ -15,13 +15,13 @@ global.alert = vi.fn();
 
 const mockUser = { id: 'u1', role: 'director' };
 const mockSchool = { id: 'sch1', name: 'Ecole 1' };
-const mockAcademicYear = { id: 'ay1', schoolId: 'sch1', name: '2026-2027', startDate: '2026-01-01', endDate: '2026-12-31', status: 'published' };
+const mockAcademicYear = { id: 'ay1', schoolId: 'sch1', name: '2026-2027', startDate: '2026-01-01', endDate: '2026-12-31', status: 'active' };
 const mockPeriod = { id: 'p1', schoolId: 'sch1', academicYearId: 'ay1', name: 'Trim 1', startDate: '2026-01-01', endDate: '2026-12-31', status: 'open' };
 const mockClass = { id: 'c1', schoolId: 'sch1', name: 'CE1', status: 'active' };
 const mockSubject = { id: 'sub1', name: 'Maths' };
 const mockClassSubject = { id: 'cs1', classId: 'c1', subjectId: 'sub1', status: 'active', programId: 'prog1' };
-const mockProgram = { id: 'prog1', classId: 'c1', academicYearId: 'ay1', status: 'published' };
-const mockAssignment = { id: 'ass1', schoolId: 'sch1', academicYearId: 'ay1', classId: 'c1', sourceClassSubjectId: 'cs1', teacherStaffId: 'u1', isActive: true };
+const mockProgram = { id: 'prog1', schoolId: 'sch1', classId: 'c1', academicYearId: 'ay1', status: 'published', publishedRevisionId: 'rev1' };
+const mockAssignment = { id: 'ass1', schoolId: 'sch1', academicYearId: 'ay1', classId: 'c1', sourceClassSubjectId: 'cs1', teacherStaffId: 'u1', isActive: true, status: 'active' };
 
 const mockStudents = [
   { id: 'st1', schoolId: 'sch1', classId: 'c1', name: 'Alice', schoolingStatus: 'active' }, // Empty field initially
@@ -42,7 +42,7 @@ const mockGrades = [
 ];
 
 const mockEvaluations = [
-  { id: 'eval1', schoolId: 'sch1', academicYearId: 'ay1', periodId: 'p1', classSubjectId: 'cs1', title: 'Eval 1', type: 'exam', maxScore: 20, weight: 1, date: '2026-10-01' }
+  { id: 'eval1', schoolId: 'sch1', academicYearId: 'ay1', periodId: 'p1', classSubjectId: 'cs1', title: 'Eval 1', type: 'exam', maxScore: 20, weight: 1, date: '2026-10-01', status: 'open' }
 ];
 
 const mockDb = {
@@ -55,6 +55,7 @@ const mockDb = {
   teacherAssignments: [mockAssignment],
   students: mockStudents,
   grades: mockGrades,
+  gradesStrict: mockGrades,
   evaluations: mockEvaluations,
 };
 
@@ -84,10 +85,8 @@ vi.mock('../../src/utils/academicState', () => ({
   }),
 }));
 
-vi.mock('../../src/context/AppContext', async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock('../../src/context/AppContext', () => {
   return {
-    ...actual,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     AppProvider: ({ children }: any) => <div>{children}</div>,
     useAppContext: () => ({
@@ -105,6 +104,7 @@ describe('Grades - Grade Entry Validation', () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
   const setupAndOpenExistingEval = async () => {
@@ -138,18 +138,15 @@ describe('Grades - Grade Entry Validation', () => {
     });
     fireEvent.change(within(modal).getAllByRole('combobox')[2], { target: { value: 'c1' } });
 
-    // selects[3] is Matière
-    await waitFor(() => {
-      expect(within(modal).getAllByRole('combobox').length).toBeGreaterThanOrEqual(4);
-    });
-    fireEvent.change(within(modal).getAllByRole('combobox')[3], { target: { value: 'cs1' } });
+    fireEvent.click(within(modal).getByRole('button', { name: /-- Choisir --/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Maths/ }));
 
     // Choose existing evaluation
     fireEvent.click(screen.getByLabelText(/Existante/));
     await waitFor(() => {
-      expect(within(modal).getAllByRole('combobox').length).toBeGreaterThanOrEqual(5);
+      expect(within(modal).getAllByRole('combobox').length).toBeGreaterThanOrEqual(4);
     });
-    fireEvent.change(within(modal).getAllByRole('combobox')[4], { target: { value: 'eval1' } });
+    fireEvent.change(within(modal).getAllByRole('combobox')[3], { target: { value: 'eval1' } });
   };
 
   const setupAndOpenNewEval = async () => {
@@ -179,10 +176,8 @@ describe('Grades - Grade Entry Validation', () => {
     });
     fireEvent.change(within(modal).getAllByRole('combobox')[2], { target: { value: 'c1' } });
 
-    await waitFor(() => {
-      expect(within(modal).getAllByRole('combobox').length).toBeGreaterThanOrEqual(4);
-    });
-    fireEvent.change(within(modal).getAllByRole('combobox')[3], { target: { value: 'cs1' } });
+    fireEvent.click(within(modal).getByRole('button', { name: /-- Choisir --/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Maths/ }));
 
     fireEvent.click(screen.getByLabelText(/Nouvelle/));
   };
@@ -196,10 +191,11 @@ describe('Grades - Grade Entry Validation', () => {
     // st4 (David) has absent -> Absent
     // st5 (Eve) has exempt -> Dispensé
 
-    expect(screen.getAllByText('Non noté')).toHaveLength(2);
-    expect(screen.getByText('Noté')).not.toBeNull();
-    expect(screen.getByText('Absent')).not.toBeNull();
-    expect(screen.getByText('Dispensé')).not.toBeNull();
+    expect((screen.getByRole('combobox', { name: 'Statut Alice' }) as HTMLSelectElement).value).toBe('scored');
+    expect((screen.getByRole('combobox', { name: 'Statut Bob' }) as HTMLSelectElement).value).toBe('notSubmitted');
+    expect((screen.getByRole('combobox', { name: 'Statut Charlie' }) as HTMLSelectElement).value).toBe('notSubmitted');
+    expect((screen.getByRole('combobox', { name: 'Statut David' }) as HTMLSelectElement).value).toBe('absent');
+    expect((screen.getByRole('combobox', { name: 'Statut Eve' }) as HTMLSelectElement).value).toBe('excused');
   });
 
   it('handles explicit 0 and decimals, preserves empty, rejects invalid', async () => {
@@ -216,7 +212,7 @@ describe('Grades - Grade Entry Validation', () => {
     fireEvent.change(inputs[2], { target: { value: '11.25' } });
 
     // Check visual status updates for those who have a note typed
-    expect(screen.getAllByText('Noté')).toHaveLength(3);
+    expect(['Alice', 'Bob', 'Charlie'].map(name => (screen.getByRole('combobox', { name: `Statut ${name}` }) as HTMLSelectElement).value)).toEqual(['scored', 'scored', 'scored']);
 
     // Trigger save
     fireEvent.click(screen.getByText('Enregistrer les notes'));
@@ -229,7 +225,7 @@ describe('Grades - Grade Entry Validation', () => {
     const payload = (mockSaveStructuredGrades as any).mock.calls[0][0];
     const grades = payload.grades;
 
-    expect(grades).toHaveLength(4);
+    expect(grades).toHaveLength(5);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bobGrade = grades.find((g: any) => g.studentId === 'st2');
@@ -253,7 +249,7 @@ describe('Grades - Grade Entry Validation', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const aliceGrade = grades.find((g: any) => g.studentId === 'st1');
-    expect(aliceGrade).toBeUndefined(); // Existing scored grade is NOT included in writes since input remained empty/unchanged
+    expect(aliceGrade).toMatchObject({ score: 15, resultStatus: 'scored' }); // Existing canonical value is preserved in the batch, never replaced by zero.
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const otherGrade = grades.find((g: any) => g.studentId === 'st6');
@@ -303,7 +299,7 @@ describe('Grades - Grade Entry Validation', () => {
     fireEvent.change(titleInput, { target: { value: 'Test Eval' } });
     expect(saveButton.disabled).toBe(false);
 
-    const typeSelect = within(modal).getAllByRole('combobox')[4];
+    const typeSelect = within(modal).getAllByRole('combobox')[3];
     fireEvent.change(typeSelect, { target: { value: 'exam' } });
 
     // Valid date inside period

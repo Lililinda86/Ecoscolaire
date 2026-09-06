@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public]
   workflow_dispatch:
 
 permissions:
@@ -25,8 +25,8 @@ jobs:
         run: npm run typecheck
       - name: Lint Pedagogy only
         run: npx eslint "functions/src/pedagogy/**/*.ts" "src/features/pedagogy/**/*.{ts,tsx}" "tests/unit/pedagogyDomain.spec.ts" "tests/unit/pedagogyPreparations.spec.ts" "tests/unit/pedagogyWeeklyAssessments.spec.ts" "tests/security/pedagogy-rules.spec.mjs" "tests/security/pedagogy-lot-b-rules.spec.mjs" "tests/security/pedagogy-lot-c-rules.spec.mjs" "tests/security/pedagogy-storage-rules.spec.mjs" "tests/pedagogy-lot-a-emulator-e2e.spec.ts" "tests/pedagogy-lot-b-emulator-e2e.spec.ts" "tests/pedagogy-lot-c-emulator-e2e.spec.ts" --max-warnings=0
-      - name: Pedagogy unit tests
-        run: npx vitest run tests/unit/pedagogyDomain.spec.ts tests/unit/pedagogyPreparations.spec.ts tests/unit/pedagogyWeeklyAssessments.spec.ts --config vitest.config.ts
+      - name: Full unit regression
+        run: npx vitest run --config vitest.config.ts
       - name: Functions tests and build
         run: npm run test:functions
       - name: Frontend build
@@ -42,6 +42,8 @@ jobs:
   emulator-gates:
     name: Pedagogy Rules and E2E
     runs-on: ubuntu-latest
+    env:
+      PEDAGOGY_SAFE_CI: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -60,6 +62,10 @@ jobs:
       - run: npm ci
         working-directory: functions
       - run: npm --prefix functions run build
+      - name: Isolated disposable emulator secret override
+        run: node scripts/prepare-pedagogy-emulator.mjs demo-ecoscolaire
+      - name: Teaching confirmation Functions authorization and concurrency
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs"
       - run: npx playwright install --with-deps chromium
       - name: Pedagogy Firestore Rules
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "npx playwright test tests/security/pedagogy-rules.spec.mjs tests/security/pedagogy-lot-b-rules.spec.mjs tests/security/pedagogy-lot-c-rules.spec.mjs --config=playwright.rules.config.ts"

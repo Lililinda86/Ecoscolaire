@@ -4,6 +4,7 @@ import { getMetadata, ref, uploadBytes } from 'firebase/storage';
 import { db, functions, storage } from '../../../db/firebase';
 import type { CurriculumProgram, LessonPreparation, LessonPreparationTemplate, PedagogyWorkspace, PreparationReview, SchoolCurriculumAdoption, TeachingPlan, TeachingPlanItem, TeachingWeek } from '../types';
 import type { AssessmentItem, WeeklyAssessment } from '../types';
+import type { TeachingState } from '../types';
 
 const documents = <T>(snapshot: Awaited<ReturnType<typeof getDocs>>): T[] => snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Record<string, unknown>) } as T));
 
@@ -56,6 +57,8 @@ export const ensureExpectedLessonPreparations = (schoolId: string, planId: strin
 export const startLessonPreparationAnalysis = (schoolId: string, uploadId: string) => call<{ schoolId: string; uploadId: string }, { preparationId: string; analysisStatus: 'succeeded' | 'failed'; fallback?: string }>('startLessonPreparationAnalysis', { schoolId, uploadId });
 export const saveLessonPreparationReview = (schoolId: string, preparationId: string, review: PreparationReview) => call('saveLessonPreparationReview', { schoolId, preparationId, review });
 export const validateLessonPreparation = (schoolId: string, preparationId: string) => call('validateLessonPreparation', { schoolId, preparationId });
+export const recordTeachingConfirmations = (input: { schoolId: string; academicYearId: string; classId: string; weekId: string; requestId: string; declarations: Array<{ preparationId: string; teacherStaffId: string; expectedVersion: number; status: TeachingState; effectiveDate: string; excerpts: string[]; note: string }> }) =>
+  call<typeof input, { recordedCount: number; idempotent: boolean }>('recordTeachingConfirmations', input);
 
 export interface ManualPreparationInput {
   academicYearId: string; classId: string; subjectId: string; subjectName: string; teacherStaffId: string;

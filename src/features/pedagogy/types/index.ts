@@ -72,6 +72,12 @@ export interface TeachingPlanItem {
 }
 
 export type LessonPreparationStatus = 'expected' | 'uploaded' | 'needs_review' | 'validated';
+export type TeachingState = 'unconfirmed' | 'taught' | 'partially_taught' | 'postponed' | 'not_taught';
+export interface TeachingConfirmation {
+  id: string; status: TeachingState; effectiveDate: string | null;
+  declaredByTeacherStaffId: string; recordedBy: string; recordedAt?: unknown;
+  reviewChecksum: string; excerpts: string[]; note: string;
+}
 export type PreparationAnalysisStatus = 'not_started' | 'pending' | 'processing' | 'succeeded' | 'failed';
 
 export interface LessonPreparationTemplate {
@@ -127,6 +133,7 @@ export interface LessonPreparation {
   extractedData?: Record<string, unknown>;
   reviewData?: PreparationReview;
   validationMeaning?: string;
+  teachingConfirmation?: TeachingConfirmation;
   version: number;
 }
 
@@ -161,6 +168,9 @@ export interface WeeklyAssessment {
   sourcePreparationIds?: string[];
   sourcePreparationVersions?: Record<string, number>;
   sourceChecksum?: string;
+  sourceEligibilityPolicy?: string;
+  excludedPreparations?: Array<{ preparationId: string; subjectId: string; reason: string }>;
+  partiallyCoveredSubjects?: AssessmentSubjectSummary[];
   sourceSnapshot?: Array<Record<string, unknown>>;
   teacherValidated?: boolean;
   teacherStaffId?: string;

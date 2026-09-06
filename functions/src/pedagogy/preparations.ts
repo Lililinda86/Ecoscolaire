@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { deterministicMockPreparationAnalyzer, validatePreparationAnalysis } from './preparationAnalyzer';
+import { validDate } from './teachingEvidence';
 
 const db = () => admin.firestore();
 const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'] as const;
@@ -112,14 +113,18 @@ export const createLessonPreparationUpload = functions.https.onCall(async (data,
     const subjectId = requireId(data?.subjectId, 'subjectId');
     const teacherStaffId = requireId(data?.teacherStaffId, 'teacherStaffId');
     const weekStartDate = text(data?.weekStartDate, 'weekStartDate', 10);
+    if (!validDate(weekStartDate)) throw new functions.https.HttpsError('invalid-argument', 'Date de semaine invalide.');
     const [yearSnap, classSnap, teacherSnap] = await Promise.all([
       db().collection('academicYears').doc(academicYearId).get(), db().collection('classes').doc(classId).get(), db().collection('staff').doc(teacherStaffId).get()
     ]);
     schoolDocument(yearSnap, schoolId, 'Année scolaire'); schoolDocument(classSnap, schoolId, 'Classe'); schoolDocument(teacherSnap, schoolId, 'Enseignant');
+    const weeks = await db().collection('teachingWeeks').where('schoolId', '==', schoolId).where('academicYearId', '==', academicYearId).where('weekStartDate', '==', weekStartDate).limit(2).get();
+    if (weeks.size !== 1 || weeks.docs[0].data().status !== 'open') throw new functions.https.HttpsError('failed-precondition', 'Une semaine pédagogique ouverte et unique est requise.');
     preparationId = manualPreparationId(schoolId, academicYearId, classId, subjectId, teacherStaffId, weekStartDate, checksum);
     preparation = {
       id: preparationId, schoolId, academicYearId, classId, subjectId, subjectName: text(data?.subjectName, 'subjectName', 200),
-      teacherStaffId, weekStartDate, lessonTitle: nullableText(data?.lessonTitle, 500), objective: nullableText(data?.objective),
+      teacherStaffId, weekStartDate, weekId: weeks.docs[0].id, weekEndDate: weeks.docs[0].data().weekEndDate,
+      lessonTitle: nullableText(data?.lessonTitle, 500), objective: nullableText(data?.objective),
       source: 'manual_unplanned', status: 'expected', analysisStatus: 'not_started', version: 1
     };
   }

@@ -62,6 +62,7 @@ describe('Grades - Filtrage des matières', () => {
       periods: mockPeriods,
       subjects: mockSubjects,
       students: [],
+      teacherAssignments: [{ id: 'assignment1', schoolId: 's1', academicYearId: 'ay1', classId: 'c1', subjectId: 'sub1', sourceClassSubjectId: 'cs1', teacherStaffId: 'synthetic-staff', teacherUserId: 'u1', status: 'active', isActive: true }],
       ...customDb
     };
 

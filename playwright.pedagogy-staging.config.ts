@@ -15,8 +15,9 @@ export default defineConfig({
   },
   use: {
     baseURL: appUrl,
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
+    // Authentication headers and school records must not enter CI artifacts.
+    trace: "off",
+    screenshot: "off",
   },
   projects: [
     {

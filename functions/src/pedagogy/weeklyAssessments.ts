@@ -1,10 +1,13 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
-import { audit, requireId, requirePedagogyActor } from './authorization';
+import { audit, PedagogyActor, requireId, requirePedagogyActor } from './authorization';
+import { admissibleTeachingContent } from './teachingEvidence';
+import { readClassPedagogyPolicy } from './classPolicies';
+import { generateAssessmentContent } from './aiAssessment';
 import {
-  assessmentId, coverageFor, DEFAULT_ASSESSMENT_POLICY, deterministicWeeklyAssessmentGenerator,
-  fridayForWeek, sourceChecksum, ValidatedPreparationSource, validateWeeklyAssessmentResult
+  assessmentId, coverageFor,
+  fridayForWeek, sourceChecksum, ValidatedPreparationSource
 } from './weeklyAssessmentGenerator';
 
 const db = () => admin.firestore();
@@ -22,22 +25,16 @@ const optionalText = (value: unknown, max = 2000): string => typeof value === 's
 const schoolDocument = (snap: admin.firestore.DocumentSnapshot, schoolId: string, label: string): Data => {
   if (!snap.exists) throw new functions.https.HttpsError('not-found', `${label} introuvable.`);
   const data = snap.data()!;
-  if (data.schoolId && data.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Accès inter-écoles interdit.');
+  const schoolRoot = snap.ref.parent.id === 'schools' && snap.id === schoolId;
+  if (!schoolRoot && data.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Accès inter-écoles interdit.');
   return data;
-};
-
-const pedagogicalText = (preparation: Data): string => {
-  const review = preparation.reviewData || {};
-  const extracted = preparation.extractedData || {};
-  return [review.lessonTitle || preparation.lessonTitle, review.objective || preparation.objective, review.lessonSteps, review.assessment,
-    extracted.lessonTitle, extracted.objective, Array.isArray(extracted.lessonSteps) ? extracted.lessonSteps.map((step: Data) => `${step.title || ''} ${step.description || ''}`).join(' ') : '']
-    .filter(Boolean).join('\n').slice(0, 12000);
 };
 
 export interface WeeklyAssessmentSources {
   identity: { schoolId: string; academicYearId: string; classId: string; weekId: string };
   school: Data; academicYear: Data; classData: Data; week: Data;
   expected: Data[]; validated: ValidatedPreparationSource[];
+  excluded: Array<{ preparationId: string; subjectId: string; reason: string }>;
   coverage: ReturnType<typeof coverageFor>; checksum: string;
 }
 
@@ -49,33 +46,52 @@ export const readWeeklyAssessmentSources = async (raw: Data, schoolId: string): 
     db().collection('schools').doc(schoolId).get(), db().collection('academicYears').doc(academicYearId).get(),
     db().collection('classes').doc(classId).get(), db().collection('teachingWeeks').doc(weekId).get(),
     db().collection('lessonPreparations').where('schoolId', '==', schoolId).where('academicYearId', '==', academicYearId)
-      .where('classId', '==', classId).where('weekId', '==', weekId).limit(250).get()
+      .where('classId', '==', classId).where('weekId', '==', weekId).limit(251).get()
   ]);
   const school = schoolDocument(schoolSnap, schoolId, 'École');
   const academicYear = schoolDocument(yearSnap, schoolId, 'Année scolaire');
   const classData = schoolDocument(classSnap, schoolId, 'Classe');
   const week = schoolDocument(weekSnap, schoolId, 'Semaine');
+  if (week.academicYearId !== academicYearId || week.status !== 'open' || academicYear.status === 'archived' || classData.isActive === false) throw new functions.https.HttpsError('failed-precondition', 'Classe, année ou semaine pédagogique incompatible.');
+  if (preparationsSnap.size > 250) throw new functions.https.HttpsError('resource-exhausted', 'Plus de 250 préparations dans la semaine : scindez le périmètre avant de générer.');
   const expected: Data[] = preparationsSnap.docs.map(document => ({ id: document.id, ...document.data() }));
-  const validated: ValidatedPreparationSource[] = expected.filter(preparation => preparation.status === 'validated' && preparation.reviewData).map(preparation => ({
+  const admissible = expected.map(preparation => ({ preparation, ...admissibleTeachingContent(preparation) }));
+  const excluded = admissible.filter(item => item.exclusion).map(item => ({ preparationId: item.preparation.id, subjectId: item.preparation.subjectId, reason: item.exclusion! }));
+  const validated: ValidatedPreparationSource[] = admissible.filter(item => !item.exclusion).map(({ preparation, content }) => ({
     id: preparation.id, version: Number(preparation.version || 1), subjectId: preparation.subjectId,
     classSubjectId: preparation.classSubjectId || preparation.subjectId, subjectName: preparation.subjectName || preparation.subjectId,
-    curriculumUnitId: preparation.curriculumUnitId || null, lessonTitle: preparation.reviewData?.lessonTitle || preparation.lessonTitle || null,
-    objective: preparation.reviewData?.objective || preparation.objective || null, pedagogicalContent: pedagogicalText(preparation)
+    curriculumUnitId: preparation.curriculumUnitId || null,
+    lessonTitle: preparation.teachingConfirmation.status === 'partially_taught' ? content.slice(0, 300) : preparation.reviewData.lessonTitle || null,
+    objective: preparation.teachingConfirmation.status === 'partially_taught' ? null : preparation.reviewData.objective || null,
+    pedagogicalContent: content,
+    teachingConfirmationId: preparation.teachingConfirmation.id,
+    teachingStatus: preparation.teachingConfirmation.status,
+    effectiveTeachingDate: preparation.teachingConfirmation.effectiveDate
   }));
   const coverage = coverageFor(expected.map(preparation => ({ subjectId: String(preparation.subjectId), subjectName: String(preparation.subjectName || preparation.subjectId) })), validated);
-  return { identity: { schoolId, academicYearId, classId, weekId }, school, academicYear, classData, week, expected, validated, coverage, checksum: sourceChecksum(validated) };
+  return { identity: { schoolId, academicYearId, classId, weekId }, school, academicYear, classData, week, expected, validated, excluded, coverage, checksum: sourceChecksum(validated) };
+};
+
+const numericAssessmentPolicy = async (sources: WeeklyAssessmentSources) => {
+  const { schoolId, academicYearId, classId } = sources.identity;
+  const policy = await readClassPedagogyPolicy(schoolId, academicYearId, classId, sources.classData);
+  if (policy.assessmentMode !== 'numeric' || policy.totalPoints === null) throw new functions.https.HttpsError('failed-precondition', 'Cette classe utilise les activités et observations, sans note ni classement.');
+  return { ...policy, totalPoints: policy.totalPoints };
 };
 
 const coverageFields = (sources: WeeklyAssessmentSources) => ({
   coveredSubjects: sources.coverage.coveredSubjects, missingSubjects: sources.coverage.missingSubjects,
   validatedPreparationCount: sources.coverage.validatedPreparationCount, expectedPreparationCount: sources.coverage.expectedPreparationCount,
-  coveragePercent: sources.coverage.coveragePercent, partial: sources.coverage.validatedPreparationCount < sources.coverage.expectedPreparationCount,
-  currentSourceChecksum: sources.checksum
+  coveragePercent: sources.coverage.coveragePercent, partial: sources.coverage.validatedPreparationCount < sources.coverage.expectedPreparationCount || sources.validated.some(item => item.teachingStatus === 'partially_taught'),
+  excludedPreparations: sources.excluded,
+  partiallyCoveredSubjects: sources.coverage.coveredSubjects.filter(subject => sources.excluded.some(item => item.subjectId === subject.id) || sources.validated.some(item => item.subjectId === subject.id && item.teachingStatus === 'partially_taught')),
+  currentSourceChecksum: sources.checksum, sourceEligibilityPolicy: 'confirmed-teaching-v1'
 });
 
 export const ensureWeeklyAssessmentDraft = functions.https.onCall(async (raw, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId);
   const sources = await readWeeklyAssessmentSources(raw || {}, schoolId);
+  const policy = await numericAssessmentPolicy(sources);
   const id = assessmentId(schoolId, sources.identity.academicYearId, sources.identity.classId, sources.identity.weekId);
   const ref = db().collection('weeklyAssessments').doc(id);
   const result = await db().runTransaction(async transaction => {
@@ -89,7 +105,7 @@ export const ensureWeeklyAssessmentDraft = functions.https.onCall(async (raw, co
       fridayDate: fridayForWeek(sources.week.weekStartDate), className: sources.classData.name || sources.identity.classId,
       academicYearName: sources.academicYear.name || sources.identity.academicYearId, schoolName: sources.school.name || schoolId,
       status: 'draft', generationStatus: 'pending', generationVersion: 0, ...coverageFields(sources),
-      totalPoints: DEFAULT_ASSESSMENT_POLICY.totalPoints, durationMinutes: DEFAULT_ASSESSMENT_POLICY.durationMinutes,
+      totalPoints: policy.totalPoints, durationMinutes: policy.durationMinutes, policySnapshot: policy,
       createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
     audit(transaction, actor, schoolId, 'weekly_assessment_draft_created', 'weeklyAssessment', id, { ...sources.identity, ...sources.coverage });
@@ -98,10 +114,16 @@ export const ensureWeeklyAssessmentDraft = functions.https.onCall(async (raw, co
   return { assessmentId: id, ...result, coverage: sources.coverage };
 });
 
-export const generateWeeklyAssessment = functions.https.onCall(async (raw, context) => {
+export const generateWeeklyAssessment = functions.runWith({ timeoutSeconds: 180, memory: '512MB', secrets: ['PEDAGOGY_OPENAI_API_KEY'] }).https.onCall(async (raw, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId);
+  return generateWeeklyAssessmentForActor(raw || {}, schoolId, actor);
+});
+
+export const generateWeeklyAssessmentForActor = async (raw: Data, schoolId: string, actor: PedagogyActor) => {
   const sources = await readWeeklyAssessmentSources(raw || {}, schoolId);
-  if (!sources.validated.length) throw new functions.https.HttpsError('failed-precondition', 'Aucune préparation validée pour cette classe et cette semaine.');
+  const policy = await numericAssessmentPolicy(sources);
+  if (!sources.validated.length) throw new functions.https.HttpsError('failed-precondition', 'Aucun cours confirmé exploitable');
+  if (Buffer.byteLength(JSON.stringify(sources.validated), 'utf8') > 700000) throw new functions.https.HttpsError('resource-exhausted', 'Sources trop volumineuses : réduisez le périmètre sans tronquer les cours.');
   const id = assessmentId(schoolId, sources.identity.academicYearId, sources.identity.classId, sources.identity.weekId);
   const ref = db().collection('weeklyAssessments').doc(id);
   const regenerate = raw?.regenerate === true;
@@ -110,9 +132,9 @@ export const generateWeeklyAssessment = functions.https.onCall(async (raw, conte
     const snap = await transaction.get(ref);
     const current = snap.data();
     if (current?.status === 'archived') throw new functions.https.HttpsError('failed-precondition', 'Cette évaluation est archivée.');
-    if (current?.generationStatus === 'processing') return { generate: false, version: current.generationVersion || 1, status: current.status, idempotent: true };
-    if (current?.sourceChecksum === sources.checksum && current?.generationVersion > 0 && !regenerate) return { generate: false, version: current.generationVersion, status: current.status, idempotent: true };
-    if (regenerate && ['teacher_validated', 'ready_to_print'].includes(current?.status) && !confirmRevision) {
+    if (current?.generationStatus === 'processing' && (current.generationStartedAt?.toMillis?.() || 0) > Date.now() - 5 * 60 * 1000) return { generate: false, version: current.generationVersion || 1, status: current.status, idempotent: true };
+    if (current?.generationStatus === 'succeeded' && current?.sourceChecksum === sources.checksum && (current.policySnapshot?.version || 1) === policy.version && current?.generationVersion > 0 && !regenerate) return { generate: false, version: current.generationVersion, status: current.status, idempotent: true };
+    if (['teacher_validated', 'ready_to_print'].includes(current?.status) && !confirmRevision) {
       throw new functions.https.HttpsError('failed-precondition', 'Confirmez explicitement la création d’une nouvelle révision après validation enseignant.');
     }
     const version = Number(current?.generationVersion || 0) + 1;
@@ -121,7 +143,9 @@ export const generateWeeklyAssessment = functions.https.onCall(async (raw, conte
       fridayDate: fridayForWeek(sources.week.weekStartDate), className: sources.classData.name || sources.identity.classId,
       academicYearName: sources.academicYear.name || sources.identity.academicYearId, schoolName: sources.school.name || schoolId,
       status: 'generating', generationStatus: 'processing', generationVersion: version, generationStartedAt: FieldValue.serverTimestamp(),
-      ...coverageFields(sources), updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
+      ...coverageFields(sources), teacherValidated: false, teacherValidationRecordedBy: null,
+      teacherValidationRecordedAt: null, teacherValidatedAt: null, teacherValidationNote: null,
+      updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     };
     if (snap.exists) transaction.update(ref, base); else transaction.create(ref, { ...base, createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid });
     audit(transaction, actor, schoolId, 'weekly_assessment_generation_started', 'weeklyAssessment', id, { generationVersion: version, sourceChecksum: sources.checksum });
@@ -129,15 +153,18 @@ export const generateWeeklyAssessment = functions.https.onCall(async (raw, conte
   });
   if (!claim.generate) return { assessmentId: id, generationVersion: claim.version, status: claim.status, idempotent: true };
   try {
-    const generated = validateWeeklyAssessmentResult(await deterministicWeeklyAssessmentGenerator.generate({
+    const output = await generateAssessmentContent(schoolId, {
       school: { id: schoolId, name: sources.school.name || schoolId },
       academicYear: { id: sources.identity.academicYearId, name: sources.academicYear.name || sources.identity.academicYearId },
       class: { id: sources.identity.classId, name: sources.classData.name || sources.identity.classId },
       week: { id: sources.identity.weekId, startDate: sources.week.weekStartDate, endDate: sources.week.weekEndDate, fridayDate: fridayForWeek(sources.week.weekStartDate) },
       validatedPreparations: sources.validated, subjects: sources.coverage.coveredSubjects,
-      pedagogicalContent: sources.validated, assessmentPolicy: DEFAULT_ASSESSMENT_POLICY
-    }));
-    const batch = db().batch();
+      pedagogicalContent: sources.validated, assessmentPolicy: policy
+    }, policy.language);
+    const generated = output.generated;
+    await db().runTransaction(async batch => {
+    const current = await batch.get(ref);
+    if (current.data()?.generationVersion !== claim.version || current.data()?.status !== 'generating') throw new Error('GENERATION_SUPERSEDED');
     generated.items.forEach(item => {
       const itemId = `${id}__v${claim.version}__q${String(item.order).padStart(3, '0')}`;
       batch.create(db().collection('assessmentItems').doc(itemId), {
@@ -145,12 +172,18 @@ export const generateWeeklyAssessment = functions.https.onCall(async (raw, conte
         createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid
       });
     });
-    const sourceSnapshot = sources.validated.map(source => ({ ...source, pedagogicalContent: source.pedagogicalContent.slice(0, 12000) }));
+    const sourceSnapshot = sources.validated;
+    batch.create(ref.collection('revisions').doc(String(claim.version)), {
+      schoolId, academicYearId: sources.identity.academicYearId, classId: sources.identity.classId, weekId: sources.identity.weekId,
+      generationVersion: claim.version, sourceChecksum: sources.checksum, sourceSnapshot, policySnapshot: policy,
+      generatorProvider: output.provider, generatorVersion: output.version, aiOperationId: output.operationId,
+      generated, createdBy: actor.uid, createdAt: FieldValue.serverTimestamp()
+    });
     batch.update(ref, {
-      status: 'needs_review', generationStatus: 'succeeded', generatorProvider: deterministicWeeklyAssessmentGenerator.provider,
-      generatorVersion: deterministicWeeklyAssessmentGenerator.version, title: generated.title, instructions: generated.instructions,
+      status: 'needs_review', generationStatus: 'succeeded', generatorProvider: output.provider, aiOperationId: output.operationId,
+      generatorVersion: output.version, title: generated.title, instructions: generated.instructions, generationError: null,
       durationMinutes: generated.durationMinutes, totalPoints: generated.totalPoints, sections: generated.sections, warnings: generated.warnings,
-      itemCount: generated.items.length,
+      itemCount: generated.items.length, policySnapshot: policy,
       sourcePreparationIds: sources.validated.map(source => source.id), sourcePreparationVersions: Object.fromEntries(sources.validated.map(source => [source.id, source.version])),
       sourceChecksum: sources.checksum, sourceSnapshot, ...coverageFields(sources), generationCompletedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
@@ -160,17 +193,19 @@ export const generateWeeklyAssessment = functions.https.onCall(async (raw, conte
       details: { generationVersion: claim.version, sourceChecksum: sources.checksum, itemCount: generated.items.length, totalPoints: generated.totalPoints },
       timestamp: FieldValue.serverTimestamp(), createdAt: FieldValue.serverTimestamp(), canonicalBackendAudit: true
     });
-    await batch.commit();
+    });
     return { assessmentId: id, generationVersion: claim.version, status: 'needs_review', idempotent: false, coverage: sources.coverage };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 200) : 'GENERATION_FAILED';
     await db().runTransaction(async transaction => {
+      const current = await transaction.get(ref);
+      if (current.data()?.generationVersion !== claim.version || current.data()?.status !== 'generating') return;
       transaction.update(ref, { status: 'failed', generationStatus: 'failed', generationError: reason, failedSourceChecksum: sources.checksum, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
       audit(transaction, actor, schoolId, 'weekly_assessment_generation_failed', 'weeklyAssessment', id, { generationVersion: claim.version, reason, sourceChecksum: sources.checksum });
     });
     return { assessmentId: id, generationVersion: claim.version, status: 'failed', error: reason, retryable: true };
   }
-});
+};
 
 const itemEdit = (raw: unknown, index: number): { id: string; questionText: string; instructions: string; points: number; order: number } => {
   if (!raw || typeof raw !== 'object') throw new functions.https.HttpsError('invalid-argument', `Question ${index + 1} invalide.`);
@@ -178,7 +213,7 @@ const itemEdit = (raw: unknown, index: number): { id: string; questionText: stri
   const points = Number(value.points);
   const order = Number(value.order);
   if (!Number.isFinite(points) || points <= 0 || points > 100 || !Number.isInteger(order) || order < 1 || order > 100) throw new functions.https.HttpsError('invalid-argument', 'Barème ou ordre invalide.');
-  return { id: requireId(value.id, 'itemId'), questionText: text(value.questionText, 'questionText'), instructions: text(value.instructions, 'instructions', 1000), points, order };
+  return { id: documentId(value.id, 'itemId'), questionText: text(value.questionText, 'questionText'), instructions: text(value.instructions, 'instructions', 1000), points, order };
 };
 
 export const saveWeeklyAssessmentEdits = functions.https.onCall(async (raw, context) => {
