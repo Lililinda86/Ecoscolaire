@@ -1,0 +1,40 @@
+name: PR201 Maternelle authenticated read-only validation
+
+on:
+  push:
+    branches: [codex/maternelle-labels-audit, staging]
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+
+jobs:
+  visual-readonly:
+    if: github.ref == 'refs/heads/codex/maternelle-labels-audit' || contains(github.event.head_commit.message, 'Merge pull request #201 ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      STAGING_FIREBASE_PROJECT_ID: ecoscolaire-staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Read-only guard contracts
+        run: node --test tests/security/maternelle-readonly-contract.spec.mjs
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Authenticated exact-SHA read-only smoke
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          STAGING_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
+          STAGING_FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_FIREBASE_STORAGE_BUCKET }}
+          STAGING_TEST_ALPHA_PASSWORD: ${{ secrets.STAGING_TEST_ALPHA_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: npx playwright test --config playwright.maternelle-readonly.config.ts
+      # No service account, remote data export, screenshot upload, HAR, trace,
+      # video, or storageState artifact. Only the existing TEST owner signs in.
