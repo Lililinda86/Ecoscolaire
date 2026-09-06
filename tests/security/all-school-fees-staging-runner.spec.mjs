@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+const source = readFileSync(new URL('../../scripts/test-all-school-fees-staging.mjs', import.meta.url), 'utf8');
+const workflow = readFileSync(new URL('../../.github/workflows/all-school-fees-staging-ui.yml', import.meta.url), 'utf8');
+test('all-fees runner is pinned to staging, verifies release, uses random ephemeral identities and cleans its own school', () => {
+  assert.match(source, /const project = 'ecoscolaire-staging'/);
+  assert.match(source, /assert.equal\(process.env.VITE_FIREBASE_PROJECT_ID, project\)/);
+  assert.match(source, /assert.equal\(process.env.TARGET_DEPLOYMENT_VERIFIED, 'true'\)/);
+  assert.match(source, /randomBytes\(32\)/);
+  assert.match(source, /finally \{/);
+  assert.match(source, /where\('schoolId', '==', schoolId\)/);
+  assert.match(source, /assert.equal\(doc.data\(\).schoolId, schoolId\)/);
+  assert.match(source, /auth.deleteUser\(user.uid\)/);
+  assert.match(source, /assert.rejects\(auth.getUser/);
+  assert.doesNotMatch(source, /console\.(?:log|error)\([^\n]*(?:password|\.token)/);
+  assert.match(workflow, /github.ref == 'refs\/heads\/staging'/);
+  assert.match(workflow, /environment: staging/);
+  assert.match(workflow, /verify-exact-deployment-run.mjs/);
+  assert.match(workflow, /test "\$GITHUB_SHA" = "\$EXPECTED_STAGING_SHA"/);
+});

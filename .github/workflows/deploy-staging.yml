@@ -259,6 +259,18 @@ jobs:
               exit 1
             fi
           done
+  all-fees-staging-ui:
+    if: github.event_name == 'workflow_dispatch' && inputs.confirmation == 'RUN_ALL_FEES_STAGING_UI'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/all-school-fees-staging-ui.yml
+    with:
+      expected_sha: ${{ inputs.expected_sha }}
+      app_url: ${{ inputs.app_url }}
+    secrets: inherit
+
   lot1-staging-ui:
     if: >-
       github.event_name == 'workflow_dispatch' &&

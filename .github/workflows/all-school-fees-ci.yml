@@ -25,6 +25,8 @@ jobs:
       - run: npm run typecheck:frontend
       - run: npx eslint functions/src/schoolFeeCatalog.ts functions/src/studentFeeAssignments.ts functions/src/studentTransportPlan.ts src/components/Settings/SchoolFeeCatalog.tsx --max-warnings=0
       - run: node scripts/check-staging-credential-regressions.mjs
+      - run: node --check scripts/test-all-school-fees-staging.mjs
+      - run: node --test tests/security/all-school-fees-staging-runner.spec.mjs
       - run: node tests/functions/test-transport-paid-cycles.cjs
       - run: node tests/functions/test-secretary-collection-calculations.cjs
       - run: npm install -g firebase-tools@15.25.0
