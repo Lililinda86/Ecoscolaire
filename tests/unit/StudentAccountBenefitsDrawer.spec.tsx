@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   moratoriumDocs: [] as Array<{ id: string; data: () => Record<string, unknown> }>,
   calls: [] as Array<{ name: string; payload: Record<string, unknown> }>,
   responses: new Map<string, Record<string, unknown>>(),
-  readGate: undefined as Promise<void> | undefined
+  readGate: undefined as Promise<void> | undefined,
+  actionGate: undefined as Promise<void> | undefined
 }));
 
 vi.mock('../../src/db/firebase', () => ({ db: {}, functions: {} }));
@@ -30,6 +31,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('firebase/functions', () => ({
   httpsCallable: vi.fn((_functions, name: string) => async (payload: Record<string, unknown>) => {
     mocks.calls.push({ name, payload });
+    if (mocks.actionGate) await mocks.actionGate;
     return { data: mocks.responses.get(name) || { status: 'draft', benefitId: 'benefit-new', moratoriumId: 'moratorium-new' } };
   })
 }));
@@ -83,6 +85,7 @@ describe('StudentAccountBenefitsDrawer', () => {
     mocks.calls = [];
     mocks.responses.clear();
     mocks.readGate = undefined;
+    mocks.actionGate = undefined;
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
   });
 
@@ -105,13 +108,21 @@ describe('StudentAccountBenefitsDrawer', () => {
   });
 
   it('creates a scoped scholarship draft without applying a financial change', async () => {
+    const creationResponse = deferredRead();
+    mocks.actionGate = creationResponse.promise;
     renderDrawer('secretary');
     fireEvent.change(screen.getByLabelText('Frais concerné'), { target: { value: 'tuition:T1' } });
     fireEvent.change(screen.getByLabelText(/^Montant/), { target: { value: '12000' } });
     fireEvent.change(screen.getByLabelText(/^Motif/), { target: { value: 'Bourse sociale documentée' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le brouillon' }));
 
-    await waitFor(() => expect(mocks.calls.some(call => call.name === 'createFinancialBenefit')).toBe(true));
+    try {
+      await waitFor(() => expect(mocks.calls.some(call => call.name === 'createFinancialBenefit')).toBe(true));
+      expect(screen.queryByText('Brouillon enregistré.')).toBeNull();
+    } finally {
+      // Recording the callable does not mean its response reached the UI.
+      creationResponse.resolve();
+    }
     const creation = mocks.calls.find(call => call.name === 'createFinancialBenefit');
     expect(creation?.payload).toMatchObject({
       schoolId: 'school-1',
@@ -124,7 +135,8 @@ describe('StudentAccountBenefitsDrawer', () => {
       value: 12000
     });
     expect(mocks.calls.some(call => call.name === 'submitFinancialBenefit')).toBe(false);
-    expect(screen.getByText('Brouillon enregistré.')).toBeTruthy();
+    expect(await screen.findByText('Brouillon enregistré.')).toBeTruthy();
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Enregistrer le brouillon' }) as HTMLButtonElement).disabled).toBe(false));
   });
 
   it('supports percentage, annual tuition scope and voucher reference validation', async () => {
