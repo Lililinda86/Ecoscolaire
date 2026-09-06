@@ -88,7 +88,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       await page.getByRole('button', { name: 'Générer maintenant' }).click();
       console.log('[Lot C] coverage: partial confirmed');
       await expect(page.getByText('Évaluation générée.')).toBeVisible({ timeout: 25_000 });
-      await expect(page.getByText(/Version 1/)).toBeVisible(); await expect(page.getByText('20/20', { exact: true })).toBeVisible();
+      await expect(page.getByText(/^Version 1 ·/)).toBeVisible(); await expect(page.getByText('20/20', { exact: true })).toBeVisible();
       await expect(page.getByText('BROUILLON — À VALIDER PAR L’ENSEIGNANT')).toBeVisible();
       const assessmentId = `${f.schoolId}__${f.yearId}__${f.classId}__${f.weekId}`;
       console.log('[Lot C] generation: 20/20 draft confirmed');
@@ -124,7 +124,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       await page.reload(); await expect(page.getByText('Les cours confirmés ont changé.')).toHaveCount(0);
       await expect(page.getByText('Sciences manquante')).toBeVisible();
       await firestore.collection('lessonPreparations').doc(fixtureId('lot-c-prep-science')).update({ ...confirmationFixture('lot-c-prep-science', { lessonTitle: 'Sciences', objective: 'Observer', lessonSteps: 'Expérience' }), version: 4 });
-      await page.reload(); await expect(page.getByText('Les cours confirmés ont changé.')).toBeVisible(); await expect(page.getByText(/Version 1/)).toBeVisible();
+      await page.reload(); await expect(page.getByText('Les cours confirmés ont changé.')).toBeVisible(); await expect(page.getByText(/^Version 1 ·/)).toBeVisible();
       console.log('[Lot C] source change: detected');
       await page.getByRole('combobox', { name: /^Classe/ }).selectOption(f.failClassId); await expect(page.getByText('1/1', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Générer maintenant' }).click();
       await expect(page.getByText(/Génération impossible : MOCK_WEEKLY_ASSESSMENT_FAILURE/)).toBeVisible({ timeout: 25_000 }); await expect(page.getByText(/vous pouvez réessayer/i)).toBeVisible();
@@ -132,8 +132,9 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       console.log('[Lot C] generator failure fallback: confirmed');
       expect((await firestore.collection('audit_logs').where('schoolId', '==', f.schoolId).get()).size).toBeGreaterThanOrEqual(6);
       console.log('[Lot C] protected collections: unchanged');
-    } finally {
       console.log('[Lot C] audit trail: confirmed');
+    } finally {
+      console.log('[Lot C] fixture cleanup: starting');
       await cleanup();
       const residuals = await Promise.all(scoped.map(async name => (await firestore.collection(name).where('schoolId', '==', f.schoolId).get()).size));
       console.log('[Lot C] cleanup final: start');
