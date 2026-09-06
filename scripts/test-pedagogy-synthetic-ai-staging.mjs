@@ -64,7 +64,7 @@ if (process.argv.includes('--check-only')) {
   const exact = [], uploaded = [], cleanupIssues = [];
   let storageCreatedCount = 0;
   let ownsFixture = false, ownsUser = false, manifestCreated = false, failure = null;
-  const report = { sha: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, model: 'gpt-4.1-mini-2025-04-14', documentChecks: [], assessments: [], successfulProviderOperations: 0, actualCostMicros: 0, cleanupVerified: false, pedagogicalApproval: 'NOT_PERFORMED' };
+  const report = { sha: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, model: 'gpt-4.1-mini-2025-04-14', documentChecks: [], assessments: [], successfulProviderOperations: 0, estimatedCostMicros: 0, costBasis: 'observed_tokens_uncached_list_price_upper_bound_not_invoice', cleanupVerified: false, pedagogicalApproval: 'NOT_PERFORMED' };
   try {
     const initial = await Promise.all([manifestRef.get(), ledgerRef.get(), db.collection('schools').doc(schoolId).get(), configRef.get()]);
     assert.ok(initial.every(snapshot => !snapshot.exists), 'TRIAL_ALREADY_EXISTS_NO_AUTOMATIC_REPLAY');
@@ -135,10 +135,10 @@ if (process.argv.includes('--check-only')) {
         await configRef.update({ enabled: false, disabledReason: 'TRIAL_FINISHED_OR_INTERRUPTED' });
         const operations = await db.collection('pedagogyAiOperations').where('schoolId', '==', schoolId).limit(11).get();
         assert.ok(operations.size <= 10, 'TRIAL_OPERATION_LIMIT_EXCEEDED');
-        report.operations = operations.docs.map(doc => { const value = doc.data(); return { operationId: doc.id, purpose: value.purpose, status: value.status, reservedMicros: value.reservedMicros, inputTokens: value.result?.inputTokens ?? null, outputTokens: value.result?.outputTokens ?? null, actualCostMicros: value.result?.actualCostMicros ?? null, errorCode: value.errorCode || null }; });
+        report.operations = operations.docs.map(doc => { const value = doc.data(); return { operationId: doc.id, purpose: value.purpose, status: value.status, reservedMicros: value.reservedMicros, inputTokens: value.result?.inputTokens ?? null, outputTokens: value.result?.outputTokens ?? null, estimatedCostMicros: value.result?.estimatedCostMicros ?? null, errorCode: value.errorCode || null }; });
         report.attemptedOperations = report.operations.length;
         report.successfulProviderOperations = report.operations.filter(item => item.status === 'succeeded').length;
-        report.actualCostMicros = report.operations.reduce((sum, item) => sum + (item.actualCostMicros || 0), 0);
+        report.estimatedCostMicros = report.operations.reduce((sum, item) => sum + (item.estimatedCostMicros || 0), 0);
         report.ledger = (await ledgerRef.get()).data();
         assert.ok(report.ledger.reservedMicros <= 2000000, 'TRIAL_BUDGET_EXCEEDED');
         report.unresolvedConsumption = report.operations.some(item => item.status !== 'succeeded');

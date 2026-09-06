@@ -69,8 +69,10 @@ export async function requestStructuredPedagogyAi(schoolId: string, request: Str
       await configSnap.ref.update({ enabled: false, disabledReason: 'AI_RESERVATION_BOUND_EXCEEDED', disabledAt: FieldValue.serverTimestamp() });
       throw new Error('AI_RESERVATION_BOUND_EXCEEDED');
     }
-    const actualCostMicros = Math.ceil((parsed.inputTokens * config.inputPriceMicrosPerMillionTokens + parsed.outputTokens * config.outputPriceMicrosPerMillionTokens) / 1000000);
-    const result = { ...parsed, provider: 'openai', protocolVersion: PEDAGOGY_AI_PROTOCOL_VERSION, actualCostMicros };
+    // Observed tokens at full uncached list price: conservative, not an invoice.
+    // Cache discounts can reduce the billed amount; reservations are never refunded.
+    const estimatedCostMicros = Math.ceil((parsed.inputTokens * config.inputPriceMicrosPerMillionTokens + parsed.outputTokens * config.outputPriceMicrosPerMillionTokens) / 1000000);
+    const result = { ...parsed, provider: 'openai', protocolVersion: PEDAGOGY_AI_PROTOCOL_VERSION, estimatedCostMicros, costBasis: 'observed_tokens_uncached_list_price_upper_bound' };
     await ref.update({ status: 'succeeded', result, completedAt: FieldValue.serverTimestamp() });
     return { ...result, operationId: id, cached: false };
   } catch (error) {

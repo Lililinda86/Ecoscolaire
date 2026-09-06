@@ -42,6 +42,12 @@ gateway repeats the exact-school, model, document-hash and budget checks.
 No secret value is copied to the repository, developer environment or CI.
 Do not infer successful provider connectivity from enabled secret metadata.
 
+Consumption reports retain the provider's observed input/output token counts.
+estimatedCostMicros prices those tokens at the full uncached configured rate:
+it is a conservative list-price estimate, NOT a billing invoice. Cache discounts
+may lower the charge. Failed/uncertain operations retain their full reservation
+and are reported separately; a missing usage receipt never means zero spend.
+
 ## Sources and reproduction
 
 Original fixture authoring source: scripts/generate-pedagogy-synthetic-documents.py.
