@@ -10,7 +10,7 @@ export interface SchoolFee extends Data {
 }
 const fail = (message: string) => new functions.https.HttpsError('failed-precondition', message);
 const id = (value: unknown): string => {
-  if (typeof value !== 'string' || !value || value.length > 128 || value.includes('/') || value.trim() !== value) throw fail('Identifiant invalide.');
+  if (typeof value !== 'string' || !value || value === '.' || value === '..' || value.length > 128 || value.includes('/') || value.trim() !== value) throw fail('Identifiant invalide.');
   return value;
 };
 const ids = (value: unknown): string[] => {
@@ -34,7 +34,7 @@ async function authorize(tx: admin.firestore.Transaction, db: admin.firestore.Fi
   const [user, school] = await Promise.all([tx.get(db.collection('users').doc(uid)), tx.get(db.collection('schools').doc(schoolId))]);
   const u = user.data() || {};
   const roles = write ? ['owner', 'director', 'superAdmin'] : ['owner', 'director', 'secretary', 'accountant', 'superAdmin'];
-  if ((!u.isActive && !u.active) || u.status === 'inactive' || !roles.includes(String(u.role)) || (u.role !== 'superAdmin' && u.schoolId !== schoolId)) {
+  if ((u.isActive !== true && u.active !== true) || u.status === 'inactive' || !roles.includes(String(u.role)) || (u.role !== 'superAdmin' && u.schoolId !== schoolId)) {
     throw new functions.https.HttpsError('permission-denied', 'Opération non autorisée.');
   }
   if (!school.exists || school.data()?.active === false || school.data()?.subscriptionStatus === 'suspended') throw fail('École indisponible.');
