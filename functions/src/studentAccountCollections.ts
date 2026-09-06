@@ -239,7 +239,7 @@ export const monthlyLines = (lines: AccountLine[]): AccountLine[] => lines.flatM
   if (line.type !== 'transport') return [line];
   const quote = line as AccountLine & TransportCollectionQuote;
   return quote.installments.map(item => ({ ...line, ...item, key: `transport:${item.period}`, period: item.period,
-    label: `Transport — ${item.period} — PK${quote.zonePk ?? ''}`, selectable: item.remainingBalance > 0 }));
+    label: `Transport — ${item.period}${item.zonePk == null ? '' : ` — PK${item.zonePk}`}`, selectable: item.remainingBalance > 0 }));
 });
 
 export const getStudentFinancialAccount = functions.https.onCall(async (raw, context) => {
@@ -281,6 +281,13 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
   return db.runTransaction(async transaction => {
     const paymentRef = db.collection('payments').doc(collectionId);
     const receiptRef = db.collection('receipts').doc(collectionId);
+    // Replays disclose financial data too: authorize before returning a stored receipt.
+    const user = (await transaction.get(db.collection('users').doc(uid))).data() || {};
+    if ((user.active !== true && user.isActive !== true) || user.status === 'inactive'
+        || !['owner', 'director', 'accountant', 'secretary', 'superAdmin'].includes(String(user.role))
+        || (user.role !== 'superAdmin' && user.schoolId !== schoolId)) {
+      throw httpsError('permission-denied', 'Access denied.', 'PERMISSION_DENIED');
+    }
     const [paymentSnap, receiptSnap] = await Promise.all([transaction.get(paymentRef), transaction.get(receiptRef)]);
     if (paymentSnap.exists || receiptSnap.exists) {
       if (!paymentSnap.exists || !receiptSnap.exists || paymentSnap.data()?.requestFingerprint !== fingerprint

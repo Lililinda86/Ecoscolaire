@@ -63,14 +63,20 @@ export const setStudentTransportPlan = functions.https.onCall(async (raw, contex
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Douala', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     const effectivePeriod = prospectivePeriod(today);
     let previous: Record<string, number> = plan.periodFees || {};
+    let periodZonePks: Record<string, number | null> = plan.periodZonePks || {};
     if (!planSnap.exists) {
       // Nursery was not billable before this policy; never manufacture past nursery debt.
       const oldFee = cycle === 'primary' && Number.isSafeInteger(privateData.transportZonePk) ? resolveItaloTransportFee({ cycle, usesTransport: student.usesTransport === true, zonePk: privateData.transportZonePk }).monthlyGrossAmount : 0;
       previous = Object.fromEntries(periods.map((period: string) => [period, oldFee]));
+      periodZonePks = Object.fromEntries(periods.map((period: string) => [period, privateData.transportZonePk ?? null]));
     }
     const periodFees = revisePeriodFees(previous, periods.filter((p: string) => !protectedPeriods.has(p)), effectivePeriod, fee.monthlyGrossAmount);
+    for (const period of Object.keys(periodFees)) {
+      if (!(period in periodZonePks)) periodZonePks[period] = plan.zonePk ?? privateData.transportZonePk ?? null;
+      if (period >= effectivePeriod && !protectedPeriods.has(period)) periodZonePks[period] = zonePk;
+    }
     const change: Data = { effectivePeriod, zonePk, usesTransport: raw.usesTransport, monthlyGrossAmount: fee.monthlyGrossAmount, actorId: context.auth!.uid, at: today };
-    tx.set(ref, { schoolId, studentId, academicYear: year.name, periodFees, usesTransport: raw.usesTransport, zonePk, effectivePeriod,
+    tx.set(ref, { schoolId, studentId, academicYear: year.name, periodFees, periodZonePks, usesTransport: raw.usesTransport, zonePk, effectivePeriod,
       history: [...(Array.isArray(plan.history) ? plan.history : []), change], updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     tx.update(studentSnap.ref, { usesTransport: raw.usesTransport, transportStatus: raw.usesTransport ? 'active' : 'none' });
     tx.update(privateSnap.ref, { transportZonePk: zonePk });

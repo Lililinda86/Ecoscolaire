@@ -472,6 +472,7 @@ export interface CollectionQuote extends PaymentScheduleSnapshot {
 
 export interface TransportInstallmentSnapshot extends CollectionQuote {
   period: string;
+  zonePk?: number | null;
   allocatedAmount: number;
 }
 
@@ -733,12 +734,13 @@ const requireTransportAllocationAmount = (allocation: Data): number => {
 };
 
 const buildTransportCollectionQuote = ({
-  fee, periods, benefits, payments, allocations, moratoriums, school, schoolId, academicYear, today, periodFees
+  fee, periods, benefits, payments, allocations, moratoriums, school, schoolId, academicYear, today, periodFees, periodZonePks
 }: {
   fee: TransportFeeResolution; periods: string[]; benefits: Data[]; payments: Data[];
   allocations: Data[]; moratoriums: Data[]; school: Data; schoolId: string;
   academicYear: string; today: string;
   periodFees?: Record<string, number>;
+  periodZonePks?: Record<string, number | null>;
 }): TransportCollectionQuote => {
   if (fee.state !== 'BILLABLE') return zeroTransportQuote(fee.state);
   const installmentAllocations = new Map<string, number>();
@@ -789,6 +791,7 @@ const buildTransportCollectionQuote = ({
     });
     return {
       ...legacyQuote, ...schedule, period, allocatedAmount, previousPaid: paidAmount, remainingBalance,
+      zonePk: periodZonePks && period in periodZonePks ? periodZonePks[period] : fee.zonePk,
       status: remainingBalance === 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID'
     };
   });
@@ -1527,6 +1530,9 @@ const readQuoteContext = async (
       throw httpsError('failed-precondition', 'Historique transport incohérent.', 'TRANSPORT_PLAN_INVALID');
     }
     const periodFees = plan?.periodFees as Record<string, number> | undefined;
+    const periodZonePks = plan?.periodZonePks as Record<string, number | null> | undefined;
+    const billingPeriods = () => [...new Set([...resolveTransportBillingPeriods(school, input.academicYear),
+      ...Object.keys(periodFees || {})])].sort();
     const fee = resolveTransportFee(plan ? { ...student, usesTransport: plan.usesTransport } : student,
       plan ? { ...privateData, transportZonePk: plan.zonePk } : privateData, classData);
     if (periodFees && resolveCanonicalClassCycle(classData) !== 'secondary' && Object.values(periodFees).some(v => v > 0)) fee.state = 'BILLABLE';
@@ -1539,15 +1545,15 @@ const readQuoteContext = async (
       quote = zeroTransportQuote(fee.state);
     } else if (!input.period) {
       quote = buildTransportCollectionQuote({
-        fee, periods: resolveTransportBillingPeriods(school, input.academicYear), benefits, payments,
+        fee, periods: billingPeriods(), benefits, payments,
         allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
-        academicYear: input.academicYear, today: getDoualaDate(), periodFees
+        academicYear: input.academicYear, today: getDoualaDate(), periodFees, periodZonePks
       });
     } else {
       const policy = school.transportPolicy && typeof school.transportPolicy === 'object'
         ? school.transportPolicy as Data : {};
       if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID
-          && !resolveTransportBillingPeriods(school, input.academicYear).includes(input.period)) {
+          && !billingPeriods().includes(input.period)) {
         throw httpsError('failed-precondition', 'Ce mois ne fait pas partie du calendrier transport.',
           'TRANSPORT_PERIOD_NOT_BILLABLE');
       }
@@ -1555,9 +1561,9 @@ const readQuoteContext = async (
         throw httpsError('failed-precondition', 'Ce mois ne fait pas partie de l’abonnement.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
       }
       if (policy.feePolicyId === ITALO_TRANSPORT_FEE_POLICY_ID) {
-        const annual = buildTransportCollectionQuote({ fee, periods: resolveTransportBillingPeriods(school, input.academicYear),
+        const annual = buildTransportCollectionQuote({ fee, periods: billingPeriods(),
           benefits, payments, allocations, moratoriums, school: scheduleSchool, schoolId: input.schoolId,
-          academicYear: input.academicYear, today: getDoualaDate(), periodFees });
+          academicYear: input.academicYear, today: getDoualaDate(), periodFees, periodZonePks });
         const selected = annual.installments.find(item => item.period === input.period);
         if (!selected) throw httpsError('failed-precondition', 'Mois non facturable.', 'TRANSPORT_PERIOD_NOT_BILLABLE');
         quote = selected;
