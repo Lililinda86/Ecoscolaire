@@ -7,12 +7,14 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
 const admin = require('../../functions/node_modules/firebase-admin');
 const {
   approveFinancialBenefit,
+  rejectFinancialBenefit,
   cancelFinancialBenefit,
   closeCashDrawer,
   createFinancialBenefit,
   getCollectionQuote,
   recordCashPayment,
-  reversePayment
+  reversePayment,
+  submitFinancialBenefit
 } = require('../../functions/lib/index');
 const { makeTuitionDiscountSlotId } = require('../../functions/lib/utils/discountHelpers');
 const { executeCreateStudentSecure } = require('../../functions/lib/studentCreationSecure');
@@ -76,6 +78,11 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   reason: 'Test fictif de bourse',
   ...overrides
 }, context(uid));
+const approveBenefit = async (uid, benefitId) => {
+  await submitFinancialBenefit.run({ benefitId }, context(uid));
+  return approveFinancialBenefit.run({ benefitId }, context(uid));
+};
+
 
 (async () => {
   await Promise.all([
@@ -288,17 +295,23 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   }
 
   // Permission matrix and scholarship approval.
-  await expectFailure(createBenefit(secretaryId, `secretary-create-${suffix}`), 'PERMISSION_DENIED');
+  const secretaryBenefit = await createBenefit(secretaryId, `secretary-create-${suffix}`);
+  assert.equal(secretaryBenefit.status, 'draft');
+  const secretarySubmission = await submitFinancialBenefit.run({ benefitId: secretaryBenefit.benefitId }, context(secretaryId));
+  assert.equal(secretarySubmission.status, 'pending');
+  await expectFailure(rejectFinancialBenefit.run({ benefitId: secretaryBenefit.benefitId, reason: 'Refus non autorisé' }, context(secretaryId)), 'PERMISSION_DENIED');
+  assert.equal((await db.collection('financialBenefits').doc(secretaryBenefit.benefitId).get()).data().status, 'pending');
+  await expectFailure(approveFinancialBenefit.run({ benefitId: secretaryBenefit.benefitId }, context(secretaryId)), 'PERMISSION_DENIED');
+  await expectFailure(approveFinancialBenefit.run({ benefitId: secretaryBenefit.benefitId }, context(secretaryId)), 'PERMISSION_DENIED');
   const scholarship = await createBenefit(ownerId, `owner-scholarship-${suffix}`);
   assert.equal(scholarship.status, 'draft');
-  await expectFailure(approveFinancialBenefit.run({ benefitId: scholarship.benefitId }, context(secretaryId)), 'PERMISSION_DENIED');
-  const approved = await approveFinancialBenefit.run({ benefitId: scholarship.benefitId }, context(ownerId));
+  const approved = await approveBenefit(ownerId, scholarship.benefitId);
   assert.equal(approved.status, 'approved');
 
   const directorBenefit = await createBenefit(directorId, `director-t3-${suffix}`, {
     installment: 'T3', value: 1000, reason: 'Bourse fictive approuvée par direction'
   });
-  assert.equal((await approveFinancialBenefit.run({ benefitId: directorBenefit.benefitId }, context(directorId))).status, 'approved');
+  assert.equal((await approveBenefit(directorId, directorBenefit.benefitId)).status, 'approved');
 
   const t1Quote = await quote(secretaryId, 'tuition', { installment: 'T1' });
   assert.deepEqual({
@@ -325,7 +338,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     installment: undefined, transportStartPeriod: '2026-09', transportEndPeriod: '2026-09',
     reference: `BON-${suffix}`, singleUse: true, maximumUses: 1, reason: 'Bon fictif transport'
   });
-  await approveFinancialBenefit.run({ benefitId: voucher.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, voucher.benefitId);
   const september = await quote(secretaryId, 'transport', { period: '2026-09' });
   assert.deepEqual({ gross: september.grossExpectedAmount, discount: september.discountAmount, net: september.netExpectedAmount },
     { gross: 4000, discount: 1000, net: 3000 });
@@ -470,7 +483,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     transportStartPeriod: '2026-09', transportEndPeriod: '2026-09',
     mode: 'FIXED_AMOUNT', value: 1000, maximumUses: 1
   });
-  await approveFinancialBenefit.run({ benefitId: fixedTransportBenefit.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, fixedTransportBenefit.benefitId);
   const fixedBenefitQuote = await quote(secretaryId, 'transport', { studentId: fixedBenefitStudentId });
   assert.equal(fixedBenefitQuote.installments[0].grossExpectedAmount, 5000);
   assert.equal(fixedBenefitQuote.installments[0].discountAmount, 1000);
@@ -482,7 +495,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     transportStartPeriod: '2026-09', transportEndPeriod: '2026-09',
     mode: 'PERCENTAGE', value: 50, maximumUses: 1
   });
-  await approveFinancialBenefit.run({ benefitId: percentTransportBenefit.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, percentTransportBenefit.benefitId);
   const percentTransportQuote = await quote(secretaryId, 'transport', { studentId: percentBenefitStudentId });
   assert.equal(percentTransportQuote.installments[0].discountAmount, 2500);
   assert.equal(percentTransportQuote.installments[0].netExpectedAmount, 2500);
@@ -490,7 +503,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     studentId: percentBenefitStudentId, paymentType: 'TUITION', installment: 'T1',
     mode: 'FIXED_AMOUNT', value: 2000
   });
-  await approveFinancialBenefit.run({ benefitId: wrongScopeBenefit.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, wrongScopeBenefit.benefitId);
   assert.equal((await quote(secretaryId, 'transport', {
     studentId: percentBenefitStudentId
   })).installments[0].discountAmount, 2500, 'tuition benefit must not affect transport');
@@ -529,13 +542,13 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   const percentScholarship = await createBenefit(ownerId, `percent-scholarship-${suffix}`, {
     studentId: percentageStudentId, installment: 'T3', mode: 'PERCENTAGE', value: 25
   });
-  await approveFinancialBenefit.run({ benefitId: percentScholarship.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, percentScholarship.benefitId);
   const percentVoucher = await createBenefit(ownerId, `percent-voucher-${suffix}`, {
     studentId: percentageStudentId, installment: 'T3', benefitType: 'DISCOUNT_VOUCHER',
     mode: 'PERCENTAGE', value: 10, reference: `BON-PERCENT-${suffix}`,
     singleUse: true, maximumUses: 1
   });
-  await approveFinancialBenefit.run({ benefitId: percentVoucher.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, percentVoucher.benefitId);
   const percentageQuote = await quote(secretaryId, 'tuition', {
     studentId: percentageStudentId, installment: 'T3'
   });
@@ -559,12 +572,12 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     studentId: invalidStudentId, benefitType: 'DISCOUNT_VOUCHER', reference: `BON-EXPIRED-${suffix}`,
     validUntil: '2000-01-01', value: 5000
   });
-  await approveFinancialBenefit.run({ benefitId: expiredVoucher.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, expiredVoucher.benefitId);
   const cancelledVoucher = await createBenefit(ownerId, `cancelled-voucher-${suffix}`, {
     studentId: invalidStudentId, installment: 'T2', benefitType: 'DISCOUNT_VOUCHER',
     reference: `BON-CANCELLED-${suffix}`, value: 5000
   });
-  await approveFinancialBenefit.run({ benefitId: cancelledVoucher.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, cancelledVoucher.benefitId);
   await cancelFinancialBenefit.run({ benefitId: cancelledVoucher.benefitId, reason: 'Test d’annulation' }, context(ownerId));
   assert.equal((await quote(secretaryId, 'tuition', {
     studentId: invalidStudentId, installment: 'T1'
@@ -590,9 +603,9 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
   const otherBenefit = await createBenefit(ownerId, `other-benefit-${suffix}`, {
     studentId: conflictStudentId, installment: 'T2', stackable: true, value: 1000
   });
-  await approveFinancialBenefit.run({ benefitId: nonStackable.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, nonStackable.benefitId);
   await expectFailure(
-    approveFinancialBenefit.run({ benefitId: otherBenefit.benefitId }, context(ownerId)),
+    approveBenefit(ownerId, otherBenefit.benefitId),
     'NON_STACKABLE_BENEFIT_CONFLICT'
   );
 
@@ -616,7 +629,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     installment: undefined, transportStartPeriod: '2026-09', transportEndPeriod: '2026-10',
     reference: `BON-RANGE-${suffix}`, singleUse: true, maximumUses: 1, value: 1000
   });
-  await approveFinancialBenefit.run({ benefitId: rangedVoucher.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, rangedVoucher.benefitId);
   await pay(secretaryId, `single-use-september-${suffix}`, 3000, 'transport', {
     studentId: singleUseStudentId, period: '2026-09'
   });
@@ -648,8 +661,8 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     benefitType: 'DISCOUNT_VOUCHER', reference: `BON-TRANSPORT-STACK-${suffix}`,
     singleUse: true, maximumUses: 1, value: 500
   });
-  await approveFinancialBenefit.run({ benefitId: transportScholarship.benefitId }, context(ownerId));
-  await approveFinancialBenefit.run({ benefitId: transportStackVoucher.benefitId }, context(ownerId));
+  await approveBenefit(ownerId, transportScholarship.benefitId);
+  await approveBenefit(ownerId, transportStackVoucher.benefitId);
   const transportStackQuote = await quote(secretaryId, 'transport', {
     studentId: transportStackStudentId, period: '2026-09'
   });
@@ -692,7 +705,7 @@ const createBenefit = (uid, requestId, overrides = {}) => createFinancialBenefit
     studentId: legacyStudentId, installment: 'T1', value: 1000
   });
   await expectFailure(
-    approveFinancialBenefit.run({ benefitId: conflictingLegacyBenefit.benefitId }, context(ownerId)),
+    approveBenefit(ownerId, conflictingLegacyBenefit.benefitId),
     'LEGACY_DISCOUNT_CONFLICT'
   );
 

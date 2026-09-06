@@ -11,7 +11,7 @@ const collectionCss = readFileSync(resolve(process.cwd(), 'src/components/Studen
 
 const mocks = vi.hoisted(() => ({ getAccount: vi.fn(), recordCollection: vi.fn() }));
 
-vi.mock('../../src/db/firebase', () => ({ functions: {} }));
+vi.mock('../../src/db/firebase', () => ({ db: {}, functions: {} }));
 vi.mock('firebase/functions', () => ({
   httpsCallable: vi.fn((_functions, name: string) =>
     name === 'getStudentFinancialAccount' ? mocks.getAccount : mocks.recordCollection),
@@ -221,4 +221,22 @@ describe('StudentAccountCollection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByText('Frais à régler')).toBeTruthy();
   });
+  it('shows and opens the advantage drawer for a secretary', async () => {
+    render(<StudentAccountCollection students={students} school={school} initialStudentId="student-1"
+      currentRole="secretary" classNamesById={{ 'class-1': 'CP' }} onClose={vi.fn()} />);
+    await screen.findByText('Frais à régler');
+
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter un avantage/ }));
+    expect(screen.getByRole('dialog', { name: 'Ajouter un avantage ou aménagement' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Soumettre pour approbation' })).toBeTruthy();
+  });
+
+  it('does not expose advantage creation to an accountant', async () => {
+    render(<StudentAccountCollection students={students} school={school} initialStudentId="student-1"
+      currentRole="accountant" classNamesById={{ 'class-1': 'CP' }} onClose={vi.fn()} />);
+    await screen.findByText('Frais à régler');
+
+    expect(screen.queryByRole('button', { name: /Ajouter un avantage/ })).toBeNull();
+  });
+
 });
