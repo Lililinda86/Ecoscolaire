@@ -55,7 +55,7 @@ export async function manageEvaluation(input: ManageEvaluationInput): Promise<Ma
 
 interface GradeRow {
   studentId: string;
-  resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted';
+  resultStatus: 'scored' | 'absent' | 'excused' | 'notSubmitted' | 'notEvaluated';
   score?: number;
   comment?: string;
   expectedVersion: number;

@@ -1,0 +1,84 @@
+name: Pedagogy exact Staging validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Full deployed staging SHA
+        required: true
+        type: string
+      app_url:
+        description: Immutable Vercel Preview URL for that SHA
+        required: true
+        type: string
+      confirmation:
+        description: RUN_PEDAGOGY_STAGING_SYNTHETIC
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/staging' && inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC'
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 20
+    concurrency:
+      group: pedagogy-staging-synthetic-validation
+      cancel-in-progress: false
+    env:
+      EXPECTED_STAGING_SHA: ${{ inputs.expected_sha }}
+      STAGING_APP_URL: ${{ inputs.app_url }}
+      PEDAGOGY_STAGING_E2E: 'true'
+      PEDAGOGY_FIREBASE_PROJECT_ID: ecoscolaire-staging
+      PEDAGOGY_SAFE_CI: 'true'
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Verify exact deployed backend and immutable frontend
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/staging
+          test "$EXPECTED_STAGING_SHA" = "$GITHUB_SHA"
+          test "$PEDAGOGY_FIREBASE_PROJECT_ID" = ecoscolaire-staging
+          printf '%s' "$STAGING_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$'
+          runs_json="$(mktemp)"
+          deployments_json="$(mktemp)"
+          statuses_json="$(mktemp)"
+          trap 'rm -f "$runs_json" "$deployments_json" "$statuses_json"' EXIT
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-staging.yml/runs" -f head_sha="$EXPECTED_STAGING_SHA" -f branch=staging -f event=push -f per_page=100 > "$runs_json"
+          node scripts/verify-exact-deployment-run.mjs "$runs_json" "$EXPECTED_STAGING_SHA" .github/workflows/deploy-staging.yml staging
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments" -f sha="$EXPECTED_STAGING_SHA" -f environment=Preview -f per_page=100 > "$deployments_json"
+          deployment_id="$(jq -er 'map(select(.sha == env.EXPECTED_STAGING_SHA and .environment == "Preview")) | first | .id' "$deployments_json")"
+          gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" > "$statuses_json"
+          jq -e --arg url "$STAGING_APP_URL" 'map(select(.state == "success" and .environment_url == $url)) | length >= 1' "$statuses_json"
+          node scripts/verify-pedagogy-build-receipt.mjs
+      - run: npm ci
+      - run: npm ci
+        working-directory: functions
+      - name: Authenticate to Staging only
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Synthetic canonical results and teacher-declared support
+        run: npx playwright test tests/pedagogy-results-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
+      - name: Synthetic local file integrity, manual review and exact cleanup
+        run: npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
+      - name: Exact checkpoint statement
+        run: |
+          printf 'STAGING_TECHNICAL_CHECKPOINT_SHA=%s\n' "$GITHUB_SHA"
+          echo 'Scope: synthetic canonical results, support, local file integrity, manual review and fixture cleanup only.'
+          echo 'REAL_AI_VERIFIED=NO; REAL_AUTOMATIONS_VERIFIED=NO; PEDAGOGICAL_REVIEW=PENDING; PRODUCT_COMPLETE=NO'

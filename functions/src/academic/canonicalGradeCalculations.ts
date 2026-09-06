@@ -1,4 +1,4 @@
-export type CanonicalGradeResultStatus = 'scored' | 'absent' | 'excused' | 'notSubmitted' | 'missing';
+export type CanonicalGradeResultStatus = 'scored' | 'absent' | 'excused' | 'notSubmitted' | 'notEvaluated' | 'missing';
 
 export interface CanonicalEvaluationScore {
   evaluationId: string;

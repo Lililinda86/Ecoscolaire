@@ -22,6 +22,9 @@ export interface ValidatedPreparationSource {
   lessonTitle: string | null;
   objective: string | null;
   pedagogicalContent: string;
+  teachingConfirmationId?: string;
+  teachingStatus?: 'taught' | 'partially_taught';
+  effectiveTeachingDate?: string;
 }
 
 export interface WeeklyAssessmentGenerationInput {
@@ -103,7 +106,10 @@ export const fridayForWeek = (weekStartDate: string): string => {
 const stableSource = (source: ValidatedPreparationSource) => ({
   id: source.id, version: source.version, subjectId: source.subjectId, classSubjectId: source.classSubjectId,
   curriculumUnitId: source.curriculumUnitId, lessonTitle: source.lessonTitle, objective: source.objective,
-  pedagogicalContent: source.pedagogicalContent
+  pedagogicalContent: source.pedagogicalContent,
+  teachingConfirmationId: source.teachingConfirmationId || null,
+  teachingStatus: source.teachingStatus || null,
+  effectiveTeachingDate: source.effectiveTeachingDate || null
 });
 
 export const sourceChecksum = (sources: ValidatedPreparationSource[]): string => createHash('sha256')

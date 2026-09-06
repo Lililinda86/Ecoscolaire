@@ -1,6 +1,37 @@
 {
   "indexes": [
     {
+      "collectionGroup": "pedagogyObservations", "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "academicYearId", "order": "ASCENDING" }, { "fieldPath": "classId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "pedagogyRemediations", "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "academicYearId", "order": "ASCENDING" }, { "fieldPath": "classId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "grades", "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "academicYearId", "order": "ASCENDING" }, { "fieldPath": "classId", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "evaluations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "periodId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "grades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "evaluationId", "order": "ASCENDING" },
+        { "fieldPath": "studentId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "teachingPlans",
       "queryScope": "COLLECTION",
       "fields": [
@@ -146,6 +177,34 @@
         { "fieldPath": "schoolId", "order": "ASCENDING" },
         { "fieldPath": "weeklyAssessmentId", "order": "ASCENDING" },
         { "fieldPath": "generationVersion", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pedagogyClassPolicies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "teacherAssignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "academicYearId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "subjectId", "order": "ASCENDING" }
       ]
     }
   ],

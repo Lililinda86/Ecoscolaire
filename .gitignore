@@ -37,3 +37,8 @@ firebase-service-account*.json
 
 # Development test accounts file
 runtime-test-accounts.md
+# Live school configuration evidence stays local; never publish in this public repository.
+docs/pedagogy-finalization/
+scripts/pedagogy-staging-inventory.mjs
+output/pdf/pedagogy-synthetic/
+tmp/pdfs/

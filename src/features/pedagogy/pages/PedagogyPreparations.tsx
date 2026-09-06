@@ -8,6 +8,7 @@ import { useLessonPreparations } from '../hooks/useLessonPreparations';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 import { ensureExpectedLessonPreparations } from '../services/pedagogyService';
 import { getClassOptionLabel } from '../../../utils/classCatalog';
+import { TeachingConfirmationForm } from '../components/TeachingConfirmationForm';
 
 export default function PedagogyPreparations() {
   const { db, currentSchool } = useAppContext();
@@ -24,6 +25,7 @@ export default function PedagogyPreparations() {
   const plan = workspace.plans.find(item => item.classId === selectedClassId && item.weekStartDate === selectedWeekStartDate);
   const selectedClass = classes.find(item => item.id === selectedClassId);
   const first = state.preparations[0];
+  const selectedWeek = workspace.weeks.find(item => item.weekStartDate === selectedWeekStartDate);
   const counters = {
     expected: state.preparations.filter(item => item.status === 'expected').length,
     review: state.preparations.filter(item => item.status === 'needs_review').length,
@@ -60,6 +62,12 @@ export default function PedagogyPreparations() {
       {state.preparations.map(item => <div className="pedagogy-list-row" key={item.id}><div><strong>{item.subjectName} — {item.lessonTitle || 'Leçon à préciser'}</strong><small>{item.source === 'planned' ? `Séance Lot A · créneau ${item.slotIndex || '—'}` : 'Préparation manuelle non planifiée'}</small></div><div className="pedagogy-row-actions"><PreparationStatus status={item.status} analysisStatus={item.analysisStatus} /><Link to={`/pedagogy/preparations/import?id=${encodeURIComponent(item.id)}`}>{item.status === 'expected' ? 'Déposer' : 'Relire'}</Link></div></div>)}
       {!state.loading && !state.preparations.length && <p className="pedagogy-empty">Générez les attentes depuis une planification, ou importez une préparation non planifiée.</p>}
     </section>
+    {currentSchool && year && selectedWeek && <TeachingConfirmationForm
+      key={`${currentSchool.id}:${year.id}:${selectedClassId}:${selectedWeek.id}`}
+      schoolId={currentSchool.id} academicYearId={year.id} classId={selectedClassId} weekId={selectedWeek.id}
+      preparations={state.preparations} teachers={(db?.staff || []).filter(item => item.role === 'teacher' && item.active !== false && item.status !== 'inactive')}
+      onSaved={state.refresh}
+    />}
     <section className="pedagogy-card pedagogy-a4" id="preparation-template">
       <SchoolDocumentHeader school={currentSchool} documentTitle="Fiche de préparation" />
       <div className="pedagogy-card-title"><div><h2>{first?.subjectName || 'Matière'} — {first?.lessonTitle || 'Titre de la leçon'}</h2><p>{selectedClass?.name || 'Classe'} · Semaine du {selectedWeekStartDate || '____-__-__'}</p></div><button className="pedagogy-button no-print" onClick={() => window.print()}>Imprimer en A4</button></div>

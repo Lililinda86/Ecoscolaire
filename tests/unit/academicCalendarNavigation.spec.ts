@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCalendarActionUrl, ACADEMIC_CALENDAR_SETTINGS_HASH } from '../../src/pages/Grades';
+import { getCalendarActionUrl, ACADEMIC_CALENDAR_SETTINGS_HASH } from '../../src/utils/academicCalendarNavigation';
 
 describe('Academic Calendar Navigation', () => {
   it('1. absence d’AcademicYear → destination calendrier académique', () => {

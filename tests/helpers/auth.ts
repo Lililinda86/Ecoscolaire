@@ -2,7 +2,7 @@ import { type Page } from '@playwright/test';
 
 export async function loginAs(page: Page, email: string, password: string) {
   const logs: string[] = [];
-  page.on('console', msg => logs.push(`[BROWSER] ${msg.text()}`));
+  if (process.env.PEDAGOGY_SAFE_CI !== 'true') page.on('console', msg => logs.push(`[BROWSER] ${msg.text()}`));
 
   const appUrl = process.env.STAGING_APP_URL;
   const vercelBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;

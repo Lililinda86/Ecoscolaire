@@ -36,7 +36,7 @@ export const validateGradeInput = (grade: Partial<Grade>): { isValid: boolean; e
     } else if (grade.score < 0 || grade.score > (grade.maxScore || 0)) {
       errors.push('Le score doit �tre compris entre 0 et la note maximale.');
     }
-  } else if (['absent', 'excused', 'exempt', 'notSubmitted'].includes(grade.resultStatus || '')) {
+  } else if (['absent', 'excused', 'exempt', 'notSubmitted', 'notEvaluated'].includes(grade.resultStatus || '')) {
     if (grade.score !== undefined) {
       errors.push('Le score ne doit pas �tre renseign� pour ce statut de r�sultat.');
     }

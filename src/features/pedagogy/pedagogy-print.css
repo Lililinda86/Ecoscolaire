@@ -1,0 +1,32 @@
+.assessment-paper { box-sizing: border-box; font-family: Arial, sans-serif; overflow-wrap: anywhere; line-height: 1.45; }
+.assessment-paper-header { display: flex; align-items: center; gap: 6mm; border-bottom: 1px solid #a9b5ae; padding-bottom: 5mm; margin-bottom: 5mm; }
+.assessment-paper-header img { max-width: 22mm; max-height: 22mm; object-fit: contain; }
+.assessment-paper-header div { min-width: 0; flex: 1; }
+.assessment-paper-header h1 { font-size: 18pt; margin: 0; line-height: 1.2; }
+.assessment-paper-header p { font-size: 9pt; margin: 1.5mm 0 0; }
+.assessment-paper h2 { font-size: 14pt; line-height: 1.25; }
+.assessment-paper h3 { font-size: 11pt; line-height: 1.45; }
+.assessment-paper .assessment-question p { white-space: pre-wrap; }
+.assessment-copy-label { border: 1px solid #68756d; padding: 2mm; font-weight: bold; }
+@media screen and (max-width: 600px) {
+  .assessment-paper-header h1 { font-size: 16px; }
+  .assessment-paper-header { align-items: flex-start; gap: 10px; }
+  .assessment-paper-header img { max-width: 48px; max-height: 48px; }
+}
+@media print {
+  @page { size: A4; margin: 12mm 14mm 16mm;
+    @bottom-right { content: "Page " counter(page) " / " counter(pages); font-family: Arial, sans-serif; font-size: 9pt; color: #333; }
+  }
+  /* Remove non-document layout rather than leaving invisible sidebar space. */
+  body:has(.pedagogy-a4) *:not(:has(.pedagogy-a4)):not(.pedagogy-a4):not(.pedagogy-a4 *) { display: none !important; }
+  html:has(.pedagogy-a4), body:has(.pedagogy-a4), body *:has(.pedagogy-a4) { position: static !important; display: block !important; overflow: visible !important; width: auto !important; max-width: none !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; background: white !important; }
+  .pedagogy-a4 { position: static !important; width: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; color: black; background: white; }
+  .pedagogy-a4, .pedagogy-a4 * { visibility: visible !important; }
+  .assessment-paper { font-size: 10pt; }
+  .assessment-meta { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  .assessment-question { break-inside: avoid-page; page-break-inside: avoid; }
+  .assessment-paper h2, .assessment-paper h3 { break-after: avoid-page; }
+  .assessment-paper p { widows: 2; orphans: 2; }
+  .assessment-answer-lines { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .assessment-footer { position: static; break-inside: avoid; }
+}

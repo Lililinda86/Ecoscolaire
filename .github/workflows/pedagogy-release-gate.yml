@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public]
   workflow_dispatch:
 
 permissions:
@@ -25,8 +25,10 @@ jobs:
         run: npm run typecheck
       - name: Lint Pedagogy only
         run: npx eslint "functions/src/pedagogy/**/*.ts" "src/features/pedagogy/**/*.{ts,tsx}" "tests/unit/pedagogyDomain.spec.ts" "tests/unit/pedagogyPreparations.spec.ts" "tests/unit/pedagogyWeeklyAssessments.spec.ts" "tests/security/pedagogy-rules.spec.mjs" "tests/security/pedagogy-lot-b-rules.spec.mjs" "tests/security/pedagogy-lot-c-rules.spec.mjs" "tests/security/pedagogy-storage-rules.spec.mjs" "tests/pedagogy-lot-a-emulator-e2e.spec.ts" "tests/pedagogy-lot-b-emulator-e2e.spec.ts" "tests/pedagogy-lot-c-emulator-e2e.spec.ts" --max-warnings=0
-      - name: Pedagogy unit tests
-        run: npx vitest run tests/unit/pedagogyDomain.spec.ts tests/unit/pedagogyPreparations.spec.ts tests/unit/pedagogyWeeklyAssessments.spec.ts --config vitest.config.ts
+      - name: Additional pedagogy regression lint
+        run: npx eslint "tests/unit/pedagogy*.spec.{ts,tsx}" "tests/pedagogy-results-emulator-e2e.spec.ts" --max-warnings=0
+      - name: Full unit regression
+        run: npx vitest run --config vitest.config.ts
       - name: Functions tests and build
         run: npm run test:functions
       - name: Frontend build
@@ -42,6 +44,8 @@ jobs:
   emulator-gates:
     name: Pedagogy Rules and E2E
     runs-on: ubuntu-latest
+    env:
+      PEDAGOGY_SAFE_CI: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -60,7 +64,18 @@ jobs:
       - run: npm ci
         working-directory: functions
       - run: npm --prefix functions run build
+      - name: Isolated disposable emulator secret override
+        run: node scripts/prepare-pedagogy-emulator.mjs demo-ecoscolaire
+      - name: Teaching confirmation Functions authorization and concurrency
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs"
       - run: npx playwright install --with-deps chromium
+      - name: Synthetic bilingual A4 print regression
+        env:
+          PEDAGOGY_PDFTOTEXT: pdftotext
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+          node scripts/verify-pedagogy-print.mjs
       - name: Pedagogy Firestore Rules
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "npx playwright test tests/security/pedagogy-rules.spec.mjs tests/security/pedagogy-lot-b-rules.spec.mjs tests/security/pedagogy-lot-c-rules.spec.mjs --config=playwright.rules.config.ts"
       - name: Pedagogy Storage Rules
@@ -101,3 +116,16 @@ jobs:
           npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire
           --only firestore,auth,functions
           "npx playwright test tests/pedagogy-lot-c-emulator-e2e.spec.ts --workers=1"
+      - name: Pedagogy canonical results browser workflow
+        env:
+          VITE_USE_FIREBASE_EMULATORS: "true"
+          VITE_FIREBASE_API_KEY: emulator-api-key
+          VITE_FIREBASE_AUTH_DOMAIN: localhost
+          VITE_FIREBASE_PROJECT_ID: demo-ecoscolaire
+          VITE_FIREBASE_STORAGE_BUCKET: demo-ecoscolaire.appspot.com
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          VITE_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
+        run: >-
+          npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire
+          --only firestore,auth,functions
+          "npx playwright test tests/pedagogy-results-emulator-e2e.spec.ts --workers=1"

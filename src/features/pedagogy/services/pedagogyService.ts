@@ -4,27 +4,26 @@ import { getMetadata, ref, uploadBytes } from 'firebase/storage';
 import { db, functions, storage } from '../../../db/firebase';
 import type { CurriculumProgram, LessonPreparation, LessonPreparationTemplate, PedagogyWorkspace, PreparationReview, SchoolCurriculumAdoption, TeachingPlan, TeachingPlanItem, TeachingWeek } from '../types';
 import type { AssessmentItem, WeeklyAssessment } from '../types';
+import type { TeachingState } from '../types';
+import { readBoundedDocuments } from './boundedQuery';
 
 const documents = <T>(snapshot: Awaited<ReturnType<typeof getDocs>>): T[] => snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Record<string, unknown>) } as T));
 
 export const loadPedagogyWorkspace = async (schoolId: string, academicYearId: string): Promise<PedagogyWorkspace> => {
   const [programs, adoptions, weeks, plans] = await Promise.all([
-    getDocs(query(collection(db, 'curriculumPrograms'), where('status', '==', 'published'))),
-    getDocs(query(collection(db, 'schoolCurriculumAdoptions'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId))),
-    getDocs(query(collection(db, 'teachingWeeks'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), orderBy('weekStartDate', 'asc'))),
-    getDocs(query(collection(db, 'teachingPlans'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), orderBy('weekStartDate', 'desc')))
+    readBoundedDocuments<CurriculumProgram>(query(collection(db, 'curriculumPrograms'), where('status', '==', 'published')), 500, 'Programmes'),
+    readBoundedDocuments<SchoolCurriculumAdoption>(query(collection(db, 'schoolCurriculumAdoptions'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId)), 200, 'Adoptions'),
+    readBoundedDocuments<TeachingWeek>(query(collection(db, 'teachingWeeks'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), orderBy('weekStartDate', 'asc')), 100, 'Semaines'),
+    readBoundedDocuments<TeachingPlan>(query(collection(db, 'teachingPlans'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), orderBy('weekStartDate', 'desc')), 2000, 'Plannings')
   ]);
   return {
-    programs: documents<CurriculumProgram>(programs),
-    adoptions: documents<SchoolCurriculumAdoption>(adoptions),
-    weeks: documents<TeachingWeek>(weeks),
-    plans: documents<TeachingPlan>(plans)
+    programs, adoptions, weeks, plans
   };
 };
 
 export const loadTeachingPlanItems = async (schoolId: string, planId: string): Promise<TeachingPlanItem[]> => {
-  const snapshot = await getDocs(query(collection(db, 'teachingPlanItems'), where('schoolId', '==', schoolId), where('planId', '==', planId)));
-  return documents<TeachingPlanItem>(snapshot).sort((a, b) => a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex);
+  const items = await readBoundedDocuments<TeachingPlanItem>(query(collection(db, 'teachingPlanItems'), where('schoolId', '==', schoolId), where('planId', '==', planId)), 500, 'Séances');
+  return items.sort((a, b) => a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex);
 };
 
 const call = async <TInput extends object, TOutput>(name: string, input: TInput): Promise<TOutput> => {
@@ -35,8 +34,8 @@ const call = async <TInput extends object, TOutput>(name: string, input: TInput)
 export const loadLessonPreparations = async (schoolId: string, academicYearId: string, weekStartDate: string, classId?: string): Promise<LessonPreparation[]> => {
   const clauses = [where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), where('weekStartDate', '==', weekStartDate)];
   if (classId) clauses.push(where('classId', '==', classId));
-  const snapshot = await getDocs(query(collection(db, 'lessonPreparations'), ...clauses, limit(250)));
-  return documents<LessonPreparation>(snapshot).sort((a, b) => (a.classId + a.subjectName + (a.slotIndex || 0)).localeCompare(b.classId + b.subjectName + (b.slotIndex || 0)));
+  const preparations = await readBoundedDocuments<LessonPreparation>(query(collection(db, 'lessonPreparations'), ...clauses), 250, 'Préparations : choisissez une classe');
+  return preparations.sort((a, b) => (a.classId + a.subjectName + (a.slotIndex || 0)).localeCompare(b.classId + b.subjectName + (b.slotIndex || 0)));
 };
 
 export const loadLessonPreparation = async (schoolId: string, preparationId: string): Promise<LessonPreparation> => {
@@ -53,9 +52,11 @@ export const loadPreparationTemplates = async (schoolId: string, academicYearId:
 };
 
 export const ensureExpectedLessonPreparations = (schoolId: string, planId: string) => call<{ schoolId: string; planId: string }, { planId: string; expectedCount: number; createdCount: number }>('ensureExpectedLessonPreparations', { schoolId, planId });
-export const startLessonPreparationAnalysis = (schoolId: string, uploadId: string) => call<{ schoolId: string; uploadId: string }, { preparationId: string; analysisStatus: 'succeeded' | 'failed'; fallback?: string }>('startLessonPreparationAnalysis', { schoolId, uploadId });
+export const startLessonPreparationAnalysis = (schoolId: string, uploadId: string, retry = false) => call<{ schoolId: string; uploadId: string; retry: boolean }, { preparationId: string; analysisStatus: 'succeeded' | 'failed'; fallback?: string; errorCode?: string }>('startLessonPreparationAnalysis', { schoolId, uploadId, retry });
 export const saveLessonPreparationReview = (schoolId: string, preparationId: string, review: PreparationReview) => call('saveLessonPreparationReview', { schoolId, preparationId, review });
 export const validateLessonPreparation = (schoolId: string, preparationId: string) => call('validateLessonPreparation', { schoolId, preparationId });
+export const recordTeachingConfirmations = (input: { schoolId: string; academicYearId: string; classId: string; weekId: string; requestId: string; declarations: Array<{ preparationId: string; teacherStaffId: string; expectedVersion: number; status: TeachingState; effectiveDate: string; excerpts: string[]; note: string }> }) =>
+  call<typeof input, { recordedCount: number; idempotent: boolean }>('recordTeachingConfirmations', input);
 
 export interface ManualPreparationInput {
   academicYearId: string; classId: string; subjectId: string; subjectName: string; teacherStaffId: string;
@@ -72,7 +73,15 @@ export const uploadLessonPreparation = async (schoolId: string, file: File, prep
   if (registered.created) {
     await uploadBytes(objectRef, file, { contentType: file.type, customMetadata: { checksum, preparationId: registered.preparationId } });
   } else {
-    await getMetadata(objectRef);
+    try {
+      const metadata = await getMetadata(objectRef);
+      if (metadata.customMetadata?.checksum !== checksum || metadata.size !== file.size) throw new Error('Le document enregistré ne correspond pas au fichier. Aucun écrasement effectué.');
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'storage/object-not-found') throw error;
+      // Registration may have succeeded before an interrupted transfer. Only
+      // the absent object is retried; immutable existing content is never replaced.
+      await uploadBytes(objectRef, file, { contentType: file.type, customMetadata: { checksum, preparationId: registered.preparationId } });
+    }
   }
   return registered;
 };
@@ -98,9 +107,10 @@ export const loadAssessmentItems = async (schoolId: string, assessmentId: string
 };
 export const ensureWeeklyAssessmentDraft = (scope: AssessmentScope) => call('ensureWeeklyAssessmentDraft', scope);
 export const generateWeeklyAssessment = (scope: AssessmentScope, regenerate = false, confirmRevision = false) => call('generateWeeklyAssessment', { ...scope, regenerate, confirmRevision });
-export const saveWeeklyAssessmentEdits = (schoolId: string, assessmentId: string, items: Array<Pick<AssessmentItem, 'id' | 'questionText' | 'instructions' | 'points' | 'order'>>, note: string) =>
-  call('saveWeeklyAssessmentEdits', { schoolId, assessmentId, items, note });
-export const recordWeeklyAssessmentTeacherValidation = (schoolId: string, assessmentId: string, teacherStaffId: string, note: string) =>
-  call('recordWeeklyAssessmentTeacherValidation', { schoolId, assessmentId, teacherStaffId, note });
-export const markWeeklyAssessmentReadyToPrint = (schoolId: string, assessmentId: string) =>
-  call('markWeeklyAssessmentReadyToPrint', { schoolId, assessmentId });
+const reviewVersion = (assessment: WeeklyAssessment) => ({ generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum });
+export const saveWeeklyAssessmentEdits = (schoolId: string, assessmentId: string, items: Array<Pick<AssessmentItem, 'id' | 'questionText' | 'instructions' | 'expectedAnswer' | 'correctionGuide' | 'points' | 'order'>>, note: string, assessment: WeeklyAssessment) =>
+  call('saveWeeklyAssessmentEdits', { schoolId, assessmentId, items, note, ...reviewVersion(assessment) });
+export const recordWeeklyAssessmentTeacherValidation = (schoolId: string, assessmentId: string, teacherStaffId: string, note: string, assessment: WeeklyAssessment, subjectId: string, declarationReceived: boolean) =>
+  call('recordWeeklyAssessmentTeacherValidation', { schoolId, assessmentId, teacherStaffId, note, subjectId, declarationReceived, ...reviewVersion(assessment) });
+export const markWeeklyAssessmentReadyToPrint = (schoolId: string, assessmentId: string, assessment: WeeklyAssessment) =>
+  call('markWeeklyAssessmentReadyToPrint', { schoolId, assessmentId, ...reviewVersion(assessment) });
