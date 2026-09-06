@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { SchoolFeeCatalog } from '../components/Settings/SchoolFeeCatalog';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { Edit2, Trash2, BookOpen } from 'lucide-react';
@@ -833,6 +834,7 @@ const Settings: React.FC = () => {
         onSave={handleSaveTuitionDeadlines}
       />
 
+      <SchoolFeeCatalog />
       <div className="card">
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-color)' }}>
           ⚙️ Comptabilité : Frais par Défaut

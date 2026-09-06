@@ -160,8 +160,8 @@ const StudentAccountCollection: React.FC<Props> = ({
     setLoadFailed(false);
     setError('');
     try {
-      const call = httpsCallable<Record<string, string>, StudentAccount>(functions, 'getStudentFinancialAccount');
-      const response = await call({ schoolId: school.id, studentId: selectedId, academicYear: school.academicYear });
+      const call = httpsCallable<Record<string, string | boolean>, StudentAccount>(functions, 'getStudentFinancialAccount');
+      const response = await call({ schoolId: school.id, studentId: selectedId, academicYear: school.academicYear, monthlyTransport: true });
       if (sequence !== loadSequenceRef.current) return;
       setAccount(response.data);
       setAmounts(previous => Object.fromEntries(response.data.lines.map(line => [line.key,
