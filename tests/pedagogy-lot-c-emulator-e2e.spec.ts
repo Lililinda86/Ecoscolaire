@@ -62,7 +62,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       expect((await firestore.collection('assessmentItems').where('weeklyAssessmentId', '==', assessmentId).get()).docs.every(document => document.data().subjectId !== 'science')).toBe(true);
       const question = page.getByLabel('Question').first(); await question.fill('Question corrigée après retour enseignant');
       await page.getByRole('button', { name: 'Enregistrer les corrections' }).click(); await expect(page.getByText('Corrections enregistrées à la demande de l’enseignant.')).toBeVisible();
-      await page.getByLabel('Enseignant').selectOption(f.staffId); await page.getByLabel('Note').fill('Accord reçu sur papier.');
+      await page.getByLabel('Enseignant', { exact: true }).selectOption(f.staffId); await page.getByLabel('Note', { exact: true }).fill('Accord reçu sur papier.');
       await page.getByRole('button', { name: 'Enregistrer validation enseignant' }).click(); await expect(page.getByText('Validation de l’enseignant enregistrée par la secrétaire.')).toBeVisible();
       await page.getByRole('button', { name: 'Passer prête à imprimer' }).click(); await expect(page.getByText('Évaluation prête à imprimer.')).toBeVisible();
       await expect(page.getByText('BROUILLON — À VALIDER PAR L’ENSEIGNANT')).toHaveCount(0);
@@ -74,7 +74,7 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       expect((await firestore.collection('weeklyAssessments').doc(assessmentId).get()).data()?.generationVersion).toBe(1);
       await firestore.collection('lessonPreparations').doc('lot-c-prep-science').update({ status: 'validated', reviewData: { lessonTitle: 'Sciences', objective: 'Observer', lessonSteps: 'Expérience' }, version: 3 });
       await page.reload(); await expect(page.getByText('Une nouvelle préparation validée est disponible.')).toBeVisible(); await expect(page.getByText(/Version 1/)).toBeVisible();
-      await page.getByLabel('Classe').selectOption(f.failClassId); await expect(page.getByText('1/1')).toBeVisible(); await page.getByRole('button', { name: 'Générer maintenant' }).click();
+      await page.getByLabel('Classe', { exact: true }).selectOption(f.failClassId); await expect(page.getByText('1/1', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Générer maintenant' }).click();
       await expect(page.getByText(/Génération impossible : MOCK_WEEKLY_ASSESSMENT_FAILURE/)).toBeVisible({ timeout: 25_000 }); await expect(page.getByText(/vous pouvez réessayer/i)).toBeVisible();
       expect(await countProtected()).toEqual(before);
       expect((await firestore.collection('audit_logs').where('schoolId', '==', f.schoolId).get()).size).toBeGreaterThanOrEqual(6);
