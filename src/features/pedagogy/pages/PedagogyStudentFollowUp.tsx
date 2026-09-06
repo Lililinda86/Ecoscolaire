@@ -36,7 +36,7 @@ function StudentPicker({ schoolId, academicYearId, classId, teachers }: { school
   const { locked } = useContext(DraftContext);
   const [cursor, setCursor] = useState(''), [studentId, setStudentId] = useState('');
   const load = useCallback(async () => (await getDocs(query(collection(firestore, 'students'), where('schoolId', '==', schoolId), where('academicYearId', '==', academicYearId), where('classId', '==', classId), orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(26)))).docs.map(item => ({ ...item.data(), id: item.id })), [schoolId, academicYearId, classId, cursor]);
-  const roster = useScopedResource(JSON.stringify([schoolId, academicYearId, classId, cursor]), emptyRows, load, 'Élèves indisponibles.');
+  const roster = useScopedResource<Row[]>(JSON.stringify([schoolId, academicYearId, classId, cursor]), emptyRows, load, 'Élèves indisponibles.');
   const page = roster.data.slice(0, 25), student = page.find(item => item.id === studentId) || page[0];
   return <>
     {roster.error && <p role="alert">{roster.error}</p>}
