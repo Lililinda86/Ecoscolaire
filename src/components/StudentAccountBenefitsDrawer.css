@@ -96,3 +96,14 @@
 @media (prefers-reduced-motion: reduce) {
   .advantage-drawer { animation: none; }
 }
+.advantage-preview { min-width: 0; padding: .9rem; border: 1px solid #ddd6fe; border-radius: 9px; background: #faf8ff; }
+.advantage-preview h3 { margin: 0 0 .65rem; font-size: .8rem; letter-spacing: .06em; color: #6d28d9; }
+.advantage-preview dl { display: grid; gap: .55rem; margin: 0; }
+.advantage-preview dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .2rem .75rem; }
+.advantage-preview dt { color: #475569; }
+.advantage-preview dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.advantage-preview p { font-size: .78rem; line-height: 1.5; color: #475569; margin: .75rem 0 0; }
+.advantage-preview .advantage-preview-approval { font-weight: 700; color: #4c1d95; }
+.advantage-drawer, .advantage-drawer * { box-sizing: border-box; }
+.advantage-drawer h2 { overflow-wrap: anywhere; }
+.advantage-drawer > header .icon-button { flex-shrink: 0; }
