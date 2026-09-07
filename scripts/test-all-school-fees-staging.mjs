@@ -270,6 +270,15 @@ try {
   await expect(page.getByRole('button', { name: 'Enregistrer les tarifs', exact: true })).toHaveCount(0);
   await expect(page.getByText('Campay Secret', { exact: false })).toHaveCount(0);
   await expect(page.getByText('Audit Logs', { exact: true })).toHaveCount(0);
+  for (const heading of ['Tenues', 'Activités / événements', 'Autres frais', 'Frais ponctuels']) {
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+  }
+  const availableTypes = await page.locator('.school-fee-types').allTextContents();
+  for (const label of ['Tenue scolaire', 'Tenue de sport', 'Tenue de cérémonie', 'Autre type de tenue',
+    "Kit d’activités", "Fête de l’école", 'Excursion', 'Sortie pédagogique', 'Photos scolaires',
+    'Activité culturelle', 'Fournitures / supports', 'Autre libellé libre']) {
+    assert.ok(availableTypes.some(text => text.includes(label)), `missing catalogue subtype: ${label}`);
+  }
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     if (width <= 640) {
@@ -293,6 +302,12 @@ try {
   await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
   await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
+  const createFee = settingsPage.getByText('Créer un nouveau frais', { exact: true });
+  await createFee.click();
+  const feeType = settingsPage.getByLabel('Type de frais');
+  for (const option of ['uniform', 'sports_uniform', 'ceremony_uniform', 'other_uniform', 'activity_kit', 'event', 'excursion',
+    'school_trip', 'cultural_activity', 'photo', 'supplies', 'other']) await expect(feeType.locator(`option[value="${option}"]`)).toHaveCount(1);
+  await createFee.click();
   await settingsPage.getByLabel('PK14 à PK33 — FCFA / mois').fill('4600');
   await settingsPage.getByLabel('Motif de la modification tarifaire').fill('Validation UI de la publication prospective');
   settingsPage.once('dialog', dialog => dialog.accept());
