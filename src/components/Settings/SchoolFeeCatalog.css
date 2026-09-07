@@ -7,3 +7,7 @@
 .school-fee-catalog button { min-height: 44px; white-space: normal; margin-block: .5rem; }
 .school-fee-list { padding: 0; list-style: none; display: grid; gap: .75rem; }
 .school-fee-list li { display: flex; flex-direction: column; gap: .3rem; border-top: 1px solid #e2e8f0; padding-top: .75rem; overflow-wrap: anywhere; }
+.school-fee-groups { display: grid; gap: 1rem; margin-block: 1.25rem; }
+.school-fee-group { border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; background: #fff; }
+.school-fee-group h3 { margin: 0 0 .35rem; }
+.school-fee-types, .school-fee-empty { color: #64748b; margin: .35rem 0 .75rem; overflow-wrap: anywhere; }
