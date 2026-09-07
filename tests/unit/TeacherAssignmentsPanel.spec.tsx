@@ -64,7 +64,7 @@ describe('TeacherAssignmentsPanel canonical lifecycle', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
     render(<TeacherAssignmentsPanel />);
     expect(await screen.findByText('Affectations enseignants')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Modifier' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Activer' })).toBeTruthy();
   });
 
@@ -72,7 +72,8 @@ describe('TeacherAssignmentsPanel canonical lifecycle', () => {
     vi.spyOn(AppContext, 'useAppContext').mockReturnValue(context('secretary'));
     render(<TeacherAssignmentsPanel />);
     expect(await screen.findByRole('button', { name: /Créer un brouillon/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy();
+    // Wait for the asynchronously loaded row before asserting role restrictions.
+    expect(await screen.findByRole('button', { name: 'Modifier' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Activer' })).toBeNull();
   });
 });

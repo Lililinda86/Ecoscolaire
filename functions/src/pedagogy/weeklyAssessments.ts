@@ -1,5 +1,4 @@
 import * as admin from 'firebase-admin';
-import { pedagogyAiRuntimeSecrets } from './aiRuntime';
 import * as functions from 'firebase-functions';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { audit, PedagogyActor, requireId, requirePedagogyActor } from './authorization';
@@ -117,7 +116,7 @@ export const ensureWeeklyAssessmentDraft = functions.https.onCall(async (raw, co
   return { assessmentId: id, ...result, coverage: sources.coverage };
 });
 
-export const generateWeeklyAssessment = functions.runWith({ timeoutSeconds: 180, memory: '512MB', secrets: pedagogyAiRuntimeSecrets() }).https.onCall(async (raw, context) => {
+export const generateWeeklyAssessment = functions.runWith({ timeoutSeconds: 180, memory: '512MB' }).https.onCall(async (raw, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId);
   return generateWeeklyAssessmentForActor(raw || {}, schoolId, actor);
 });

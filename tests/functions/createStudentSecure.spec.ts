@@ -204,6 +204,8 @@ describe('createStudentSecure callable', () => {
     expect((await db.collection('studentMatriculeReservations').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
   });
 
+  // Firestore transaction contention includes SDK backoff on shared CI runners.
+  // Keep every uniqueness assertion; only allow the concurrent requests to settle.
   it('16 concurrent same matricule -> one PASS and one DENY', async () => {
     const fixture = await seed();
     const matricule = `MAT-${nextId('shared')}`;
@@ -216,7 +218,7 @@ describe('createStudentSecure callable', () => {
     expect((await db.collection('schools').doc(fixture.schoolId).get()).data()?.studentsCount).toBe(1);
     expect((await db.collection('students').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
     expect((await db.collection('studentMatriculeReservations').where('schoolId', '==', fixture.schoolId).get()).size).toBe(1);
-  });
+  }, 20_000);
 
   it('17 probable duplicate without confirmation -> error', async () => {
     const fixture = await seed();

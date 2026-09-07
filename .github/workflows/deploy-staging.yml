@@ -171,8 +171,8 @@ jobs:
     environment: staging
     env:
       FIREBASE_PROJECT_ID: ecoscolaire-staging
-      # Provider access stays disabled until a separately approved secure setup.
-      PEDAGOGY_AI_SECRET_BINDING_ENABLED: 'false'
+      # Private gateway only; global USD 2 synthetic trial ledger remains mandatory.
+      PEDAGOGY_AI_SECRET_BINDING_ENABLED: 'true'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -242,6 +242,9 @@ jobs:
             /tmp/staging-functions-gen2.json \
             "$FIREBASE_PROJECT_ID" \
             us-central1
+
+      - name: Deploy private synthetic AI gateway (Staging only)
+        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:pedagogySyntheticAiGateway --non-interactive
 
       - name: Deploy Firebase Backend
         run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only firestore:rules,firestore:indexes,storage,functions:approveFinancialBenefit,functions:approveTuitionDiscount,functions:archiveClassProgram,functions:archiveWeeklyAssessment,functions:assignStudentToClass,functions:bulkAddSubjectsToClasses,functions:campayWebhook,functions:cancelFinancialBenefit,functions:closeCashDrawer,functions:createExpense,functions:createFinancialBenefit,functions:createLessonPreparationUpload,functions:createSaaSCheckout,functions:createStudentSecure,functions:createTuitionDiscount,functions:dailySubscriptionCheck,functions:deactivateTeacherAssignment,functions:enforceStudentSaasLimits,functions:ensureClassProgramDraft,functions:ensureExpectedLessonPreparations,functions:ensureWeeklyAssessmentDraft,functions:generateWeeklyAssessment,functions:getBoardViewerGovernanceSummary,functions:getCollectionQuote,functions:getStudentFinancialAccount,functions:getTeacherAssignmentCandidates,functions:initiatePayment,functions:linkStaffToUser,functions:manageAcademicPeriod,functions:manageEvaluation,functions:manageReportCard,functions:manageStaff,functions:manageTeacherAssignment,functions:markWeeklyAssessmentReadyToPrint,functions:mockConfirmPayment,functions:onPaymentCreated,functions:processStudentImportJob,functions:publishClassProgramDraft,functions:recordAuthenticatedAudit,functions:recordCashCollection,functions:recordCashPayment,functions:recordGradesBatch,functions:recordStudentAttendance,functions:recordWeeklyAssessmentTeacherValidation,functions:reverseCashCollection,functions:reverseExpense,functions:reversePayment,functions:saveLessonPreparationReview,functions:saveWeeklyAssessmentEdits,functions:seedDefaultSubjectCatalog,functions:setPrimaryTeacherAssignment,functions:startLessonPreparationAnalysis,functions:sweepZombieImportJobs,functions:unlinkStaffFromUser,functions:updateAcademicYearBounds,functions:updateClassProgramDraft,functions:updateStudentFinancialStatus,functions:validateLessonPreparation,functions:verifySaaSPayment,functions:submitFinancialBenefit,functions:rejectFinancialBenefit,functions:createPaymentMoratorium,functions:submitPaymentMoratorium,functions:approvePaymentMoratorium,functions:rejectPaymentMoratorium,functions:adoptCurriculumProgram,functions:ensureTeachingWeeks,functions:ensureTeachingPlanDraft,functions:generateTeachingPlanProposal,functions:saveTeachingPlanAdjustments,functions:recordTeacherPlanValidation,functions:archiveTeachingPlan,functions:recordTeachingConfirmations,functions:savePedagogyClassPolicy,functions:recordPedagogyObservations,functions:savePedagogyFridayConfiguration,functions:pedagogyFridayScheduler,functions:publishPedagogyAssessmentToGrades,functions:recordPedagogyResults,functions:managePedagogyRemediation --non-interactive

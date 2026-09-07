@@ -34,10 +34,10 @@ permissions:
 
 jobs:
   validate:
-    if: github.ref == 'refs/heads/staging' && inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC'
+    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2')
     runs-on: ubuntu-latest
     environment: staging
-    timeout-minutes: 20
+    timeout-minutes: 35
     concurrency:
       group: pedagogy-staging-synthetic-validation
       cancel-in-progress: false
@@ -88,7 +88,21 @@ jobs:
         run: npx playwright test tests/pedagogy-results-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
       - name: Synthetic local file integrity, manual review and exact cleanup
         run: npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
+      - name: Real synthetic AI trial with persistent USD 2 ledger
+        if: inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2'
+        env:
+          PEDAGOGY_AI_TRIAL_CONFIRMATION: RUN_PEDAGOGY_STAGING_AI_USD2
+          STAGING_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
+        run: |
+          gcloud functions describe pedagogySyntheticAiGateway --project ecoscolaire-staging --region us-central1 --format='json(status,serviceAccountEmail,secretEnvironmentVariables)' > /tmp/pedagogy-ai-runtime.json
+          gcloud functions get-iam-policy pedagogySyntheticAiGateway --project ecoscolaire-staging --region us-central1 --format=json > /tmp/pedagogy-ai-invokers.json
+          node scripts/verify-pedagogy-ai-deployment.mjs /tmp/pedagogy-ai-runtime.json /tmp/pedagogy-ai-invokers.json
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Type: application/json' --data '{}' https://us-central1-ecoscolaire-staging.cloudfunctions.net/pedagogySyntheticAiGateway)"
+          test "$status" = 403 -o "$status" = 401
+          npm run build --prefix functions
+          node scripts/test-pedagogy-synthetic-ai-staging.mjs
       - name: Exact checkpoint statement
+        if: inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC'
         run: |
           printf 'STAGING_TECHNICAL_CHECKPOINT_SHA=%s\n' "$GITHUB_SHA"
           echo 'Scope: synthetic canonical results, support, local file integrity, manual review and fixture cleanup only.'
