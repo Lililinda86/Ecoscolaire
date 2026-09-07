@@ -8,6 +8,7 @@ const { initializeFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const { getStorage } = require('firebase-admin/storage');
 const { assertApprovedSyntheticDocument } = require('../functions/lib/pedagogy/approvedSyntheticDocuments.js');
+const { approvedAssessmentLessons } = require('../functions/lib/pedagogy/approvedSyntheticRequests.js');
 const schoolId = 'pedagogy-ai-validation-20260906';
 const trialId = 'synthetic-validation-2026-09-06';
 const projectId = 'ecoscolaire-staging';
@@ -37,6 +38,7 @@ const lessons = [
   ['fr', 'primary', 'Comparer des nombres', 'Sept est plus grand que cinq. Cinq est plus petit que sept. Sept est egal a sept.'],
 ];
 const hash = value => createHash('sha256').update(value).digest('hex');
+assert.deepEqual(lessons, approvedAssessmentLessons, 'SYNTHETIC_LESSON_ALLOWLIST_MISMATCH');
 const reviewChecksum = (uploadId, review) => hash(JSON.stringify({ uploadId, review: ['lessonTitle', 'objective', 'prerequisites', 'materials', 'lessonSteps', 'assessment', 'differentiation'].map(field => [field, review[field] || null]) }));
 const safeError = error => error instanceof Error && /^[A-Z_0-9: -]{1,180}$/.test(error.message) ? error.message : 'TRIAL_FAILED_REQUIRES_DIAGNOSIS';
 const files = await Promise.all(documents.map(async ([name, mimeType, keyword], index) => {

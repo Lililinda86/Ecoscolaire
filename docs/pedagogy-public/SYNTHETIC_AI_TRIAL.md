@@ -39,6 +39,8 @@ single secret. It receives Firestore get/list/create/update and transaction
 permissions, but no document deletion, Auth or Storage permissions. The existing
 Functions call its IAM-private endpoint using their service identity. The
 gateway repeats the exact-school, model, document-hash and budget checks.
+It also accepts only the exact authored trial prompts, schemas and lesson texts;
+internal IAM access cannot add unrelated data in an accompanying text field.
 No secret value is copied to the repository, developer environment or CI.
 Do not infer successful provider connectivity from enabled secret metadata.
 

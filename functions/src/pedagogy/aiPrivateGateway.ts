@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import { pedagogyAiRuntimeSecrets } from './aiRuntime';
 import { requestStructuredPedagogyAi } from './aiGateway';
+import { assertApprovedSyntheticEnvelope } from './approvedSyntheticRequests';
 
 // Only this identity holds secretAccessor. It has no Storage, Auth or delete rights.
 // IAM authenticates the existing Staging Functions identity, never allUsers.
@@ -17,6 +18,6 @@ export const pedagogySyntheticAiGateway = functions.runWith({
       typeof request.sourceKey !== 'string' || request.sourceKey.length > 500 || typeof request.instructions !== 'string' || typeof request.content !== 'string' || !request.schema) {
     res.status(400).json({ errorCode: 'AI_PRIVATE_REQUEST_INVALID' }); return;
   }
-  try { res.json(await requestStructuredPedagogyAi(schoolId, request)); }
+  try { assertApprovedSyntheticEnvelope(request); res.json(await requestStructuredPedagogyAi(schoolId, request)); }
   catch (error) { res.status(422).json({ errorCode: error instanceof Error && /^AI_[A-Z_0-9]+$/.test(error.message) ? error.message : 'AI_PRIVATE_GATEWAY_UNCERTAIN' }); }
 });
