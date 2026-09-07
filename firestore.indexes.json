@@ -1,6 +1,10 @@
 {
   "indexes": [
     {
+      "collectionGroup": "pedagogySourceWatches", "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "enabled", "order": "ASCENDING" }, { "fieldPath": "nextCheckAt", "order": "ASCENDING" }]
+    },
+    {
       "collectionGroup": "grades", "queryScope": "COLLECTION",
       "fields": [{ "fieldPath": "schoolId", "order": "ASCENDING" }, { "fieldPath": "evaluationId", "order": "ASCENDING" }, { "fieldPath": "pedagogySecretaryReadable", "order": "ASCENDING" }, { "fieldPath": "studentId", "order": "ASCENDING" }]
     },

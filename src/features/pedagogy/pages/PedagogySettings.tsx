@@ -6,6 +6,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { getClassOptionLabel } from '../../../utils/classCatalog';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { FridayConfiguration } from '../components/FridayConfiguration';
+import { SourceWatchConfiguration } from '../components/SourceWatchConfiguration';
 import { defaultPedagogyPolicy, type PedagogyPolicy } from '../../../../functions/src/pedagogy/pedagogyPolicy';
 
 export default function PedagogySettings() {
@@ -20,6 +21,7 @@ export default function PedagogySettings() {
     <section className="pedagogy-toolbar"><label>Classe<select value={classroom?.id || ''} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option value={item.id} key={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label></section>
     {currentSchool && year && classroom ? <ClassPolicyEditor key={`${currentSchool.id}:${year.id}:${classroom.id}`} schoolId={currentSchool.id} academicYearId={year.id} classId={classroom.id} initial={defaultPedagogyPolicy(classroom)} canEdit={canEdit} /> : <p>Une classe et une année active configurée sont nécessaires.</p>}
     {currentSchool && year && <FridayConfiguration key={`friday:${currentSchool.id}:${year.id}`} schoolId={currentSchool.id} academicYearId={year.id} classes={classes.map(item => ({ id: item.id, label: getClassOptionLabel(item, classes) }))} canEdit={canEdit} />}
+    {currentSchool && <SourceWatchConfiguration key={`watch:${currentSchool.id}`} schoolId={currentSchool.id} canEdit={canEdit} />}
   </main>;
 }
 
