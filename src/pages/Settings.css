@@ -3,6 +3,13 @@
 .settings-sections button { text-align: left; background: #eef5f7; color: #174758; border: 1px solid #d7e4e9; padding: .8rem; }
 .financial-settings-page h2[id], .financial-settings-page section[id] { scroll-margin-top: 1rem; }
 .financial-settings-page textarea { width: 100%; max-width: 100%; }
+.financial-readonly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: .75rem; margin: 0; }
+.financial-readonly-grid > div { padding: .85rem; border: 1px solid var(--border-color); border-radius: 8px; min-width: 0; }
+.financial-readonly-grid dt { color: var(--text-muted); font-size: .85rem; }
+.financial-readonly-grid dd { margin: .25rem 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.financial-readonly-table-wrap { max-width: 100%; overflow-x: auto; }
+.financial-readonly-table { width: 100%; min-width: 620px; border-collapse: collapse; }
+.financial-readonly-table th, .financial-readonly-table td { padding: .7rem; text-align: left; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
 @media (max-width: 768px) {
   .financial-settings-page .page-header { flex-wrap: wrap; gap: .7rem; }
   .financial-settings-page .card > div[style*="display: flex"] { flex-wrap: wrap; }

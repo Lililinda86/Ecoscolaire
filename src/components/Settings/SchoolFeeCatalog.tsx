@@ -6,7 +6,7 @@ import { formatCurrency } from '../../utils/paymentReceipt';
 import './SchoolFeeCatalog.css';
 
 interface Fee { id: string; label: string; amount: number; category?: string; mandatory?: boolean; active?: boolean; academicYear?: string; dueDate?: string | null; schemaVersion?: number; versionId?: string }
-const categories = { uniform: 'Tenue scolaire', sports_uniform: 'Tenue de sport', books: 'Livres', supplies: 'Fournitures', exam: "Frais d’examen", canteen: 'Cantine', activity: 'Activité', excursion: 'Excursion', event: 'Fête / événement', photo: 'Photo scolaire', contribution: 'Contribution', exceptional: 'Frais exceptionnel', other: 'Autre' };
+const feeCategories = { uniform: 'Tenue scolaire', sports_uniform: 'Tenue de sport', books: 'Livres', supplies: 'Fournitures', exam: "Frais d’examen", canteen: 'Cantine', childcare: 'Garderie', activity: 'Activité scolaire', excursion: 'Excursion', event: 'Fête / événement', photo: 'Photo scolaire', contribution: 'Contribution', exceptional: 'Frais exceptionnel', other: 'Autre' };
 export function SchoolFeeCatalog() {
   const { db, currentUser } = useAppContext();
   const school = db.school;
@@ -45,8 +45,8 @@ export function SchoolFeeCatalog() {
     {canManage && <details><summary>Créer un nouveau frais</summary>
       <form onSubmit={async e => { e.preventDefault(); if (await run({ action: 'create', feeId, fee: { label, category, amount: Number(amount), description, mandatory, dueDate: dueDate || null, academicYear: school.academicYear, classIds, cycles, studentIds } })) { setFeeId(crypto.randomUUID()); setLabel(''); setAmount(''); } }}>
         <div className="school-fee-grid">
-          <label>Nom du frais<input required maxLength={120} value={label} onChange={e => setLabel(e.target.value)} /></label>
-          <label>Catégorie<select value={category} onChange={e => setCategory(e.target.value)}>{Object.entries(categories).map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label>
+          <label>{category === 'other' ? 'Précisez le libellé du frais' : 'Libellé précis du frais'}<input required maxLength={120} value={label} onChange={e => setLabel(e.target.value)} placeholder={category === 'other' ? 'Ex. Cérémonie de fin d’année' : 'Ex. Excursion Kribi 2027'} /></label>
+          <label>Catégorie<select value={category} onChange={e => setCategory(e.target.value)}>{Object.entries(feeCategories).map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label>
           <label>Montant (FCFA)<input required type="number" min="1" step="1" value={amount} onChange={e => setAmount(e.target.value)} /></label>
           <label>Échéance éventuelle<input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></label>
           <label>Année scolaire<input readOnly value={school.academicYear} /></label>
@@ -61,7 +61,7 @@ export function SchoolFeeCatalog() {
         <button disabled={busy} type="submit">Publier le frais</button>
       </form>
     </details>}
-    <ul className="school-fee-list">{fees.map(fee => <li key={fee.id}><strong>{fee.label}</strong><span>{formatCurrency(fee.amount)} · {fee.mandatory === false ? 'Facultatif' : 'Obligatoire'} · {fee.active === false ? 'INACTIF' : 'ACTIF'}{fee.academicYear ? ` · ${fee.academicYear}` : ' · historique'}</span>{fee.dueDate && <span>Échéance : {fee.dueDate}</span>}{canManage && fee.schemaVersion === 2 && fee.active !== false && <button disabled={busy} type="button" onClick={() => void run({ action: 'archive', feeId: fee.id })}>Désactiver les nouvelles affectations</button>}</li>)}</ul>
+    <ul className="school-fee-list">{fees.map(fee => <li key={fee.id}><strong>{fee.label}</strong><span>{feeCategories[fee.category as keyof typeof feeCategories] || 'Catégorie historique'} · {formatCurrency(fee.amount)} · {fee.mandatory === false ? 'Facultatif' : 'Obligatoire'} · {fee.active === false ? 'INACTIF' : 'ACTIF'}{fee.academicYear ? ` · ${fee.academicYear}` : ' · historique'}</span>{fee.dueDate && <span>Échéance : {fee.dueDate}</span>}{canManage && fee.schemaVersion === 2 && fee.active !== false && <button disabled={busy} type="button" onClick={() => void run({ action: 'archive', feeId: fee.id })}>Désactiver les nouvelles affectations</button>}</li>)}</ul>
     {canManage && <form onSubmit={e => { e.preventDefault(); void run({ action: 'assign', feeId: assignFee, studentId }); }}>
       <h3>Nouvelle version d’un tarif</h3>
       <p>Modifie uniquement les nouvelles obligations. Aucun supplément automatique pour les élèves déjà concernés par une obligation de ce frais.</p>
