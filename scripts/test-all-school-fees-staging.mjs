@@ -92,22 +92,23 @@ try {
   }
   const studentId = students.primary18;
   await denied(call('getStudentFinancialAccount', { studentId, academicYear: year }, 'foreign'));
-  const categories = ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other'];
+  const categories = ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other'];
   for (const category of categories) {
-    const fee = { label: `TEST ${category}`, category, amount: 15000, description: 'Fixture isolée Staging', academicYear: year,
+    const fee = { label: category === 'other' ? 'Cérémonie de fin d’année TEST' : `TEST ${category}`, category, amount: 15000, description: 'Fixture isolée Staging', academicYear: year,
       mandatory: category !== 'excursion', dueDate: '2027-06-15', classIds: [], cycles: ['primary'], studentIds: [] };
     const payload = { action: 'create', feeId: `${schoolId}-${category}`, fee };
     await denied(call('manageSchoolFee', payload));
     await call('manageSchoolFee', payload, 'director');
     assert.equal((await call('manageSchoolFee', payload, 'director')).replay, true);
   }
-  assert.equal((await account(studentId)).lines.filter(line => line.type === 'other').length, 12);
+  assert.equal((await account(studentId)).lines.filter(line => line.type === 'other').length, 13);
   const assign = { action: 'assign', feeId: `${schoolId}-excursion`, studentId };
   await call('manageSchoolFee', assign, 'director');
   assert.equal((await call('manageSchoolFee', assign, 'director')).replay, true);
   let snapshot = await account(studentId);
-  assert.equal(snapshot.lines.filter(line => line.type === 'other').length, 13);
+  assert.equal(snapshot.lines.filter(line => line.type === 'other').length, 14);
   for (const key of ['registration_fee', 'tuition:T1', 'tuition:T2', 'tuition:T3']) assert.ok(snapshot.lines.some(line => line.key === key));
+  assert.equal(snapshot.lines.find(line => line.feeId === `${schoolId}-other`).label, 'Cérémonie de fin d’année TEST');
   pass('CATALOGUE / OPTIONAL / EVENTS / EXCURSIONS / INSCRIPTION / T1 T2 T3');
 
   const benefit = await call('createFinancialBenefit', { requestId: `benefit-${runId}`, studentId, academicYear: year, benefitType: 'SCHOLARSHIP',
@@ -143,6 +144,13 @@ try {
   const receipt = await db.collection('receipts').doc(payment.receiptId).get();
   assert.equal(receipt.data().schoolId, schoolId); assert.equal(receipt.data().amount, 19000);
   await assert.rejects(call('recordCashCollection', { ...paymentInput, requestId: `overpay-${runId}`, allocations: [{ type: 'other', feeId, amount: 10001 }] }));
+  const customFeeId = `${schoolId}-other`;
+  const customPayment = await call('recordCashCollection', { requestId: `custom-label-${runId}`, studentId, academicYear: year,
+    allocations: [{ type: 'other', feeId: customFeeId, amount: 1000 }] });
+  assert.equal(customPayment.lineItems[0].label, 'Cérémonie de fin d’année TEST');
+  const customReceipt = await db.collection('receipts').doc(customPayment.receiptId).get();
+  assert.equal(customReceipt.data().lineItems[0].label, 'Cérémonie de fin d’année TEST');
+  assert.equal((await account(studentId)).lines.find(line => line.feeId === customFeeId).remainingBalance, 14000);
   await call('setStudentTransportPlan', { studentId, usesTransport: true, zonePk: 36 });
   const historical = (await account(studentId)).lines.find(line => line.key === transport.key);
   assert.equal(historical.grossExpectedAmount, 4000); assert.match(historical.label, /PK18/);
@@ -256,6 +264,23 @@ try {
   await download.saveAs('all-fees-receipt.pdf');
   assert.equal((await account(studentId)).lines.find(l => l.feeId === `${schoolId}-excursion`).previousPaid, 1000);
   pass('AUTOMATIC RECEIPT UI / PDF DOWNLOAD / UI PARTIAL PAYMENT');
+  await page.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Paramètres financiers', exact: true }).waitFor({ timeout: 30000 });
+  await expect(page.getByTestId('nav-settings')).toContainText('Tarifs financiers');
+  await expect(page.getByRole('button', { name: 'Enregistrer les tarifs', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Campay Secret', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('Audit Logs', { exact: true })).toHaveCount(0);
+  for (const width of [360, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    if (width <= 640) {
+      const sidebar = page.getByTestId('sidebar');
+      if ((await sidebar.getAttribute('class')).includes('sidebar-open')) await sidebar.locator('.sidebar-close-button').click();
+      await expect(sidebar).not.toBeInViewport();
+    }
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await page.screenshot({ path: `all-fees-secretary-settings-${width}.png`, fullPage: true });
+  }
+  pass('SECRETARY FINANCIAL SETTINGS READ-ONLY / 360 / 768 / 1440');
   const directorContext = await browser.newContext();
   const settingsPage = await directorContext.newPage();
   settingsPage.on('pageerror', error => errors.push(error.message));
