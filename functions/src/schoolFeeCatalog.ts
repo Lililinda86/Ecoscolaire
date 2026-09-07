@@ -80,7 +80,7 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       if (targets.some(s => !s.exists || s.data()?.schoolId !== schoolId)) throw new functions.https.HttpsError('permission-denied', 'Cible hors établissement.');
       if (typeof source.label !== 'string' || !source.label.trim() || source.label.length > 120 || typeof source.description !== 'string' || source.description.length > 500) throw fail('Nom ou description invalide.');
       if (!Number.isSafeInteger(source.amount) || source.amount <= 0 || typeof source.mandatory !== 'boolean') throw fail('Montant ou caractère obligatoire invalide.');
-      const categories = ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other'];
+      const categories = ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other'];
       if (!categories.includes(source.category)) throw fail('Catégorie invalide.');
       const dueDate = source.dueDate || null;
       if (dueDate !== null && (typeof dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(Date.parse(dueDate)) || new Date(dueDate).toISOString().slice(0, 10) !== dueDate)) throw fail('Échéance invalide.');

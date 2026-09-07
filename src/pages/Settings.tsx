@@ -14,12 +14,13 @@ import { getClassOptionLabel } from '../utils/classCatalog';
 import type { School, EducationCycle } from '../types';
 import { AcademicCalendarSettings } from '../components/Settings/AcademicCalendarSettings';
 import { TuitionDeadlineSettings } from '../components/Settings/TuitionDeadlineSettings';
+import { FinancialSettingsReadOnly } from '../components/Settings/FinancialSettingsReadOnly';
 import {
   validateTuitionPaymentDeadlines,
   type TuitionPaymentDeadlines
 } from '../utils/tuitionDeadlines';
 
-const Settings: React.FC = () => {
+const FullSettings: React.FC = () => {
   const { db, safeMergeDB, updateLocalState, currentUser } = useAppContext();
   const navigate = useNavigate();
   const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as 'francophone' | 'anglophone' });
@@ -1103,6 +1104,12 @@ const Settings: React.FC = () => {
       )}
     </div>
   );
+};
+
+const Settings: React.FC = () => {
+  const { currentUser } = useAppContext();
+  if (currentUser?.role === 'secretary') return <FinancialSettingsReadOnly />;
+  return <FullSettings />;
 };
 
 export default Settings;

@@ -47,7 +47,7 @@ const students = {};
     }
   }
   const studentId = students.primary18;
-  for (const category of ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other']) {
+  for (const category of ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other']) {
     const feeId = `fee-${category}-${suffix}`;
     const fee = { label: category, category, amount: 15000, description: 'Test', academicYear, mandatory: category !== 'excursion', dueDate: '2027-06-15', classIds: [], cycles: ['primary'], studentIds: [] };
     await assert.rejects(call('manageSchoolFee', { action: 'create', feeId, fee }, secretaryId), e => e.code === 'permission-denied');
@@ -56,12 +56,12 @@ const students = {};
     await assert.rejects(call('manageSchoolFee', { action: 'create', feeId, fee: { ...fee, amount: 1 } }), e => e.code === 'already-exists');
   }
   let account = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
-  assert.equal(account.lines.filter(l => l.type === 'other').length, 12);
+  assert.equal(account.lines.filter(l => l.type === 'other').length, 13);
   const excursionId = `fee-excursion-${suffix}`;
   await call('manageSchoolFee', { action: 'assign', feeId: excursionId, studentId });
   await call('manageSchoolFee', { action: 'assign', feeId: excursionId, studentId });
   account = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
-  assert.equal(account.lines.filter(l => l.type === 'other').length, 13);
+  assert.equal(account.lines.filter(l => l.type === 'other').length, 14);
   const transport = account.lines.find(l => l.type === 'transport');
   const feeId = `fee-uniform-${suffix}`;
   const allocations = [{ type: 'registration_fee', amount: 10000 }, { type: 'transport', period: transport.period, amount: 4000 }, { type: 'other', feeId, amount: 5000 }];
