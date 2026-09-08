@@ -16,6 +16,12 @@ const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.Modu
 const componentModule = new Module(filename);
 componentModule.filename = filename;
 componentModule.paths = createRequire(filename).resolve.paths('react');
+const helperFilename = path.join(root, 'src/features/pedagogy/services/assessmentText.ts');
+const helperModule = new Module(helperFilename);
+helperModule.filename = helperFilename;
+helperModule._compile(ts.transpileModule(await fs.readFile(helperFilename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, helperFilename);
+const nativeRequire = componentModule.require.bind(componentModule);
+componentModule.require = id => id === '../services/assessmentText' ? helperModule.exports : nativeRequire(id);
 componentModule._compile(compiled, filename);
 const { AssessmentPrint } = componentModule.exports;
 const css = (await Promise.all(['pedagogy.css', 'pedagogy-print.css'].map(name => fs.readFile(path.join(root, 'src/features/pedagogy', name), 'utf8')))).join('\n');
@@ -30,11 +36,15 @@ try {
       questionText: `${language === 'fr' ? 'Question synthétique' : 'Synthetic question'} ${index + 1} : 2 + 3 = ?`,
       instructions: language === 'fr' ? 'Explique ta démarche en une phrase.' : 'Explain your reasoning in one sentence.',
       expectedAnswer: '5', correctionGuide: language === 'fr' ? 'Accepter toute démarche correcte. Ne pas inférer une compétence globale.' : 'Accept any correct method. Do not infer overall competency.' }));
+    items[0].questionText = 'Synthetic fraction: \\( \\frac{1}{2} = \\frac{2}{4} \\)';
+    items[0].expectedAnswer = '\\( \\frac{2}{4} \\)';
     const markup = renderToStaticMarkup(React.createElement(AssessmentPrint, {
       school: { name: 'SYNTHETIC SCHOOL - PRINT QA', address: 'Synthetic address' }, language, mode, sourceChanged: false,
       academicYearLabel: '2026-2027', items,
       assessment: { status: 'draft', className: 'SYNTHETIC CLASS', fridayDate: '2026-09-11', weekStartDate: '2026-09-07', durationMinutes: 45, totalPoints: 24, generationVersion: 2, contentRevision: 3, instructions: 'SYNTHETIC FIXTURE - NOT A PEDAGOGICAL APPROVAL' },
     }));
+    assert.ok(markup.includes('1/2 = 2/4'));
+    assert.ok(!markup.includes('\\frac'));
     await page.setContent(`<html><head><meta charset="utf-8"><style>body{margin:0} ${css}</style></head><body><aside>NON_DOCUMENT_SENTINEL</aside><main>${markup}</main></body></html>`);
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
