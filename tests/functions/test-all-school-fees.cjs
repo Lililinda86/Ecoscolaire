@@ -157,5 +157,6 @@ const students = {};
     for (const doc of snap.docs) await doc.ref.delete();
   }
   await db.collection('counters').doc(`receipts_${schoolId}`).delete();
+  for (const version of (await db.collection('schools').doc(schoolId).collection('financialTariffVersions').get()).docs) await version.ref.delete();
   for (const ref of documents.reverse()) await ref.delete();
 }).catch(e => { console.error(e); process.exitCode = 1; });

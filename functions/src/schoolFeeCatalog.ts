@@ -139,7 +139,7 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       if (editing) {
         for (const write of legacyWrites) write();
         const versionId = createHash('sha256').update(JSON.stringify([schoolId, feeId, existing!.versionId || 'initial', fee])).digest('hex');
-        const next = { ...fee, versionId };
+        const next = { ...existing, ...fee, versionId };
         tx.create(school.ref.collection('financialTariffVersions').doc(versionId), {
           feeId, academicYear: year, previous: existing, next, reason: raw.reason.trim(),
           actorId: context.auth!.uid, effectiveAt: admin.firestore.FieldValue.serverTimestamp()
