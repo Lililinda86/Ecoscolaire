@@ -5,6 +5,7 @@ import { audit, PedagogyActor, requireId, requirePedagogyActor } from './authori
 import { admissibleTeachingContent } from './teachingEvidence';
 import { readClassPedagogyPolicy } from './classPolicies';
 import { generateAssessmentContent } from './aiAssessment';
+import { assertAiAssessmentReviewQuality } from './assessmentQualityGate';
 import { responsibleTeacher } from './scopes';
 import { allSubjectsValidated, sameAssessmentReviewVersion, SubjectTeacherValidation } from './assessmentReview';
 import {
@@ -278,6 +279,7 @@ export const recordWeeklyAssessmentTeacherValidation = functions.https.onCall(as
     const assessment = schoolDocument(await transaction.get(ref), schoolId, 'Évaluation');
     assertReviewVersion(raw, assessment);
     if (assessment.status !== 'needs_review') throw new functions.https.HttpsError('failed-precondition', 'Le brouillon doit être relu avant la validation enseignant.');
+    await assertAiAssessmentReviewQuality(transaction, assessment, schoolId, id);
     await assertCurrentTeachingVersions(transaction, assessment);
     const subjects = assessmentSubjects(assessment);
     const selected = raw.subjectId ? [requireId(raw.subjectId, 'subjectId')] : subjects;
@@ -309,6 +311,7 @@ export const markWeeklyAssessmentReadyToPrint = functions.https.onCall(async (ra
     if (sources.checksum !== assessment.sourceChecksum || !allSubjectsValidated(assessmentSubjects(assessment), assessment.teacherValidations || [], assessment as { generationVersion: number })) throw new functions.https.HttpsError('failed-precondition', 'Sources modifiées ou visas par matière incomplets.');
     await assertCurrentTeachingVersions(transaction, assessment);
     if (assessment.status !== 'teacher_validated' || assessment.teacherValidated !== true) throw new functions.https.HttpsError('failed-precondition', 'La validation de l’enseignant doit être enregistrée.');
+    await assertAiAssessmentReviewQuality(transaction, assessment, schoolId, id);
     transaction.update(ref, { status: 'ready_to_print', readyToPrintAt: FieldValue.serverTimestamp(), readyToPrintBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     audit(transaction, actor, schoolId, 'weekly_assessment_ready_to_print', 'weeklyAssessment', id, { generationVersion: assessment.generationVersion });
   });

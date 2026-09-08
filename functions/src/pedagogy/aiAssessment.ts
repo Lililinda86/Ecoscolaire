@@ -1,5 +1,6 @@
 import { requestPrivatePedagogyAi as requestStructuredPedagogyAi } from './aiPrivateClient';
 import { deterministicWeeklyAssessmentGenerator, QUESTION_TYPES, sourceChecksum, validateWeeklyAssessmentResult, WeeklyAssessmentGenerationInput } from './weeklyAssessmentGenerator';
+import { assessmentMechanicalIssues } from './assessmentMechanicalQuality';
 
 const text = { type: 'string' };
 const texts = { type: 'array', items: text };
@@ -31,6 +32,8 @@ export async function generateAssessmentContent(schoolId: string, input: WeeklyA
     content: JSON.stringify({ language, policy: input.assessmentPolicy, sources: sanitized })
   });
   const generated = validateWeeklyAssessmentResult(response.data);
+  const mechanicalIssues = assessmentMechanicalIssues(generated.items);
+  generated.warnings = [...mechanicalIssues.map(issue => 'Correction manuelle requise avant visa / Manual correction required: ' + issue), ...generated.warnings].slice(0, 30);
   if (generated.totalPoints !== input.assessmentPolicy.totalPoints || generated.durationMinutes !== input.assessmentPolicy.durationMinutes) throw new Error('AI_ASSESSMENT_POLICY_MISMATCH');
   const sourceMap = new Map(sanitized.map((source, index) => [source.id, sources[index]]));
   const subjectMap = new Map(subjectIds.map((id, index) => [`subject_${index + 1}`, id]));

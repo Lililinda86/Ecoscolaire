@@ -1,5 +1,6 @@
 import type { School } from '../../../types';
 import type { AssessmentItem, WeeklyAssessment } from '../types';
+import { readableAssessmentText } from '../services/assessmentText';
 import '../pedagogy-print.css';
 
 export function AssessmentPrint({ school, assessment, items, mode, sourceChanged, language, academicYearLabel }: {
@@ -19,8 +20,8 @@ export function AssessmentPrint({ school, assessment, items, mode, sourceChanged
     <div className="assessment-meta"><span>{en ? 'Class' : 'Classe'}<br /><strong>{assessment.className}</strong></span><span>Date<br /><strong>{assessment.fridayDate}</strong></span><span>{en ? 'Duration' : 'Durée'}<br /><strong>{assessment.durationMinutes} min</strong></span><span>{en ? 'Scale' : 'Barème'}<br /><strong>/{assessment.totalPoints}</strong></span></div>
     {!correction && <p>{en ? 'Pupil’s full name' : 'Nom et prénom de l’élève'} : _____________________________________</p>}
     {correction && <p className="assessment-copy-label">{en ? 'Teacher copy - do not distribute to pupils' : 'Exemplaire enseignant - ne pas distribuer aux élèves'}</p>}
-    <p>{assessment.instructions}</p>
-    {items.map(item => <article className="assessment-question" key={item.id}><h3>{item.order}. {item.questionText} <small>({item.points} pt{item.points > 1 ? 's' : ''})</small></h3><p>{item.instructions}</p>{correction ? <><strong>{en ? 'Expected answer' : 'Réponse attendue'}</strong><p>{item.expectedAnswer}</p><strong>{en ? 'Marking guidance' : 'Consignes de correction'}</strong><p>{item.correctionGuide}</p></> : <div className="assessment-answer-lines" />}</article>)}
+    <p>{readableAssessmentText(assessment.instructions || '')}</p>
+    {items.map(item => <article className="assessment-question" key={item.id}><h3>{item.order}. {readableAssessmentText(item.questionText)} <small>({item.points} pt{item.points > 1 ? 's' : ''})</small></h3><p>{readableAssessmentText(item.instructions)}</p>{correction ? <><strong>{en ? 'Expected answer' : 'Réponse attendue'}</strong><p>{readableAssessmentText(item.expectedAnswer)}</p><strong>{en ? 'Marking guidance' : 'Consignes de correction'}</strong><p>{readableAssessmentText(item.correctionGuide)}</p></> : <div className="assessment-answer-lines" />}</article>)}
     <p className="assessment-total">Total : {total}/{assessment.totalPoints}</p>
     <footer className="assessment-footer"><span>{en ? 'Week starting' : 'Semaine du'} {assessment.weekStartDate}</span><span>Version {assessment.generationVersion}.{assessment.contentRevision || 0}</span></footer>
   </section>;
