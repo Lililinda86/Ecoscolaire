@@ -3,6 +3,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { adoptCurriculumProgram } from '../services/pedagogyService';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
+import { curriculumProvenanceLabel, curriculumProvenanceLink } from '../services/curriculumProvenance';
 
 export default function PedagogyProgram() {
   const { db, currentSchool, currentUser } = useAppContext();
@@ -33,6 +34,6 @@ export default function PedagogyProgram() {
       </article>
       <article className="pedagogy-card"><h2>Adoptions actives</h2>{workspace.adoptions.map(item => <div className="pedagogy-list-row" key={item.id}><div><strong>{item.catalogLevelId}</strong><small>{workspace.programs.find(program => program.id === item.curriculumProgramId)?.title || item.curriculumProgramId}</small></div><span className="pedagogy-status pedagogy-status--teacher_validated">Actif</span></div>)}{!workspace.adoptions.length && <p className="pedagogy-empty">Aucune adoption pour cette année.</p>}</article>
     </section>
-    <section className="pedagogy-card"><h2>Catalogue disponible</h2>{workspace.programs.map(program => <div className="pedagogy-list-row" key={program.id}><div><strong>{program.title}</strong><small>{program.countryCode} · {program.section} · {program.sourceType === 'mock' ? 'démonstration non homologuée' : 'source officielle'}</small></div><code>{program.checksum?.slice(0, 10) || program.version}</code></div>)}</section>
+    <section className="pedagogy-card"><h2>Catalogue disponible</h2><p>La publication dans le catalogue ne certifie pas à elle seule l’authenticité documentaire, les droits de réutilisation ou la couverture du programme.</p>{workspace.programs.map(program => <div className="pedagogy-list-row" key={program.id}><div><strong>{program.title}</strong><small>{program.countryCode} · {program.section} · {curriculumProvenanceLabel(program.sourceType)}</small>{curriculumProvenanceLink(program.provenance?.sourceUrl) && <a href={curriculumProvenanceLink(program.provenance?.sourceUrl)!} target="_blank" rel="noopener noreferrer">Voir la provenance déclarée</a>}</div><code>{program.checksum?.slice(0, 10) || program.version}</code></div>)}</section>
   </main>;
 }

@@ -12,6 +12,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { getStorage } = require('firebase-admin/storage');
 const { assertApprovedSyntheticDocument } = require('../functions/lib/pedagogy/approvedSyntheticDocuments.js');
 const { approvedAssessmentLessons } = require('../functions/lib/pedagogy/approvedSyntheticRequests.js');
+const { AI_CONTINUATION_CONFIRMATION, AI_PRIOR_OPERATION_IDS, assertDiagnosedAiContinuation } = require('../functions/lib/pedagogy/aiTrialContinuation.js');
 const schoolId = 'pedagogy-ai-validation-20260906';
 const trialId = 'synthetic-validation-2026-09-06';
 const projectId = 'ecoscolaire-staging';
@@ -58,7 +59,8 @@ if (process.argv.includes('--check-only')) {
   assert.match(process.env.GITHUB_SHA || '', /^[a-f0-9]{40}$/);
   assert.equal(process.env.EXPECTED_STAGING_SHA, process.env.GITHUB_SHA);
   assert.equal(process.env.PEDAGOGY_FIREBASE_PROJECT_ID, projectId);
-  assert.equal(process.env.PEDAGOGY_AI_TRIAL_CONFIRMATION, 'RUN_PEDAGOGY_STAGING_AI_USD2');
+  const continuation = process.env.PEDAGOGY_AI_TRIAL_CONFIRMATION === AI_CONTINUATION_CONFIRMATION;
+  assert.ok(continuation || process.env.PEDAGOGY_AI_TRIAL_CONFIRMATION === 'RUN_PEDAGOGY_STAGING_AI_USD2');
   assert.ok(!process.env.FIRESTORE_EMULATOR_HOST && !process.env.FIREBASE_AUTH_EMULATOR_HOST);
   assert.ok(process.env.STAGING_FIREBASE_API_KEY, 'FIREBASE_CLIENT_CONFIGURATION_REQUIRED');
   const app = initializeApp({ projectId, storageBucket: bucketName }, 'pedagogy-synthetic-ai-trial');
@@ -73,8 +75,30 @@ if (process.argv.includes('--check-only')) {
   const report = { sha: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, model: 'gpt-4.1-mini-2025-04-14', documentChecks: [], assessments: [], successfulProviderOperations: 0, estimatedCostMicros: 0, costBasis: 'observed_tokens_uncached_list_price_upper_bound_not_invoice', cleanupVerified: false, pedagogicalApproval: 'NOT_PERFORMED' };
   try {
     const initial = await Promise.all([manifestRef.get(), ledgerRef.get(), db.collection('schools').doc(schoolId).get(), configRef.get(), fridayRef.get()]);
-    assert.ok(initial.every(snapshot => !snapshot.exists), 'TRIAL_ALREADY_EXISTS_NO_AUTOMATIC_REPLAY');
-    await manifestRef.create({ schoolId, sha: report.sha, runId: report.runId, state: 'setting_up', createdAt: FieldValue.serverTimestamp(), fixtureOnly: true, userId: uid, storagePaths: files.map(file => file.storagePath) });
+    if (continuation) {
+      assert.ok(!initial[2].exists && !initial[4].exists, 'CONTINUATION_FIXTURE_RESIDUE');
+      const previous = await db.collection('pedagogyAiOperations').where('schoolId', '==', schoolId).limit(11).get();
+      const operations = previous.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      assertDiagnosedAiContinuation(initial[0].data() || {}, initial[1].data() || {}, initial[3].data() || {}, operations);
+      await db.runTransaction(async tx => {
+        const [manifest, ledger, config] = await Promise.all([tx.get(manifestRef), tx.get(ledgerRef), tx.get(configRef)]);
+        assertDiagnosedAiContinuation(manifest.data() || {}, ledger.data() || {}, config.data() || {}, operations);
+        tx.update(manifestRef, { continuationClaimed: true, previousReport: manifest.data().report, continuationSha: report.sha, continuationRunId: report.runId, state: 'continuation_setting_up' });
+      });
+      report.continuationOf = '34185299765';
+      // Read the two immutable paid results; never invoke their callables again.
+      for (let index = 0; index < 2; index++) {
+        const operation = operations.find(item => item.id === AI_PRIOR_OPERATION_IDS[index]);
+        const result = operation.result.data;
+        const title = String(result.lessonTitle || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        report.documentChecks.push({ file: files[index].name, sha256: files[index].checksum, operationId: operation.id, reusedPersistedResult: true,
+          titleAnchorMatched: title.includes(files[index].keyword), contentAnchorsMatched: extractionAnchors[index].every(anchor => anchor.test(JSON.stringify(result))),
+          draftOnly: true, incompleteFieldsChecked: false, syntheticExtractForReview: result });
+      }
+    } else {
+      assert.ok(initial.every(snapshot => !snapshot.exists), 'TRIAL_ALREADY_EXISTS_NO_AUTOMATIC_REPLAY');
+      await manifestRef.create({ schoolId, sha: report.sha, runId: report.runId, state: 'setting_up', createdAt: FieldValue.serverTimestamp(), fixtureOnly: true, userId: uid, storagePaths: files.map(file => file.storagePath) });
+    }
     manifestCreated = true;
     await auth.createUser({ uid, email: 'pedagogy-ai-trial-20260906@example.invalid', displayName: 'Synthetic AI trial secretary' }); ownsUser = true;
     const batch = db.batch();
@@ -94,8 +118,12 @@ if (process.argv.includes('--check-only')) {
       create('lessonPreparations', preparationId, { academicYearId: yearId, classId, weekId, subjectId: 'synthetic-math', classSubjectId: classId + '-math', subjectName: language === 'en' ? 'Mathematics' : 'Mathematiques', version: 1, status: 'validated', currentUploadId: uploadId, reviewData,
         teachingConfirmation: { id: `synthetic-declaration-${index}`, status: 'taught', effectiveDate: '2026-09-01', declaredByTeacherStaffId: 'synthetic-teacher-not-a-person', recordedBy: uid, reviewChecksum: reviewChecksum(uploadId, reviewData), excerpts: [], note: 'Synthetic fixture only, NOT an actual teacher decision or taught course.' } });
     }
-    batch.create(ledgerRef, { trialId, reservedMicros: 0, preparationCalls: 0, assessmentCalls: 0, createdAt: FieldValue.serverTimestamp() });
-    batch.create(configRef, { enabled: true, provider: 'openai', model: report.model, version: 1, maxOutputTokens: 4000, maxInputBytes: 20000, dailyCallLimit: 10, dailyBudgetMicros: 2000000, inputPriceMicrosPerMillionTokens: 400000, outputPriceMicrosPerMillionTokens: 1600000, approvalReference: 'User authorization: five synthetic documents plus five assessments, USD2 total', privacyReviewReference: 'Pinned original synthetic fixtures only; no real records' });
+    if (!continuation) {
+      batch.create(ledgerRef, { trialId, reservedMicros: 0, preparationCalls: 0, assessmentCalls: 0, createdAt: FieldValue.serverTimestamp() });
+      batch.create(configRef, { enabled: true, provider: 'openai', model: report.model, version: 1, maxOutputTokens: 4000, maxInputBytes: 20000, dailyCallLimit: 10, dailyBudgetMicros: 2000000, inputPriceMicrosPerMillionTokens: 400000, outputPriceMicrosPerMillionTokens: 1600000, approvalReference: 'User authorization: five synthetic documents plus five assessments, USD2 total', privacyReviewReference: 'Pinned original synthetic fixtures only; no real records' });
+    } else {
+      batch.update(configRef, { enabled: true, continuationRunId: report.runId });
+    }
     await batch.commit(); ownsFixture = true;
     await manifestRef.update({ state: 'fixture_ready', exactPaths: exact.map(ref => ref.path) });
     for (const file of files) {
@@ -112,7 +140,7 @@ if (process.argv.includes('--check-only')) {
       assert.ok(response.ok, 'STAGING_CALLABLE_FAILED'); const body = await response.json(); assert.ok(!body.error && body.result, 'STAGING_CALLABLE_REJECTED'); return body.result;
     };
     await manifestRef.update({ state: 'running', startedAt: FieldValue.serverTimestamp() });
-    for (const file of files) {
+    for (const file of files.slice(continuation ? 2 : 0)) {
       const started = performance.now();
       const result = await call('startLessonPreparationAnalysis', { uploadId: file.uploadId });
       const callableLatencyMs = Math.round(performance.now() - started);
@@ -121,7 +149,7 @@ if (process.argv.includes('--check-only')) {
       assert.equal(analysis.processingMode, 'synthetic_provider_attempt'); assert.equal(analysis.providerReceipt?.model, report.model);
       assert.equal(analysis.appliedToCurrentPreparation, true);
       const title = String(result.result?.lessonTitle || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-      assert.ok(title.includes(file.keyword), 'SYNTHETIC_TITLE_CHECK_FAILED');
+      const titleAnchorMatched = title.includes(file.keyword);
       const extracted = JSON.stringify(result.result);
       assert.ok(extractionAnchors[report.documentChecks.length].every(anchor => anchor.test(extracted)), 'SYNTHETIC_CONTENT_ANCHOR_FAILED');
       assert.equal((await db.collection('lessonPreparations').doc(file.preparationId).get()).data().status, 'needs_review');
@@ -132,7 +160,7 @@ if (process.argv.includes('--check-only')) {
         assert.equal(result.result.differentiation, null, 'MISSING_DIFFERENTIATION_INVENTED');
         assert.ok(result.result.warnings.length > 0, 'MISSING_FIELDS_NOT_SIGNALED');
       }
-      report.documentChecks.push({ file: file.name, sha256: file.checksum, operationId: analysis.providerReceipt.operationId, titleAnchorMatched: true, contentAnchorsMatched: true, draftOnly: true, callableLatencyMs,
+      report.documentChecks.push({ file: file.name, sha256: file.checksum, operationId: analysis.providerReceipt.operationId, titleAnchorMatched, contentAnchorsMatched: true, draftOnly: true, callableLatencyMs,
         incompleteFieldsChecked: file.name === 'primary-fr.pdf', syntheticExtractForReview: result.result });
       console.log(JSON.stringify({ phase: 'document', completed: report.documentChecks.length, provider: 'openai' }));
     }
@@ -184,6 +212,7 @@ if (process.argv.includes('--check-only')) {
       report.assessments.push({ index, language, cycle, operationId: assessment.aiOperationId, itemCount: assessment.itemCount, totalPoints: assessment.totalPoints, draftOnly: true, callableLatencyMs, syntheticQuestionsForReview });
       console.log(JSON.stringify({ phase: 'assessment', completed: report.assessments.length, provider: 'openai' }));
     }
+    assert.ok(report.documentChecks.every(item => item.titleAnchorMatched && item.contentAnchorsMatched), 'SYNTHETIC_EXTRACTION_QUALITY_REVIEW_REQUIRED');
   } catch (error) { failure = safeError(error); }
   finally {
     if (ownsFriday) {

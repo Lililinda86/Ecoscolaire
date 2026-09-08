@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch, codex/pedagogy-private-ai-validation, codex/pedagogy-secret-binding-resume]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch, codex/pedagogy-private-ai-validation, codex/pedagogy-secret-binding-resume, codex/pedagogy-watch-resume]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -51,7 +51,7 @@ jobs:
           PEDAGOGY_RECOVERY_CONFIRMATION: ${{ inputs.confirmation }}
         run: node scripts/recover-pedagogy-results-checkpoint.mjs --delete-exact-fixture
   exact-staging:
-    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2')
+    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2' || inputs.confirmation == 'CONTINUE_PEDAGOGY_AI_34185299765' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_BASELINE' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_CHANGE')
     needs: [static-gates, emulator-gates]
     permissions:
       contents: read
@@ -123,7 +123,7 @@ jobs:
       - name: Isolated disposable emulator secret override
         run: node scripts/prepare-pedagogy-emulator.mjs demo-ecoscolaire
       - name: Teaching confirmation Functions authorization and concurrency
-        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs"
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs && node tests/functions/test-pedagogy-source-watch-emulator.cjs"
       - run: npx playwright install --with-deps chromium
       - name: Synthetic bilingual A4 print regression
         env:

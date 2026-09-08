@@ -11,6 +11,7 @@ export { savePedagogyFridayConfiguration, pedagogyFridayScheduler } from './frid
 export { publishPedagogyAssessmentToGrades, recordPedagogyResults } from './canonicalResults';
 export { managePedagogyRemediation } from './remediations';
 export { pedagogySyntheticAiGateway } from './aiPrivateGateway';
+export { savePedagogySourceWatch, recordPedagogySourceWatchReview, pedagogySourceWatchScheduler } from './sourceWatch';
 
 export {
   ensureExpectedLessonPreparations,
