@@ -1376,6 +1376,10 @@ service cloud.firestore {
         allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
         allow write: if false;
       }
+      match /reviews/{reviewId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
     }
     match /pedagogySourceWatchAttempts/{id} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);

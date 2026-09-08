@@ -8,6 +8,27 @@ import { sourceWatchChange, sourceWatchInterval, sourceWatchUrl } from './source
 
 const configs = 'pedagogySourceWatches', attempts = 'pedagogySourceWatchAttempts';
 const synthetic = () => (admin.app().options.projectId || process.env.GCLOUD_PROJECT) === 'ecoscolaire-staging';
+export const recordPedagogySourceWatchReview = functions.https.onCall(async (raw, context) => {
+  const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId, ['superAdmin', 'owner', 'director']);
+  if (!Number.isInteger(raw?.slot) || raw.slot < 1 || raw.slot > 10 || raw.declarationReceived !== true ||
+      typeof raw.note !== 'string' || !raw.note.trim() || raw.note.length > 1000 || !/^[a-f0-9]{64}$/.test(raw.expectedSha256 || '')) {
+    throw new functions.https.HttpsError('invalid-argument', 'Examen reçu, note et empreinte du fichier requis.');
+  }
+  const db = admin.firestore(), ref = db.collection(configs).doc(schoolId + '--' + raw.slot);
+  return db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(ref), current = snapshot.data();
+    if (!current || current.schoolId !== schoolId) throw new functions.https.HttpsError('not-found', 'Veille introuvable.');
+    if (current.version !== raw.expectedVersion || current.fingerprint?.sha256 !== raw.expectedSha256) throw new functions.https.HttpsError('aborted', 'La source a changé : rechargez avant de consigner son examen.');
+    if (!current.pendingReview || current.status === 'failed') throw new functions.https.HttpsError('failed-precondition', 'Changement en attente et dernier contrôle réussi requis.');
+    const version = current.version + 1;
+    const review = { schoolId, sourceWatchId: ref.id, configurationVersion: current.version, sha256: raw.expectedSha256,
+      note: raw.note.trim(), recordedBy: actor.uid, recordedAt: FieldValue.serverTimestamp(), publicationDecision: 'none', sourceAuthentication: 'not_established_by_watch' };
+    transaction.create(ref.collection('reviews').doc(String(version)), review);
+    transaction.update(ref, { version, pendingReview: false, lastReview: review });
+    audit(transaction, actor, schoolId, 'pedagogy_source_change_review_recorded', 'pedagogySourceWatch', ref.id, { version, sha256: raw.expectedSha256 });
+    return { version };
+  });
+});
 export const savePedagogySourceWatch = functions.https.onCall(async (raw, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, raw?.schoolId, ['superAdmin', 'owner', 'director']);
   if (!Number.isInteger(raw?.slot) || raw.slot < 1 || raw.slot > 10 || typeof raw.enabled !== 'boolean') throw new functions.https.HttpsError('invalid-argument', 'Dix emplacements de veille au maximum.');

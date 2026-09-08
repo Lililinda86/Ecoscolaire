@@ -36,3 +36,16 @@ it('locks a modified scope and requires reload after an uncertain save', async (
   await waitFor(() => expect((screen.getByLabelText('Titre de la source') as HTMLInputElement).value).toBe('Synthetic source'));
   expect(fake.call).toHaveBeenCalledTimes(1);
 });
+it('requires an explicit received review for the current fingerprint', async () => {
+  fake.data[0] = { ...fake.data[0], status: 'file_changed', pendingReview: true, fingerprint: { sha256: 'a'.repeat(64) } };
+  fake.call.mockResolvedValueOnce({ data: { version: 2 } });
+  render(<SourceWatchConfiguration schoolId="synthetic" canEdit />);
+  const button = screen.getByRole('button', { name: 'Consigner l’examen du fichier' }) as HTMLButtonElement;
+  expect(button.disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Note d’examen'), { target: { value: 'Synthetic review only' } });
+  expect(button.disabled).toBe(true);
+  fireEvent.click(screen.getByLabelText('L’examen de cette version du fichier a effectivement été reçu.'));
+  fireEvent.click(button);
+  await waitFor(() => expect(fake.call).toHaveBeenCalledTimes(1));
+  expect(fake.call.mock.calls[0][0]).toMatchObject({ schoolId: 'synthetic', slot: 1, expectedVersion: 1, expectedSha256: 'a'.repeat(64), declarationReceived: true, note: 'Synthetic review only' });
+});

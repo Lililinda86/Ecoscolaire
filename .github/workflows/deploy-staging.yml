@@ -258,6 +258,9 @@ jobs:
       - name: Deploy school fee catalogue and transport plans (Staging only)
         run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:getSchoolFeeCatalog,functions:manageSchoolFee,functions:setStudentTransportPlan --non-interactive
 
+      - name: Deploy source-watch review (Staging only)
+        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:recordPedagogySourceWatchReview --non-interactive
+
       - name: Verify advantage workflow Functions are ACTIVE
         shell: bash
         run: |

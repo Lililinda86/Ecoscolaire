@@ -29,6 +29,22 @@ beforeEach(async () => {
 });
 
 describe('Pedagogy Lot A read matrix and backend-only writes', () => {
+  test('source-watch records are school-scoped and never client-writable', async () => {
+    const paths = ['pedagogySourceWatches/watch-a', 'pedagogySourceWatches/watch-a/versions/1', 'pedagogySourceWatches/watch-a/reviews/2', 'pedagogySourceWatchAttempts/attempt-a'];
+    await env.withSecurityRulesDisabled(async context => {
+      for (const path of paths) await setDoc(doc(context.firestore(), path), { schoolId: 'school-a' });
+    });
+    for (const path of paths) {
+      for (const role of ['owner', 'director', 'secretary']) await assertSucceeds(getDoc(doc(env.authenticatedContext(`pedagogy-${role}`).firestore(), path)));
+      for (const uid of ['pedagogy-owner-b', 'pedagogy-teacher', 'pedagogy-parent']) await assertFails(getDoc(doc(env.authenticatedContext(uid).firestore(), path)));
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+      for (const role of ['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']) {
+        const target = doc(env.authenticatedContext(`pedagogy-${role}`).firestore(), path);
+        await assertFails(updateDoc(target, { pendingReview: false }));
+        await assertFails(deleteDoc(target));
+      }
+    }
+  });
   test('management roles and board viewer can read their school', async () => {
     for (const role of ['owner', 'director', 'secretary', 'boardViewer']) {
       const db = env.authenticatedContext(`pedagogy-${role}`).firestore();
