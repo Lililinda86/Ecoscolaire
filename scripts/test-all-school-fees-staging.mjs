@@ -62,12 +62,13 @@ const denied = promise => assert.rejects(promise, error => error.status === 'PER
 
 try {
   await seed('schools', schoolId, { id: schoolId, name: 'Validation tous frais Staging', academicYear: year, activeAcademicYearId: yearId,
+    feeCatalog: [{ id: 'legacy-test', label: 'Frais historique TEST', amount: 2500, cycles: ['secondary'], active: true }],
     active: true, subscriptionStatus: 'active', studentsCount: 6, studentLimit: 30,
-    classFees: Object.fromEntries(['Maternelle', 'CP', 'Form 1'].map(name => [name, { registration: 15000, tuition: 150000, t1: 60000, t2: 50000, t3: 40000 }])),
+    classFees: Object.fromEntries(['Maternelle Petite Section', 'CP', 'Form 1'].map(name => [name, { registration: 15000, tuition: 150000, t1: 60000, t2: 50000, t3: 40000 }])),
     transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: ['2026-09', '2026-10', '2026-11'] } });
   await seed('academicYears', yearId, { schoolId, name: year, status: 'active', tuitionPaymentDeadlines: { T1: '2026-09-05', T2: '2027-01-10', T3: '2027-04-10' } });
   await makeUser('secretary'); await makeUser('director'); await makeUser('secretary', true);
-  for (const [cycle, name] of [['nursery', 'Maternelle'], ['primary', 'CP'], ['secondary', 'Form 1']]) {
+  for (const [cycle, name] of [['nursery', 'Maternelle Petite Section'], ['primary', 'CP'], ['secondary', 'Form 1']]) {
     const classId = `${schoolId}-${cycle}`;
     await seed('classes', classId, { id: classId, schoolId, name, cycle, level: cycle, academicYearId: yearId });
     for (const pk of [18, 36]) {
@@ -89,6 +90,9 @@ try {
       }
       pass(`${cycle.toUpperCase()} PK${pk}`);
     }
+  }
+  for (const [key, name, active] of [['ms', 'Maternelle Moyenne Section', true], ['gs', 'Maternelle Grande Section', true], ['en', 'Nursery 2', true], ['old', 'Maternelle 2', false]]) {
+    await seed('classes', `${schoolId}-${key}`, { schoolId, name, cycle: 'nursery', academicYearId: yearId, isActive: active });
   }
   const studentId = students.primary18;
   await denied(call('getStudentFinancialAccount', { studentId, academicYear: year }, 'foreign'));
@@ -168,6 +172,22 @@ try {
     allocations: [{ type: 'tuition', installment: 'T3', amount: 1000 }] });
 
   browser = await chromium.launch();
+  const previewContext = await browser.newContext();
+  const previewPage = await previewContext.newPage();
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) await previewPage.route(`${origin}/**`, route => route.continue({ headers: { ...route.request().headers(),
+    'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
+  await previewPage.goto(`${origin}/#/login`);
+  await previewPage.getByTestId('login-email').fill(users.secretary.email);
+  await previewPage.getByTestId('login-password').fill(users.secretary.password);
+  await previewPage.getByTestId('login-submit').click();
+  await previewPage.getByTestId('sidebar').waitFor({ timeout: 45000 });
+  await previewPage.goto(`${origin}/#/settings`);
+  const transportCard = previewPage.getByRole('region', { name: 'Transport', exact: true });
+  await expect(transportCard).toContainText(/4\s*000\s*FCFA/);
+  await expect(transportCard).toContainText(/5\s*000\s*FCFA/);
+  await previewPage.screenshot({ path: 'all-fees-transport-defaults.png', fullPage: true });
+  await previewContext.close();
+  pass('TRANSPORT DEFAULT 4000 / 5000 VISIBLE WITHOUT STORED PK RATES');
   const schoolBeforeRevision = (await db.collection('schools').doc(schoolId).get()).data();
   const revised = { globalFees: { feeT1: 0, feeT2: 0, feeT3: 0, feeTransport: 0, feeUniforms: 0 },
     classFees: structuredClone(schoolBeforeRevision.classFees),
@@ -304,18 +324,20 @@ try {
   await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Finances & tarifs', exact: true }).click();
-  const createFee = settingsPage.getByText('Créer un nouveau frais', { exact: true });
-  await createFee.click();
+  await expect(settingsPage.getByRole('button', { name: 'Ajouter — Tenues', exact: true })).toBeVisible();
+  await settingsPage.getByRole('button', { name: 'Ajouter — Autres frais', exact: true }).click();
   const feeType = settingsPage.getByLabel('Type de frais');
   for (const option of ['uniform', 'sports_uniform', 'ceremony_uniform', 'other_uniform', 'activity_kit', 'event', 'excursion',
     'school_trip', 'cultural_activity', 'photo', 'supplies', 'other']) await expect(feeType.locator(`option[value="${option}"]`)).toHaveCount(1);
   const targetClasses = settingsPage.getByRole('group', { name: 'Classes concernées', exact: true });
   const targetStudents = settingsPage.getByRole('group', { name: 'Élèves concernés', exact: true });
   await settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true }).getByRole('checkbox', { name: 'Maternelle', exact: true }).check();
-  await expect(targetClasses.getByRole('checkbox')).toHaveCount(2);
+  await expect(targetClasses.getByRole('checkbox')).toHaveCount(5);
+  for (const name of ['Maternelle Petite Section', 'Maternelle Moyenne Section', 'Maternelle Grande Section', 'Nursery 2']) await expect(targetClasses.getByRole('checkbox', { name, exact: true })).toBeVisible();
+  await expect(targetClasses.getByRole('checkbox', { name: 'Maternelle 2', exact: true })).toHaveCount(0);
   await expect(targetClasses.getByRole('checkbox', { name: 'CP', exact: true })).toHaveCount(0);
   await settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true }).getByRole('checkbox', { name: 'Primaire', exact: true }).check();
-  await expect(targetClasses.getByRole('checkbox')).toHaveCount(3);
+  await expect(targetClasses.getByRole('checkbox')).toHaveCount(6);
   await targetClasses.getByRole('checkbox', { name: 'CP', exact: true }).check();
   await expect(targetStudents.getByRole('checkbox')).toHaveCount(4);
   await targetStudents.getByRole('searchbox').fill('AF-NEW');
@@ -328,9 +350,9 @@ try {
   await feeType.selectOption('other');
   await settingsPage.getByLabel('Précisez le libellé du frais').fill('Excursion cascade TEST');
   await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('7500');
-  await settingsPage.getByLabel('Obligatoire pour les élèves concernés').uncheck();
+  await targetStudents.getByRole('checkbox', { name: 'ALLFEES primary PK18 — AF-primary-18', exact: true }).check();
   await settingsPage.getByRole('button', { name: 'Vérifier avant publication', exact: true }).click();
-  await expect(settingsPage.getByRole('region', { name: 'Résumé avant publication' })).toContainText('Élèves concernés : 3');
+  await expect(settingsPage.getByRole('region', { name: 'Résumé avant publication' })).toContainText('Élèves concernés : 1');
   for (const width of [360, 768, 1440]) {
     await settingsPage.setViewportSize({ width, height: 1000 });
     if (width <= 640) {
@@ -341,15 +363,60 @@ try {
     assert.equal(await settingsPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
     await settingsPage.screenshot({ path: `all-fees-cascade-${width}.png`, fullPage: true });
   }
+  const ledgerBeforePublication = (await db.collection('payments').where('schoolId', '==', schoolId).get()).docs.map(d => d.id).sort();
   await settingsPage.getByRole('button', { name: 'Publier le frais', exact: true }).click();
   await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.some(f => f.label === 'Excursion cascade TEST')).toBe(true);
   const published = (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.find(f => f.label === 'Excursion cascade TEST');
   assert.deepEqual(published.cycles, ['primary']); assert.deepEqual(published.classIds, [`${schoolId}-primary`]);
-  assert.equal((await account(studentId)).lines.some(l => l.feeId === published.id), false);
-  await call('manageSchoolFee', { action: 'assign', feeId: published.id, studentId }, 'director');
-  assert.equal((await account(studentId)).lines.find(l => l.feeId === published.id).label, 'Excursion cascade TEST');
-  pass('CYCLE CLASS STUDENT CASCADE / PUBLICATION REVIEW / OPTIONAL SUBSCRIPTION');
-  await createFee.click();
+  assert.deepEqual(published.studentIds, [studentId]);
+  assert.equal((await account(studentId)).lines.find(l => l.feeId === published.id).grossExpectedAmount, 7500);
+  for (const otherStudent of [students.primary36, newStudentId, students.nursery18, students.secondary18]) {
+    assert.equal((await account(otherStudent)).lines.some(l => l.feeId === published.id), false);
+  }
+  assert.deepEqual((await db.collection('payments').where('schoolId', '==', schoolId).get()).docs.map(d => d.id).sort(), ledgerBeforePublication);
+  await page.goto(`${origin}/#/payments`);
+  await page.getByTestId('open-cash-payment').click();
+  await page.getByTestId('cash-payment-student').selectOption(studentId);
+  const createdAmount = page.getByLabel('Montant reçu pour Excursion cascade TEST', { exact: true });
+  await createdAmount.waitFor({ state: 'attached', timeout: 30000 });
+  const createdGroup = createdAmount.locator('xpath=ancestor::details[contains(@class,"account-fee-group")]');
+  if (await createdGroup.getAttribute('open') === null) await createdGroup.locator('summary').first().click();
+  await createdAmount.fill('2500');
+  await page.getByTestId('cash-payment-submit').click();
+  await page.getByRole('heading', { name: 'Encaissement enregistré ✓', exact: true }).waitFor({ timeout: 30000 });
+  await expect(page.locator('.student-account-receipt')).toContainText('Excursion cascade TEST');
+  const createdBalance = (await account(studentId)).lines.find(l => l.feeId === published.id);
+  assert.equal(createdBalance.grossExpectedAmount, 7500);
+  assert.equal(createdBalance.previousPaid, 2500); assert.equal(createdBalance.remainingBalance, 5000);
+  await page.screenshot({ path: 'all-fees-created-fee-partial-payment.png', fullPage: true });
+  pass('UI CREATE / CYCLE / CLASS / INDIVIDUAL STUDENT / PUBLISH / ENCAISSEMENT / 7500 / PAY 2500 / REMAINDER 5000');
+  const ledgerAfterPayment = (await db.collection('payments').where('schoolId', '==', schoolId).get()).docs.map(d => ({ id: d.id, data: d.data() })).sort((a,b) => a.id.localeCompare(b.id));
+  const receiptsAfterPayment = (await db.collection('receipts').where('schoolId', '==', schoolId).get()).docs.map(d => ({ id: d.id, data: d.data() })).sort((a,b) => a.id.localeCompare(b.id));
+  const publishedRow = settingsPage.locator('.school-fee-list li').filter({ has: settingsPage.getByText('Excursion cascade TEST', { exact: true }) });
+  await publishedRow.getByRole('button', { name: 'Modifier le frais', exact: true }).click();
+  await settingsPage.getByLabel('Précisez le libellé du frais').fill('Excursion révisée TEST');
+  await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('9000');
+  await settingsPage.getByLabel('Description', { exact: true }).fill('Description modifiée depuis Staging');
+  await settingsPage.getByLabel('Échéance éventuelle').fill('2027-05-20');
+  await settingsPage.getByLabel('Motif de la modification du frais').fill('Révision complète isolée');
+  await settingsPage.getByRole('button', { name: 'Vérifier avant publication', exact: true }).click();
+  await settingsPage.getByRole('button', { name: 'Publier les modifications', exact: true }).click();
+  const revisedRow = settingsPage.locator('.school-fee-list li').filter({ has: settingsPage.getByText('Excursion révisée TEST', { exact: true }) });
+  await expect(revisedRow).toContainText('Description modifiée depuis Staging');
+  assert.deepEqual((await account(studentId)).lines.find(l => l.feeId === published.id), createdBalance);
+  await revisedRow.getByRole('button', { name: 'Désactiver les nouvelles affectations', exact: true }).click();
+  await expect(revisedRow).toContainText('INACTIF');
+  assert.deepEqual((await account(studentId)).lines.find(l => l.feeId === published.id), createdBalance);
+  const legacyBefore = (await account(students.secondary18)).lines.find(l => l.feeId === 'legacy-test');
+  const legacyRow = settingsPage.locator('.school-fee-list li').filter({ has: settingsPage.getByText('Frais historique TEST', { exact: true }) });
+  await legacyRow.getByRole('button', { name: 'Désactiver les nouvelles affectations', exact: true }).click();
+  await expect(legacyRow).toContainText('INACTIF');
+  const legacyAfter = (await account(students.secondary18)).lines.find(l => l.feeId === 'legacy-test');
+  assert.equal(legacyAfter.grossExpectedAmount, legacyBefore.grossExpectedAmount);
+  assert.equal(legacyAfter.remainingBalance, legacyBefore.remainingBalance);
+  assert.deepEqual((await db.collection('payments').where('schoolId', '==', schoolId).get()).docs.map(d => ({ id: d.id, data: d.data() })).sort((a,b) => a.id.localeCompare(b.id)), ledgerAfterPayment);
+  assert.deepEqual((await db.collection('receipts').where('schoolId', '==', schoolId).get()).docs.map(d => ({ id: d.id, data: d.data() })).sort((a,b) => a.id.localeCompare(b.id)), receiptsAfterPayment);
+  pass('FULL CATALOGUE EDIT / ARCHIVE UI / LEGACY DEBT PRESERVED / UNEXPECTED PAYMENT AND RECEIPT WRITES 0');
   for (const label of ['Établissement', 'Cycles & classes', 'Année académique', 'Transport', 'Documents & reçus', 'Politiques', 'Rôles & validations', 'Finances & tarifs']) {
     await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: label, exact: true }).click();
   }

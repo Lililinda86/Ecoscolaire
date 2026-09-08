@@ -485,7 +485,8 @@ const FullSettings: React.FC = () => {
         </button>
       </div>
 
-        <nav className="settings-sections" aria-label="Sections des paramètres">{[['institution', 'Établissement'], ['cycles-classes', 'Cycles & classes'], ['academic-calendar', 'Année académique'], ['financial-tariff-version', 'Finances & tarifs'], ['transport-configuration', 'Transport'], ['documents-receipts', 'Documents & reçus'], ['school-policies', 'Politiques'], ['roles-validations', 'Rôles & validations']].map(([id, label]) => <button type="button" key={id} onClick={() => {
+        <p>Administration : les actions financières sont accessibles à la direction et au propriétaire. Chaque publication conserve les obligations déjà établies. Les informations d’établissement sont enregistrées par le propriétaire.</p>
+        <nav className="settings-sections" aria-label="Sections des paramètres">{[['institution', 'Établissement'], ['cycles-classes', 'Cycles & classes'], ['academic-calendar', 'Année académique'], ['fee-catalog-title', 'Finances & tarifs'], ['transport-configuration', 'Transport'], ['documents-receipts', 'Documents & reçus'], ['school-policies', 'Politiques'], ['roles-validations', 'Rôles & validations']].map(([id, label]) => <button type="button" key={id} onClick={() => {
           const target = document.getElementById(id);
           let parent = target?.parentElement;
           while (parent) { if (parent instanceof HTMLDetailsElement) parent.open = true; parent = parent.parentElement; }
@@ -830,7 +831,7 @@ const FullSettings: React.FC = () => {
         </div>
       </details>
 
-      <details className="card"><summary>Finances &amp; tarifs</summary>
+      <details className="card" open><summary>Finances &amp; tarifs</summary>
       <TuitionDeadlineSettings
         academicYearName={activeAcademicYear?.name || ''}
         value={draftTuitionDeadlines}
@@ -1020,8 +1021,9 @@ const FullSettings: React.FC = () => {
 
       <details className="card" style={{ marginTop: '2rem' }}><summary>Classes</summary>
         <h2>Gestion des classes</h2>
-        <p>Les classes, leurs cycles, sections et matières sont configurés dans le module Classes. Les données historiques restent conservées.</p>
+        <p>Gérez les classes, cycles et sections dans Classes. Configurez les matières et leurs affectations dans Programmes par classe. Les données historiques restent conservées.</p>
         <button type="button" onClick={() => navigate('/classes')}>Ouvrir la gestion des classes</button>
+        <button type="button" onClick={() => navigate('/subjects-program')}>Configurer les matières par classe</button>
         <ul>{sortClasses(db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId))).map(c => <li key={c.id}>{getClassOptionLabel(c, db.classes)}</li>)}</ul>
       </details>
 

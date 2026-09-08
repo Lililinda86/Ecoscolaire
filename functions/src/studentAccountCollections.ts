@@ -228,15 +228,28 @@ export const buildAccountLines = async (
   for (const fee of assigned.fees) {
     const key = `other:${fee.id}`;
     const paid = payments.reduce((sum, payment) => collectionInternals.safeAdd(sum, paymentLineAmount(payment, key), 'catalogFeePaid'), 0);
-    const quote = simpleQuote(fee.amount, paid);
+    const frozen = snapshotsFrom(base.finance)[key];
+    const quote = simpleQuote(frozen?.grossExpectedAmount ?? fee.amount, paid);
     const today = collectionInternals.getDoualaDate();
-    const dueDate = fee.dueDate;
+    const dueDate = frozen ? frozen.originalDueDate : fee.dueDate;
     const overdue = !!dueDate && dueDate < today && quote.remainingBalance > 0;
-    lines.push({ ...quote, key, type: 'other', label: fee.label, category: fee.category, installment: null, period: null, feeId: fee.id,
+    lines.push({ ...quote, key, type: 'other', label: String(frozen?.label || fee.label), category: String(frozen?.category || fee.category), installment: null, period: null, feeId: fee.id,
       tariffVersion: String(fee.versionId || fee.id),
       originalDueDate: dueDate, effectiveDueDate: dueDate, nextDueDate: quote.remainingBalance > 0 ? dueDate : null,
       overdue, dueStatus: quote.remainingBalance === 0 ? 'PAID' : !dueDate ? 'UNCONFIGURED' : overdue ? 'OVERDUE' : dueDate > today ? 'NOT_DUE' : 'DUE_TODAY',
       selectable: quote.remainingBalance > 0 });
+  }
+  // Archived or retargeted catalogue entries cannot hide an established historical debt.
+  for (const [key, frozen] of Object.entries(snapshotsFrom(base.finance))) {
+    if (!key.startsWith('other:') || lines.some(line => line.key === key)) continue;
+    const paid = payments.reduce((sum, payment) => collectionInternals.safeAdd(sum, paymentLineAmount(payment, key), 'historicalCatalogPaid'), 0);
+    const quote = simpleQuote(frozen.grossExpectedAmount, paid);
+    lines.push({ ...quote, key, type: 'other', label: String(frozen.label || key), category: String(frozen.category || 'other'),
+      installment: null, period: null, feeId: key.slice(6), selectable: quote.remainingBalance > 0,
+      originalDueDate: frozen.originalDueDate, effectiveDueDate: frozen.originalDueDate,
+      nextDueDate: quote.remainingBalance > 0 ? frozen.originalDueDate : null,
+      overdue: !!frozen.originalDueDate && frozen.originalDueDate < collectionInternals.getDoualaDate() && quote.remainingBalance > 0,
+      dueStatus: quote.remainingBalance === 0 ? 'PAID' : !frozen.originalDueDate ? 'UNCONFIGURED' : frozen.originalDueDate < collectionInternals.getDoualaDate() ? 'OVERDUE' : frozen.originalDueDate > collectionInternals.getDoualaDate() ? 'NOT_DUE' : 'DUE_TODAY' });
   }
   return { lines, base, pendingFees: assigned.pending };
 };
