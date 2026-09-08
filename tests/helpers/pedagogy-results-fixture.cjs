@@ -35,6 +35,7 @@ async function seedResultsFixture(db, prefix) {
   }
   put('weeklyAssessments', f.assessmentId, { schoolId: f.schoolId, academicYearId: f.academicYearId, classId: f.classId, className: 'CE1', weekId: f.weekId, weekStartDate: '2026-08-31', weekEndDate: '2026-09-04', fridayDate: '2026-09-04', title: 'Synthetic weekly assessment', status: 'teacher_validated', generationStatus: 'succeeded', generationVersion: 1, contentRevision: 0, teacherValidated: true, teacherValidations: decisions, sourceChecksum: 'synthetic-source-checksum', sourcePreparationVersions: versions, sourcePreparationIds: Object.keys(versions), expectedPreparationCount: 2, validatedPreparationCount: 2, itemCount: 2, totalPoints: 20, durationMinutes: 60, sections, coveredSubjects: sections.map(item => ({ id: item.subjectId, name: item.title })), missingSubjects: [], policySnapshot: { version: 1, assessmentMode: 'numeric', totalPoints: 20, stage: 'primary' } });
   await batch.commit();
+  console.log('LOT_D_SYNTHETIC_SCOPE=' + prefix);
   return { ...f, async cleanup() {
     for (const name of ['evaluations', 'grades', 'pedagogyObservations', 'pedagogyObservationBatches', 'pedagogyRemediations', 'pedagogyRemediationRequests', 'pedagogyAssessmentPublications', 'pedagogyResultBatches', 'audit_logs']) {
       for (const document of (await db.collection(name).where('schoolId', '==', f.schoolId).get()).docs) {
@@ -44,7 +45,15 @@ async function seedResultsFixture(db, prefix) {
       }
     }
     const cleanup = db.batch(); [...manifest].forEach(path => cleanup.delete(db.doc(path))); await cleanup.commit();
-    assert.ok((await Promise.all([...manifest].map(path => db.doc(path).get()))).every(item => !item.exists));
+    // One bounded batch read avoids dozens of concurrent REST batchGet requests.
+    // Retry verification reads only; never replay writes or widen the manifest.
+    let verified;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { verified = await db.getAll(...[...manifest].map(path => db.doc(path))); break; }
+      catch (error) { if (attempt === 2) throw error; await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); }
+    }
+    assert.ok(verified.every(item => !item.exists));
+    console.log('LOT_D_EXACT_FIRESTORE_CLEANUP_VERIFIED=' + prefix);
   } };
 }
 module.exports = { seedResultsFixture };

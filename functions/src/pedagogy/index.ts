@@ -44,32 +44,7 @@ const schoolData = (snap: admin.firestore.DocumentSnapshot, schoolId: string, la
   return value;
 };
 
-export const adoptCurriculumProgram = functions.https.onCall(async (data, context) => {
-  const { actor, schoolId } = await requirePedagogyActor(context, data?.schoolId);
-  const academicYearId = requireId(data?.academicYearId, 'academicYearId');
-  const catalogLevelId = requireId(data?.catalogLevelId, 'catalogLevelId');
-  const curriculumProgramId = requireId(data?.curriculumProgramId, 'curriculumProgramId');
-  const ref = db().collection('schoolCurriculumAdoptions').doc(adoptionId(schoolId, academicYearId, catalogLevelId));
-  const [yearSnap, programSnap] = await Promise.all([
-    db().collection('academicYears').doc(academicYearId).get(),
-    db().collection('curriculumPrograms').doc(curriculumProgramId).get()
-  ]);
-  const year = schoolData(yearSnap, schoolId, 'Année scolaire');
-  if (!isActive(year)) throw new functions.https.HttpsError('failed-precondition', 'Année scolaire inactive.');
-  if (!programSnap.exists || programSnap.data()?.status !== 'published') throw new functions.https.HttpsError('failed-precondition', 'Programme national non publié.');
-  await db().runTransaction(async transaction => {
-    const previous = await transaction.get(ref);
-    transaction.set(ref, {
-      id: ref.id, schoolId, academicYearId, catalogLevelId, curriculumProgramId, status: 'active',
-      adoptedAt: FieldValue.serverTimestamp(), adoptedBy: actor.uid,
-      createdAt: previous.exists ? previous.data()?.createdAt : FieldValue.serverTimestamp(),
-      createdBy: previous.exists ? previous.data()?.createdBy : actor.uid,
-      updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
-    }, { merge: true });
-    audit(transaction, actor, schoolId, 'CURRICULUM_PROGRAM_ADOPTED', 'schoolCurriculumAdoption', ref.id, { academicYearId, catalogLevelId, curriculumProgramId });
-  });
-  return { adoptionId: ref.id, curriculumProgramId };
-});
+export { adoptCurriculumProgram } from './curriculumAdoption';
 
 export const ensureTeachingWeeks = functions.https.onCall(async (data, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, data?.schoolId);

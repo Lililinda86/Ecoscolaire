@@ -95,6 +95,10 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     await expect(page.getByRole('combobox', { name: 'Élève suivi', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Enregistrer la rectification reçue', exact: true }).click();
     await expect(page.getByText(/rectifiée, exclue des preuves courantes/)).toBeVisible();
+    const objectiveSummary = page.getByRole('region', { name: 'Synthèse des objectifs observés' });
+    await expect(objectiveSummary.getByRole('heading', { name: 'Synthetic objective', exact: true })).toBeVisible();
+    await expect(objectiveSummary.getByText(/Acquis dans la situation observée/)).toBeVisible();
+    await expect(objectiveSummary.getByText(/1 observation\(s\) non rectifiée\(s\)/)).toBeVisible();
     const prior = (await db.doc(`pedagogyObservations/${observationId}`).get()).data()!;
     expect(prior.state).toBe('developing'); expect(prior.supersededBy).toBeTruthy();
     const corrected = (await db.doc(`pedagogyObservations/${prior.supersededBy}`).get()).data()!;

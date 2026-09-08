@@ -7,6 +7,7 @@ import { getClassOptionLabel } from '../../../utils/classCatalog';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { useScopedResource } from '../hooks/useScopedResource';
 import { readBoundedDocuments } from '../services/boundedQuery';
+import { ObjectiveEvidenceSummary } from '../components/ObjectiveEvidenceSummary';
 
 type Row = { id: string; [key: string]: unknown };
 type Evidence = { kind: 'grade' | 'observation'; id: string; label: string; date: string; subjectId: string };
@@ -60,6 +61,7 @@ function StudentProfile({ schoolId, academicYearId, classId, studentId, teachers
   return <section className="pedagogy-card">
     <p>Compétences : données insuffisantes en l’absence de rattachement pédagogique explicite. Les notes ci-dessous sont les notes canoniques, pas un registre parallèle. « Acquis » dans une observation décrit cette situation, pas un acquis durable.</p>
     {resource.loading && <p>Chargement du dossier…</p>}{resource.error && <p role="alert">{resource.error}</p>}
+    {!resource.loading && !resource.error && <ObjectiveEvidenceSummary rows={resource.data.observations} scope={{ schoolId, academicYearId, classId, studentId }} />}
     <h2>Preuves et historique d’observation</h2>
     {resource.data.observations.map(item => <article key={item.id}><p>{String(item.date)} · {String(item.objective)} · {stateLabels[String(item.state)]} · {String(item.comment)}{item.supersededBy ? ' — rectifiée, exclue des preuves courantes' : ''}</p>{!item.supersededBy && Boolean(item.preparationId && item.objective && item.studentId) && <ObservationCorrectionForm schoolId={schoolId} academicYearId={academicYearId} classId={classId} original={item} teachers={teachers} onSaved={resource.refresh} />}</article>)}
     {resource.data.grades.map(item => <p key={item.id}>{String(item.subjectId)} · {item.resultStatus === 'scored' ? `${item.score}/${item.maxScore}` : stateLabels[String(item.resultStatus)] || 'Statut non calculable'} · version {String(item.version)}</p>)}

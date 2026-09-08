@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch, codex/pedagogy-private-ai-validation, codex/pedagogy-secret-binding-resume, codex/pedagogy-watch-resume, codex/pedagogy-exam-bank-resume]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch, codex/pedagogy-private-ai-validation, codex/pedagogy-secret-binding-resume, codex/pedagogy-watch-resume, codex/pedagogy-exam-bank-resume, codex/pedagogy-curriculum-review-resume]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -123,7 +123,7 @@ jobs:
       - name: Isolated disposable emulator secret override
         run: node scripts/prepare-pedagogy-emulator.mjs demo-ecoscolaire
       - name: Teaching confirmation Functions authorization and concurrency
-        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs && node tests/functions/test-pedagogy-source-watch-emulator.cjs"
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs && node tests/functions/test-pedagogy-source-watch-emulator.cjs && node tests/functions/test-pedagogy-adoption-emulator.cjs"
       - run: npx playwright install --with-deps chromium
       - name: Synthetic bilingual A4 print regression
         env:
