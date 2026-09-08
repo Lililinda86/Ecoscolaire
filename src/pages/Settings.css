@@ -16,3 +16,4 @@
   .financial-settings-page .card > form { flex-wrap: wrap; }
   .financial-settings-page input, .financial-settings-page select { max-width: 100%; min-width: 0; }
 }
+.financial-settings-page > details > summary { cursor: pointer; min-height: 44px; font-weight: 600; padding: .75rem 0; } .financial-settings-page > details[open] > summary { margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); } .settings-sections { flex-wrap: wrap; }

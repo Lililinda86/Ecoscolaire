@@ -55,6 +55,15 @@ const students = {};
     await call('manageSchoolFee', { action: 'create', feeId, fee });
     await assert.rejects(call('manageSchoolFee', { action: 'create', feeId, fee: { ...fee, amount: 1 } }), e => e.code === 'already-exists');
   }
+  const scopeFee = { label: 'Scope test', category: 'other', amount: 7500, description: '', academicYear, mandatory: false, dueDate: null, cycles: ['nursery'], classIds: [`allfees-class-primary-${suffix}`], studentIds: [] };
+  await assert.rejects(call('manageSchoolFee', { action: 'create', feeId: `bad-cycle-${suffix}`, fee: scopeFee }), e => e.code === 'failed-precondition');
+  await assert.rejects(call('manageSchoolFee', { action: 'create', feeId: `bad-student-${suffix}`, fee: { ...scopeFee, cycles: ['primary'], studentIds: [students.nursery18] } }), e => e.code === 'failed-precondition');
+  await db.collection('students').doc(students.primary36).update({ schoolingStatus: 'inactive' });
+  await assert.rejects(call('manageSchoolFee', { action: 'create', feeId: `inactive-${suffix}`, fee: { ...scopeFee, cycles: ['primary'], studentIds: [students.primary36] } }), e => e.code === 'failed-precondition');
+  await db.collection('students').doc(students.primary36).update({ schoolingStatus: 'active' });
+  await db.collection('classes').doc(`allfees-class-primary-${suffix}`).update({ isActive: false });
+  await assert.rejects(call('manageSchoolFee', { action: 'create', feeId: `inactive-class-${suffix}`, fee: { ...scopeFee, cycles: ['primary'] } }), e => e.code === 'failed-precondition');
+  await db.collection('classes').doc(`allfees-class-primary-${suffix}`).update({ isActive: true });
   let account = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
   assert.equal(account.lines.filter(l => l.type === 'other').length, 13);
   const excursionId = `fee-excursion-${suffix}`;

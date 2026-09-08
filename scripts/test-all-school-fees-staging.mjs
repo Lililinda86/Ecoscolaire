@@ -302,12 +302,57 @@ try {
   await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
   await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
+  await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Finances & tarifs', exact: true }).click();
   const createFee = settingsPage.getByText('Créer un nouveau frais', { exact: true });
   await createFee.click();
   const feeType = settingsPage.getByLabel('Type de frais');
   for (const option of ['uniform', 'sports_uniform', 'ceremony_uniform', 'other_uniform', 'activity_kit', 'event', 'excursion',
     'school_trip', 'cultural_activity', 'photo', 'supplies', 'other']) await expect(feeType.locator(`option[value="${option}"]`)).toHaveCount(1);
+  const targetClasses = settingsPage.getByRole('group', { name: 'Classes concernées', exact: true });
+  const targetStudents = settingsPage.getByRole('group', { name: 'Élèves concernés', exact: true });
+  await settingsPage.getByRole('checkbox', { name: 'Maternelle', exact: true }).check();
+  await expect(targetClasses.getByRole('checkbox')).toHaveCount(2);
+  await expect(targetClasses.getByRole('checkbox', { name: 'CP', exact: true })).toHaveCount(0);
+  await settingsPage.getByRole('checkbox', { name: 'Primaire', exact: true }).check();
+  await expect(targetClasses.getByRole('checkbox')).toHaveCount(3);
+  await targetClasses.getByRole('checkbox', { name: 'CP', exact: true }).check();
+  await expect(targetStudents.getByRole('checkbox')).toHaveCount(4);
+  await targetStudents.getByRole('searchbox').fill('AF-NEW');
+  await expect(targetStudents.getByRole('checkbox')).toHaveCount(2);
+  await targetStudents.getByRole('searchbox').fill('');
+  await settingsPage.getByRole('checkbox', { name: 'Maternelle', exact: true }).uncheck();
+  await settingsPage.getByRole('checkbox', { name: 'Secondaire', exact: true }).check();
+  await expect(targetClasses.getByRole('checkbox')).toHaveCount(3);
+  await settingsPage.getByRole('checkbox', { name: 'Secondaire', exact: true }).uncheck();
+  await feeType.selectOption('other');
+  await settingsPage.getByLabel('Précisez le libellé du frais').fill('Excursion cascade TEST');
+  await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('7500');
+  await settingsPage.getByLabel('Obligatoire pour les élèves concernés').uncheck();
+  await settingsPage.getByRole('button', { name: 'Vérifier avant publication', exact: true }).click();
+  await expect(settingsPage.getByRole('region', { name: 'Résumé avant publication' })).toContainText('Élèves concernés : 3');
+  for (const width of [360, 768, 1440]) {
+    await settingsPage.setViewportSize({ width, height: 1000 });
+    if (width <= 640) {
+      const sidebar = settingsPage.getByTestId('sidebar');
+      if ((await sidebar.getAttribute('class')).includes('sidebar-open')) await sidebar.locator('.sidebar-close-button').click();
+      await expect(sidebar).not.toBeInViewport();
+    }
+    assert.equal(await settingsPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await settingsPage.screenshot({ path: `all-fees-cascade-${width}.png`, fullPage: true });
+  }
+  await settingsPage.getByRole('button', { name: 'Publier le frais', exact: true }).click();
+  await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.some(f => f.label === 'Excursion cascade TEST')).toBe(true);
+  const published = (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.find(f => f.label === 'Excursion cascade TEST');
+  assert.deepEqual(published.cycles, ['primary']); assert.deepEqual(published.classIds, [`${schoolId}-primary`]);
+  assert.equal((await account(studentId)).lines.some(l => l.feeId === published.id), false);
+  await call('manageSchoolFee', { action: 'assign', feeId: published.id, studentId }, 'director');
+  assert.equal((await account(studentId)).lines.find(l => l.feeId === published.id).label, 'Excursion cascade TEST');
+  pass('CYCLE CLASS STUDENT CASCADE / PUBLICATION REVIEW / OPTIONAL SUBSCRIPTION');
   await createFee.click();
+  for (const label of ['Établissement', 'Cycles & classes', 'Année académique', 'Transport', 'Documents & reçus', 'Politiques', 'Rôles & validations', 'Finances & tarifs']) {
+    await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: label, exact: true }).click();
+  }
+  pass('EXISTING PARAMETERS SECTIONS ACCESSIBLE');
   await settingsPage.getByLabel('PK14 à PK33 — FCFA / mois').fill('4600');
   await settingsPage.getByLabel('Motif de la modification tarifaire').fill('Validation UI de la publication prospective');
   settingsPage.once('dialog', dialog => dialog.accept());

@@ -1,3 +1,4 @@
+import { activeFeeClass, activeFeeStudent, feeClassCycle } from './feeTargeting';
 import { publishFinancialTariffs } from './financialTariffConfiguration';
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
@@ -25,7 +26,7 @@ export const schoolFees = (school: Data): Data[] => Array.isArray(school.feeCata
     ? Object.entries(school.feeCatalog as Data).map(([key, value]) => ({ ...(value as Data), id: key })) : [];
 
 export const appliesToStudent = (fee: SchoolFee, student: Data, classData: Data, year: string): boolean =>
-  fee.academicYear === year && fee.active &&
+  fee.academicYear === year && fee.active && student.schoolingStatus !== 'inactive' && student.isActive !== false && student.active !== false && student.status !== 'inactive' && classData.isActive !== false &&
   (!fee.classIds.length || fee.classIds.includes(String(student.classId))) &&
   (!fee.cycles.length || fee.cycles.includes(resolveCanonicalClassCycle(classData))) &&
   (!fee.studentIds.length || fee.studentIds.includes(String(student.id)));
@@ -78,6 +79,21 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       if (cycles.some(c => !['nursery', 'primary', 'secondary'].includes(c))) throw fail('Cycle invalide.');
       const targets = await Promise.all([...classIds.map(c => tx.get(db.collection('classes').doc(c))), ...studentIds.map(s => tx.get(db.collection('students').doc(s)))]);
       if (targets.some(s => !s.exists || s.data()?.schoolId !== schoolId)) throw new functions.https.HttpsError('permission-denied', 'Cible hors établissement.');
+      const yearId = school.data()?.activeAcademicYearId;
+      const selectedClasses = targets.slice(0, classIds.length);
+      for (const target of selectedClasses) {
+        const cls = { ...target.data(), id: target.id, name: String(target.data()?.name || '') };
+        if (!activeFeeClass(cls, schoolId, yearId) || (cycles.length > 0 && !cycles.includes(feeClassCycle(cls)))) throw fail('Classe inactive, année ou cycle incompatible.');
+      }
+      for (const target of targets.slice(classIds.length)) {
+        const student = { ...target.data(), id: target.id };
+        if (!activeFeeStudent(student, schoolId, yearId) || (classIds.length > 0 && !classIds.includes(String(target.data()?.classId)))) throw fail('Élève inactif, année ou classe incompatible.');
+        const classId = id(target.data()?.classId);
+        const cls = selectedClasses.find(c => c.id === classId) || await tx.get(db.collection('classes').doc(classId));
+        const classData = { ...cls.data(), id: cls.id, name: String(cls.data()?.name || '') };
+        if (!cls.exists || !activeFeeClass(classData, schoolId, yearId) || (cycles.length > 0 && !cycles.includes(feeClassCycle(classData)))) throw fail('Classe élève incompatible.');
+      }
+      if (source.recurrence !== undefined && !['one_off', 'recurring'].includes(source.recurrence)) throw fail('Périodicité invalide.');
       if (typeof source.label !== 'string' || !source.label.trim() || source.label.length > 120 || typeof source.description !== 'string' || source.description.length > 500) throw fail('Nom ou description invalide.');
       if (!Number.isSafeInteger(source.amount) || source.amount <= 0 || typeof source.mandatory !== 'boolean') throw fail('Montant ou caractère obligatoire invalide.');
       const categories = ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other'];
@@ -85,7 +101,7 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       const dueDate = source.dueDate || null;
       if (dueDate !== null && (typeof dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(Date.parse(dueDate)) || new Date(dueDate).toISOString().slice(0, 10) !== dueDate)) throw fail('Échéance invalide.');
       const fee: SchoolFee = { id: feeId, schemaVersion: 2, label: source.label.trim(), description: source.description.trim(), category: source.category,
-        amount: source.amount, academicYear: year, mandatory: source.mandatory, active: true, dueDate, classIds, cycles, studentIds };
+        amount: source.amount, academicYear: year, mandatory: source.mandatory, active: true, dueDate, classIds, cycles, studentIds, ...(source.recurrence ? { recurrence: source.recurrence } : {}) };
       if (existing) {
         if (JSON.stringify(existing) === JSON.stringify(fee)) return { feeId, replay: true };
         throw new functions.https.HttpsError('already-exists', 'Identifiant déjà utilisé : créer une nouvelle version.');
@@ -133,6 +149,7 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       const student = await tx.get(db.collection('students').doc(studentId));
       if (!student.exists || student.data()?.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Élève hors établissement.');
       const data = { ...student.data(), id: studentId };
+      if (!activeFeeStudent(data, schoolId, school.data()?.activeAcademicYearId)) throw fail('Élève actif de l’année courante requis.');
       const classSnap = await tx.get(db.collection('classes').doc(id(student.data()?.classId)));
       if (!classSnap.exists || classSnap.data()?.schoolId !== schoolId || !appliesToStudent(fee, data, classSnap.data() || {}, String(school.data()?.academicYear))) throw fail('Frais non applicable à cet élève.');
       const yearSnap = await tx.get(db.collection('academicYears').doc(id(student.data()?.academicYearId)));
