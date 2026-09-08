@@ -64,7 +64,7 @@ try {
   await seed('schools', schoolId, { id: schoolId, name: 'Validation tous frais Staging', academicYear: year, activeAcademicYearId: yearId,
     feeCatalog: [{ id: 'legacy-test', label: 'Frais historique TEST', amount: 2500, cycles: ['secondary'], active: true }],
     active: true, subscriptionStatus: 'active', studentsCount: 6, studentLimit: 30,
-    classFees: Object.fromEntries(['Maternelle Petite Section', 'CP', 'Form 1'].map(name => [name, { registration: 15000, tuition: 150000, t1: 60000, t2: 50000, t3: 40000 }])),
+    classFees: Object.fromEntries(['Maternelle Petite Section', 'Maternelle Moyenne Section', 'CP', 'Form 1'].map(name => [name, { registration: 15000, tuition: 150000, t1: 60000, t2: 50000, t3: 40000 }])),
     transportPolicy: { feePolicyId: 'ITALO_PK_2026', billingPeriods: ['2026-09', '2026-10', '2026-11'] } });
   await seed('academicYears', yearId, { schoolId, name: year, status: 'active', tuitionPaymentDeadlines: { T1: '2026-09-05', T2: '2027-01-10', T3: '2027-04-10' } });
   await makeUser('secretary'); await makeUser('director'); await makeUser('secretary', true);
@@ -99,6 +99,7 @@ try {
   await seed('students', students.nurseryMS, { schoolId, classId: `${schoolId}-ms`, academicYearId: yearId, academicYear: year, usesTransport: false, name: 'ALLFEES Maternelle MS', matricule: 'AF-MS', schoolingStatus: 'active', gender: 'F', section: 'francophone' });
   await seed('studentPrivate', students.nurseryMS, { schoolId, studentId: students.nurseryMS, transportZonePk: null });
   await seed('studentFinance', students.nurseryMS, { schoolId, studentId: students.nurseryMS, registrationFeeExpected: 15000 });
+  assert.equal((await account(students.nurseryMS)).lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 60000);
   const studentId = students.primary18;
   await denied(call('getStudentFinancialAccount', { studentId, academicYear: year }, 'foreign'));
   const categories = ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other'];
