@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { originalTemplates, templateText } from '../resources/originalTemplates';
 import type { OriginalTemplate, ResourceCycle } from '../resources/originalTemplates';
@@ -29,6 +30,6 @@ export default function PedagogyResources() {
       </details>)}
       {!resources.length && <p>Aucun modèle pour ces filtres.</p>}
     </section>
-    <section className="pedagogy-card"><h2>Sources externes et banque d’épreuves</h2><p>Le fonds institutionnel et la banque d’épreuves authentifiées ne sont pas encore intégrés. Aucun corrigé authentique n’est annoncé disponible.</p><p>CEDUC : connexion et droits de réutilisation non vérifiés. Ces modèles restent disponibles indépendamment de ce service. Aucun contenu tiers n’a été copié dans ce fonds.</p></section>
+    <section className="pedagogy-card"><h2>Sources externes et banque d’épreuves</h2><p><Link to="/pedagogy/exam-bank">Consulter la banque interne des évaluations validées de cet établissement</Link>. Ces créations internes ne sont pas des annales officielles ; leur nouvelle utilisation exige une nouvelle relecture.</p><p>Le fonds institutionnel et les annales externes authentifiées ne sont pas encore intégrés. Aucun corrigé authentique externe n’est annoncé disponible.</p><p>CEDUC : connexion et droits de réutilisation non vérifiés. Ces modèles restent disponibles indépendamment de ce service. Aucun contenu tiers n’a été copié dans ce fonds.</p></section>
   </div>;
 }

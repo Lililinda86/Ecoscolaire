@@ -116,6 +116,18 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       console.log('[Lot C] correction guide: confirmed');
       await page.reload(); await expect(page.getByLabel('Question').first()).toHaveValue('Question corrigée après retour enseignant'); await expect(page.getByText('Validation de l’enseignant enregistrée par la secrétaire').first()).toBeVisible();
       console.log('[Lot C] reload: persisted');
+      await page.goto('/#/pedagogy/exam-bank');
+      await expect(page.getByRole('heading', { name: 'Banque d’épreuves internes' })).toBeVisible();
+      await page.getByLabel('Classe banque').selectOption(f.classId);
+      await page.getByRole('button', { name: 'Consulter', exact: true }).click();
+      await expect(page.locator('#weekly-assessment-print')).toContainText('Question corrigée après retour enseignant');
+      await expect(page.locator('#weekly-assessment-print')).not.toContainText('Réponse attendue');
+      await page.getByLabel('Exemplaire de la banque').selectOption('correction');
+      await expect(page.locator('#weekly-assessment-print')).toContainText('Réponse attendue');
+      await expect(page.locator('#weekly-assessment-print')).toContainText('BROUILLON — À VALIDER PAR L’ENSEIGNANT');
+      await expect(page.getByText('Interdit')).toHaveCount(0);
+      await page.goto('/#/pedagogy/assessments');
+      await expect(page.getByLabel('Question').first()).toHaveValue('Question corrigée après retour enseignant');
       await page.getByRole('button', { name: 'Générer maintenant' }).click(); await expect(page.getByText('Évaluation générée.')).toBeVisible();
       expect((await firestore.collection('weeklyAssessments').where('schoolId', '==', f.schoolId).where('classId', '==', f.classId).get()).size).toBe(1);
       expect((await firestore.collection('weeklyAssessments').doc(assessmentId).get()).data()?.generationVersion).toBe(1);

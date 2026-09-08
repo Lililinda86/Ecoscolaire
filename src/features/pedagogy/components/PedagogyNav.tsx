@@ -13,6 +13,7 @@ const links = [
   ['/pedagogy/results', 'Résultats et suivi'],
   ['/pedagogy/follow-up', 'Suivi individuel'],
   ['/pedagogy/resources', 'Ressources'],
+  ['/pedagogy/exam-bank', 'Banque d’épreuves'],
   ['/pedagogy/settings', 'Paramètres pédagogiques'],
   ['/pedagogy/history', 'Historique']
 ] as const;
@@ -20,7 +21,7 @@ const links = [
 export const PedagogyNav = () => {
   const { currentUser } = useAppContext();
   return <nav className="pedagogy-tabs" aria-label="Navigation Pédagogie">
-    {links.filter(([to]) => currentUser?.role !== 'boardViewer' || !['/preparations', '/assessments', '/observations', '/settings', '/results', '/follow-up', '/resources'].some(segment => to.includes(segment))).map(([to, label]) =>
+    {links.filter(([to]) => currentUser?.role !== 'boardViewer' || !['/preparations', '/assessments', '/observations', '/settings', '/results', '/follow-up', '/resources', '/exam-bank'].some(segment => to.includes(segment))).map(([to, label]) =>
       <NavLink key={to} end={to === '/pedagogy'} to={to}>{label}</NavLink>)}
   </nav>;
 };
