@@ -21,6 +21,9 @@ export interface SchoolCurriculumAdoption {
   catalogLevelId: string;
   curriculumProgramId: string;
   status: 'active' | 'archived';
+  revision?: number;
+  programVersion?: string;
+  decision?: { declarationReceived: boolean; declaredBy: string; effectiveDate: string; reference: string };
 }
 
 export interface TeachingWeek {
