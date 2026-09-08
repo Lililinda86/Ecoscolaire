@@ -934,7 +934,7 @@ const FullSettings: React.FC = () => {
             <tbody>
               {sortClasses(db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId))).map(c => (
                 <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{getClassOptionLabel(c, db.classes)}</td>
+                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{getClassOptionLabel(c, db.classes.filter(item => activeFeeClass(item, db.school?.id || '', db.school?.activeAcademicYearId)))}</td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.registration || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], registration: e.target.value } }))} /></td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.tuition || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], tuition: e.target.value } }))} /></td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t1 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t1: e.target.value } }))} /></td>
@@ -1024,7 +1024,7 @@ const FullSettings: React.FC = () => {
         <p>Gérez les classes, cycles et sections dans Classes. Configurez les matières et leurs affectations dans Programmes par classe. Les données historiques restent conservées.</p>
         <button type="button" onClick={() => navigate('/classes')}>Ouvrir la gestion des classes</button>
         <button type="button" onClick={() => navigate('/subjects-program')}>Configurer les matières par classe</button>
-        <ul>{sortClasses(db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId))).map(c => <li key={c.id}>{getClassOptionLabel(c, db.classes)}</li>)}</ul>
+        <ul>{sortClasses(db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId))).map(c => <li key={c.id}>{getClassOptionLabel(c, db.classes.filter(item => activeFeeClass(item, db.school?.id || '', db.school?.activeAcademicYearId)))}</li>)}</ul>
       </details>
 
       {db.school && currentUser && (

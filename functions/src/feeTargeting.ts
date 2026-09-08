@@ -19,7 +19,7 @@ export function feeClassCycle(c: FeeTargetClass) {
   return resolveCanonicalClassCycle({ ...c });
 }
 export function feeTargetClasses<T extends FeeTargetClass>(classes: T[], schoolId: string, yearId: string | undefined, cycles: string[]): T[] {
-  return [...new Map(classes.filter(c => activeFeeClass(c, schoolId, yearId) && cycles.includes(feeClassCycle(c))).map(c => [c.id, c])).values()];
+  return [...new Map(classes.filter(c => activeFeeClass(c, schoolId, yearId) && (!cycles.length || cycles.includes(feeClassCycle(c)))).map(c => [c.id, c])).values()];
 }
 export function feeTargetStudents<T extends FeeTargetStudent>(students: T[], schoolId: string, yearId: string | undefined, classIds: string[]): T[] {
   return [...new Map(students.filter(s => activeFeeStudent(s, schoolId, yearId) && classIds.includes(s.classId || '')).map(s => [s.id, s])).values()];

@@ -34,7 +34,8 @@ const students = {};
       const preview = await call('getSchoolFeeCatalog', { classId, zonePk: pk }, secretaryId);
       assert.equal(preview.transportTariff.monthlyGrossAmount, cycle === 'secondary' ? 0 : pk === 18 ? 4000 : 5000);
       assert.equal((await db.collection('studentTransportPlans').where('studentId', '==', studentId).get()).size, 0, 'tariff preview never creates a subscription');
-      const plan = await call('setStudentTransportPlan', { studentId, usesTransport: true, zonePk: pk });
+      const plan = await call('setStudentTransportPlan', { studentId, usesTransport: true });
+      assert.equal((await db.collection('studentPrivate').doc(studentId).get()).data().transportZonePk, pk, 'stored PK reused without re-entry');
       assert.equal(plan.monthlyGrossAmount, cycle === 'secondary' ? 0 : pk === 18 ? 4000 : 5000);
       const account = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
       const transport = account.lines.filter(l => l.type === 'transport');
@@ -47,6 +48,11 @@ const students = {};
     }
   }
   const studentId = students.primary18;
+  const { appliesToStudent } = require('../../functions/lib/schoolFeeCatalog');
+  const unrestrictedFee = { academicYear, active: true, cycles: [], classIds: [], studentIds: [] };
+  assert.equal(appliesToStudent(unrestrictedFee, { id: studentId, classId: 'primary', academicYearId: yearId }, { cycle: 'primary', academicYearId: yearId }, academicYear), true);
+  assert.equal(appliesToStudent(unrestrictedFee, { id: studentId, classId: 'primary', academicYearId: yearId }, { cycle: 'primary', academicYearId: 'old-year' }, academicYear), false);
+  assert.equal(appliesToStudent({ ...unrestrictedFee, cycles: ['nursery'] }, { id: studentId, classId: 'primary' }, { cycle: 'primary' }, academicYear), false);
   for (const category of ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other']) {
     const feeId = `fee-${category}-${suffix}`;
     const fee = { label: category, category, amount: 15000, description: 'Test', academicYear, mandatory: category !== 'excursion', dueDate: '2027-06-15', classIds: [], cycles: ['primary'], studentIds: [] };
@@ -108,6 +114,9 @@ const students = {};
   }
   let account = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
   assert.equal(account.lines.filter(l => l.type === 'other').length, 13);
+  assert.deepEqual(account.groups.find(g => g.key === 'one-off').lineKeys.sort(), [`other:fee-exam-${suffix}`, `other:fee-exceptional-${suffix}`].sort());
+  assert.equal(account.groups.find(g => g.key === 'one-off').totals.totalBilled, 30000);
+  assert.ok(account.groups.find(g => g.key === 'other').lineKeys.includes(`other:fee-photo-${suffix}`));
   const excursionId = `fee-excursion-${suffix}`;
   await call('manageSchoolFee', { action: 'assign', feeId: excursionId, studentId });
   await call('manageSchoolFee', { action: 'assign', feeId: excursionId, studentId });

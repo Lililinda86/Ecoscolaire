@@ -36,7 +36,7 @@ export function FinancialSettingsReadOnly() {
         <thead><tr><th>Classe</th><th>Inscription</th><th>T1</th><th>T2</th><th>T3</th></tr></thead>
         <tbody>{sortClasses(db.classes.filter(item => activeFeeClass(item, school.id, school.activeAcademicYearId))).map(item => {
           const fees = school.classFees?.[item.name];
-          return <tr key={item.id}><th>{getClassOptionLabel(item, db.classes)}</th><td>{formatCurrency(fees?.registration)}</td><td>{formatCurrency(fees?.t1)}</td><td>{formatCurrency(fees?.t2)}</td><td>{formatCurrency(fees?.t3)}</td></tr>;
+          return <tr key={item.id}><th>{getClassOptionLabel(item, db.classes.filter(c => activeFeeClass(c, school.id, school.activeAcademicYearId)))}</th><td>{formatCurrency(fees?.registration)}</td><td>{formatCurrency(fees?.t1)}</td><td>{formatCurrency(fees?.t2)}</td><td>{formatCurrency(fees?.t3)}</td></tr>;
         })}</tbody>
       </table></div>
     </section>
