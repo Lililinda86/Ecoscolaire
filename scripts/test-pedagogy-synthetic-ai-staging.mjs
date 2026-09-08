@@ -109,7 +109,9 @@ if (process.argv.includes('--check-only')) {
     };
     await manifestRef.update({ state: 'running', startedAt: FieldValue.serverTimestamp() });
     for (const file of files) {
+      const started = performance.now();
       const result = await call('startLessonPreparationAnalysis', { uploadId: file.uploadId });
+      const callableLatencyMs = Math.round(performance.now() - started);
       if (result.analysisStatus !== 'succeeded') throw new Error('AI_DOCUMENT_FAILED: ' + (result.errorCode || 'UNKNOWN'));
       const analysis = (await db.collection('preparationAnalyses').doc(result.analysisId).get()).data();
       assert.equal(analysis.processingMode, 'synthetic_provider_attempt'); assert.equal(analysis.providerReceipt?.model, report.model);
@@ -119,15 +121,36 @@ if (process.argv.includes('--check-only')) {
       const extracted = JSON.stringify(result.result);
       assert.ok(extractionAnchors[report.documentChecks.length].every(anchor => anchor.test(extracted)), 'SYNTHETIC_CONTENT_ANCHOR_FAILED');
       assert.equal((await db.collection('lessonPreparations').doc(file.preparationId).get()).data().status, 'needs_review');
-      report.documentChecks.push({ file: file.name, sha256: file.checksum, operationId: analysis.providerReceipt.operationId, titleAnchorMatched: true, contentAnchorsMatched: true, draftOnly: true });
+      // This approved PDF deliberately serves as the incomplete-field case:
+      // neither prerequisites nor differentiation appears in its native text.
+      if (file.name === 'primary-fr.pdf') {
+        assert.deepEqual(result.result.prerequisites, [], 'MISSING_PREREQUISITES_INVENTED');
+        assert.equal(result.result.differentiation, null, 'MISSING_DIFFERENTIATION_INVENTED');
+        assert.ok(result.result.warnings.length > 0, 'MISSING_FIELDS_NOT_SIGNALED');
+      }
+      report.documentChecks.push({ file: file.name, sha256: file.checksum, operationId: analysis.providerReceipt.operationId, titleAnchorMatched: true, contentAnchorsMatched: true, draftOnly: true, callableLatencyMs,
+        incompleteFieldsChecked: file.name === 'primary-fr.pdf', syntheticExtractForReview: result.result });
       console.log(JSON.stringify({ phase: 'document', completed: report.documentChecks.length, provider: 'openai' }));
     }
     for (const [index, [language, cycle]] of lessons.entries()) {
+      const started = performance.now();
       const result = await call('generateWeeklyAssessment', { academicYearId: yearId, classId: `pedagogy-ai-trial-class-${index}`, weekId });
+      const callableLatencyMs = Math.round(performance.now() - started);
       if (result.status !== 'needs_review') throw new Error('AI_ASSESSMENT_FAILED: ' + (result.error || 'UNKNOWN'));
       const assessment = (await db.collection('weeklyAssessments').doc(result.assessmentId).get()).data();
       assert.equal(assessment.generatorProvider, 'openai'); assert.equal(assessment.teacherValidated, false); assert.equal(assessment.totalPoints, 20); assert.ok(assessment.itemCount > 0);
-      report.assessments.push({ index, language, cycle, operationId: assessment.aiOperationId, itemCount: assessment.itemCount, totalPoints: assessment.totalPoints, draftOnly: true });
+      const items = await db.collection('assessmentItems').where('schoolId', '==', schoolId).where('weeklyAssessmentId', '==', result.assessmentId).limit(101).get();
+      assert.equal(items.size, assessment.itemCount, 'ASSESSMENT_ITEM_COUNT_MISMATCH');
+      assert.ok(items.size > 0 && items.size <= 100, 'ASSESSMENT_ITEM_BOUND_EXCEEDED');
+      const syntheticQuestionsForReview = items.docs.map(doc => {
+        const item = doc.data();
+        assert.ok(item.questionText && item.expectedAnswer && item.correctionGuide, 'ASSESSMENT_CONTENT_MISSING');
+        assert.deepEqual(item.sourceCurriculumUnitIds, [], 'UNVERIFIED_CURRICULUM_LINK');
+        assert.deepEqual(item.sourceLessonPreparationIds, [`pedagogy-ai-trial-lesson-${index}`], 'UNCONFIRMED_ASSESSMENT_SOURCE');
+        return { order: item.order, questionType: item.questionType, questionText: item.questionText, instructions: item.instructions, expectedAnswer: item.expectedAnswer, correctionGuide: item.correctionGuide, points: item.points };
+      }).sort((a, b) => a.order - b.order);
+      assert.equal(syntheticQuestionsForReview.reduce((sum, item) => sum + item.points, 0), 20, 'ASSESSMENT_POINT_TOTAL_MISMATCH');
+      report.assessments.push({ index, language, cycle, operationId: assessment.aiOperationId, itemCount: assessment.itemCount, totalPoints: assessment.totalPoints, draftOnly: true, callableLatencyMs, syntheticQuestionsForReview });
       console.log(JSON.stringify({ phase: 'assessment', completed: report.assessments.length, provider: 'openai' }));
     }
   } catch (error) { failure = safeError(error); }
@@ -137,9 +160,13 @@ if (process.argv.includes('--check-only')) {
         await configRef.update({ enabled: false, disabledReason: 'TRIAL_FINISHED_OR_INTERRUPTED' });
         const operations = await db.collection('pedagogyAiOperations').where('schoolId', '==', schoolId).limit(11).get();
         assert.ok(operations.size <= 10, 'TRIAL_OPERATION_LIMIT_EXCEEDED');
-        report.operations = operations.docs.map(doc => { const value = doc.data(); return { operationId: doc.id, purpose: value.purpose, status: value.status, reservedMicros: value.reservedMicros, inputTokens: value.result?.inputTokens ?? null, outputTokens: value.result?.outputTokens ?? null, estimatedCostMicros: value.result?.estimatedCostMicros ?? null, errorCode: value.errorCode || null }; });
+        report.operations = operations.docs.map(doc => { const value = doc.data(); return { operationId: doc.id, purpose: value.purpose, status: value.status, reservedMicros: value.reservedMicros, inputTokens: value.result?.inputTokens ?? null, outputTokens: value.result?.outputTokens ?? null, estimatedCostMicros: value.result?.estimatedCostMicros ?? null, operationLatencyMs: value.completedAt && value.startedAt ? value.completedAt.toMillis() - value.startedAt.toMillis() : null, errorCode: value.errorCode || null }; });
         report.attemptedOperations = report.operations.length;
         report.successfulProviderOperations = report.operations.filter(item => item.status === 'succeeded').length;
+        report.successfulGenerationRequests = report.successfulProviderOperations;
+        report.successfulTokenPreflights = report.operations.filter(item => item.status === 'succeeded' && item.purpose === 'preparation_analysis').length;
+        report.totalInputTokens = report.operations.reduce((sum, item) => sum + (item.inputTokens || 0), 0);
+        report.totalOutputTokens = report.operations.reduce((sum, item) => sum + (item.outputTokens || 0), 0);
         report.estimatedCostMicros = report.operations.reduce((sum, item) => sum + (item.estimatedCostMicros || 0), 0);
         report.ledger = (await ledgerRef.get()).data();
         assert.ok(report.ledger.reservedMicros <= 2000000, 'TRIAL_BUDGET_EXCEEDED');

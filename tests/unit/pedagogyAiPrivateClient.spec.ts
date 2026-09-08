@@ -12,7 +12,7 @@ describe('private IAM transport (simulated, not live AI proof)', () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
   it.each(['wrong-project', 'demo-ecoscolaire'])('blocks project %s before credentials or network', async project => {
     vi.stubEnv('GCLOUD_PROJECT', project);
-    await expect(requestPrivatePedagogyAi(school, request)).rejects.toThrow('AI_SYNTHETIC_TRIAL_SCOPE_REQUIRED');
+    await expect(requestPrivatePedagogyAi(school, request)).rejects.toThrow('AI_RUNTIME_DISABLED');
     expect(auth.getIdTokenClient).not.toHaveBeenCalled();
   });
   it('blocks ordinary schools', async () => {
