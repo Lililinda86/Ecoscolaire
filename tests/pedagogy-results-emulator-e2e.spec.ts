@@ -101,6 +101,24 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     expect(corrected.state).toBe('acquired'); expect(corrected.supersedesId).toBe(observationId);
     expect(corrected.studentId).toBe(f.pupilIds[0]); expect(corrected.preparationId).toBe(observationPreparation);
     expect((await cases.docs[0].ref.get()).data()?.review).toEqual(cases.docs[0].data().review);
+    await test.step('Read the existing synthetic validated assessment in the internal bank without AI', async () => {
+      await page.goto('/#/pedagogy/exam-bank');
+      await expect(page.getByRole('heading', { name: 'Banque d’épreuves internes' })).toBeVisible();
+      await page.getByRole('button', { name: 'Consulter', exact: true }).click({ timeout: 20_000 });
+      const paper = page.locator('#weekly-assessment-print');
+      await expect(paper).toContainText('Synthetic Mathematics question');
+      await expect(paper).not.toContainText('Synthetic answer');
+      await page.getByLabel('Exemplaire de la banque').selectOption('correction');
+      await expect(paper).toContainText('Synthetic answer');
+      await expect(paper).toContainText('BROUILLON — À VALIDER PAR L’ENSEIGNANT');
+      for (const width of [390, 768, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth), 'Bank must not overflow the viewport').toBeLessThanOrEqual(width + 1);
+      }
+      expect((await db.doc(`weeklyAssessments/${f.assessmentId}`).get()).data()?.contentRevision).toBe(0);
+      expect((await db.collection('pedagogyAiOperations').where('schoolId', '==', f.schoolId).limit(1).get()).empty).toBe(true);
+      console.log('LOT_D_BANK: synthetic stored assessment; subject/correction separation; responsive 390/768/1440; zero AI operations');
+    }, { timeout: 35_000 });
     for (const name of ['payments', 'expenses', 'cashClosures', 'buses', 'inventory']) expect((await db.collection(name).where('schoolId', '==', f.schoolId).get()).empty).toBe(true);
     console.log('LOT_D_BROWSER: canonical evaluation and grade writes expected and verified; no real pupil data or human approval');
   } finally {

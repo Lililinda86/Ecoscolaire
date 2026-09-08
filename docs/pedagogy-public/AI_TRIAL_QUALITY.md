@@ -1,5 +1,32 @@
 # Real synthetic AI trial: quality is not HTTP success
 
+## Update: five document analyses completed, Scheduler conflict diagnosed
+
+[Continuation 34187407004](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34187407004)
+on Staging1e872bff59426c8004ca1990875291c902072569 reused the first two results
+without provider calls and completed the three remaining analyses. Cumulative:
+5 Responses and5input-token preflights,5,663input/888output tokens, estimated
+USD0.003688 (not invoice), USD0.445 reserved. No assessment operation was consumed.
+Title anchors passed4/5; content anchors passed5/5. These narrow checks are not
+an accuracy score: nursery title was omitted, and language/subject interpretation
+still requires comparison with the source. The incomplete PDF left absent fields
+empty; the secondary image result visibly included the new missing-assessment warning.
+
+The two simultaneous Scheduler RunJob mutations conflicted: one returned ABORTED
+“sync mutate calls cannot be queued”, the other was accepted after the trial
+configuration had been disabled. Cloud audit showed jobs.run permission granted.
+No IAM grant was added. Subsequent bounded reads confirmed zero Friday run,
+zero trial receipt, zero assessment consumption and disabled configuration.
+Exact disposable cleanup passed; all consumed audit records remain.
+
+The assessment-only continuation serializes the two dispatch requests and accepts
+only this diagnosed manifest, five retained successful document operations,
+unchanged USD0.445 reservation and no Friday run/receipt. It is claimed once,
+does not invoke any document-analysis callable and can consume at most the five
+remaining assessments. This is an implemented control, not yet a live PASS.
+
+## Initial attempt (historical)
+
 On Staging SHA d42ad3f9248a3e3c09dacf7e91d8f9fef8f7ca99,
 [run 34185299765](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34185299765)
 verified the private gateway secret binding and completed two real document

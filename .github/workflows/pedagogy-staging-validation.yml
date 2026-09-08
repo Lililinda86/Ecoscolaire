@@ -34,7 +34,7 @@ permissions:
 
 jobs:
   validate:
-    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2' || inputs.confirmation == 'CONTINUE_PEDAGOGY_AI_34185299765' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_BASELINE' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_CHANGE')
+    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2' || inputs.confirmation == 'CONTINUE_PEDAGOGY_AI_34185299765' || inputs.confirmation == 'CONTINUE_PEDAGOGY_ASSESSMENTS_34187407004' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_BASELINE' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_CHANGE')
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 35
@@ -89,7 +89,7 @@ jobs:
       - name: Synthetic local file integrity, manual review and exact cleanup
         run: npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
       - name: Real synthetic AI trial with persistent USD 2 ledger
-        if: inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2' || inputs.confirmation == 'CONTINUE_PEDAGOGY_AI_34185299765'
+        if: inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2' || inputs.confirmation == 'CONTINUE_PEDAGOGY_AI_34185299765' || inputs.confirmation == 'CONTINUE_PEDAGOGY_ASSESSMENTS_34187407004'
         env:
           PEDAGOGY_AI_TRIAL_CONFIRMATION: ${{ inputs.confirmation }}
           STAGING_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}

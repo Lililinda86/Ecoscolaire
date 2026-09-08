@@ -2,7 +2,7 @@ name: Pedagogy Lots A + B + C Release Gate
 
 on:
   push:
-    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch, codex/pedagogy-private-ai-validation, codex/pedagogy-secret-binding-resume, codex/pedagogy-watch-resume]
+    branches: [codex/pedagogy-lot-b, codex/pedagogy-lot-c, codex/pedagogy-finalization-public, codex/pedagogy-resource-library, codex/pedagogy-observation-corrections, codex/pedagogy-synthetic-ai-watch, codex/pedagogy-private-ai-validation, codex/pedagogy-secret-binding-resume, codex/pedagogy-watch-resume, codex/pedagogy-exam-bank-resume]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -51,7 +51,7 @@ jobs:
           PEDAGOGY_RECOVERY_CONFIRMATION: ${{ inputs.confirmation }}
         run: node scripts/recover-pedagogy-results-checkpoint.mjs --delete-exact-fixture
   exact-staging:
-    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2' || inputs.confirmation == 'CONTINUE_PEDAGOGY_AI_34185299765' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_BASELINE' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_CHANGE')
+    if: github.ref == 'refs/heads/staging' && (inputs.confirmation == 'RUN_PEDAGOGY_STAGING_SYNTHETIC' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_AI_USD2' || inputs.confirmation == 'CONTINUE_PEDAGOGY_AI_34185299765' || inputs.confirmation == 'CONTINUE_PEDAGOGY_ASSESSMENTS_34187407004' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_BASELINE' || inputs.confirmation == 'RUN_PEDAGOGY_STAGING_WATCH_CHANGE')
     needs: [static-gates, emulator-gates]
     permissions:
       contents: read

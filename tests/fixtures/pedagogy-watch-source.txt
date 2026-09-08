@@ -1,5 +1,6 @@
 ECOSCOLAIRE SYNTHETIC SOURCE WATCH FIXTURE
-Version: 1
+Version: 2
 Purpose: detect controlled public file changes in Staging.
 This is original synthetic test content, not an official curriculum.
 No personal data, teaching record, assessment or pedagogical approval.
+Controlled revision: a changed file must require review, never automatic curriculum publication.

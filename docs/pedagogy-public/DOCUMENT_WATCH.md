@@ -1,5 +1,17 @@
 # Controlled document watch
 
+## Live baseline evidence
+
+[Run34187428876](https://github.com/Lililinda86/Ecoscolaire/actions/runs/34187428876)
+passed on Staging1e872bff59426c8004ca1990875291c902072569. The actual Scheduler job
+retrieved the original public fixture and recorded baseline SHA256
+118d234e4b0870331ed592419c4eadea525011365614faf15fee0617e56b0a7e
+at2026-09-08T04:44:13.982Z. No AI call was involved. The synthetic user was removed;
+the source was disabled and its school/configuration retained for the change phase.
+This proves the baseline only. Version2 must be published and its actual detection,
+explicit synthetic review and final fixture cleanup verified before claiming the
+complete live watch scenario. No institutional document was authenticated by this test.
+
 The direction configures up to ten HTTPS sources per school under Pedagogy >
 Settings. The secretary can read status, not activate sources or record a review.
 Public hosts are restricted to MINEDUB, MINESEC and CEDUC, with one exact original
@@ -23,7 +35,8 @@ Review history is server-only writable and scoped to the school.
 Unit tests simulate HTTP. The emulator scenario adds real Firestore transactions,
 authorization, concurrency, changed-file review and failure handling. Only a separate
 deployed scheduler run against a changing public fixture can establish live operation.
-No real scheduled-watch PASS is claimed by this document.
+The live baseline above is separate from these simulated-HTTP tests; full live
+changed-file review remains pending until its separate report is recorded.
 
 ## Documentary coverage limit
 
