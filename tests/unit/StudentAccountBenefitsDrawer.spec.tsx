@@ -165,16 +165,16 @@ describe('StudentAccountBenefitsDrawer', () => {
     renderDrawer('director', { onChanged });
 
     expect(await screen.findByText('Réduction familiale')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Approuver' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Approuver' }));
     await waitFor(() => expect(mocks.calls.some(call => call.name === 'approveFinancialBenefit')).toBe(true));
-    expect(onChanged).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
 
     vi.spyOn(window, 'prompt').mockReturnValue('Pièce justificative manquante');
     cleanup();
     mocks.calls = [];
     renderDrawer('director', { onChanged: vi.fn() });
     await screen.findByText('Réduction familiale');
-    fireEvent.click(screen.getByRole('button', { name: 'Refuser' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Refuser' }));
     await waitFor(() => expect(mocks.calls.some(call => call.name === 'rejectFinancialBenefit')).toBe(true));
   });
 
