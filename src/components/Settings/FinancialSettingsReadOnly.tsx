@@ -1,3 +1,4 @@
+import { activeFeeClass } from '../../../functions/src/feeTargeting';
 import { useAppContext } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/paymentReceipt';
 import { sortClasses } from '../../utils/sortClasses';
@@ -33,7 +34,7 @@ export function FinancialSettingsReadOnly() {
       <h2 id="readonly-class-fees-title">Tarifs scolaires par classe</h2>
       <div className="financial-readonly-table-wrap"><table className="financial-readonly-table">
         <thead><tr><th>Classe</th><th>Inscription</th><th>T1</th><th>T2</th><th>T3</th></tr></thead>
-        <tbody>{sortClasses(db.classes.filter(item => item.schoolId === school.id)).map(item => {
+        <tbody>{sortClasses(db.classes.filter(item => activeFeeClass(item, school.id, school.activeAcademicYearId))).map(item => {
           const fees = school.classFees?.[item.name];
           return <tr key={item.id}><th>{getClassOptionLabel(item, db.classes)}</th><td>{formatCurrency(fees?.registration)}</td><td>{formatCurrency(fees?.t1)}</td><td>{formatCurrency(fees?.t2)}</td><td>{formatCurrency(fees?.t3)}</td></tr>;
         })}</tbody>

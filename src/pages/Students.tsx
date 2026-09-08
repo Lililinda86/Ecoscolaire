@@ -1,3 +1,4 @@
+import { activeFeeClass } from '../../functions/src/feeTargeting';
 import React, { useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
@@ -1792,7 +1793,7 @@ const Students: React.FC = () => {
             </select>
             <select value={classFilter} onChange={e => setClassFilter(e.target.value)} aria-label="Filtrer par classe">
               <option value="all">Toutes les classes</option>
-              {db.classes.filter(c => sectionFilter === 'all' || c.type === sectionFilter).map(c => (
+              {db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId) && (sectionFilter === 'all' || c.type === sectionFilter)).map(c => (
                  <option key={c.id} value={c.id}>{getClassOptionLabel(c, db.classes)}</option>
               ))}
             </select>
@@ -2837,10 +2838,10 @@ const Students: React.FC = () => {
                   ]
                 ];
 
-                const activeClasses = db.classes.filter(c => c.isActive !== false);
+                const activeClasses = db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId));
                 const wsDataClasses = [
                   ['nom', 'section', 'cycle', 'educationType', 'levelOrder'],
-                  ...activeClasses.map(c => [c.name, c.type, c.cycle || '', c.educationType || '', c.levelOrder || ''])
+                  ...activeClasses.map(c => [getClassOptionLabel(c, activeClasses), c.type, c.cycle || '', c.educationType || '', c.levelOrder || ''])
                 ];
 
                 const wsDataBareme = [
