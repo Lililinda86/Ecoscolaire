@@ -1,3 +1,5 @@
+import { recoverHistoricalTariffs } from './legacyObligationTariffs';
+import { readObligations, freezeObligations } from './financialObligationSnapshots';
 import { activeFeeClass, activeFeeStudent, feeClassCycle } from './feeTargeting';
 import { publishFinancialTariffs } from './financialTariffConfiguration';
 import * as admin from 'firebase-admin';
@@ -63,6 +65,33 @@ export const getSchoolFeeCatalog = functions.https.onCall(async (raw, context) =
   });
 });
 
+// Preserve each current legacy debt before changing its catalogue source. No payment or receipt is rewritten.
+async function preserveLegacyFee(tx: admin.firestore.Transaction, db: admin.firestore.Firestore, schoolId: string, school: Data, fee: Data) {
+  if (!Number.isSafeInteger(fee.amount) || Number(fee.amount) <= 0 || typeof fee.label !== 'string' || !fee.label.trim()) return [];
+  const roster = await tx.get(db.collection('students').where('schoolId', '==', schoolId).limit(401));
+  if (roster.size > 400) throw fail('La conservation de ce catalogue historique dépasse 400 élèves ; traitement par lots requis.');
+  const writes: Array<() => void> = [];
+  if (fee.active === false) return writes;
+  for (const student of roster.docs) {
+    const data = student.data();
+    if (data.academicYearId !== school.activeAcademicYearId || !data.classId) continue;
+    const cls = await tx.get(db.collection('classes').doc(id(data.classId)));
+    if (!cls.exists || cls.data()?.schoolId !== schoolId) continue;
+    if (Array.isArray(fee.classIds) && !fee.classIds.includes(data.classId)) continue;
+    if (Array.isArray(fee.cycles) && !fee.cycles.includes(cls.data()?.cycle) && !fee.cycles.includes(cls.data()?.level)) continue;
+    const year = String(school.academicYear);
+    const payments = await tx.get(db.collection('payments').where('studentId', '==', student.id));
+    const snapshots = recoverHistoricalTariffs(await readObligations(tx, db, schoolId, student.id, year), payments.docs.map(p => ({ ...p.data(), id: p.id })),
+      { schoolId, studentId: student.id, academicYear: year, classId: String(data.classId) });
+    const gross = snapshots['other:' + fee.id]?.grossExpectedAmount ?? Number(fee.amount);
+    writes.push(() => freezeObligations(tx, db, snapshots, { schoolId, studentId: student.id, academicYear: year,
+      classId: String(data.classId), cycle: resolveCanonicalClassCycle(cls.data() || {}), tariffVersion: 'legacy-catalogue' },
+    [{ key: 'other:' + fee.id, type: 'other', label: String(fee.label), grossExpectedAmount: gross,
+      netExpectedAmount: gross, originalDueDate: null, period: null, feeId: String(fee.id) }]));
+  }
+  return writes;
+}
+
 export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentification requise.');
   const schoolId = id(raw?.schoolId); const feeId = raw?.action === 'configure' ? 'configuration' : id(raw?.feeId); const db = admin.firestore();
@@ -71,7 +100,12 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
     if (raw.action === 'configure') return publishFinancialTariffs(tx, db, school, context.auth!.uid, raw);
     const entries = schoolFees(school.data() || {});
     const existing = entries.find(f => f.id === feeId);
-    if (raw.action === 'create') {
+    if (raw.action === 'create' || (raw.action === 'revise' && raw.fee)) {
+      const editing = raw.action === 'revise';
+      if (editing && (!existing || existing.active === false)) throw fail('Frais actif requis.');
+      if (editing && (existing!.amount !== raw.expectedAmount || (existing!.versionId || null) !== (raw.expectedVersion || null))) throw fail('Le frais a changé. Rechargez le catalogue.');
+      if (editing && (typeof raw.reason !== 'string' || !raw.reason.trim() || raw.reason.length > 500)) throw fail('Motif requis.');
+      const legacyWrites = editing && existing!.schemaVersion !== 2 ? await preserveLegacyFee(tx, db, schoolId, school.data() || {}, existing!) : [];
       const source = raw.fee || {};
       const year = String(source.academicYear || '');
       if (!/^\d{4}-\d{4}$/.test(year) || Number(year.slice(5)) !== Number(year.slice(0, 4)) + 1 || school.data()?.academicYear !== year) throw fail('Année scolaire active requise.');
@@ -102,14 +136,25 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       if (dueDate !== null && (typeof dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(Date.parse(dueDate)) || new Date(dueDate).toISOString().slice(0, 10) !== dueDate)) throw fail('Échéance invalide.');
       const fee: SchoolFee = { id: feeId, schemaVersion: 2, label: source.label.trim(), description: source.description.trim(), category: source.category,
         amount: source.amount, academicYear: year, mandatory: source.mandatory, active: true, dueDate, classIds, cycles, studentIds, ...(source.recurrence ? { recurrence: source.recurrence } : {}) };
+      if (editing) {
+        for (const write of legacyWrites) write();
+        const versionId = createHash('sha256').update(JSON.stringify([schoolId, feeId, existing!.versionId || 'initial', fee])).digest('hex');
+        const next = { ...existing, ...fee, versionId };
+        tx.create(school.ref.collection('financialTariffVersions').doc(versionId), {
+          feeId, academicYear: year, previous: existing, next, reason: raw.reason.trim(),
+          actorId: context.auth!.uid, effectiveAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        tx.update(school.ref, { feeCatalog: entries.map(f => f.id === feeId ? next : f) });
+      } else {
       if (existing) {
         if (JSON.stringify(existing) === JSON.stringify(fee)) return { feeId, replay: true };
         throw new functions.https.HttpsError('already-exists', 'Identifiant déjà utilisé : créer une nouvelle version.');
       }
       if (entries.length >= 200) throw fail('Catalogue limité à 200 versions.');
       tx.update(school.ref, { feeCatalog: [...entries, fee] });
+      }
     } else if (raw.action === 'revise') {
-      if (!existing || existing.schemaVersion !== 2 || existing.active !== true) throw fail('Frais actif requis.');
+      if (!existing || existing.schemaVersion !== 2 || existing.active === false) throw fail('Frais actif requis.');
       if (existing.amount !== raw.expectedAmount) throw fail('Le tarif a changé. Rechargez le catalogue.');
       if (!Number.isSafeInteger(raw.amount) || raw.amount <= 0) throw fail('Montant entier positif requis.');
       if (typeof raw.reason !== 'string' || !raw.reason.trim() || raw.reason.length > 500) throw fail('Motif requis.');
@@ -124,11 +169,12 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       });
       tx.update(school.ref, { feeCatalog: entries.map(f => f.id === feeId ? next : f) });
     } else if (raw.action === 'archive') {
-      if (!existing || existing.schemaVersion !== 2) throw fail('Frais versionné requis.');
+      if (!existing) throw fail('Frais requis.');
       if (existing.active === false) return { feeId, replay: true };
+      const legacyWrites = existing.schemaVersion !== 2 ? await preserveLegacyFee(tx, db, schoolId, school.data() || {}, existing) : [];
       const fee = existing as SchoolFee;
       // Freeze all current mandatory obligations before stopping new assignments.
-      const roster = fee.mandatory ? await tx.get(db.collection('students').where('schoolId', '==', schoolId).limit(201)) : null;
+      const roster = existing.schemaVersion === 2 && fee.mandatory ? await tx.get(db.collection('students').where('schoolId', '==', schoolId).limit(201)) : null;
       if (roster && roster.size > 200) throw fail('Archivage à traiter par lot administrateur (plus de 200 élèves).');
       const pending: Array<{ ref: admin.firestore.DocumentReference; studentId: string }> = [];
       for (const student of roster?.docs || []) {
@@ -140,11 +186,12 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
         const ref = db.collection('studentFeeAssignments').doc(feeAssignmentId(schoolId, student.id, fee.academicYear, feeId));
         if (!(await tx.get(ref)).exists) pending.push({ ref, studentId: student.id });
       }
+      for (const write of legacyWrites) write();
       for (const item of pending) tx.create(item.ref, { schoolId, studentId: item.studentId, academicYear: fee.academicYear, feeId, fee,
         assignedBy: context.auth!.uid, assignedAt: admin.firestore.FieldValue.serverTimestamp() });
       tx.update(school.ref, { feeCatalog: entries.map(f => f.id === feeId ? { ...f, active: false } : f) });
     } else if (raw.action === 'assign') {
-      if (!existing || existing.schemaVersion !== 2 || existing.active !== true) throw fail('Frais actif requis.');
+      if (!existing || existing.active === false) throw fail('Frais actif requis.');
       const fee = existing as SchoolFee; const studentId = id(raw.studentId);
       const student = await tx.get(db.collection('students').doc(studentId));
       if (!student.exists || student.data()?.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Élève hors établissement.');
