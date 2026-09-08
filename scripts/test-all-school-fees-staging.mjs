@@ -399,6 +399,8 @@ try {
   const nurseryPaid = (await account(students.nursery18)).lines.find(l => l.feeId === nurseryFee.id);
   assert.equal(nurseryPaid.grossExpectedAmount, 10000); assert.equal(nurseryPaid.previousPaid, 10000); assert.equal(nurseryPaid.remainingBalance, 0);
   await page.screenshot({ path: 'all-fees-nursery-paid-in-full.png', fullPage: true });
+  await page.locator('.student-account-success').getByRole('button', { name: 'Fermer', exact: true }).click();
+  await expect(page.getByTestId('modal-backdrop')).toHaveCount(0);
   pass('NURSERY CLICK CASCADE / MULTI SELECT DESELECT / PUBLICATION / ONE-OFF GROUP / PAID IN FULL');
 
   // Persist each empty-scope combination and verify actual accounts, not only DOM presence.
