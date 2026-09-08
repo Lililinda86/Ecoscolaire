@@ -37,6 +37,9 @@ async function seedResultsFixture(db, prefix) {
   await batch.commit();
   console.log('LOT_D_SYNTHETIC_SCOPE=' + prefix);
   return { ...f, async cleanup() {
+    for (const collection of ['teacherDecisions', 'contentRevisions']) {
+      for (const document of (await db.doc('weeklyAssessments/' + f.assessmentId).collection(collection).get()).docs) manifest.add(document.ref.path);
+    }
     for (const name of ['evaluations', 'grades', 'pedagogyObservations', 'pedagogyObservationBatches', 'pedagogyRemediations', 'pedagogyRemediationRequests', 'pedagogyAssessmentPublications', 'pedagogyResultBatches', 'audit_logs']) {
       for (const document of (await db.collection(name).where('schoolId', '==', f.schoolId).get()).docs) {
         manifest.add(document.ref.path);
