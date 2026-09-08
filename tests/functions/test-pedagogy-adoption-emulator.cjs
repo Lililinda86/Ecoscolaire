@@ -48,6 +48,8 @@ const context = role => ({ auth: { uid: prefix + '-' + role, token: {} } });
     const checkQuality = () => db.runTransaction(transaction => assertAiAssessmentReviewQuality(transaction, qualityAssessment, schoolId, prefix + '-quality'));
     await assert.rejects(checkQuality(), error => error.code === 'failed-precondition');
     await qualityRef.update({ questionText: 'Synthetic choices: A) 2/4 B) 1/4' });
+    await assert.rejects(checkQuality(), error => error.code === 'failed-precondition');
+    await qualityRef.update({ choices: ['2/4', '1/4'], correctAnswer: '2/4', expectedAnswer: '2/4' });
     await checkQuality();
     await qualityRef.update({ questionType: 'exercise', expectedAnswer: '2/6 = 2/3' });
     await assert.rejects(checkQuality(), error => error.code === 'failed-precondition');

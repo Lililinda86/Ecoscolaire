@@ -8,6 +8,11 @@ export async function assertAiAssessmentReviewQuality(transaction: admin.firesto
   if (assessment.generatorProvider !== 'openai') return;
   const items = await transaction.get(admin.firestore().collection('assessmentItems').where('schoolId', '==', schoolId).where('weeklyAssessmentId', '==', id).where('generationVersion', '==', assessment.generationVersion).limit(101));
   if (!items.size || items.size > 100 || items.size !== assessment.itemCount) throw new functions.https.HttpsError('failed-precondition', 'Questions incomplètes : vérifier le brouillon.');
-  const issues = assessmentMechanicalIssues(items.docs.map(item => item.data() as GeneratedAssessmentItem));
+  // Historical AI rows also need explicit choices before a new signoff.
+  // Manual/non-AI rows retain their existing workflow.
+  const issues = assessmentMechanicalIssues(items.docs.map(item => {
+    const data = item.data() as GeneratedAssessmentItem;
+    return { ...data, choices: data.choices ?? [] };
+  }));
   if (issues.length) throw new functions.https.HttpsError('failed-precondition', 'Corriger les défauts détectés avant visa ou impression : ' + issues.join(', '));
 }
