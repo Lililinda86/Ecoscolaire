@@ -264,13 +264,14 @@ export const monthlyLines = (lines: AccountLine[]): AccountLine[] => lines.flatM
 export const accountGroups = (lines: AccountLine[]) => {
   const definitions = [
     ['registration', 'Inscription'], ['tuition', 'Scolarité'], ['transport', 'Transport'],
-    ['uniforms', 'Tenues'], ['activities', 'Activités & événements'], ['other', 'Autres frais']
+    ['uniforms', 'Tenues'], ['activities', 'Activités & événements'], ['other', 'Autres frais'], ['one-off', 'Frais ponctuels']
   ];
   const groupKey = (line: AccountLine): string => {
     if (line.type === 'registration_fee') return 'registration';
     if (line.type === 'tuition' || line.type === 'transport') return line.type;
     if (line.type === 'uniforms' || ['uniform', 'sports_uniform'].includes(line.category || '')) return 'uniforms';
-    if (['activity', 'excursion', 'event', 'photo', 'exam'].includes(line.category || '')) return 'activities';
+    if (['exam', 'exceptional'].includes(line.category || '')) return 'one-off';
+    if (['activity', 'excursion', 'event'].includes(line.category || '')) return 'activities';
     return 'other';
   };
   return definitions.flatMap(([key, label]) => {

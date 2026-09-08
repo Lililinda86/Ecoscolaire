@@ -79,7 +79,8 @@ try {
       await seed('studentFinance', id, { id, studentId: id, schoolId, registrationFeeExpected: 15000, registrationFeePaid: 0, feeT1: 0, feeT2: 0, feeT3: 0 });
       const before = await account(id);
       if (cycle !== 'primary') assert.equal(before.lines.some(line => line.type === 'transport'), false);
-      const plan = await call('setStudentTransportPlan', { studentId: id, usesTransport: true, zonePk: pk });
+      const plan = await call('setStudentTransportPlan', { studentId: id, usesTransport: true });
+      assert.equal((await db.collection('studentPrivate').doc(id).get()).data().transportZonePk, pk);
       const amount = cycle === 'secondary' ? 0 : pk === 18 ? 4000 : 5000;
       assert.equal(plan.monthlyGrossAmount, amount);
       const lines = (await account(id)).lines.filter(line => line.type === 'transport');
@@ -94,6 +95,10 @@ try {
   for (const [key, name, active] of [['ms', 'Maternelle Moyenne Section', true], ['gs', 'Maternelle Grande Section', true], ['en', 'Nursery 2', true], ['old', 'Maternelle 2', false]]) {
     await seed('classes', `${schoolId}-${key}`, { schoolId, name, cycle: 'nursery', academicYearId: yearId, isActive: active });
   }
+  students.nurseryMS = `${schoolId}-ms-student`;
+  await seed('students', students.nurseryMS, { schoolId, classId: `${schoolId}-ms`, academicYearId: yearId, academicYear: year, usesTransport: false, name: 'ALLFEES Maternelle MS', matricule: 'AF-MS', schoolingStatus: 'active', gender: 'F', section: 'francophone' });
+  await seed('studentPrivate', students.nurseryMS, { schoolId, studentId: students.nurseryMS, transportZonePk: null });
+  await seed('studentFinance', students.nurseryMS, { schoolId, studentId: students.nurseryMS, registrationFeeExpected: 15000 });
   const studentId = students.primary18;
   await denied(call('getStudentFinancialAccount', { studentId, academicYear: year }, 'foreign'));
   const categories = ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other'];
@@ -185,6 +190,7 @@ try {
   const transportCard = previewPage.getByRole('region', { name: 'Transport', exact: true });
   await expect(transportCard).toContainText(/4\s*000\s*FCFA/);
   await expect(transportCard).toContainText(/5\s*000\s*FCFA/);
+  await expect(previewPage.getByText('Maternelle Moyenne Section', { exact: true })).toBeVisible();
   await previewPage.screenshot({ path: 'all-fees-transport-defaults.png', fullPage: true });
   await previewContext.close();
   pass('TRANSPORT DEFAULT 4000 / 5000 VISIBLE WITHOUT STORED PK RATES');
@@ -324,6 +330,119 @@ try {
   await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Finances & tarifs', exact: true }).click();
+  // Exercise the exact nursery workflow, including implicit scope and actual deselection.
+  await settingsPage.getByText('Créer un nouveau frais', { exact: true }).click();
+  const nurseryCycles = settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true });
+  const nurseryClasses = settingsPage.getByRole('group', { name: 'Classes concernées', exact: true });
+  const nurseryStudents = settingsPage.getByRole('group', { name: 'Élèves concernés', exact: true });
+  await expect(nurseryClasses.getByRole('checkbox')).toHaveCount(7);
+  await expect(nurseryStudents.getByRole('checkbox')).toHaveCount(9);
+  await settingsPage.getByLabel('Type de frais').selectOption('exam');
+  await settingsPage.getByLabel('Libellé précis du frais', { exact: true }).fill('Examen maternelle TEST');
+  await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('10000');
+  await nurseryCycles.getByRole('checkbox', { name: 'Maternelle', exact: true }).check();
+  await expect(nurseryClasses.getByRole('checkbox')).toHaveCount(5);
+  await expect(nurseryStudents.getByRole('checkbox')).toHaveCount(4);
+  await expect(nurseryClasses.getByRole('checkbox', { name: 'CP', exact: true })).toHaveCount(0);
+  await nurseryClasses.getByRole('checkbox', { name: 'Maternelle Petite Section', exact: true }).check();
+  await expect(nurseryStudents.getByRole('checkbox')).toHaveCount(3);
+  await nurseryClasses.getByRole('checkbox', { name: 'Maternelle Moyenne Section', exact: true }).check();
+  await nurseryStudents.getByRole('checkbox', { name: 'ALLFEES Maternelle MS — AF-MS', exact: true }).check();
+  await nurseryStudents.getByRole('checkbox', { name: 'ALLFEES nursery PK18 — AF-nursery-18', exact: true }).check();
+  await nurseryClasses.getByRole('checkbox', { name: 'Maternelle Moyenne Section', exact: true }).uncheck();
+  await expect(nurseryStudents.getByRole('checkbox', { name: 'ALLFEES Maternelle MS — AF-MS', exact: true })).toHaveCount(0);
+  await nurseryClasses.getByRole('button', { name: 'Tout désélectionner — classes', exact: true }).click();
+  await expect(nurseryStudents.getByRole('checkbox')).toHaveCount(4);
+  await nurseryStudents.getByRole('button', { name: 'Tout désélectionner — élèves', exact: true }).click();
+  await nurseryCycles.getByRole('button', { name: 'Tout sélectionner — cycles', exact: true }).click();
+  await expect(nurseryClasses.getByRole('checkbox')).toHaveCount(7);
+  await nurseryCycles.getByRole('button', { name: 'Tout désélectionner — cycles', exact: true }).click();
+  await expect(nurseryClasses.getByRole('checkbox')).toHaveCount(7);
+  await expect(nurseryStudents.getByRole('checkbox')).toHaveCount(9);
+  await nurseryCycles.getByRole('checkbox', { name: 'Maternelle', exact: true }).check();
+  await nurseryClasses.getByRole('searchbox').fill('Petite');
+  await expect(nurseryClasses.getByRole('checkbox')).toHaveCount(2);
+  await nurseryClasses.getByRole('searchbox').fill('');
+  await nurseryClasses.getByRole('checkbox', { name: 'Maternelle Petite Section', exact: true }).check();
+  await nurseryStudents.getByRole('checkbox', { name: 'Tout sélectionner — élèves', exact: true }).check();
+  await nurseryStudents.getByRole('button', { name: 'Tout désélectionner — élèves', exact: true }).click();
+  await nurseryStudents.getByRole('checkbox', { name: 'ALLFEES nursery PK18 — AF-nursery-18', exact: true }).check();
+  await settingsPage.getByRole('button', { name: 'Vérifier avant publication', exact: true }).click();
+  await expect(settingsPage.getByRole('region', { name: 'Résumé avant publication' })).toContainText('Élèves concernés : 1');
+  for (const width of [360, 768, 1440]) {
+    await settingsPage.setViewportSize({ width, height: 1000 });
+    if (width <= 640) {
+      const sidebar = settingsPage.getByTestId('sidebar');
+      if ((await sidebar.getAttribute('class')).includes('sidebar-open')) await sidebar.locator('.sidebar-close-button').click();
+      await expect(sidebar).not.toBeInViewport();
+    }
+    assert.equal(await settingsPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await settingsPage.screenshot({ path: `all-fees-nursery-targets-${width}.png`, fullPage: true });
+  }
+  await settingsPage.getByRole('button', { name: 'Publier le frais', exact: true }).click();
+  await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.some(f => f.label === 'Examen maternelle TEST')).toBe(true);
+  const nurseryFee = (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.find(f => f.label === 'Examen maternelle TEST');
+  assert.deepEqual(nurseryFee.studentIds, [students.nursery18]);
+  for (const outside of [students.nursery36, students.nurseryMS, students.primary18, students.secondary18]) assert.equal((await account(outside)).lines.some(l => l.feeId === nurseryFee.id), false);
+  await page.goto(`${origin}/#/payments`);
+  await page.getByTestId('open-cash-payment').click();
+  await page.getByTestId('cash-payment-student').selectOption(students.nursery18);
+  const nurseryAmount = page.getByLabel('Montant reçu pour Examen maternelle TEST', { exact: true });
+  await nurseryAmount.waitFor({ state: 'attached', timeout: 30000 });
+  const nurseryGroup = nurseryAmount.locator('xpath=ancestor::details[contains(@class,"account-fee-group")]');
+  await expect(nurseryGroup.locator('summary')).toContainText('Frais ponctuels');
+  if (await nurseryGroup.getAttribute('open') === null) await nurseryGroup.locator('summary').first().click();
+  await nurseryAmount.fill('10000');
+  await page.getByTestId('cash-payment-submit').click();
+  await page.getByRole('heading', { name: 'Encaissement enregistré ✓', exact: true }).waitFor({ timeout: 30000 });
+  const nurseryPaid = (await account(students.nursery18)).lines.find(l => l.feeId === nurseryFee.id);
+  assert.equal(nurseryPaid.grossExpectedAmount, 10000); assert.equal(nurseryPaid.previousPaid, 10000); assert.equal(nurseryPaid.remainingBalance, 0);
+  await page.screenshot({ path: 'all-fees-nursery-paid-in-full.png', fullPage: true });
+  pass('NURSERY CLICK CASCADE / MULTI SELECT DESELECT / PUBLICATION / ONE-OFF GROUP / PAID IN FULL');
+
+  // Persist each empty-scope combination and verify actual accounts, not only DOM presence.
+  for (const scope of [
+    { label: 'Tous périmètres TEST', cycle: null, cls: null, included: [students.nursery18, students.primary36, students.secondary18], excluded: [] },
+    { label: 'Toutes classes maternelles TEST', cycle: 'Maternelle', cls: null, included: [students.nursery18, students.nurseryMS], excluded: [students.primary36, students.secondary18] },
+    { label: 'CP tous élèves TEST', cycle: null, cls: 'CP', included: [students.primary18, students.primary36, newStudentId], excluded: [students.nursery18, students.secondary18] }
+  ]) {
+    await settingsPage.getByRole('button', { name: 'Ajouter un frais', exact: true }).click();
+    await settingsPage.getByLabel('Libellé précis du frais', { exact: true }).fill(scope.label);
+    await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('1200');
+    if (scope.cycle) await nurseryCycles.getByRole('checkbox', { name: scope.cycle, exact: true }).check();
+    if (scope.cls) await nurseryClasses.getByRole('checkbox', { name: scope.cls, exact: true }).check();
+    await settingsPage.getByRole('button', { name: 'Vérifier avant publication', exact: true }).click();
+    await settingsPage.getByRole('button', { name: 'Publier le frais', exact: true }).click();
+    await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.some(f => f.label === scope.label)).toBe(true);
+    const scoped = (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.find(f => f.label === scope.label);
+    if (!scope.cycle) assert.deepEqual(scoped.cycles, []);
+    if (!scope.cls) assert.deepEqual(scoped.classIds, []);
+    assert.deepEqual(scoped.studentIds, []);
+    for (const included of scope.included) assert.equal((await account(included)).lines.find(l => l.feeId === scoped.id).grossExpectedAmount, 1200);
+    for (const excluded of scope.excluded) assert.equal((await account(excluded)).lines.some(l => l.feeId === scoped.id), false);
+  }
+  pass('EMPTY CYCLE / EMPTY CLASS / EMPTY STUDENT SCOPES PUBLISHED AND APPLIED CORRECTLY');
+  await settingsPage.getByRole('button', { name: 'Ajouter un frais', exact: true }).click();
+  await settingsPage.getByLabel('Type de frais').selectOption('excursion');
+  await settingsPage.getByLabel('Libellé précis du frais', { exact: true }).fill('Sortie MS facultative TEST');
+  await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('2000');
+  await settingsPage.getByLabel('Obligatoire pour les élèves concernés').uncheck();
+  await nurseryCycles.getByRole('checkbox', { name: 'Maternelle', exact: true }).check();
+  await nurseryClasses.getByRole('checkbox', { name: 'Maternelle Moyenne Section', exact: true }).check();
+  await settingsPage.getByRole('button', { name: 'Vérifier avant publication', exact: true }).click();
+  await settingsPage.getByRole('button', { name: 'Publier le frais', exact: true }).click();
+  await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.some(f => f.label === 'Sortie MS facultative TEST')).toBe(true);
+  const optionalFee = (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.find(f => f.label === 'Sortie MS facultative TEST');
+  assert.equal((await account(students.nurseryMS)).lines.some(l => l.feeId === optionalFee.id), false);
+  await settingsPage.getByLabel('Frais facultatif', { exact: true }).selectOption(optionalFee.id);
+  const eligibleOptional = settingsPage.getByLabel('Élève concerné', { exact: true });
+  await expect(eligibleOptional.locator('option')).toHaveCount(2);
+  await eligibleOptional.selectOption(students.nurseryMS);
+  await settingsPage.getByRole('button', { name: 'Affecter à l’élève', exact: true }).click();
+  await expect.poll(async () => (await account(students.nurseryMS)).lines.find(l => l.feeId === optionalFee.id)?.grossExpectedAmount).toBe(2000);
+  assert.equal((await account(students.nursery18)).lines.some(l => l.feeId === optionalFee.id), false);
+  pass('OPTIONAL FEE UI / NO AUTOMATIC DEBT / FILTERED EXPLICIT ASSIGNMENT');
+
   await expect(settingsPage.getByRole('button', { name: 'Ajouter — Tenues', exact: true })).toBeVisible();
   await settingsPage.getByRole('button', { name: 'Ajouter — Autres frais', exact: true }).click();
   const feeType = settingsPage.getByLabel('Type de frais');

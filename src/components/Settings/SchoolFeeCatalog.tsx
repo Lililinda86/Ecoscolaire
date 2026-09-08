@@ -1,4 +1,4 @@
-import { feeTargetClasses, feeTargetStudents, } from '../../../functions/src/feeTargeting';
+import { feeTargetClasses, feeTargetStudents } from '../../../functions/src/feeTargeting';
 import { getClassOptionLabel } from '../../utils/classCatalog';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
@@ -56,6 +56,7 @@ export function SchoolFeeCatalog() {
   const [classIds, setClassIds] = useState<string[]>([]); const [cycles, setCycles] = useState<string[]>([]);
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
+  const [classSearch, setClassSearch] = useState('');
   const [review, setReview] = useState(false);
   const [recurrence, setRecurrence] = useState('one_off');
   const [feeId, setFeeId] = useState<string>(() => crypto.randomUUID());
@@ -81,19 +82,23 @@ export function SchoolFeeCatalog() {
   if (!school) return null;
   const availableClasses = feeTargetClasses(db.classes, school.id, school.activeAcademicYearId, cycles);
   const selectedClasses = classIds.filter(id => availableClasses.some(c => c.id === id));
-  const availableStudents = feeTargetStudents(db.students, school.id, school.activeAcademicYearId, selectedClasses);
+  const effectiveClasses = selectedClasses.length ? selectedClasses : availableClasses.map(c => c.id);
+  const availableStudents = feeTargetStudents(db.students, school.id, school.activeAcademicYearId, effectiveClasses);
+  const normalizeSearch = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr');
+  const visibleClasses = availableClasses.filter(c => normalizeSearch(getClassOptionLabel(c, availableClasses)).includes(normalizeSearch(classSearch)));
   const selectedStudents = studentIds.filter(id => availableStudents.some(s => s.id === id));
   const search = studentSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr');
   const visibleStudents = availableStudents.filter(s => (s.name + ' ' + (s.matricule || '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr').includes(search));
   const changeCycles = (next: string[]) => {
     setCycles(next); setReview(false);
-    const nextClasses = classIds.filter(id => feeTargetClasses(db.classes, school.id, school.activeAcademicYearId, next).some(c => c.id === id));
+    const eligible = feeTargetClasses(db.classes, school.id, school.activeAcademicYearId, next);
+    const nextClasses = classIds.filter(id => eligible.some(c => c.id === id));
     setClassIds(nextClasses);
-    setStudentIds(old => old.filter(id => feeTargetStudents(db.students, school.id, school.activeAcademicYearId, nextClasses).some(s => s.id === id)));
+    setStudentIds(old => old.filter(id => feeTargetStudents(db.students, school.id, school.activeAcademicYearId, nextClasses.length ? nextClasses : eligible.map(c => c.id)).some(s => s.id === id)));
   };
   const changeClasses = (next: string[]) => {
     setClassIds(next); setReview(false);
-    setStudentIds(old => old.filter(id => feeTargetStudents(db.students, school.id, school.activeAcademicYearId, next).some(s => s.id === id)));
+    setStudentIds(old => old.filter(id => feeTargetStudents(db.students, school.id, school.activeAcademicYearId, next.length ? next : availableClasses.map(c => c.id)).some(s => s.id === id)));
   };
   const openEditor = (fee?: Fee, revise = false, type = 'uniform') => {
     setEditing(revise && fee ? fee : null); setEditReason(''); setReview(false); setError(''); setMessage('');
@@ -102,7 +107,7 @@ export function SchoolFeeCatalog() {
     setLabel(fee?.label || feeTypes.find(t => t.key === type)?.suggestedLabel || '');
     setAmount(fee ? String(fee.amount) : ''); setDescription(fee?.description || '');
     setDueDate(fee?.dueDate || ''); setMandatory(fee?.mandatory !== false); setRecurrence(fee?.recurrence || 'one_off');
-    setCycles(fee?.cycles || []); setClassIds(fee?.classIds || []); setStudentIds(fee?.studentIds || []); setStudentSearch('');
+    setCycles(fee?.cycles || []); setClassIds(fee?.classIds || []); setStudentIds(fee?.studentIds || []); setStudentSearch(''); setClassSearch('');
     if (editor.current) { editor.current.open = true; editor.current.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }
   };
   const assignedFee = fees.find(f => f.id === assignFee);
@@ -132,7 +137,7 @@ export function SchoolFeeCatalog() {
     {canManage && <details ref={editor}><summary>{editing ? `Modifier : ${editing.label}` : 'Créer un nouveau frais'}</summary>
       <form onChange={() => setReview(false)} onSubmit={async e => {
         e.preventDefault();
-        if (!cycles.length || !selectedClasses.length || (studentIds.length > 0 && !selectedStudents.length)) { setError('Sélectionnez les cycles et classes actifs, puis vérifiez les élèves.'); return; }
+        if (!availableClasses.length || selectedClasses.length !== classIds.length || selectedStudents.length !== studentIds.length) { setError('Le périmètre a changé ou ne contient aucune classe éligible. Vérifiez les classes et élèves avant publication.'); return; }
         if (!review) { setReview(true); return; }
         const category = feeTypes.find(type => type.key === feeType)?.category || 'other';
         if (await run({ action: editing ? 'revise' : 'create', feeId, ...(editing ? { expectedAmount: editing.amount, expectedVersion: editing.versionId || null, reason: editReason } : {}), fee: { label, category, amount: Number(amount), description, mandatory, recurrence, dueDate: dueDate || null, academicYear: school.academicYear, classIds: selectedClasses, cycles, studentIds: selectedStudents } })) {
@@ -153,31 +158,34 @@ export function SchoolFeeCatalog() {
         <p>{mandatory ? 'Affectation automatique aux élèves du périmètre sélectionné.' : 'Aucune dette sans affectation explicite à un élève.'}</p>
         <label>Périodicité<select value={recurrence} onChange={e => setRecurrence(e.target.value)}><option value="one_off">Ponctuel</option><option value="recurring">Récurrent</option></select></label>
         {recurrence === 'recurring' && <p>Chaque nouvelle échéance doit être publiée explicitement comme un frais distinct. Aucune mensualité n’est créée automatiquement.</p>}
-        <fieldset><legend>Cycles concernés</legend>{Object.entries({ nursery: 'Maternelle', primary: 'Primaire', secondary: 'Secondaire' }).map(([key, text]) => <label key={key}><input type="checkbox" checked={cycles.includes(key)} onChange={e => changeCycles(e.target.checked ? [...cycles, key] : cycles.filter(c => c !== key))} />{text}</label>)}</fieldset>
+        <fieldset><legend>Cycles concernés</legend><p>Aucun cycle coché : toutes les classes éligibles de l’établissement.</p><div className="fee-actions"><button type="button" onClick={() => changeCycles(['nursery', 'primary', 'secondary'])}>Tout sélectionner — cycles</button><button type="button" onClick={() => changeCycles([])}>Tout désélectionner — cycles</button></div>{Object.entries({ nursery: 'Maternelle', primary: 'Primaire', secondary: 'Secondaire' }).map(([key, text]) => <label key={key}><input type="checkbox" checked={cycles.includes(key)} onChange={e => changeCycles(e.target.checked ? [...cycles, key] : cycles.filter(c => c !== key))} />{text}</label>)}</fieldset>
         <fieldset><legend>Classes concernées</legend>
           <label><input type="checkbox" disabled={!availableClasses.length} checked={availableClasses.length > 0 && selectedClasses.length === availableClasses.length} onChange={e => changeClasses(e.target.checked ? availableClasses.map(c => c.id) : [])} />Tout sélectionner — classes</label>
-          {!cycles.length && <p>Sélectionnez au moins un cycle.</p>}
-          <div className="fee-target-list">{availableClasses.map(c => <label key={c.id}><input type="checkbox" checked={selectedClasses.includes(c.id)} onChange={e => changeClasses(e.target.checked ? [...selectedClasses, c.id] : selectedClasses.filter(id => id !== c.id))} />{getClassOptionLabel(c, availableClasses)}</label>)}</div>
+          <button type="button" onClick={() => changeClasses([])}>Tout désélectionner — classes</button>
+          <p>Aucune classe cochée : tous les élèves des classes éligibles du périmètre.</p>
+          <label>Rechercher une classe<input type="search" value={classSearch} onChange={e => setClassSearch(e.target.value)} /></label>
+          <div className="fee-target-list">{visibleClasses.map(c => <label key={c.id}><input type="checkbox" checked={selectedClasses.includes(c.id)} onChange={e => changeClasses(e.target.checked ? [...selectedClasses, c.id] : selectedClasses.filter(id => id !== c.id))} />{getClassOptionLabel(c, availableClasses)}</label>)}</div>
         </fieldset>
         <fieldset><legend>Élèves concernés</legend>
-          <p>Aucune sélection individuelle : tous les élèves actifs des classes sélectionnées. Un frais facultatif exige ensuite une affectation explicite.</p>
+          <p>Aucun élève coché : tous les élèves actifs du périmètre défini. Un frais facultatif exige ensuite une affectation explicite.</p>
           <label>Rechercher par nom, prénom ou matricule<input type="search" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} /></label>
           <label><input type="checkbox" disabled={!availableStudents.length} checked={availableStudents.length > 0 && selectedStudents.length === availableStudents.length} onChange={e => setStudentIds(e.target.checked ? availableStudents.map(s => s.id) : [])} />Tout sélectionner — élèves</label>
           <p role="status">{selectedStudents.length} élèves sélectionnés</p>
-          {!selectedClasses.length && <p>Sélectionnez au moins une classe.</p>}
+          <button type="button" onClick={() => { setStudentIds([]); setReview(false); }}>Tout désélectionner — élèves</button>
+          <p>{selectedStudents.length || availableStudents.length} élèves concernés par le périmètre actuel.</p>
           <div className="fee-target-list">{visibleStudents.map(s => <label key={s.id}><input type="checkbox" checked={selectedStudents.includes(s.id)} onChange={e => setStudentIds(e.target.checked ? [...selectedStudents, s.id] : selectedStudents.filter(id => id !== s.id))} />{s.name} — {s.matricule}</label>)}</div>
         </fieldset>
         {review && <section aria-label="Résumé avant publication" className="fee-publication-review">
           <h3>Vérifier avant publication</h3><p><strong>{label}</strong> — {formatCurrency(Number(amount))}</p>
           <p>{mandatory ? 'Obligatoire' : 'Facultatif'} · {recurrence === 'one_off' ? 'Ponctuel' : 'Récurrent'} · {school.academicYear}</p>
-          <p>Cycles : {cycles.map(c => ({ nursery: 'Maternelle', primary: 'Primaire', secondary: 'Secondaire' })[c]).join(', ')}</p>
-          <p>Classes : {availableClasses.filter(c => selectedClasses.includes(c.id)).map(c => getClassOptionLabel(c, availableClasses)).join(', ')}</p>
+          <p>Cycles : {cycles.map(c => ({ nursery: 'Maternelle', primary: 'Primaire', secondary: 'Secondaire' })[c]).join(', ') || 'Tous les cycles éligibles'}</p>
+          <p>Classes : {availableClasses.filter(c => effectiveClasses.includes(c.id)).map(c => getClassOptionLabel(c, availableClasses)).join(', ')}</p>
           <p>Élèves concernés : {selectedStudents.length || availableStudents.length}</p><p>Échéance : {dueDate || 'Non définie'}</p>
           {!mandatory && <p>La publication ne crée aucune dette. Affectez ensuite le frais aux élèves inscrits.</p>}
         </section>}
         <p>Après publication, le tarif est figé. Un nouveau frais crée une obligation supplémentaire ; il ne remplace ni n’annule une dette existante. Désactiver arrête uniquement les nouvelles affectations.</p>
         {editing && <label>Motif de la modification du frais<textarea required maxLength={500} value={editReason} onChange={e => setEditReason(e.target.value)} /></label>}
-        <button disabled={busy || !selectedClasses.length} type="submit">{review ? (editing ? 'Publier les modifications' : 'Publier le frais') : 'Vérifier avant publication'}</button>
+        <button disabled={busy || !availableClasses.length} type="submit">{review ? (editing ? 'Publier les modifications' : 'Publier le frais') : 'Vérifier avant publication'}</button>
       </form>
     </details>}
     <div className="school-fee-groups">{feeTypeGroups.map(group => {

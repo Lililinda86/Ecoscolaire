@@ -29,6 +29,7 @@ export const schoolFees = (school: Data): Data[] => Array.isArray(school.feeCata
 
 export const appliesToStudent = (fee: SchoolFee, student: Data, classData: Data, year: string): boolean =>
   fee.academicYear === year && fee.active && student.schoolingStatus !== 'inactive' && student.isActive !== false && student.active !== false && student.status !== 'inactive' && classData.isActive !== false &&
+  (!classData.academicYearId || classData.academicYearId === student.academicYearId) &&
   (!fee.classIds.length || fee.classIds.includes(String(student.classId))) &&
   (!fee.cycles.length || fee.cycles.includes(resolveCanonicalClassCycle(classData))) &&
   (!fee.studentIds.length || fee.studentIds.includes(String(student.id)));
