@@ -1,4 +1,5 @@
 import { originalTemplates, templateText } from './originalTemplates';
+import { structuredReviewExcerpts, minedubDocuments } from './minedubVerified';
 const ids = ['original-nursery-fr-v1', 'original-primary-fr-v1', 'original-primary-en-v1', 'original-secondary-fr-v1', 'original-secondary-en-v1'];
 const examples: Record<string, { assessment: string; correction: string; remediation: string }> = {
   'original-nursery-fr-v1': {
@@ -31,21 +32,29 @@ export function pedagogicalReviewPackText(): string {
   return ['# PEDAGOGICAL_REVIEW_PACK',
     'STATUS: DRAFT — HUMAN APPROVAL NOT PERFORMED',
     'Five representative cycle/language examples, not exhaustive curriculum coverage. Specific ITALO class/level, prerequisites and suitability require human mapping.',
-    'Source: original assistant-authored ITALO project resources. No official curriculum, third-party document, actual taught lesson, pupil result or teacher decision is asserted.',
+    'Sources: authenticated MINEDUB 2018 documents with short located paraphrases where available; original assistant-authored ITALO exercises remain separate. No actual taught lesson, pupil result or teacher decision is asserted. Official document authenticity does not establish current applicability, redistribution rights or adoption.',
     'Before use: authenticate the applicable MINEDUB/MINESEC source, record exact page/objective, rights, version and received adoption decision. If pre-nursery lies outside verified scope, use ITALO_EARLY_YEARS_PROGRAM with human review, not a MINEDUB label.',
     'Planning below is an Ecoscolaire proposal, never a ministry-prescribed weekly allocation.',
     ...ids.map(id => {
       const resource = originalTemplates.find(row => row.id === id)!;
       const example = examples[id];
+      const excerptId = id.includes('nursery') ? 'nursery-fr-sorting' : id.includes('primary-fr') ? 'primary-fr-sharing' : id.includes('primary-en') ? 'primary-en-sharing' : null;
+      const excerpt = structuredReviewExcerpts.find(row => row.id === excerptId);
+      const document = minedubDocuments.find(row => row.id === excerpt?.documentId);
       return ['## ' + resource.cycle + ' / ' + resource.language.toUpperCase(),
-        'Source locator: internal resource ' + id + ', version ' + resource.version + '. Official locator: MISSING.',
-        'Progression proposed: verify prerequisites → model → guided attempt → independent evidence → review → support → new evidence. Scheduling and duration: teacher decision pending.',
-        templateText(resource), '### Assessment / bilan\n' + example.assessment,
-        '### Correction / observation criteria\n' + example.correction,
-        '### Competency evidence\n' + resource.observation + ' Link only to the exact objective; no automatic official competency equivalence or overall mastery.',
-        '### Remediation / reassessment\n' + example.remediation,
-        '### Human decision form\nReviewer: ______  Date: ______  Class/level: ______\nOfficial source/version/page and rights: ______\nPrerequisites checked: ______\nCorrections requested: ______\nDecision actually received: pending / revise / approve\nTeaching actually confirmed: NOT RECORDED\nReassessment evidence: NOT RECORDED',
+        '### 1. Source and status\n' + (document ? document.title + ', cover edition 2018. OFFICIAL_VERIFIED (authorship only). https://www.minedub.cm/download/350/archives/' + document.download + '\nSHA-256: ' + document.sha + '\nRights UNKNOWN / LINK_ONLY; current applicability and ITALO mapping PENDING.' : 'MINESEC curriculum: MISSING / CHECK_FAILED, official catalogue requests timed out. This internal example is NOT an official programme. Secondary FR/EN level mapping remains unconfirmed.'),
+        '### 2. Structured source excerpt\n' + (excerpt ? JSON.stringify(excerpt, null, 2) : 'No authenticated official excerpt. Subject: mathematics; unit, official lesson, competency, recommended hours, page: null. Internal objective: distinguish constant from nonconstant multipliers. Do not populate official fields from this example.'),
+        '### 3. Proposed planning\nEcoscolaire proposal: prerequisites → model → guided attempt → independent evidence → review → support → new evidence. Scheduling and duration: teacher decision pending. Not a ministry-prescribed weekly allocation.',
+        '### 4. Template\n' + templateText(resource),
+        '### 5. Synthetic preparation\nIdentifier: review-' + id + '; version 1; status DRAFT. Objective: ' + resource.objective + '\nContent: ' + resource.steps.join(' ') + '\nNo teacher validation or classroom teaching recorded.',
+        '### 6. Taught snapshot scenario\nHypothetical fixture only: after received validation and teaching confirmation, snapshot review-' + id + '@1 may include ONLY the activity explicitly taught. Confirmation, effective date and production checksum: NOT RECORDED. Unfinished steps stay excluded. The application binds immutable source/portion hashes; changed content invalidates visas. Do not copy this scenario as a real confirmation.',
+        '### 7. Assessment / bilan\n' + example.assessment + '\nUse only when each question AND answer/correction is supported by the confirmed taught snapshot. Unknown scope: NEEDS_REVIEW. No automatic approval.',
+        '### 8. Correction / observation criteria\n' + example.correction,
+        '### 9. Results and competency evidence\nSynthetic scenario only: record an observed sharing/sorting/calculation attempt and its assistance, not a fabricated pupil result. ' + resource.observation + ' Link only to the exact objective; no automatic official competency equivalence or overall mastery from /20. Reuse Lot D and existing grade links, never a parallel gradebook.',
+        '### 10. Remediation / reassessment\n' + example.remediation,
+        '### 11. Human questions and decision checklist\nIs the proposed source edition and class mapping applicable? Are prerequisites and language suitable? Does every answer and explanation stay inside taught portions? Is duration/barème appropriate? Is support accessible and safe?\nReviewer: ______  Date: ______  Class/level: ______\nOfficial source/version/page and rights: ______\nPrerequisites checked: ______\nCorrections requested: ______\n[ ] APPROVE\n[ ] REQUEST_CHANGE\n[ ] NOT_APPLICABLE\nDecision actually received: PENDING\nTeaching actually confirmed: NOT RECORDED\nReassessment evidence: NOT RECORDED',
       ].join('\n\n');
     }),
+    '## Early years boundary\nPrématernelle / Pre-nursery: ITALO_EARLY_YEARS_PROGRAM / ITALO_INTERNAL / PEDAGOGICAL_APPROVAL_REQUIRED. No separate official scope authenticated. The nursery source is not silently extended to pre-nursery or to a third local nursery year. No mandatory numerical score.',
   ].join('\n\n');
 }

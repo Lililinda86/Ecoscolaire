@@ -79,6 +79,26 @@ test.describe('Lot B — préparations de cours', () => {
       console.log('Synthetic resource checkpoint: opening');
       await page.goto('/#/pedagogy/resources');
       await expect(page.getByRole('heading', { name: 'Ressources pédagogiques', exact: true })).toBeVisible();
+      await page.getByText('Curriculum primaire francophone — niveau 1 (SIL / CP) · OFFICIEL — MINEDUB', { exact: true }).click();
+      await expect(page.getByText(/38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81/)).toBeVisible();
+      for (const width of [360, 768, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+        await expect(page.getByRole('button', { name: 'Télécharger PEDAGOGICAL_REVIEW_PACK' })).toBeVisible();
+        await test.info().attach('resources-review-' + width, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      }
+      const packEvent = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Télécharger PEDAGOGICAL_REVIEW_PACK' }).click();
+      const packDownload = await packEvent;
+      const packStream = await packDownload.createReadStream();
+      if (!packStream) throw new Error('Review pack download missing');
+      const packChunks: Buffer[] = [];
+      for await (const chunk of packStream) packChunks.push(Buffer.from(chunk));
+      const pack = Buffer.concat(packChunks).toString('utf8');
+      expect(pack.match(/### 11\. Human questions/g)).toHaveLength(5);
+      expect(pack).toContain('[ ] APPROVE');
+      expect(pack).toContain('MISSING / CHECK_FAILED');
+      await packDownload.delete();
       await page.getByLabel('Langue', { exact: true }).selectOption('en');
       await page.getByLabel('Cycle', { exact: true }).selectOption('pre_nursery');
       await page.getByText('Explore and name familiar objects', { exact: true }).click();

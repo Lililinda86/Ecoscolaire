@@ -1,3 +1,4 @@
+import { minedubDocuments } from './minedubVerified';
 export type ProvenanceStatus = 'OFFICIAL_VERIFIED' | 'OFFICIAL_PENDING_VERIFICATION' | 'COMPLEMENTARY_VERIFIED' | 'EXTERNAL_LINK_ONLY' | 'ITALO_INTERNAL' | 'MOCK' | 'REJECTED';
 export interface ProvenanceRecord {
   id: string; authority: 'MINEDUB' | 'MINESEC' | 'MINESUP' | 'CEDUC' | 'ITALO' | 'OTHER';
@@ -23,10 +24,20 @@ const metadata: Omit<ProvenanceRecord, 'id' | 'authority' | 'issuingOrganization
 };
 /** Hierarchy is authority scope, not a claim that any corpus has been authenticated. */
 export const provenanceRegistry: ProvenanceRecord[] = [
+  ...minedubDocuments.map((document): ProvenanceRecord => ({ ...metadata,
+    id: document.id, authority: 'MINEDUB', issuingOrganization: 'Ministère de l’Éducation de Base', hostingOrganization: 'MINEDUB', sourceType: 'curriculum',
+    title: document.title, officialUrl: 'https://www.minedub.cm/wp-file-download-search/',
+    retrievalUrl: 'https://www.minedub.cm/download/350/archives/' + document.download,
+    edition: '2018', language: document.language, section: document.language, levels: document.levels,
+    checksumSha256: document.sha, retrievedAt: '2026-09-08', verifiedAt: '2026-09-08',
+    verificationMethod: 'Lien du catalogue public MINEDUB, téléchargement sur le domaine ministériel, couverture et empreinte SHA-256 ; ' + document.pages + ' pages PDF.',
+    status: 'OFFICIAL_VERIFIED', applicability: 'APPLICABLE', accessStatus: 'AVAILABLE', storagePolicy: 'LINK_ONLY',
+    missingReason: 'Authenticité documentaire vérifiée, pas une adoption. Date d’effet et édition actuellement applicable à confirmer. Droits de republication inconnus. Texte intégral non publié. Correspondances ITALO, progression et validation humaine requises.',
+  })),
   { ...metadata, id: 'minedub-catalogue', authority: 'MINEDUB', issuingOrganization: 'Ministère de l’Éducation de Base', hostingOrganization: 'MINEDUB',
     title: 'MINEDUB — éducation de base', officialUrl: 'https://www.minedub.cm/', retrievalUrl: 'https://www.minedub.cm/',
-    applicability: 'APPLICABLE', accessStatus: 'CHECK_FAILED',
-    missingReason: 'Portail indexé le 8 septembre 2026 ; lecture directe instable. Curricula, éditions applicables, périmètre prématernel et droits non authentifiés. Aucun programme importé.' },
+    applicability: 'APPLICABLE', accessStatus: 'AVAILABLE',
+    missingReason: 'Catalogue public consulté le 8 septembre 2026 : huit programmes maternels/primaires FR et EN et deux variantes de fichiers, édition de couverture 2018. Applicabilité actuelle, prématernel et droits restent à confirmer. Métadonnées seulement, pas d’adoption automatique.' },
   { ...metadata, id: 'minesec-catalogue', authority: 'MINESEC', issuingOrganization: 'Ministère des Enseignements Secondaires', hostingOrganization: 'MINESEC',
     title: 'MINESEC — programmes FR et syllabus EN', officialUrl: 'https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels',
     retrievalUrl: 'https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels', applicability: 'APPLICABLE', accessStatus: 'CHECK_FAILED',
