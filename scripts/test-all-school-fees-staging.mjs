@@ -435,8 +435,8 @@ try {
   await expect.poll(async () => (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.some(f => f.label === 'Sortie MS facultative TEST')).toBe(true);
   const optionalFee = (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.find(f => f.label === 'Sortie MS facultative TEST');
   assert.equal((await account(students.nurseryMS)).lines.some(l => l.feeId === optionalFee.id), false);
-  await settingsPage.getByLabel('Frais facultatif', { exact: true }).selectOption(optionalFee.id);
-  const eligibleOptional = settingsPage.getByLabel('Élève concerné', { exact: true });
+  await settingsPage.getByRole('combobox', { name: 'Frais facultatif', exact: true }).selectOption(optionalFee.id);
+  const eligibleOptional = settingsPage.getByRole('combobox', { name: 'Élève concerné', exact: true });
   await expect(eligibleOptional.locator('option')).toHaveCount(2);
   await eligibleOptional.selectOption(students.nurseryMS);
   await settingsPage.getByRole('button', { name: 'Affecter à l’élève', exact: true }).click();
