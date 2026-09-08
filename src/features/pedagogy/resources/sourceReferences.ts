@@ -4,14 +4,14 @@ export const sourceReferences = [
     id: 'minesec-programmes-index', title: 'MINESEC — index des programmes FR/EN',
     url: 'https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels',
     publisher: 'MINESEC', host: 'MINESEC', coverage: 'Enseignement secondaire, catalogues francophone et anglophone',
-    checkedOn: '2026-09-08', access: 'Index consulté ; fichiers du corpus non authentifiés ni intégrés.',
+    checkedOn: '2026-09-08', access: 'Index identifié ; contrôles directs récents expirés (CHECK_FAILED). Fichiers du corpus non authentifiés ni intégrés.',
     rights: 'Droits de redistribution des documents non établis.',
   },
   {
     id: 'minedub-portal', title: 'MINEDUB — portail institutionnel',
     url: 'https://www.minedub.cm/', publisher: 'MINEDUB', host: 'MINEDUB',
     coverage: 'Éducation de base ; aucune couverture de curriculum acquise par ce lien.',
-    checkedOn: '2026-09-08', access: 'Dernière tentative de lecture : erreur HTTP 502. Ne pas considérer le fonds à jour.',
+    checkedOn: '2026-09-08', access: 'Lecture HTTP directe du catalogue réussie après échec du lecteur web. Huit programmes 2018 et deux variantes authentifiés : voir registre ci-dessus. Applicabilité actuelle non établie.',
     rights: 'Droits de redistribution des documents non établis.',
   },
   {

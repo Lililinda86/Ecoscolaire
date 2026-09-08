@@ -3,6 +3,7 @@ import { configuredCurriculumCoverage } from '../../src/features/pedagogy/servic
 import { provenanceRegistry, provenanceBadge, authenticatedOfficialDocument } from '../../src/features/pedagogy/resources/provenanceRegistry';
 import { pedagogicalReviewPackText } from '../../src/features/pedagogy/resources/pedagogicalReviewPack';
 import { minedubDocuments, structuredReviewExcerpts } from '../../src/features/pedagogy/resources/minedubVerified';
+import { resourceTaxonomy } from '../../src/features/pedagogy/resources/resourceTaxonomy';
 it('does not drop preschool or unmapped active classes or claim coverage from a catalogue', () => {
   const rows = configuredCurriculumCoverage('s', 'y', [
     { id: 'pre', schoolId: 's', name: 'Pre', type: 'francophone', subjects: ['language'] },
@@ -36,6 +37,7 @@ it('creates five complete review examples without fabricating human approval', (
   expect(pack).toContain('3 × 2 = 6');
 });
 it('keeps authentication, rights, adoption and partial structuring separate', () => {
+  expect(resourceTaxonomy.map(row => row.kind)).toEqual(['official_exam', 'official_answer_key', 'italo_assessment', 'weekly_assessment', 'mock_exam', 'practice', 'ceduc_resource', 'external_link']);
   expect(minedubDocuments).toHaveLength(10);
   const verified = provenanceRegistry.filter(authenticatedOfficialDocument);
   expect(verified).toHaveLength(10);
