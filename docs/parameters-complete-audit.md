@@ -30,3 +30,5 @@ Base : `origin/staging` eb6e3c6. Travail isolé ; aucune migration ni opération
 ## Validation
 
 Tests ajoutés : cascade multi-cycle/multi-classe, classes inactives/anciennes/étrangères, élèves inactifs/anciens/étrangers, noms officiels, recherche matricule, purge de sélection, revue avant publication, payload facultatif ; refus serveur des cycles/classes/élèves incohérents. Suites financières et Rules via émulateur CI. Smoke Staging et responsive sur fixtures isolées requis avant livraison.
+
+Le barème du modèle d’import élèves utilise désormais les tarifs réels par classe ; ses exemples tarifaires hardcodés sont retirés. Les contrôles PIN et secret Campay ne sont affichés qu’au propriétaire/SuperAdmin, conformément aux droits serveur existants.

@@ -2841,19 +2841,15 @@ const Students: React.FC = () => {
                 const activeClasses = db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId));
                 const wsDataClasses = [
                   ['nom', 'section', 'cycle', 'educationType', 'levelOrder'],
-                  ...activeClasses.map(c => [getClassOptionLabel(c, activeClasses), c.type, c.cycle || '', c.educationType || '', c.levelOrder || ''])
+                  ...activeClasses.map(c => [getDisplayClassName(c.name), c.type, c.cycle || '', c.educationType || '', c.levelOrder || ''])
                 ];
 
                 const wsDataBareme = [
                   ['section', 'classe', 'inscription_attendue', 'scolarite_annuelle', 'tranche_1', 'tranche_2', 'tranche_3', 'transport_mensuel'],
-                  ['anglophone', 'Pre-Nursery', 15000, 130000, 60000, 40000, 20000, 0],
-                  ['anglophone', 'Nursery 1', 15000, 115000, 50000, 40000, 25000, 0],
-                  ['anglophone', 'Class 1', 15000, 85000, 40000, 30000, 15000, 0],
-                  ['anglophone', 'Class 6', 15000, 90000, 50000, 40000, 0, 0],
-                  ['francophone', 'SIL', 15000, 85000, 40000, 30000, 15000, 0],
-                  ['francophone', 'CM2', 15000, 90000, 50000, 40000, 0, 0],
-                  ['francophone', '6ème', 15000, 115000, 50000, 40000, 25000, 0],
-                  ['francophone', '5ème', 15000, 120000, 55000, 40000, 25000, 0]
+                  ...activeClasses.map(c => {
+                    const fees = db.school?.classFees?.[c.name];
+                    return [c.type, getDisplayClassName(c.name), fees?.registration ?? '', fees?.tuition ?? '', fees?.t1 ?? '', fees?.t2 ?? '', fees?.t3 ?? '', ''];
+                  })
                 ];
 
                 const wb = XLSX.utils.book_new();

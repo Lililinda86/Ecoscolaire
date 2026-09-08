@@ -764,6 +764,7 @@ const FullSettings: React.FC = () => {
           />
         </div>
 
+        {canEditInstitution && <>
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div style={{ flex: 1 }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nouveau Code PIN Administrateur</label>
@@ -815,6 +816,7 @@ const FullSettings: React.FC = () => {
           </div>
         </div>
 
+        </>}
         <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '2rem' }}>
           
           <div style={{ flex: 1 }}>
