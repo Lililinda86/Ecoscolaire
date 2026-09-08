@@ -15,11 +15,11 @@ export function FinancialSettingsReadOnly() {
   );
   if (!school) return null;
   const periods = school.transportPolicy?.billingPeriods || [];
-  const rates = school.transportPolicy?.pkRates;
+  const rates = school.transportPolicy?.pkRates ?? { pk14To33: 4000, pk34To42: 5000 };
   return <div className="page-container financial-settings-page financial-settings-readonly">
     <div className="page-header"><div>
       <h1>Paramètres financiers</h1>
-      <p>Consultation des tarifs officiels nécessaires à l’encaissement. Les autres réglages sensibles restent réservés à la direction.</p>
+      <p>Consultation des tarifs officiels nécessaires à l’encaissement. Votre rôle Secrétariat autorise la consultation et l’encaissement. La direction et le propriétaire disposent des actions de création, modification et publication dans Paramètres.</p>
     </div></div>
     <section className="card" aria-labelledby="readonly-deadlines-title">
       <h2 id="readonly-deadlines-title">Scolarité et échéances</h2>
@@ -36,12 +36,13 @@ export function FinancialSettingsReadOnly() {
         <thead><tr><th>Classe</th><th>Inscription</th><th>T1</th><th>T2</th><th>T3</th></tr></thead>
         <tbody>{sortClasses(db.classes.filter(item => activeFeeClass(item, school.id, school.activeAcademicYearId))).map(item => {
           const fees = school.classFees?.[item.name];
-          return <tr key={item.id}><th>{getClassOptionLabel(item, db.classes)}</th><td>{formatCurrency(fees?.registration)}</td><td>{formatCurrency(fees?.t1)}</td><td>{formatCurrency(fees?.t2)}</td><td>{formatCurrency(fees?.t3)}</td></tr>;
+          return <tr key={item.id}><th>{getClassOptionLabel(item, db.classes.filter(c => activeFeeClass(c, school.id, school.activeAcademicYearId)))}</th><td>{formatCurrency(fees?.registration)}</td><td>{formatCurrency(fees?.t1)}</td><td>{formatCurrency(fees?.t2)}</td><td>{formatCurrency(fees?.t3)}</td></tr>;
         })}</tbody>
       </table></div>
     </section>
     <section className="card" aria-labelledby="readonly-transport-title">
       <h2 id="readonly-transport-title">Transport</h2>
+      {school.transportPolicy?.feePolicyId !== 'ITALO_PK_2026' && <p>Barème de référence : activation du transport à configurer par la direction.</p>}
       <p>Maternelle et primaire : transport payant selon le point PK. Secondaire : gratuit, sans dette transport.</p>
       <dl className="financial-readonly-grid">
         <div><dt>PK14 à PK33</dt><dd>{formatCurrency(rates?.pk14To33)} / mois</dd></div>

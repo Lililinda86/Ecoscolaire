@@ -34,7 +34,8 @@ const students = {};
       const preview = await call('getSchoolFeeCatalog', { classId, zonePk: pk }, secretaryId);
       assert.equal(preview.transportTariff.monthlyGrossAmount, cycle === 'secondary' ? 0 : pk === 18 ? 4000 : 5000);
       assert.equal((await db.collection('studentTransportPlans').where('studentId', '==', studentId).get()).size, 0, 'tariff preview never creates a subscription');
-      const plan = await call('setStudentTransportPlan', { studentId, usesTransport: true, zonePk: pk });
+      const plan = await call('setStudentTransportPlan', { studentId, usesTransport: true });
+      assert.equal((await db.collection('studentPrivate').doc(studentId).get()).data().transportZonePk, pk, 'stored PK reused without re-entry');
       assert.equal(plan.monthlyGrossAmount, cycle === 'secondary' ? 0 : pk === 18 ? 4000 : 5000);
       const account = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
       const transport = account.lines.filter(l => l.type === 'transport');
@@ -47,6 +48,11 @@ const students = {};
     }
   }
   const studentId = students.primary18;
+  const { appliesToStudent } = require('../../functions/lib/schoolFeeCatalog');
+  const unrestrictedFee = { academicYear, active: true, cycles: [], classIds: [], studentIds: [] };
+  assert.equal(appliesToStudent(unrestrictedFee, { id: studentId, classId: 'primary', academicYearId: yearId }, { cycle: 'primary', academicYearId: yearId }, academicYear), true);
+  assert.equal(appliesToStudent(unrestrictedFee, { id: studentId, classId: 'primary', academicYearId: yearId }, { cycle: 'primary', academicYearId: 'old-year' }, academicYear), false);
+  assert.equal(appliesToStudent({ ...unrestrictedFee, cycles: ['nursery'] }, { id: studentId, classId: 'primary' }, { cycle: 'primary' }, academicYear), false);
   for (const category of ['uniform', 'sports_uniform', 'books', 'supplies', 'exam', 'canteen', 'childcare', 'activity', 'excursion', 'event', 'photo', 'contribution', 'exceptional', 'other']) {
     const feeId = `fee-${category}-${suffix}`;
     const fee = { label: category, category, amount: 15000, description: 'Test', academicYear, mandatory: category !== 'excursion', dueDate: '2027-06-15', classIds: [], cycles: ['primary'], studentIds: [] };
@@ -64,8 +70,53 @@ const students = {};
   await db.collection('classes').doc(`allfees-class-primary-${suffix}`).update({ isActive: false });
   await assert.rejects(call('manageSchoolFee', { action: 'create', feeId: `inactive-class-${suffix}`, fee: { ...scopeFee, cycles: ['primary'] } }), e => e.code === 'failed-precondition');
   await db.collection('classes').doc(`allfees-class-primary-${suffix}`).update({ isActive: true });
+  const legacySchool = (await db.collection('schools').doc(schoolId).get()).data();
+  await db.collection('schools').doc(schoolId).update({ feeCatalog: [...legacySchool.feeCatalog,
+    { id: 'legacy-edit', label: 'Legacy edit', amount: 2500, cycles: ['secondary'] },
+    { id: 'legacy-archive', label: 'Legacy archive', amount: 3000, cycles: ['nursery'] }] });
+  await call('manageSchoolFee', { action: 'revise', feeId: 'legacy-edit', expectedAmount: 2500, expectedVersion: null, reason: 'Legacy preservation',
+    fee: { label: 'New legacy version', amount: 4500, description: '', category: 'other', academicYear, mandatory: true, cycles: ['primary'], classIds: [], studentIds: [] } });
+  const preservedLegacy = (await call('getStudentFinancialAccount', { studentId: students.secondary18, academicYear }, secretaryId)).lines.find(l => l.feeId === 'legacy-edit');
+  assert.equal(preservedLegacy.grossExpectedAmount, 2500); assert.equal(preservedLegacy.label, 'Legacy edit');
+  await call('manageSchoolFee', { action: 'archive', feeId: 'legacy-edit' });
+  await call('manageSchoolFee', { action: 'archive', feeId: 'legacy-archive' });
+  const archivedLegacy = (await call('getStudentFinancialAccount', { studentId: students.nursery18, academicYear }, secretaryId)).lines.find(l => l.feeId === 'legacy-archive');
+  assert.equal(archivedLegacy.grossExpectedAmount, 3000);
+  // Legacy upgrade's new primary obligations are isolated from the base fixture's line-count checks.
+  for (const collection of ['studentFeeAssignments', 'studentFinancialObligations']) {
+    const docs = await db.collection(collection).where('schoolId', '==', schoolId).get();
+    for (const doc of docs.docs) if (doc.data().feeId === 'legacy-edit' && [students.primary18, students.primary36].includes(doc.data().studentId)) await doc.ref.delete();
+  }
+  // Complete edits preserve established terms, reject stale updates, and do not write a payment.
+  const editId = `full-edit-${suffix}`;
+  const initialFee = { ...scopeFee, label: 'Initial label', cycles: ['primary'], mandatory: true, studentIds: [studentId] };
+  await call('manageSchoolFee', { action: 'create', feeId: editId, fee: initialFee });
+  const initialAccount = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
+  const initialLine = initialAccount.lines.find(l => l.feeId === editId);
+  const paymentsBefore = (await db.collection('payments').where('schoolId', '==', schoolId).get()).size;
+  const editedFee = { ...initialFee, label: 'Revised label', description: 'Revised description', category: 'books', dueDate: '2027-06-20', amount: 9000, studentIds: [students.primary36] };
+  const editPayload = { action: 'revise', feeId: editId, fee: editedFee, expectedAmount: 7500, expectedVersion: null, reason: 'Complete edit test' };
+  await assert.rejects(call('manageSchoolFee', editPayload, secretaryId), e => e.code === 'permission-denied');
+  await call('manageSchoolFee', editPayload);
+  await assert.rejects(call('manageSchoolFee', editPayload), e => e.code === 'failed-precondition');
+  const oldLine = (await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId)).lines.find(l => l.feeId === editId);
+  assert.equal(oldLine.label, initialLine.label); assert.equal(oldLine.grossExpectedAmount, 7500); assert.equal(oldLine.originalDueDate, null);
+  const newLine = (await call('getStudentFinancialAccount', { studentId: students.primary36, academicYear, monthlyTransport: true }, secretaryId)).lines.find(l => l.feeId === editId);
+  assert.equal(newLine.label, 'Revised label'); assert.equal(newLine.grossExpectedAmount, 9000); assert.equal(newLine.originalDueDate, '2027-06-20');
+  assert.equal((await db.collection('payments').where('schoolId', '==', schoolId).get()).size, paymentsBefore);
+  await call('manageSchoolFee', { action: 'archive', feeId: editId });
+  // Remove only this test catalogue/assignment/snapshot to preserve pre-existing exact line-count assertions below.
+  const editSchool = (await db.collection('schools').doc(schoolId).get()).data();
+  await db.collection('schools').doc(schoolId).update({ feeCatalog: editSchool.feeCatalog.filter(f => f.id !== editId) });
+  for (const collection of ['studentFeeAssignments', 'studentFinancialObligations']) {
+    const docs = await db.collection(collection).where('schoolId', '==', schoolId).get();
+    for (const doc of docs.docs) if (doc.data().feeId === editId) await doc.ref.delete();
+  }
   let account = await call('getStudentFinancialAccount', { studentId, academicYear, monthlyTransport: true }, secretaryId);
   assert.equal(account.lines.filter(l => l.type === 'other').length, 13);
+  assert.deepEqual(account.groups.find(g => g.key === 'one-off').lineKeys.sort(), [`other:fee-exam-${suffix}`, `other:fee-exceptional-${suffix}`].sort());
+  assert.equal(account.groups.find(g => g.key === 'one-off').totals.totalBilled, 30000);
+  assert.ok(account.groups.find(g => g.key === 'other').lineKeys.includes(`other:fee-photo-${suffix}`));
   const excursionId = `fee-excursion-${suffix}`;
   await call('manageSchoolFee', { action: 'assign', feeId: excursionId, studentId });
   await call('manageSchoolFee', { action: 'assign', feeId: excursionId, studentId });
@@ -115,5 +166,6 @@ const students = {};
     for (const doc of snap.docs) await doc.ref.delete();
   }
   await db.collection('counters').doc(`receipts_${schoolId}`).delete();
+  for (const version of (await db.collection('schools').doc(schoolId).collection('financialTariffVersions').get()).docs) await version.ref.delete();
   for (const ref of documents.reverse()) await ref.delete();
 }).catch(e => { console.error(e); process.exitCode = 1; });

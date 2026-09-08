@@ -46,7 +46,7 @@ export const setStudentTransportPlan = functions.https.onCall(async (raw, contex
       throw new functions.https.HttpsError('failed-precondition', 'Mois hors année scolaire.');
     }
     if (school.transportPolicy?.feePolicyId !== 'ITALO_PK_2026' || !Array.isArray(periods) || !periods.length || new Set(periods).size !== periods.length) throw new functions.https.HttpsError('failed-precondition', 'Configurer les mois facturables.');
-    const zonePk = raw.zonePk ?? null;
+    const zonePk = raw.zonePk === undefined ? (raw.usesTransport ? privateData.transportZonePk ?? null : null) : raw.zonePk;
     if (raw.usesTransport && (!Number.isSafeInteger(zonePk) || zonePk < 14 || zonePk > 42)) throw new functions.https.HttpsError('invalid-argument', 'Choisir un point PK14 à PK42.');
     const fee = resolveItaloTransportFee({ cycle, usesTransport: raw.usesTransport, zonePk, rates: school.transportPolicy?.pkRates });
     const ref = db.collection('studentTransportPlans').doc(transportPlanId(schoolId, studentId, year.name));
