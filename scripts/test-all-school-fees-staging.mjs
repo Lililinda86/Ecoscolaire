@@ -273,6 +273,7 @@ try {
   for (const heading of ['Tenues', 'Activités / événements', 'Autres frais', 'Frais ponctuels']) {
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
   }
+  await expect(page.getByText('TEST sports_uniform', { exact: true })).toBeVisible({ timeout: 30000 });
   const availableTypes = await page.locator('.school-fee-types').allTextContents();
   for (const label of ['Tenue scolaire', 'Tenue de sport', 'Tenue de cérémonie', 'Autre type de tenue',
     "Kit d’activités", "Fête de l’école", 'Excursion', 'Sortie pédagogique', 'Photos scolaires',
@@ -412,4 +413,5 @@ try {
   console.log('CLEANUP: PASS\nRESIDUALS: 0 (isolated test school)\nORPHANS: 0 (isolated test school)\nPRODUCTION TOUCHED: NO');
   await deleteApp(app);
 }
+
 
