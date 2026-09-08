@@ -211,13 +211,19 @@ export const generateWeeklyAssessmentForActor = async (raw: Data, schoolId: stri
   }
 };
 
-const itemEdit = (raw: unknown, index: number): { id: string; questionText: string; instructions: string; expectedAnswer: string; correctionGuide: string; points: number; order: number } => {
+const itemEdit = (raw: unknown, index: number): { id: string; questionText: string; instructions: string; expectedAnswer: string; correctionGuide: string; points: number; order: number; choices?: string[]; correctAnswer?: string | null } => {
   if (!raw || typeof raw !== 'object') throw new functions.https.HttpsError('invalid-argument', `Question ${index + 1} invalide.`);
   const value = raw as Data;
   const points = Number(value.points);
   const order = Number(value.order);
   if (!Number.isFinite(points) || points <= 0 || points > 100 || !Number.isInteger(order) || order < 1 || order > 100) throw new functions.https.HttpsError('invalid-argument', 'Barème ou ordre invalide.');
-  return { id: documentId(value.id, 'itemId'), questionText: text(value.questionText, 'questionText'), instructions: text(value.instructions, 'instructions', 1000), expectedAnswer: text(value.expectedAnswer, 'expectedAnswer', 5000), correctionGuide: text(value.correctionGuide, 'correctionGuide', 5000), points, order };
+  const structured: { choices?: string[]; correctAnswer?: string | null } = {};
+  if (value.choices !== undefined || value.correctAnswer !== undefined) {
+    if (!Array.isArray(value.choices) || value.choices.length > 5 || value.choices.some((choice: unknown) => typeof choice !== 'string' || choice.length > 1000) || (value.correctAnswer !== null && typeof value.correctAnswer !== 'string') || (typeof value.correctAnswer === 'string' && value.correctAnswer.length > 1000)) throw new functions.https.HttpsError('invalid-argument', 'Choix ou réponse QCM invalide.');
+    structured.choices = value.choices;
+    structured.correctAnswer = value.correctAnswer;
+  }
+  return { id: documentId(value.id, 'itemId'), questionText: text(value.questionText, 'questionText'), instructions: text(value.instructions, 'instructions', 1000), expectedAnswer: text(value.expectedAnswer, 'expectedAnswer', 5000), correctionGuide: text(value.correctionGuide, 'correctionGuide', 5000), points, order, ...structured };
 };
 const assertReviewVersion = (raw: Data, assessment: Data) => {
   if (!sameAssessmentReviewVersion(raw as { generationVersion: number }, assessment as { generationVersion: number })) throw new functions.https.HttpsError('aborted', 'Version modifiée : rechargez avant d’enregistrer une décision.');
@@ -254,7 +260,7 @@ export const saveWeeklyAssessmentEdits = functions.https.onCall(async (raw, cont
       const edit = edits[index];
       const item = schoolDocument(itemSnap, schoolId, 'Question');
       if (item.weeklyAssessmentId !== id || item.generationVersion !== assessment.generationVersion) throw new functions.https.HttpsError('failed-precondition', 'Question hors de la version courante.');
-      transaction.update(itemRefs[index], { questionText: edit.questionText, instructions: edit.instructions, expectedAnswer: edit.expectedAnswer, correctionGuide: edit.correctionGuide, points: edit.points, order: edit.order, lastEditedBy: actor.uid, lastEditedAt: FieldValue.serverTimestamp(), editReason: optionalText(raw?.note, 1000) || 'Corrections enregistrées à la demande de l’enseignant.' });
+      transaction.update(itemRefs[index], { questionText: edit.questionText, instructions: edit.instructions, expectedAnswer: edit.expectedAnswer, correctionGuide: edit.correctionGuide, ...(edit.choices !== undefined ? { choices: edit.choices, correctAnswer: edit.correctAnswer } : {}), points: edit.points, order: edit.order, lastEditedBy: actor.uid, lastEditedAt: FieldValue.serverTimestamp(), editReason: optionalText(raw?.note, 1000) || 'Corrections enregistrées à la demande de l’enseignant.' });
     });
     const contentRevision = Number(assessment.contentRevision || 0) + 1;
     const sections = (assessment.sections || []).map((section: Data) => {

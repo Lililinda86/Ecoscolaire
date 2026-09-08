@@ -48,6 +48,9 @@ export interface GeneratedAssessmentItem {
   instructions: string;
   points: number;
   expectedAnswer: string;
+  /** Absent only on legacy/manual rows. */
+  choices?: string[];
+  correctAnswer?: string | null;
   correctionGuide: string;
   difficulty: 'easy' | 'medium' | 'hard';
   order: number;

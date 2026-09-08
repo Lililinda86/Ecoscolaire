@@ -38,6 +38,7 @@ try {
       expectedAnswer: '5', correctionGuide: language === 'fr' ? 'Accepter toute démarche correcte. Ne pas inférer une compétence globale.' : 'Accept any correct method. Do not infer overall competency.' }));
     items[0].questionText = 'Synthetic fraction: \\( \\frac{1}{2} = \\frac{2}{4} \\)';
     items[0].expectedAnswer = '\\( \\frac{2}{4} \\)';
+    Object.assign(items[1], { questionType: 'multiple_choice', choices: ['4', '5', '6'], correctAnswer: '5' });
     const markup = renderToStaticMarkup(React.createElement(AssessmentPrint, {
       school: { name: 'SYNTHETIC SCHOOL - PRINT QA', address: 'Synthetic address' }, language, mode, sourceChanged: false,
       academicYearLabel: '2026-2027', items,
@@ -50,6 +51,7 @@ try {
       await page.setViewportSize({ width, height: 900 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${language}/${mode}: overflow at ${width}`);
     }
+    assert.equal(await page.locator('.assessment-question').nth(1).locator('ol li').count(), 3, 'Structured QCM choices must be printed');
     await page.emulateMedia({ media: 'print' });
     assert.equal(await page.locator('aside').isVisible(), false);
     assert.equal(await page.locator('.assessment-question').count(), 24);

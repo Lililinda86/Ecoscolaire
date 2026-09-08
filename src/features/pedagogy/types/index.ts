@@ -202,6 +202,8 @@ export interface AssessmentItem {
   instructions: string;
   points: number;
   expectedAnswer: string;
+  choices?: string[];
+  correctAnswer?: string | null;
   correctionGuide: string;
   difficulty: 'easy' | 'medium' | 'hard';
   order: number;

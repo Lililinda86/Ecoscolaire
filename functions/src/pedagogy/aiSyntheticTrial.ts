@@ -4,6 +4,8 @@
  */
 export const PEDAGOGY_SYNTHETIC_TRIAL_ID = 'synthetic-validation-2026-09-06';
 export const PEDAGOGY_SYNTHETIC_TRIAL_MODEL = 'gpt-4.1-mini-2025-04-14';
+export const AI_REVALIDATION_ID = 'quality-revalidation-20260908';
+export const AI_REVALIDATION_CONFIRMATION = 'RUN_PEDAGOGY_REVALIDATION_TWO_ASSESSMENTS';
 export interface SyntheticTrialLedger {
   reservedMicros: number;
   preparationCalls: number;
@@ -13,6 +15,7 @@ export function reserveSyntheticTrial(
   previous: SyntheticTrialLedger,
   purpose: string,
   reserveMicros: number,
+  revalidationAuthorized = false,
 ): SyntheticTrialLedger {
   if (![previous.reservedMicros, previous.preparationCalls, previous.assessmentCalls, reserveMicros]
     .every(value => Number.isSafeInteger(value) && value >= 0) || reserveMicros === 0) throw new Error('AI_TRIAL_LEDGER_INVALID');
@@ -22,6 +25,7 @@ export function reserveSyntheticTrial(
     preparationCalls: previous.preparationCalls + (purpose === 'preparation_analysis' ? 1 : 0),
     assessmentCalls: previous.assessmentCalls + (purpose === 'weekly_assessment' ? 1 : 0),
   };
-  if (next.reservedMicros > 2_000_000 || next.preparationCalls > 5 || next.assessmentCalls > 5) throw new Error('AI_TRIAL_ALLOWANCE_EXHAUSTED');
+  if (revalidationAuthorized && (purpose !== 'weekly_assessment' || previous.preparationCalls !== 5 || previous.assessmentCalls < 5)) throw new Error('AI_REVALIDATION_STATE_INVALID');
+  if (next.reservedMicros > 2_000_000 || next.preparationCalls > 5 || next.assessmentCalls > (revalidationAuthorized ? 7 : 5)) throw new Error('AI_TRIAL_ALLOWANCE_EXHAUSTED');
   return next;
 }

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { originalTemplates, templateText } from '../resources/originalTemplates';
 import { sourceReferences } from '../resources/sourceReferences';
+import { provenanceRegistry, provenanceBadge } from '../resources/provenanceRegistry';
+import { pedagogicalReviewPackText } from '../resources/pedagogicalReviewPack';
 import type { OriginalTemplate, ResourceCycle } from '../resources/originalTemplates';
 
 const cycleLabels: Record<ResourceCycle, string> = { pre_nursery: 'Prématernelle / Pre-nursery', nursery: 'Maternelle / Nursery', primary: 'Primaire / Primary', secondary: 'Collège / Secondary' };
@@ -15,9 +17,22 @@ export default function PedagogyResources() {
     link.href = url; link.download = resource.id + '.txt'; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const downloadReviewPack = () => {
+    const url = URL.createObjectURL(new Blob([pedagogicalReviewPackText()], { type: 'text/markdown;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'PEDAGOGICAL_REVIEW_PACK.md'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const downloadRegistry = () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(provenanceRegistry, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'PROVENANCE_REGISTRY.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   return <div className="pedagogy-page">
     <PedagogyHeader title="Ressources pédagogiques" description="Modèles intégrés consultables et exportables. Aucun téléchargement ne vaut adoption, cours enseigné ou validation par un enseignant." /><PedagogyNav />
+    <button onClick={downloadRegistry}>Exporter le registre complet de provenance (JSON)</button>
+    <section className="pedagogy-card"><h2>Dossier de revue pédagogique humaine</h2><p>Cinq exemples : maternelle FR, primaire FR/EN, secondaire FR/EN. Sources internes originales, progression proposée, préparation, bilan/évaluation, corrigé, preuves d’objectifs et remédiation. Correspondances officielles manquantes et décisions humaines explicitement en attente.</p><button onClick={downloadReviewPack}>Télécharger PEDAGOGICAL_REVIEW_PACK</button></section>
     <div className="pedagogy-alert"><strong>Fonds original à relire : 8 modèles, 4 cycles, français et anglais.</strong><p>Ces textes ont été rédigés avec un assistant pour le projet. Ils ne sont ni des programmes officiels, ni des extraits de CEDUC, ni des contenus validés par les enseignants. Les rattachements au programme et l’adaptation à la classe restent à confirmer.</p></div>
+    <section className="pedagogy-card"><h2>Registre hiérarchisé de provenance</h2><p>MINEDUB : éducation de base. MINESEC : secondaire. MINESUP : uniquement si pertinent. CEDUC : complémentaire, jamais autorité du curriculum.</p>{provenanceRegistry.map(record => <details key={record.id}><summary>{record.title} · {provenanceBadge(record)}</summary><p>Émetteur : {record.issuingOrganization || 'non identifié'}. Hébergeur : {record.hostingOrganization || 'non identifié'}.</p><p>{record.applicability} · {record.accessStatus} · droits {record.rightsStatus} · stockage {record.storagePolicy}</p><p>{record.missingReason}</p>{record.retrievalUrl && <a href={record.retrievalUrl} target="_blank" rel="noopener noreferrer">Consulter le lien externe</a>}<p>Édition/date d’effet/checksum : non établis pour un corpus exploitable. Aucune publication automatique.</p></details>)}</section>
     <section className="pedagogy-card">
       <div className="pedagogy-filters"><label>Langue<select aria-label="Langue" value={language} onChange={event => setLanguage(event.target.value)}><option value="">Toutes</option><option value="fr">Français</option><option value="en">English</option></select></label><label>Cycle<select aria-label="Cycle" value={cycle} onChange={event => setCycle(event.target.value)}><option value="">Tous</option>{Object.entries(cycleLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label><label>Recherche<input aria-label="Recherche" value={search} onChange={event => setSearch(event.target.value)} placeholder="Titre ou objectif" /></label></div>
       <p role="status">{resources.length} modèle(s) affiché(s). Consultation locale, sans appel IA.</p>

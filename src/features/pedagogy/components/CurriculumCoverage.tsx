@@ -1,0 +1,24 @@
+import { useState } from 'react';
+import { useAppContext } from '../../../context/AppContext';
+import { configuredCurriculumCoverage } from '../services/curriculumCoverage';
+import type { CurriculumProgram, SchoolCurriculumAdoption } from '../types';
+export function CurriculumCoverage({ yearId, programs, adoptions, unavailable }: { yearId?: string; programs: CurriculumProgram[]; adoptions: SchoolCurriculumAdoption[]; unavailable: boolean }) {
+  const { db, currentSchool } = useAppContext();
+  const [page, setPage] = useState(0);
+  if (!db || !currentSchool || !yearId || unavailable) return <section className="pedagogy-card"><h2>Couverture du référentiel</h2><p>Couverture indisponible : chargement ou périmètre incomplet. Pas de pourcentage annoncé.</p></section>;
+  const rows = configuredCurriculumCoverage(currentSchool.id, yearId, db.classes || [], db.classSubjects || [], db.classPrograms || [], programs, adoptions);
+  const totalClasses = new Set(rows.map(row => row.classId)).size;
+  const exportMatrix = () => {
+    const blob = new Blob([JSON.stringify({ schoolId: currentSchool.id, academicYearId: yearId, generatedAt: new Date().toISOString(), scope: 'configured classes, not proof of actual opening', rows }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = 'curriculum-coverage.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return <section className="pedagogy-card"><h2>Couverture du référentiel — classes configurées</h2>
+    <p>{totalClasses} classe(s) active(s) configurée(s), {rows.length} ligne(s) classe/matière ou domaine. Les niveaux et matières manquants restent visibles. L’ouverture réelle et les décisions pédagogiques sont à confirmer.</p>
+    <p>Aucune couverture officielle authentifiée acquise. Une adoption historique ou un programme publié ne suffit pas. Pour une classe antérieure au périmètre officiel retrouvé : ITALO_EARLY_YEARS_PROGRAM, validation humaine requise, jamais MINEDUB par défaut.</p>
+    <button disabled={!rows.length} onClick={exportMatrix}>Exporter la matrice complète (JSON)</button>
+    {rows.slice(page * 25, (page + 1) * 25).map((row, index) => <details key={row.classId + ':' + index}><summary>{row.className} · {row.section} · {row.subject}</summary><p>Niveau : {row.level} ; sous-système : {row.subsystem}.</p><p>Source trouvée/authentifiée : non/non. Droits connus : non. Extraction/publication documentaire : non/non. Revue humaine : requise. Décision d’adoption de version reçue : {row.adoptedByITALO ? 'oui' : 'non établie'}.</p><p>{row.missingReason}</p></details>)}
+    {!rows.length && <p>Aucune classe disponible ; cela ne signifie pas une couverture de 100 %.</p>}
+    <button disabled={!page} onClick={() => setPage(page - 1)}>Précédent</button><span> Page {page + 1} </span><button disabled={(page + 1) * 25 >= rows.length} onClick={() => setPage(page + 1)}>Suivant</button>
+  </section>;
+}

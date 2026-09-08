@@ -14,13 +14,22 @@ export const approvedAssessmentLessons = [
   ['fr', 'primary', 'Comparer des nombres', 'Sept est plus grand que cinq. Cinq est plus petit que sept. Sept est egal a sept.'],
 ] as const;
 export function approvedAssessmentEnvelope(index: number, sourceKey: string): StructuredPedagogyRequest {
-  const [language, cycle, title, content] = approvedAssessmentLessons[index];
+  const [language, cycle, title, content] = [...approvedAssessmentLessons, ...revalidationAssessmentLessons][index];
   const policy = { ...defaultPedagogyPolicy({ cycle, section: language === 'en' ? 'anglophone' : 'francophone' }), configured: false };
   return {
     purpose: 'weekly_assessment', sourceKey, schema: assessmentAiSchema,
-    instructions: `Prepare a usable weekly assessment draft entirely in ${language === 'en' ? 'English' : 'French'}. Use ONLY the confirmed taught content supplied. No broader lesson titles or unconfirmed portions may be introduced. Write complete, answerable questions, actual multiple-choice options or actual statements where applicable, precise expected answers and a usable correction guide. The sum of points must equal the policy total; each section must exactly match its questions. Reference only the supplied source/subject identifiers. sourceCurriculumUnitIds must be empty because no official curriculum evidence is supplied. Do not invent missing content. No teacher validation is implied.`,
+    instructions: assessmentInstructions(language),
     content: JSON.stringify({ language, policy, sources: [{ id: 'source_1', subjectId: 'subject_1', classSubjectId: 'class_subject_1', subjectName: language === 'en' ? 'Mathematics' : 'Mathematiques', content: `${title}\n${content}\n${content}` }] }),
   };
+}
+// Exactly two additional wholly original lessons authorized for targeted revalidation.
+// Separate from the historical five fixtures, whose receipts must never be replayed.
+export const revalidationAssessmentLessons = [
+  ['fr', 'primary', 'Addition — revalidation synthétique', 'Notions enseignées synthétiques : trois plus quatre égale sept (3 + 4 = 7) ; deux plus cinq égale sept (2 + 5 = 7). Réunir les deux collections donne leur somme. Seulement ces deux additions ; pas de soustraction, multiplication ou division.'],
+  ['en', 'secondary', 'Equivalent fractions — synthetic revalidation', 'Synthetic taught content: one half equals two quarters (1/2 = 2/4); two thirds equals four sixths (2/3 = 4/6). Multiplying both numerator and denominator by two preserves the value. Only these two examples and doubling; no addition, subtraction, simplification or multiplication of two fractions.'],
+] as const;
+export function assertRevalidationEnvelope(request: StructuredPedagogyRequest) {
+  if (!revalidationAssessmentLessons.some((_, index) => isDeepStrictEqual(approvedAssessmentEnvelope(index + 5, request.sourceKey), request))) throw new Error('AI_REVALIDATION_ENVELOPE_NOT_APPROVED');
 }
 export function approvedPreparationEnvelope(document: NonNullable<StructuredPedagogyRequest['document']>, sourceKey: string): StructuredPedagogyRequest {
   return {
@@ -33,6 +42,7 @@ export function approvedPreparationEnvelope(document: NonNullable<StructuredPeda
 export function assertApprovedSyntheticEnvelope(request: StructuredPedagogyRequest) {
   const candidates = request.purpose === 'preparation_analysis' && request.document
     ? [approvedPreparationEnvelope(request.document, request.sourceKey)]
-    : request.purpose === 'weekly_assessment' ? approvedAssessmentLessons.map((_, index) => approvedAssessmentEnvelope(index, request.sourceKey)) : [];
+    : request.purpose === 'weekly_assessment' ? [...approvedAssessmentLessons, ...revalidationAssessmentLessons].map((_, index) => approvedAssessmentEnvelope(index, request.sourceKey)) : [];
   if (!candidates.some(candidate => isDeepStrictEqual(candidate, request))) throw new Error('AI_SYNTHETIC_ENVELOPE_NOT_APPROVED');
 }
+import { assessmentInstructions } from './assessmentInstructions';

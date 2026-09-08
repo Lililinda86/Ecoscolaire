@@ -10,6 +10,7 @@ export const assessmentAiSchema = object({
   sections: { type: 'array', items: object({ subjectId: text, title: text, itemOrders: { type: 'array', items: { type: 'integer' } }, points: { type: 'number' } }) },
   items: { type: 'array', items: object({ subjectId: text, classSubjectId: text, sourceLessonPreparationIds: texts, sourceCurriculumUnitIds: texts,
     questionType: { type: 'string', enum: [...QUESTION_TYPES] }, questionText: text, instructions: text, points: { type: 'number' }, expectedAnswer: text, correctionGuide: text,
+    choices: texts, correctAnswer: { type: ['string', 'null'] },
     difficulty: { type: 'string', enum: ['easy', 'medium', 'hard'] }, order: { type: 'integer' } }) },
   coverageSummary: object({ coveredSubjectIds: texts, validatedPreparationCount: { type: 'integer' } }), warnings: texts
 });
@@ -28,7 +29,7 @@ export async function generateAssessmentContent(schoolId: string, input: WeeklyA
   }));
   const response = await requestStructuredPedagogyAi(schoolId, {
     purpose: 'weekly_assessment', sourceKey: sourceChecksum(sources), schema: assessmentAiSchema,
-    instructions: `Prepare a usable weekly assessment draft entirely in ${language === 'en' ? 'English' : 'French'}. Use ONLY the confirmed taught content supplied. No broader lesson titles or unconfirmed portions may be introduced. Write complete, answerable questions, actual multiple-choice options or actual statements where applicable, precise expected answers and a usable correction guide. The sum of points must equal the policy total; each section must exactly match its questions. Reference only the supplied source/subject identifiers. sourceCurriculumUnitIds must be empty because no official curriculum evidence is supplied. Do not invent missing content. No teacher validation is implied.`,
+    instructions: assessmentInstructions(language),
     content: JSON.stringify({ language, policy: input.assessmentPolicy, sources: sanitized })
   });
   const generated = validateWeeklyAssessmentResult(response.data);
@@ -59,3 +60,4 @@ export async function generateAssessmentContent(schoolId: string, input: WeeklyA
   if (generated.coverageSummary.validatedPreparationCount !== sources.length) throw new Error('AI_ASSESSMENT_SOURCE_OMITTED');
   return { generated, provider: response.provider, version: `${response.protocolVersion}:${response.model}`, operationId: response.operationId };
 }
+import { assessmentInstructions } from './assessmentInstructions';
