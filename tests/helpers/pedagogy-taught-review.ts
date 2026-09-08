@@ -51,15 +51,18 @@ export async function verifyStoredTaughtReview(page: Page, db: Firestore, f: { s
   await receipt.check(); await visa.click();
   await expect(page.getByText(/Corriger les défauts détectés.*OUTSIDE_TAUGHT_CONTENT/)).toBeVisible();
   expect((await assessmentRef.get()).data()?.status).toBe('needs_review');
-  await page.getByLabel('Réponse attendue', { exact: true }).first().fill('2/4');
-  await page.getByLabel('Consignes de correction', { exact: true }).first().fill('Numerator 1 × 2 = 2; denominator 2 × 2 = 4; resulting fraction 2/4.');
+  console.log('STORED_REVIEW_PHASE: scope rejection verified');
+  await page.getByRole('textbox', { name: /^Réponse attendue/ }).first().fill('2/4');
+  await page.getByRole('textbox', { name: /^Consignes de correction/ }).first().fill('Numerator 1 × 2 = 2; denominator 2 × 2 = 4; resulting fraction 2/4.');
   await page.getByRole('button', { name: 'Enregistrer les corrections', exact: true }).click();
   await expect(page.getByText('Corrections enregistrées à la demande de l’enseignant.', { exact: true })).toBeVisible();
   await expect(receipt).not.toBeChecked();
+  console.log('STORED_REVIEW_PHASE: manual correction saved and receipt reset');
   // Same version number, changed teaching declaration: checksum must still block.
   await prepRef.update({ 'teachingConfirmation.id': 'synthetic-changed-confirmation' });
   await receipt.check(); await visa.click();
   await expect(page.getByText(/Les enseignements ont changé/)).toBeVisible();
+  console.log('STORED_REVIEW_PHASE: changed confirmation rejected');
   await prepRef.update({ 'teachingConfirmation.id': original.teachingConfirmation.id });
   await visa.click();
   await expect(page.getByRole('button', { name: 'Passer prête à imprimer' })).toBeVisible();
