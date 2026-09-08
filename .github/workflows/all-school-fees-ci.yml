@@ -2,7 +2,7 @@ name: All school fees safety
 on:
   pull_request:
   push:
-    branches: [codex/encaissement-all-fees, codex/financial-settings-collection-v3]
+    branches: [codex/encaissement-all-fees, codex/financial-settings-collection-v3, codex/final-financial-catalog-production]
 permissions:
   contents: read
 jobs:
@@ -23,6 +23,8 @@ jobs:
       - run: npm --prefix functions ci
       - run: npm --prefix functions run build
       - run: npm run typecheck:frontend
+      - run: npm run build
+      - run: npm run lint
       - run: npx eslint functions/src/schoolFeeCatalog.ts functions/src/studentFeeAssignments.ts functions/src/studentTransportPlan.ts src/components/Settings/SchoolFeeCatalog.tsx --max-warnings=0
       - run: npx eslint functions/src/classCycle.ts src/components/TransportTariffPreview.tsx --max-warnings=0
       - run: node scripts/check-staging-credential-regressions.mjs
@@ -35,3 +37,4 @@ jobs:
       - run: npx vitest run tests/unit/StudentAccountCollection.spec.tsx tests/unit/StudentAccountBenefitsDrawer.spec.tsx tests/unit/AdvantageRequestPreview.spec.tsx tests/unit/studentAccountReceipt.spec.ts
       - run: npx vitest run tests/unit/TransportTariffPreview.spec.tsx tests/unit/SchoolFeeCatalog.spec.tsx
       - run: npx vitest run tests/unit/AccountFeeGroups.spec.tsx tests/unit/financialSettingsPayload.spec.ts
+      - run: npx vitest run tests/unit/FinancialSettingsReadOnly.spec.tsx tests/unit/TuitionDeadlineSettings.spec.tsx tests/unit/StudentsTransportPersistence.spec.ts

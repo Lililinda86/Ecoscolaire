@@ -14,6 +14,9 @@ const functionsIndex = fs.readFileSync(functionsIndexPath, 'utf8');
 const mainRef = 'refs/heads/main';
 
 const requiredFunctions = new Set([
+  'getSchoolFeeCatalog',
+  'manageSchoolFee',
+  'setStudentTransportPlan',
   'createStudentSecure',
   'submitFinancialBenefit',
   'rejectFinancialBenefit',
@@ -111,7 +114,7 @@ test('Production deploy eligibility is fail-closed for every configured trigger'
   assert.equal(productionDeployJobEligible('workflow_dispatch', 'refs/heads/feature/example'), false);
 });
 
-test('Production deployment includes Firestore Rules and the exact forty-two Functions', () => {
+test('Production deployment includes Firestore Rules and the exact forty-five Functions', () => {
   assert.ok(deployTargets.includes('firestore:rules'));
   assert.deepEqual(deployedFunctions, requiredFunctions);
 });
