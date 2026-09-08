@@ -310,20 +310,20 @@ try {
     'school_trip', 'cultural_activity', 'photo', 'supplies', 'other']) await expect(feeType.locator(`option[value="${option}"]`)).toHaveCount(1);
   const targetClasses = settingsPage.getByRole('group', { name: 'Classes concernées', exact: true });
   const targetStudents = settingsPage.getByRole('group', { name: 'Élèves concernés', exact: true });
-  await settingsPage.getByRole('checkbox', { name: 'Maternelle', exact: true }).check();
+  await settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true }).getByRole('checkbox', { name: 'Maternelle', exact: true }).check();
   await expect(targetClasses.getByRole('checkbox')).toHaveCount(2);
   await expect(targetClasses.getByRole('checkbox', { name: 'CP', exact: true })).toHaveCount(0);
-  await settingsPage.getByRole('checkbox', { name: 'Primaire', exact: true }).check();
+  await settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true }).getByRole('checkbox', { name: 'Primaire', exact: true }).check();
   await expect(targetClasses.getByRole('checkbox')).toHaveCount(3);
   await targetClasses.getByRole('checkbox', { name: 'CP', exact: true }).check();
   await expect(targetStudents.getByRole('checkbox')).toHaveCount(4);
   await targetStudents.getByRole('searchbox').fill('AF-NEW');
   await expect(targetStudents.getByRole('checkbox')).toHaveCount(2);
   await targetStudents.getByRole('searchbox').fill('');
-  await settingsPage.getByRole('checkbox', { name: 'Maternelle', exact: true }).uncheck();
-  await settingsPage.getByRole('checkbox', { name: 'Secondaire', exact: true }).check();
+  await settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true }).getByRole('checkbox', { name: 'Maternelle', exact: true }).uncheck();
+  await settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true }).getByRole('checkbox', { name: 'Secondaire', exact: true }).check();
   await expect(targetClasses.getByRole('checkbox')).toHaveCount(3);
-  await settingsPage.getByRole('checkbox', { name: 'Secondaire', exact: true }).uncheck();
+  await settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true }).getByRole('checkbox', { name: 'Secondaire', exact: true }).uncheck();
   await feeType.selectOption('other');
   await settingsPage.getByLabel('Précisez le libellé du frais').fill('Excursion cascade TEST');
   await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('7500');
@@ -412,3 +412,4 @@ try {
   console.log('CLEANUP: PASS\nRESIDUALS: 0 (isolated test school)\nORPHANS: 0 (isolated test school)\nPRODUCTION TOUCHED: NO');
   await deleteApp(app);
 }
+
