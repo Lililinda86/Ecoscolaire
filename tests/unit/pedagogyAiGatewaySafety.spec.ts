@@ -32,6 +32,8 @@ describe('gateway reservations with simulated transport, NOT real-provider proof
     state.docs.clear(); state.project = 'ecoscolaire-staging';
     state.docs.set('pedagogyAiConfigurations/' + school, configuration);
     vi.stubEnv('PEDAGOGY_AI_SECRET_BINDING_ENABLED', 'true');
+    vi.stubEnv('GCLOUD_PROJECT', 'ecoscolaire-staging');
+    vi.stubEnv('FUNCTIONS_EMULATOR', 'false');
     vi.stubEnv('PEDAGOGY_OPENAI_API_KEY', 'synthetic-unit-value-not-a-key');
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
