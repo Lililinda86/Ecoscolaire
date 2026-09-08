@@ -27,6 +27,15 @@ export interface PreparationAnalyzer {
   analyze(input: PreparationAnalysisInput): Promise<PreparationAnalysisResult>;
 }
 
+/** A valid JSON response is not evidence of complete extraction. Never fill gaps. */
+export function flagIncompleteAiExtraction(result: PreparationAnalysisResult): PreparationAnalysisResult {
+  const missing: string[] = (['lessonTitle', 'subjectName', 'objective', 'assessment'] as const).filter(field => !result[field]);
+  if (!result.lessonSteps.length) missing.push('lessonSteps');
+  if (!missing.length) return result;
+  const warning = 'Extraction incomplète / Incomplete extraction: ' + [...new Set(missing)].join(', ') + '. Comparer au document original / Compare with original.';
+  return { ...result, warnings: [...result.warnings.slice(0, 29), warning] };
+}
+
 const nullableText = (value: unknown, max = 1000): string | null => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value !== 'string' || value.length > max) throw new Error('INVALID_ANALYSIS_SCHEMA');
