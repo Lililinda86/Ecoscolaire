@@ -59,8 +59,8 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       set('schools', f.schoolId, { name: 'École Lot C', schoolCode: 'LOT-C', activeAcademicYearId: f.yearId, academicYear: '2026-2027', subscriptionStatus: 'active', isActive: true });
       set('schools', f.otherSchoolId, { name: 'Autre école', subscriptionStatus: 'active', isActive: true });
       set('academicYears', f.yearId, { schoolId: f.schoolId, name: '2026-2027', startDate: '2026-09-01', endDate: '2027-06-30', status: 'active' });
-      set('classes', f.classId, { schoolId: f.schoolId, name: 'CE1 Lot C', type: 'francophone', section: 'francophone', isActive: true });
-      set('classes', f.failClassId, { schoolId: f.schoolId, name: '[generator-fail] CE2', type: 'francophone', section: 'francophone', isActive: true });
+      set('classes', f.classId, { schoolId: f.schoolId, name: 'CE1 Lot C', cycle: 'primary', type: 'francophone', section: 'francophone', isActive: true });
+      set('classes', f.failClassId, { schoolId: f.schoolId, name: '[generator-fail] CE2', cycle: 'primary', type: 'francophone', section: 'francophone', isActive: true });
       set('staff', f.staffId, { schoolId: f.schoolId, name: 'Mme Validation', role: 'teacher', status: 'active', isActive: true });
       for (const subjectId of ['math', 'fr']) set('teacherAssignments', fixtureId(`assignment-${subjectId}`), { schoolId: f.schoolId, academicYearId: f.yearId, classId: f.classId, subjectId, teacherStaffId: f.staffId, status: 'active', isActive: true });
       set('teachingWeeks', f.weekId, { schoolId: f.schoolId, academicYearId: f.yearId, weekNumber: 1, weekStartDate: '2026-09-07', weekEndDate: '2026-09-13', status: 'open' });
