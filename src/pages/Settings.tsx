@@ -15,6 +15,7 @@ import type { School, EducationCycle } from '../types';
 import { AcademicCalendarSettings } from '../components/Settings/AcademicCalendarSettings';
 import { TuitionDeadlineSettings } from '../components/Settings/TuitionDeadlineSettings';
 import { FinancialSettingsReadOnly } from '../components/Settings/FinancialSettingsReadOnly';
+import { SchoolFeeCatalog } from '../components/Settings/SchoolFeeCatalog';
 import {
   validateTuitionPaymentDeadlines,
   type TuitionPaymentDeadlines
