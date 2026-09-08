@@ -12,7 +12,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { getStorage } = require('firebase-admin/storage');
 const { assertApprovedSyntheticDocument } = require('../functions/lib/pedagogy/approvedSyntheticDocuments.js');
 const { approvedAssessmentLessons } = require('../functions/lib/pedagogy/approvedSyntheticRequests.js');
-const { AI_CONTINUATION_CONFIRMATION, AI_PRIOR_OPERATION_IDS, assertDiagnosedAiContinuation } = require('../functions/lib/pedagogy/aiTrialContinuation.js');
+const { AI_CONTINUATION_CONFIRMATION, AI_PRIOR_OPERATION_IDS, AI_ASSESSMENT_CONTINUATION_CONFIRMATION, AI_ALL_DOCUMENT_OPERATION_IDS, assertDiagnosedAiContinuation, assertDiagnosedAssessmentContinuation } = require('../functions/lib/pedagogy/aiTrialContinuation.js');
 const schoolId = 'pedagogy-ai-validation-20260906';
 const trialId = 'synthetic-validation-2026-09-06';
 const projectId = 'ecoscolaire-staging';
@@ -59,7 +59,9 @@ if (process.argv.includes('--check-only')) {
   assert.match(process.env.GITHUB_SHA || '', /^[a-f0-9]{40}$/);
   assert.equal(process.env.EXPECTED_STAGING_SHA, process.env.GITHUB_SHA);
   assert.equal(process.env.PEDAGOGY_FIREBASE_PROJECT_ID, projectId);
-  const continuation = process.env.PEDAGOGY_AI_TRIAL_CONFIRMATION === AI_CONTINUATION_CONFIRMATION;
+  const assessmentContinuation = process.env.PEDAGOGY_AI_TRIAL_CONFIRMATION === AI_ASSESSMENT_CONTINUATION_CONFIRMATION;
+  const continuation = assessmentContinuation || process.env.PEDAGOGY_AI_TRIAL_CONFIRMATION === AI_CONTINUATION_CONFIRMATION;
+  const reusedDocumentCount = assessmentContinuation ? 5 : continuation ? 2 : 0;
   assert.ok(continuation || process.env.PEDAGOGY_AI_TRIAL_CONFIRMATION === 'RUN_PEDAGOGY_STAGING_AI_USD2');
   assert.ok(!process.env.FIRESTORE_EMULATOR_HOST && !process.env.FIREBASE_AUTH_EMULATOR_HOST);
   assert.ok(process.env.STAGING_FIREBASE_API_KEY, 'FIREBASE_CLIENT_CONFIGURATION_REQUIRED');
@@ -76,24 +78,33 @@ if (process.argv.includes('--check-only')) {
   try {
     const initial = await Promise.all([manifestRef.get(), ledgerRef.get(), db.collection('schools').doc(schoolId).get(), configRef.get(), fridayRef.get()]);
     if (continuation) {
-      assert.ok(!initial[2].exists && !initial[4].exists, 'CONTINUATION_FIXTURE_RESIDUE');
+      assert.ok(!initial[2].exists && (assessmentContinuation || !initial[4].exists), 'CONTINUATION_FIXTURE_RESIDUE');
       const previous = await db.collection('pedagogyAiOperations').where('schoolId', '==', schoolId).limit(11).get();
       const operations = previous.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      assertDiagnosedAiContinuation(initial[0].data() || {}, initial[1].data() || {}, initial[3].data() || {}, operations);
+      if (assessmentContinuation) {
+        assertDiagnosedAssessmentContinuation(initial[0].data() || {}, initial[1].data() || {}, initial[3].data() || {}, operations, initial[4].data() || {});
+        assert.ok((await db.collection('pedagogyFridayRuns').where('schoolId', '==', schoolId).limit(1).get()).empty, 'FRIDAY_RUN_ALREADY_EXISTS_REVIEW_REQUIRED');
+        assert.ok((await fridayRef.collection('trialTicks').limit(1).get()).empty, 'FRIDAY_RECEIPT_ALREADY_EXISTS_REVIEW_REQUIRED');
+      } else assertDiagnosedAiContinuation(initial[0].data() || {}, initial[1].data() || {}, initial[3].data() || {}, operations);
       await db.runTransaction(async tx => {
-        const [manifest, ledger, config] = await Promise.all([tx.get(manifestRef), tx.get(ledgerRef), tx.get(configRef)]);
-        assertDiagnosedAiContinuation(manifest.data() || {}, ledger.data() || {}, config.data() || {}, operations);
-        tx.update(manifestRef, { continuationClaimed: true, previousReport: manifest.data().report, continuationSha: report.sha, continuationRunId: report.runId, state: 'continuation_setting_up' });
+        const [manifest, ledger, config, friday] = await Promise.all([tx.get(manifestRef), tx.get(ledgerRef), tx.get(configRef), tx.get(fridayRef)]);
+        if (assessmentContinuation) {
+          assertDiagnosedAssessmentContinuation(manifest.data() || {}, ledger.data() || {}, config.data() || {}, operations, friday.data() || {});
+          tx.update(manifestRef, { assessmentContinuationClaimed: true, previousContinuationReport: manifest.data().report, assessmentContinuationSha: report.sha, assessmentContinuationRunId: report.runId, state: 'assessment_continuation_setting_up' });
+        } else {
+          assertDiagnosedAiContinuation(manifest.data() || {}, ledger.data() || {}, config.data() || {}, operations);
+          tx.update(manifestRef, { continuationClaimed: true, previousReport: manifest.data().report, continuationSha: report.sha, continuationRunId: report.runId, state: 'continuation_setting_up' });
+        }
       });
-      report.continuationOf = '34185299765';
-      // Read the two immutable paid results; never invoke their callables again.
-      for (let index = 0; index < 2; index++) {
-        const operation = operations.find(item => item.id === AI_PRIOR_OPERATION_IDS[index]);
+      report.continuationOf = assessmentContinuation ? '34187407004' : '34185299765';
+      // Read immutable paid results; never invoke their callables again.
+      for (let index = 0; index < reusedDocumentCount; index++) {
+        const operation = operations.find(item => item.id === (assessmentContinuation ? AI_ALL_DOCUMENT_OPERATION_IDS : AI_PRIOR_OPERATION_IDS)[index]);
         const result = operation.result.data;
         const title = String(result.lessonTitle || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         report.documentChecks.push({ file: files[index].name, sha256: files[index].checksum, operationId: operation.id, reusedPersistedResult: true,
           titleAnchorMatched: title.includes(files[index].keyword), contentAnchorsMatched: extractionAnchors[index].every(anchor => anchor.test(JSON.stringify(result))),
-          draftOnly: true, incompleteFieldsChecked: false, syntheticExtractForReview: result });
+          draftOnly: true, incompleteFieldsChecked: files[index].name === 'primary-fr.pdf' && result.prerequisites.length === 0 && result.differentiation === null && result.warnings.length > 0, syntheticExtractForReview: result });
       }
     } else {
       assert.ok(initial.every(snapshot => !snapshot.exists), 'TRIAL_ALREADY_EXISTS_NO_AUTOMATIC_REPLAY');
@@ -140,7 +151,7 @@ if (process.argv.includes('--check-only')) {
       assert.ok(response.ok, 'STAGING_CALLABLE_FAILED'); const body = await response.json(); assert.ok(!body.error && body.result, 'STAGING_CALLABLE_REJECTED'); return body.result;
     };
     await manifestRef.update({ state: 'running', startedAt: FieldValue.serverTimestamp() });
-    for (const file of files.slice(continuation ? 2 : 0)) {
+    for (const file of files.slice(reusedDocumentCount)) {
       const started = performance.now();
       const result = await call('startLessonPreparationAnalysis', { uploadId: file.uploadId });
       const callableLatencyMs = Math.round(performance.now() - started);
@@ -167,13 +178,18 @@ if (process.argv.includes('--check-only')) {
     // Trigger the actual existing Cloud Scheduler job, never a mocked generator.
     // Refuse a global trigger if any other school's automation is enabled.
     assert.ok((await db.collection('pedagogyFridayConfigurations').where('enabled', '==', true).limit(1).get()).empty, 'OTHER_FRIDAY_CONFIGURATION_ENABLED');
-    await fridayRef.create({ schoolId, academicYearId: yearId, enabled: true, localTime: '12:00', classIds: ['pedagogy-ai-trial-class-0'], version: 1, syntheticTrial: trialId, controlledTrialFriday: '2026-09-04T12:00:00Z', createdAt: FieldValue.serverTimestamp() });
+    if (assessmentContinuation) await fridayRef.update({ enabled: true, assessmentContinuationRunId: report.runId });
+    else await fridayRef.create({ schoolId, academicYearId: yearId, enabled: true, localTime: '12:00', classIds: ['pedagogy-ai-trial-class-0'], version: 1, syntheticTrial: trialId, controlledTrialFriday: '2026-09-04T12:00:00Z', createdAt: FieldValue.serverTimestamp() });
     ownsFriday = true;
     const trigger = async () => {
       try { await executeFile('gcloud', ['scheduler', 'jobs', 'run', 'firebase-schedule-pedagogyFridayScheduler-us-central1', '--project', projectId, '--location', 'us-central1'], { timeout: 30000, maxBuffer: 10000 }); }
       catch { throw new Error('FRIDAY_CONTROLLED_TRIGGER_FAILED'); }
     };
-    await Promise.all([trigger(), trigger()]);
+    // The RunJob control plane rejects simultaneous mutations (ABORTED).
+    // Serialize accepted dispatches; the Functions delivery/lease remains real.
+    await trigger();
+    await trigger();
+    report.fridayTriggerRequestsSerialized = true;
     const fridayDeadline = Date.now() + 240000;
     let ticks, runs;
     do {

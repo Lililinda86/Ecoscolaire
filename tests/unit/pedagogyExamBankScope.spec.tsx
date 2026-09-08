@@ -14,6 +14,17 @@ import PedagogyExamBank from '../../src/features/pedagogy/pages/PedagogyExamBank
 const assessment = { id: 'assessment-a', schoolId: 'a', academicYearId: 'a-year', classId: 'a-class', title: 'Synthetic addition', className: 'CE1', fridayDate: '2026-09-04', generationVersion: 1, contentRevision: 0, coveredSubjects: [{ id: 'math', name: 'Maths' }], status: 'ready_to_print', totalPoints: 20, durationMinutes: 10, weekStartDate: '2026-08-31' };
 const item = { id: 'item', schoolId: 'a', weeklyAssessmentId: assessment.id, generationVersion: 1, order: 1, questionText: 'Three plus four?', expectedAnswer: 'Synthetic answer seven', correctionGuide: 'Synthetic guide', points: 20 };
 afterEach(() => { cleanup(); state.schoolId = 'a'; state.bank.mockReset(); state.items.mockReset(); });
+it('renders only 25 of 500 loaded entries and paginates without new provider work', async () => {
+  state.bank.mockResolvedValue(Array.from({ length: 500 }, (_, index) => ({ ...assessment, id: 'entry-' + index, title: 'Synthetic entry ' + index })));
+  render(<MemoryRouter><PedagogyExamBank /></MemoryRouter>);
+  await waitFor(() => expect(screen.getAllByRole('button', { name: 'Consulter' })).toHaveLength(25));
+  fireEvent.click(screen.getByRole('button', { name: 'Suivant' }));
+  expect(screen.getByText(/Synthetic entry 25 ·/)).toBeTruthy();
+  expect(screen.queryByText(/Synthetic entry 0 ·/)).toBeNull();
+  expect(screen.getAllByRole('button', { name: 'Consulter' })).toHaveLength(25);
+  expect(state.bank).toHaveBeenCalledTimes(1);
+  expect(state.items).not.toHaveBeenCalled();
+});
 it('separates the student sheet from corrections and removes it on school change', async () => {
   state.bank.mockResolvedValueOnce([assessment]).mockResolvedValueOnce([]);
   state.items.mockResolvedValue([item]);

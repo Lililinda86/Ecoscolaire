@@ -57,7 +57,7 @@ export default function PedagogyExamBank() {
   const classes = (db?.classes || []).filter(item => item.schoolId === currentSchool?.id && ['primary', 'secondary'].includes(localEducationStage(item)));
   const year = years.find(item => item.id === yearId) || years.find(item => item.id === currentSchool?.activeAcademicYearId) || years[0];
   const classroom = classes.find(item => item.id === classId) || classes[0];
-  return <main className="pedagogy-page">
+  return <main className="pedagogy-page pedagogy-exam-bank">
     <PedagogyHeader title="Banque d’épreuves internes" description="Consulter les évaluations validées de l’établissement, par année, classe et matière. Aucun appel IA, aucune modification ni validation automatique." /><PedagogyNav />
     <p>Cette banque ne contient pas d’annales officielles intégrées. Les droits des sujets externes restent à vérifier. Le préscolaire utilise les activités et observations, sans épreuves numériques imposées.</p>
     <section className="pedagogy-card pedagogy-filters"><label>Année<select aria-label="Année banque" value={year?.id || ''} onChange={event => setYearId(event.target.value)}>{years.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Classe / section<select aria-label="Classe banque" value={classroom?.id || ''} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.type}</option>)}</select></label></section>
