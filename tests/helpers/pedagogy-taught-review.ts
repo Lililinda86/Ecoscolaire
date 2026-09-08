@@ -17,6 +17,11 @@ export async function verifyStoredTaughtReview(page: Page, db: Firestore, f: { s
   const reviewData = { ...original.reviewData, lessonSteps: '1/2 = 2/4; 2/3 = 4/6. Doubling numerator and denominator only. No multiplication of two fractions.' };
   await prepRef.update({ reviewData, 'teachingConfirmation.reviewChecksum': reviewChecksum({ ...original, reviewData }) });
   const preparations = await db.collection('lessonPreparations').where('schoolId', '==', f.schoolId).get();
+  // The results-only seed did not need the preparation UI's weekStartDate index.
+  const week = (await db.doc('teachingWeeks/' + original.weekId).get()).data()!;
+  const dates = db.batch();
+  for (const document of preparations.docs) dates.update(document.ref, { weekStartDate: week.weekStartDate, weekEndDate: week.weekEndDate });
+  await dates.commit();
   const sources: ValidatedPreparationSource[] = preparations.docs.map(document => {
     const p = document.data();
     return { id: document.id, version: p.version, subjectId: p.subjectId, classSubjectId: p.classSubjectId || p.subjectId, subjectName: p.subjectName || p.subjectId, curriculumUnitId: p.curriculumUnitId || null, lessonTitle: p.reviewData.lessonTitle, objective: p.reviewData.objective, pedagogicalContent: reviewedTeachingContent(p), teachingConfirmationId: p.teachingConfirmation.id, teachingStatus: p.teachingConfirmation.status, effectiveTeachingDate: p.teachingConfirmation.effectiveDate };
