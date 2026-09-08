@@ -27,6 +27,8 @@ export function taughtContentIssues(item: Item, sources: ValidatedPreparationSou
   const fractionProduct = /\d+\s*\/\s*\d+\s*[×*]\s*\d+\s*\/\s*\d+|(?:multiplication|multiply|multiplying|produit|multiplier)\s+(?:(?:of|de|des|two|deux)\s+)*fractions/;
   const operations = [
     { name: 'FRACTION_PRODUCT', expression: fractionProduct, allowed: fractionProduct },
+    { name: 'ADDITION', expression: /\d\s*\+\s*\d|\b(?:addition|add|ajouter)\b/, allowed: /\d\s*\+\s*\d|\b(?:addition|add|ajouter)\b/ },
+    { name: 'MULTIPLICATION', expression: /\d\s*[×*]\s*\d|\b(?:multiplication|multiply|multiplying|multiplier|produit)\b/, allowed: /\d\s*[×*]\s*\d|\b(?:multiplication|multiply|multiplying|multiplier|produit|doubling|double|doubler)\b/ },
     { name: 'SUBTRACTION', expression: /\d\s*[-−]\s*\d|\b(?:subtract|subtraction|soustraction|soustraire)\b/, allowed: /\d\s*[-−]\s*\d|\b(?:subtract|subtraction|soustraction|soustraire)\b/ },
     { name: 'DIVISION', expression: /\d\s*÷\s*\d|\b(?:division|divide|diviser)\b/, allowed: /\d\s*÷\s*\d|\b(?:division|divide|diviser)\b/ },
     { name: 'POWER', expression: /\d\s*\^\s*\d|\b(?:power|exponent|puissance|exposant)\b/, allowed: /\d\s*\^\s*\d|\b(?:power|exponent|puissance|exposant)\b/ },

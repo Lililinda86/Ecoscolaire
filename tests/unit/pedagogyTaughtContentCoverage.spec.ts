@@ -21,6 +21,9 @@ describe('taught snapshot coverage, no provider calls', () => {
     expect(check({ correctionGuide: 'Multiplier deux fractions : 1/2 × 2/2 = 2/4.' }, [fr])).toContain('OUTSIDE_TAUGHT_CONTENT:correctionGuide:FRACTION_PRODUCT');
   });
   it('rejects untaught questions, not just answers', () => {
+    expect(check({ expectedAnswer: '3 + 4 = 7' })).toContain('OUTSIDE_TAUGHT_CONTENT:expectedAnswer:ADDITION');
+    expect(check({ correctionGuide: '3 × 4 = 12' }, [{ ...source, pedagogicalContent: '3 + 4 = 7; 2 + 5 = 7. Pas de multiplication.' }])).toContain('OUTSIDE_TAUGHT_CONTENT:correctionGuide:MULTIPLICATION');
+    expect(check({ choices: ['1/2 × 2/2', '2/4'] })).toContain('OUTSIDE_TAUGHT_CONTENT:choices:FRACTION_PRODUCT');
     expect(check({ questionText: 'Subtract 4 − 2.' })).toContain('OUTSIDE_TAUGHT_CONTENT:questionText:SUBTRACTION');
     expect(check({ questionText: 'Compute 2^3.' })).toContain('OUTSIDE_TAUGHT_CONTENT:questionText:POWER');
   });
