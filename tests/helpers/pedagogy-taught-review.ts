@@ -1,8 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { Firestore } from 'firebase-admin/firestore';
-import { reviewChecksum, reviewedTeachingContent } from '../../functions/src/pedagogy/teachingEvidence';
-import { sourceChecksum, type ValidatedPreparationSource } from '../../functions/src/pedagogy/weeklyAssessmentGenerator';
-import { bindTaughtSnapshot } from '../../functions/src/pedagogy/taughtContentCoverage';
+import { createRequire } from 'node:module';
+import type { ValidatedPreparationSource } from '../../functions/src/pedagogy/weeklyAssessmentGenerator';
+const require = createRequire(import.meta.url);
+const { reviewChecksum, reviewedTeachingContent } = require('../../functions/lib/pedagogy/teachingEvidence');
+const { sourceChecksum } = require('../../functions/lib/pedagogy/weeklyAssessmentGenerator');
+const { bindTaughtSnapshot } = require('../../functions/lib/pedagogy/taughtContentCoverage');
 
 /** Stored synthetic rows exercise the deployed review Functions. NEVER generate
  * content or call an AI provider. All IDs belong to the existing disposable fixture.
