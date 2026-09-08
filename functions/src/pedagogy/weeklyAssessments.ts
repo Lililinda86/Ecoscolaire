@@ -6,6 +6,7 @@ import { admissibleTeachingContent } from './teachingEvidence';
 import { readClassPedagogyPolicy } from './classPolicies';
 import { generateAssessmentContent } from './aiAssessment';
 import { assertAiAssessmentReviewQuality } from './assessmentQualityGate';
+import { bindTaughtSnapshot, taughtContentIssues, TAUGHT_COVERAGE_POLICY } from './taughtContentCoverage';
 import { responsibleTeacher } from './scopes';
 import { allSubjectsValidated, sameAssessmentReviewVersion, SubjectTeacherValidation } from './assessmentReview';
 import {
@@ -172,7 +173,8 @@ export const generateWeeklyAssessmentForActor = async (raw: Data, schoolId: stri
     generated.items.forEach(item => {
       const itemId = `${id}__v${claim.version}__q${String(item.order).padStart(3, '0')}`;
       batch.create(db().collection('assessmentItems').doc(itemId), {
-        id: itemId, weeklyAssessmentId: id, ...sources.identity, ...item, generationVersion: claim.version,
+        id: itemId, weeklyAssessmentId: id, ...sources.identity, ...item, ...bindTaughtSnapshot(item, sources.validated), generationVersion: claim.version,
+        coverageIssues: taughtContentIssues({ ...item, ...bindTaughtSnapshot(item, sources.validated) }, sources.validated),
         createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid
       });
     });
@@ -234,8 +236,19 @@ const assertCurrentTeachingVersions = async (transaction: admin.firestore.Transa
     .where('academicYearId', '==', assessment.academicYearId).where('classId', '==', assessment.classId).where('weekId', '==', assessment.weekId).limit(251));
   const saved = assessment.sourcePreparationVersions || {};
   const admissible = current.docs.filter(document => !admissibleTeachingContent(document.data()).exclusion);
+  const currentSources: ValidatedPreparationSource[] = admissible.map(document => {
+    const preparation = document.data();
+    const { content } = admissibleTeachingContent(preparation);
+    const partial = preparation.teachingConfirmation.status === 'partially_taught';
+    return { id: document.id, version: Number(preparation.version || 1), subjectId: preparation.subjectId,
+      classSubjectId: preparation.classSubjectId || preparation.subjectId, subjectName: preparation.subjectName || preparation.subjectId,
+      curriculumUnitId: preparation.curriculumUnitId || null, lessonTitle: partial ? content.slice(0, 300) : preparation.reviewData.lessonTitle || null,
+      objective: partial ? null : preparation.reviewData.objective || null, pedagogicalContent: content,
+      teachingConfirmationId: preparation.teachingConfirmation.id, teachingStatus: preparation.teachingConfirmation.status,
+      effectiveTeachingDate: preparation.teachingConfirmation.effectiveDate };
+  });
   if (current.size > 250 || current.size !== assessment.expectedPreparationCount || admissible.length !== Object.keys(saved).length ||
-      admissible.some(document => Number(document.data().version || 1) !== saved[document.id])) {
+      admissible.some(document => Number(document.data().version || 1) !== saved[document.id]) || sourceChecksum(currentSources) !== assessment.sourceChecksum) {
     throw new functions.https.HttpsError('failed-precondition', 'Les enseignements ont changé : générez et faites valider une nouvelle révision.');
   }
 };
@@ -260,6 +273,10 @@ export const saveWeeklyAssessmentEdits = functions.https.onCall(async (raw, cont
       const edit = edits[index];
       const item = schoolDocument(itemSnap, schoolId, 'Question');
       if (item.weeklyAssessmentId !== id || item.generationVersion !== assessment.generationVersion) throw new functions.https.HttpsError('failed-precondition', 'Question hors de la version courante.');
+      const corrected = { ...item, ...edit };
+      const snapshot = Array.isArray(assessment.sourceSnapshot) ? assessment.sourceSnapshot : [];
+      const binding = bindTaughtSnapshot(corrected, snapshot);
+      transaction.update(itemRefs[index], { ...binding, coverageIssues: taughtContentIssues({ ...corrected, ...binding }, snapshot) });
       transaction.update(itemRefs[index], { questionText: edit.questionText, instructions: edit.instructions, expectedAnswer: edit.expectedAnswer, correctionGuide: edit.correctionGuide, ...(edit.choices !== undefined ? { choices: edit.choices, correctAnswer: edit.correctAnswer } : {}), points: edit.points, order: edit.order, lastEditedBy: actor.uid, lastEditedAt: FieldValue.serverTimestamp(), editReason: optionalText(raw?.note, 1000) || 'Corrections enregistrées à la demande de l’enseignant.' });
     });
     const contentRevision = Number(assessment.contentRevision || 0) + 1;
@@ -285,6 +302,7 @@ export const recordWeeklyAssessmentTeacherValidation = functions.https.onCall(as
     const assessment = schoolDocument(await transaction.get(ref), schoolId, 'Évaluation');
     assertReviewVersion(raw, assessment);
     if (assessment.status !== 'needs_review') throw new functions.https.HttpsError('failed-precondition', 'Le brouillon doit être relu avant la validation enseignant.');
+    if (assessment.generatorProvider === 'openai' && raw.taughtContentReviewReceived !== true) throw new functions.https.HttpsError('failed-precondition', 'Revue de fidélité reçue requise : questions, réponses, explications et corrigés comparés aux seuls enseignements du snapshot.');
     await assertAiAssessmentReviewQuality(transaction, assessment, schoolId, id);
     await assertCurrentTeachingVersions(transaction, assessment);
     const subjects = assessmentSubjects(assessment);
@@ -292,13 +310,14 @@ export const recordWeeklyAssessmentTeacherValidation = functions.https.onCall(as
     if (!selected.length || selected.some(subjectId => !subjects.includes(subjectId))) throw new functions.https.HttpsError('invalid-argument', 'Matière absente de cette évaluation.');
     for (const subjectId of selected) await responsibleTeacher(transaction, db(), { schoolId, academicYearId: assessment.academicYearId, classId: assessment.classId, subjectId }, teacherStaffId);
     const signatures: SubjectTeacherValidation[] = (assessment.teacherValidations || []).filter((item: SubjectTeacherValidation) => !selected.includes(item.subjectId));
-    signatures.push(...selected.map(subjectId => ({ subjectId, teacherStaffId, recordedBy: actor.uid, recordedAt: Timestamp.now(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum })));
+    signatures.push(...selected.map(subjectId => ({ subjectId, teacherStaffId, recordedBy: actor.uid, recordedAt: Timestamp.now(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum, ...(assessment.generatorProvider === 'openai' ? { taughtContentReviewPolicy: TAUGHT_COVERAGE_POLICY } : {}) })));
     const complete = allSubjectsValidated(subjects, signatures, assessment as { generationVersion: number });
     transaction.create(ref.collection('teacherDecisions').doc(), { schoolId, subjectIds: selected, teacherStaffId, recordedBy: actor.uid, recordedAt: FieldValue.serverTimestamp(), note, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, sourceChecksum: assessment.sourceChecksum });
     transaction.update(ref, {
       status: complete ? 'teacher_validated' : 'needs_review', teacherValidated: complete, teacherValidations: signatures, teacherValidatedAt: complete ? FieldValue.serverTimestamp() : null, teacherStaffId,
       teacherValidationRecordedBy: actor.uid, teacherValidationRecordedAt: FieldValue.serverTimestamp(), teacherValidationNote: optionalText(raw?.note, 1000),
-      teacherValidationMeaning: 'Validation de l’enseignant enregistrée par la secrétaire.', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
+      teacherValidationMeaning: 'Validation de l’enseignant enregistrée par la secrétaire.', updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid,
+      ...(assessment.generatorProvider === 'openai' ? { taughtContentReview: { policy: TAUGHT_COVERAGE_POLICY, sourceChecksum: assessment.sourceChecksum, generationVersion: assessment.generationVersion, contentRevision: assessment.contentRevision || 0, received: true, recordedBy: actor.uid, teacherStaffId, note } } : {})
     });
     audit(transaction, actor, schoolId, 'weekly_assessment_teacher_validation_recorded', 'weeklyAssessment', id, { teacherStaffId, generationVersion: assessment.generationVersion });
   });
@@ -317,6 +336,8 @@ export const markWeeklyAssessmentReadyToPrint = functions.https.onCall(async (ra
     if (sources.checksum !== assessment.sourceChecksum || !allSubjectsValidated(assessmentSubjects(assessment), assessment.teacherValidations || [], assessment as { generationVersion: number })) throw new functions.https.HttpsError('failed-precondition', 'Sources modifiées ou visas par matière incomplets.');
     await assertCurrentTeachingVersions(transaction, assessment);
     if (assessment.status !== 'teacher_validated' || assessment.teacherValidated !== true) throw new functions.https.HttpsError('failed-precondition', 'La validation de l’enseignant doit être enregistrée.');
+    if (assessment.generatorProvider === 'openai' && (assessment.taughtContentReview?.policy !== TAUGHT_COVERAGE_POLICY || !assessment.taughtContentReview?.received || !sameAssessmentReviewVersion(assessment.taughtContentReview, assessment as { generationVersion: number }))) throw new functions.https.HttpsError('failed-precondition', 'Revue de fidélité absente ou ancienne : conserver le brouillon.');
+    if (assessment.generatorProvider === 'openai' && (assessment.teacherValidations || []).some((decision: SubjectTeacherValidation) => decision.taughtContentReviewPolicy !== TAUGHT_COVERAGE_POLICY)) throw new functions.https.HttpsError('failed-precondition', 'Une revue de fidélité reçue est nécessaire pour chaque matière.');
     await assertAiAssessmentReviewQuality(transaction, assessment, schoolId, id);
     transaction.update(ref, { status: 'ready_to_print', readyToPrintAt: FieldValue.serverTimestamp(), readyToPrintBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid });
     audit(transaction, actor, schoolId, 'weekly_assessment_ready_to_print', 'weeklyAssessment', id, { generationVersion: assessment.generationVersion });

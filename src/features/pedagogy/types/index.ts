@@ -187,6 +187,10 @@ export interface WeeklyAssessment {
 }
 
 export interface AssessmentItem {
+  sourceSnapshotChecksum?: string;
+  taughtPortionIds?: string[];
+  coverageIssues?: string[];
+  coverageStatus?: string;
   id: string;
   weeklyAssessmentId: string;
   schoolId: string;

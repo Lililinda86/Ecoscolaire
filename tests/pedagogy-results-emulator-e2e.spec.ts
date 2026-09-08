@@ -5,6 +5,7 @@ import { initializeFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import fixture from './helpers/pedagogy-results-fixture.cjs';
 import { loginAs } from './helpers/auth';
+import { verifyStoredTaughtReview } from './helpers/pedagogy-taught-review';
 
 const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire';
 const staging = process.env.PEDAGOGY_STAGING_E2E === 'true';
@@ -123,6 +124,7 @@ test('Lot D: secretary transfers subject assessments and records received canoni
       expect((await db.collection('pedagogyAiOperations').where('schoolId', '==', f.schoolId).limit(1).get()).empty).toBe(true);
       console.log('LOT_D_BANK: synthetic stored assessment; subject/correction separation; responsive 390/768/1440; zero AI operations');
     }, { timeout: 35_000 });
+    await test.step('Stored taught-content guard without AI calls', () => verifyStoredTaughtReview(page, db, f), { timeout: 60_000 });
     for (const name of ['payments', 'expenses', 'cashClosures', 'buses', 'inventory']) expect((await db.collection(name).where('schoolId', '==', f.schoolId).get()).empty).toBe(true);
     console.log('LOT_D_BROWSER: canonical evaluation and grade writes expected and verified; no real pupil data or human approval');
   } finally {

@@ -1,5 +1,6 @@
 export interface AssessmentReviewVersion { generationVersion: number; contentRevision?: number; sourceChecksum?: string }
 export interface SubjectTeacherValidation extends AssessmentReviewVersion {
+  taughtContentReviewPolicy?: string;
   subjectId: string; teacherStaffId: string; recordedBy: string; note: string; recordedAt?: unknown;
 }
 export function sameAssessmentReviewVersion(left: AssessmentReviewVersion, right: AssessmentReviewVersion) {

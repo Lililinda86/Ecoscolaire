@@ -82,7 +82,11 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
-      - name: Install Chromium
+      - name: Compile current Functions guards without provider calls
+        # The no-AI stored-row fixture imports the current compiled pure guards.
+        # Build first; never load stale tracked Functions output from another SHA.
+        run: npm run build --prefix functions
+      - name: Install Chromium browser
         run: npx playwright install --with-deps chromium
       - name: Synthetic canonical results and teacher-declared support
         run: npx playwright test tests/pedagogy-results-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1

@@ -90,6 +90,14 @@ test.describe('Lot C — évaluations hebdomadaires du vendredi', () => {
       await expect(page.getByText('Évaluation générée.')).toBeVisible({ timeout: 25_000 });
       await expect(page.getByText(/^Version 1 ·/)).toBeVisible(); await expect(page.getByText('20/20', { exact: true })).toBeVisible();
       await expect(page.getByText('BROUILLON — À VALIDER PAR L’ENSEIGNANT')).toBeVisible();
+      await page.getByText('Sources enseignées — périmètre de revue', { exact: true }).click();
+      for (const width of [360, 768, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        const scope = page.locator('details').filter({ has: page.getByText('Sources enseignées — périmètre de revue', { exact: true }) });
+        await expect(scope).toBeVisible();
+        expect(await scope.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+        await test.info().attach('taught-review-' + width, { body: await scope.screenshot(), contentType: 'image/png' });
+      }
       const assessmentId = `${f.schoolId}__${f.yearId}__${f.classId}__${f.weekId}`;
       console.log('[Lot C] generation: 20/20 draft confirmed');
       expect((await firestore.collection('weeklyAssessments').where('schoolId', '==', f.schoolId).where('classId', '==', f.classId).get()).size).toBe(1);
