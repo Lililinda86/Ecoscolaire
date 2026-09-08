@@ -1,4 +1,11 @@
 export const FRIDAY_TIME_ZONE = 'Africa/Douala';
+/** Controlled clock only for the one approved synthetic Staging trial.
+ * Does not grant provider access, alter real-school time, or bypass the ledger. */
+export function fridayTrialClock(now: Date, projectId: string | undefined, schoolId: string, config: Record<string, unknown>) {
+  return projectId === 'ecoscolaire-staging' && schoolId === 'pedagogy-ai-validation-20260906' &&
+    config.syntheticTrial === 'synthetic-validation-2026-09-06' && config.controlledTrialFriday === '2026-09-04T12:00:00Z'
+    ? new Date('2026-09-04T12:00:00Z') : now;
+}
 export interface FridayPolicy { enabled: boolean; localTime: string; classIds: string[] }
 export function parseFridayPolicy(value: unknown): FridayPolicy {
   const policy = value as FridayPolicy;

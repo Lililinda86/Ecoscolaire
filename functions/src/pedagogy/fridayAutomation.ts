@@ -5,7 +5,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { activePedagogyDocument } from './scopes';
 import { mondayIso } from './ids';
-import { FRIDAY_TIME_ZONE, fridayWindow, parseFridayPolicy } from './fridayPolicy';
+import { FRIDAY_TIME_ZONE, fridayWindow, fridayTrialClock, parseFridayPolicy } from './fridayPolicy';
 import { generateWeeklyAssessmentForActor } from './weeklyAssessments';
 
 const configurationCollection = 'pedagogyFridayConfigurations';
@@ -53,8 +53,9 @@ export async function runPedagogyFriday(now = new Date()) {
         await configSnapshot.ref.update({ lastError: 'FRIDAY_CONFIGURATION_INVALID', lastAttemptAt: FieldValue.serverTimestamp() });
         continue;
       }
-      if (config.schoolId !== schoolId || !fridayWindow(now, policy).due) continue;
-      const date = fridayWindow(now, policy).date;
+      const effectiveClock = fridayTrialClock(now, process.env.GCLOUD_PROJECT, schoolId, config);
+      if (config.schoolId !== schoolId || !fridayWindow(effectiveClock, policy).due) continue;
+      const date = fridayWindow(effectiveClock, policy).date;
       const [school, year, weeks] = await Promise.all([
         db.collection('schools').doc(schoolId).get(),
         db.collection('academicYears').doc(config.academicYearId).get(),
@@ -90,7 +91,7 @@ export async function runPedagogyFriday(now = new Date()) {
         await db.runTransaction(async transaction => {
           const current = await transaction.get(ref);
           if (current.data()?.lease !== lease) return;
-          transaction.update(ref, { status, errorCode, assessmentId, leaseUntil: Timestamp.fromMillis(0), completedAt: FieldValue.serverTimestamp(), scheduledFor: Timestamp.fromDate(now) });
+          transaction.update(ref, { status, errorCode, assessmentId, leaseUntil: Timestamp.fromMillis(0), completedAt: FieldValue.serverTimestamp(), scheduledFor: Timestamp.fromDate(effectiveClock), controlledSyntheticClock: effectiveClock !== now });
         });
         await configSnapshot.ref.update({ lastAttemptAt: FieldValue.serverTimestamp(), ...(status === 'succeeded' ? { lastSuccessAt: FieldValue.serverTimestamp(), lastError: null } : { lastError: errorCode }) });
         // At most three potentially slow provider requests per invocation. Other
@@ -104,4 +105,14 @@ export async function runPedagogyFriday(now = new Date()) {
 }
 
 export const pedagogyFridayScheduler = functions.runWith({ timeoutSeconds: 540, memory: '512MB' })
-  .pubsub.schedule('every 15 minutes').timeZone(FRIDAY_TIME_ZONE).onRun(async () => { await runPedagogyFriday(); });
+  .pubsub.schedule('every 15 minutes').timeZone(FRIDAY_TIME_ZONE).onRun(async context => {
+    const result = await runPedagogyFriday();
+    // Non-personal proof that distinct real scheduler deliveries completed.
+    if (process.env.GCLOUD_PROJECT === 'ecoscolaire-staging') {
+      const trial = await admin.firestore().collection(configurationCollection).doc('pedagogy-ai-validation-20260906').get();
+      if (trial.data()?.enabled === true && trial.data()?.syntheticTrial === 'synthetic-validation-2026-09-06' && trial.data()?.controlledTrialFriday === '2026-09-04T12:00:00Z') {
+        const eventId = createHash('sha256').update(context.eventId).digest('hex');
+        await trial.ref.collection('trialTicks').doc(eventId).set({ ...result, eventId, completedAt: FieldValue.serverTimestamp(), syntheticTrial: 'synthetic-validation-2026-09-06' });
+      }
+    }
+  });

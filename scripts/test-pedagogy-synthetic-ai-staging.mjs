@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const executeFile = promisify(execFile);
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
 const { initializeApp, deleteApp } = require('firebase-admin/app');
 const { initializeFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -63,12 +66,13 @@ if (process.argv.includes('--check-only')) {
   const manifestRef = db.collection('pedagogyAiTrialManifests').doc(trialId);
   const ledgerRef = db.collection('pedagogyAiBudgets').doc(trialId);
   const configRef = db.collection('pedagogyAiConfigurations').doc(schoolId);
+  const fridayRef = db.collection('pedagogyFridayConfigurations').doc(schoolId);
   const exact = [], uploaded = [], cleanupIssues = [];
   let storageCreatedCount = 0;
-  let ownsFixture = false, ownsUser = false, manifestCreated = false, failure = null;
+  let ownsFixture = false, ownsUser = false, ownsFriday = false, manifestCreated = false, failure = null;
   const report = { sha: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, model: 'gpt-4.1-mini-2025-04-14', documentChecks: [], assessments: [], successfulProviderOperations: 0, estimatedCostMicros: 0, costBasis: 'observed_tokens_uncached_list_price_upper_bound_not_invoice', cleanupVerified: false, pedagogicalApproval: 'NOT_PERFORMED' };
   try {
-    const initial = await Promise.all([manifestRef.get(), ledgerRef.get(), db.collection('schools').doc(schoolId).get(), configRef.get()]);
+    const initial = await Promise.all([manifestRef.get(), ledgerRef.get(), db.collection('schools').doc(schoolId).get(), configRef.get(), fridayRef.get()]);
     assert.ok(initial.every(snapshot => !snapshot.exists), 'TRIAL_ALREADY_EXISTS_NO_AUTOMATIC_REPLAY');
     await manifestRef.create({ schoolId, sha: report.sha, runId: report.runId, state: 'setting_up', createdAt: FieldValue.serverTimestamp(), fixtureOnly: true, userId: uid, storagePaths: files.map(file => file.storagePath) });
     manifestCreated = true;
@@ -132,11 +136,38 @@ if (process.argv.includes('--check-only')) {
         incompleteFieldsChecked: file.name === 'primary-fr.pdf', syntheticExtractForReview: result.result });
       console.log(JSON.stringify({ phase: 'document', completed: report.documentChecks.length, provider: 'openai' }));
     }
+    // Trigger the actual existing Cloud Scheduler job, never a mocked generator.
+    // Refuse a global trigger if any other school's automation is enabled.
+    assert.ok((await db.collection('pedagogyFridayConfigurations').where('enabled', '==', true).limit(1).get()).empty, 'OTHER_FRIDAY_CONFIGURATION_ENABLED');
+    await fridayRef.create({ schoolId, academicYearId: yearId, enabled: true, localTime: '12:00', classIds: ['pedagogy-ai-trial-class-0'], version: 1, syntheticTrial: trialId, controlledTrialFriday: '2026-09-04T12:00:00Z', createdAt: FieldValue.serverTimestamp() });
+    ownsFriday = true;
+    const trigger = async () => {
+      try { await executeFile('gcloud', ['scheduler', 'jobs', 'run', 'firebase-schedule-pedagogyFridayScheduler-us-central1', '--project', projectId, '--location', 'us-central1'], { timeout: 30000, maxBuffer: 10000 }); }
+      catch { throw new Error('FRIDAY_CONTROLLED_TRIGGER_FAILED'); }
+    };
+    await Promise.all([trigger(), trigger()]);
+    const fridayDeadline = Date.now() + 240000;
+    let ticks, runs;
+    do {
+      ticks = await fridayRef.collection('trialTicks').limit(6).get();
+      runs = await db.collection('pedagogyFridayRuns').where('schoolId', '==', schoolId).limit(2).get();
+      if (runs.docs.some(doc => doc.data().status === 'retryable')) throw new Error('FRIDAY_GENERATION_REQUIRES_DIAGNOSIS');
+      if (ticks.size >= 2 && runs.size === 1 && runs.docs[0].data().status === 'succeeded') break;
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    } while (Date.now() < fridayDeadline);
+    assert.ok(ticks.size >= 2, 'FRIDAY_DOUBLE_DELIVERY_NOT_OBSERVED');
+    assert.equal(runs.size, 1, 'FRIDAY_RUN_COUNT_MISMATCH');
+    assert.equal(runs.docs[0].data().status, 'succeeded', 'FRIDAY_RUN_NOT_SUCCESSFUL');
+    assert.equal(runs.docs[0].data().attempts, 1, 'FRIDAY_DUPLICATE_GENERATION');
+    assert.equal((await ledgerRef.get()).data().assessmentCalls, 1, 'FRIDAY_DUPLICATE_PROVIDER_RESERVATION');
+    await fridayRef.update({ enabled: false, disabledAt: FieldValue.serverTimestamp() });
+    report.fridayAutomation = { actualSchedulerTriggered: true, completedDeliveries: ticks.size, attempts: 1, controlledClock: '2026-09-04T12:00:00Z', generatedAssessmentId: runs.docs[0].data().assessmentId, noDuplicateProviderReservation: true };
     for (const [index, [language, cycle]] of lessons.entries()) {
       const started = performance.now();
       const result = await call('generateWeeklyAssessment', { academicYearId: yearId, classId: `pedagogy-ai-trial-class-${index}`, weekId });
       const callableLatencyMs = Math.round(performance.now() - started);
       if (result.status !== 'needs_review') throw new Error('AI_ASSESSMENT_FAILED: ' + (result.error || 'UNKNOWN'));
+      if (index === 0) assert.equal(result.idempotent, true, 'MANUAL_REPLAY_DID_NOT_REUSE_FRIDAY_DRAFT');
       const assessment = (await db.collection('weeklyAssessments').doc(result.assessmentId).get()).data();
       assert.equal(assessment.generatorProvider, 'openai'); assert.equal(assessment.teacherValidated, false); assert.equal(assessment.totalPoints, 20); assert.ok(assessment.itemCount > 0);
       const items = await db.collection('assessmentItems').where('schoolId', '==', schoolId).where('weeklyAssessmentId', '==', result.assessmentId).limit(101).get();
@@ -155,6 +186,11 @@ if (process.argv.includes('--check-only')) {
     }
   } catch (error) { failure = safeError(error); }
   finally {
+    if (ownsFriday) {
+      try { await fridayRef.update({ enabled: false, disabledAt: FieldValue.serverTimestamp() }); }
+      catch { failure ||= 'FRIDAY_DISABLE_FAILED'; cleanupIssues.push('FRIDAY_DISABLE_FAILED'); }
+      report.retainedFridayAudit = { configuration: fridayRef.path, deliveryReceipts: fridayRef.path + '/trialTicks', runCollection: 'pedagogyFridayRuns', schoolId, reason: 'disabled non-personal scheduler proof retained with consumed trial ledger' };
+    }
     if (ownsFixture) {
       try {
         await configRef.update({ enabled: false, disabledReason: 'TRIAL_FINISHED_OR_INTERRUPTED' });
