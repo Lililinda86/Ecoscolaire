@@ -23,6 +23,7 @@ vi.mock('../../functions/node_modules/firebase-admin/lib/index.js', () => ({
 vi.mock('../../functions/node_modules/firebase-admin/lib/firestore/index.js', () => ({ FieldValue: { serverTimestamp: () => 'synthetic-server-time' } }));
 import { requestStructuredPedagogyAi } from '../../functions/src/pedagogy/aiGateway';
 import { PEDAGOGY_SYNTHETIC_TRIAL_ID } from '../../functions/src/pedagogy/aiSyntheticTrial';
+import { approvedAssessmentEnvelope } from '../../functions/src/pedagogy/approvedSyntheticRequests';
 const school = 'pedagogy-ai-validation-20260906';
 const ledger = 'pedagogyAiBudgets/' + PEDAGOGY_SYNTHETIC_TRIAL_ID;
 const request = { purpose: 'weekly_assessment' as const, instructions: 'Synthetic only', content: 'Synthetic lesson', schema: {}, sourceKey: 'synthetic-source' };
@@ -67,6 +68,33 @@ describe('gateway reservations with simulated transport, NOT real-provider proof
     state.docs.set(ledger, { reservedMicros: 2000000, preparationCalls: 0, assessmentCalls: 0 });
     const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
     await expect(requestStructuredPedagogyAi(school, request)).rejects.toThrow('AI_TRIAL_ALLOWANCE_EXHAUSTED');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('requires the one-use extension manifest before a version 2 transport', async () => {
+    state.docs.set('pedagogyAiConfigurations/' + school, { ...configuration, version: 2 });
+    state.docs.set(ledger, { reservedMicros: 496062, preparationCalls: 5, assessmentCalls: 5 });
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+    await expect(requestStructuredPedagogyAi(school, request)).rejects.toThrow('AI_REVALIDATION_AUTHORIZATION_REQUIRED');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('consumes exactly the two extension reservations and blocks a third before transport', async () => {
+    state.docs.set('pedagogyAiConfigurations/' + school, { ...configuration, version: 2, maxInputBytes: 20000 });
+    state.docs.set(ledger, { reservedMicros: 496062, preparationCalls: 5, assessmentCalls: 5 });
+    state.docs.set('pedagogyAiTrialManifests/quality-revalidation-20260908', { state: 'running', schoolId: school, additionalAssessmentLimit: 2, priorAssessmentCalls: 5, priorPreparationCalls: 5, configurationVersion: 2 });
+    const response = { id: 'synthetic-response', model: configuration.model, status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: '{"draft":true}' }] }], usage: { input_tokens: 1000, output_tokens: 100 } };
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(response) }); vi.stubGlobal('fetch', fetcher);
+    await requestStructuredPedagogyAi(school, approvedAssessmentEnvelope(5, 'synthetic-one'));
+    await requestStructuredPedagogyAi(school, approvedAssessmentEnvelope(6, 'synthetic-two'));
+    expect(state.docs.get(ledger)?.assessmentCalls).toBe(7);
+    await expect(requestStructuredPedagogyAi(school, approvedAssessmentEnvelope(5, 'synthetic-three'))).rejects.toThrow('AI_TRIAL_ALLOWANCE_EXHAUSTED');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it('refuses non-pinned content even with the exact extension manifest', async () => {
+    state.docs.set('pedagogyAiConfigurations/' + school, { ...configuration, version: 2 });
+    state.docs.set(ledger, { reservedMicros: 496062, preparationCalls: 5, assessmentCalls: 5 });
+    state.docs.set('pedagogyAiTrialManifests/quality-revalidation-20260908', { state: 'running', schoolId: school, additionalAssessmentLimit: 2, priorAssessmentCalls: 5, priorPreparationCalls: 5, configurationVersion: 2 });
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+    await expect(requestStructuredPedagogyAi(school, request)).rejects.toThrow('AI_REVALIDATION_ENVELOPE_NOT_APPROVED');
     expect(fetcher).not.toHaveBeenCalled();
   });
   it('blocks altered document bytes before even the token count endpoint', async () => {

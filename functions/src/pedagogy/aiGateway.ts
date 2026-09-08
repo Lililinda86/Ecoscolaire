@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { buildPedagogyAiRequest, parsePedagogyAiResponse, PEDAGOGY_AI_PROTOCOL_VERSION, StructuredPedagogyRequest, validateAiConfiguration } from './aiProtocol';
 import { pedagogyAiRuntimeEnabled } from './aiRuntime';
+import { AI_REVALIDATION_ID } from './aiSyntheticTrial';
+import { assertRevalidationEnvelope } from './approvedSyntheticRequests';
 import { PEDAGOGY_SYNTHETIC_TRIAL_ID, PEDAGOGY_SYNTHETIC_TRIAL_MODEL, reserveSyntheticTrial, type SyntheticTrialLedger } from './aiSyntheticTrial';
 
 // Server-only collections. Secrets, prompts, file contents and pupil data never enter logs.
@@ -35,8 +37,16 @@ export async function requestStructuredPedagogyAi(schoolId: string, request: Str
       if (previous.status === 'succeeded') return { cached: true as const, result: previous.result };
       throw new Error(previous.status === 'processing' ? 'AI_REQUEST_IN_PROGRESS_OR_UNCERTAIN' : 'AI_PREVIOUS_ATTEMPT_REQUIRES_REVIEW');
     }
+    let revalidationAuthorized = false;
+    if (config.version === 2) {
+      const authorization = await transaction.get(db.collection('pedagogyAiTrialManifests').doc(AI_REVALIDATION_ID));
+      const data = authorization.data();
+      if (data?.state !== 'running' || data.schoolId !== schoolId || data.additionalAssessmentLimit !== 2 || data.priorAssessmentCalls !== 5 || data.priorPreparationCalls !== 5 || data.configurationVersion !== 2) throw new Error('AI_REVALIDATION_AUTHORIZATION_REQUIRED');
+      assertRevalidationEnvelope(request);
+      revalidationAuthorized = true;
+    } else if (config.version !== 1) throw new Error('AI_CONFIGURATION_VERSION_NOT_APPROVED');
     const budget = budgetSnap.data() || { reservedMicros: 0, calls: 0 };
-    const nextTrial = reserveSyntheticTrial((trialSnap.data() || { reservedMicros: 0, preparationCalls: 0, assessmentCalls: 0 }) as SyntheticTrialLedger, request.purpose, built.reserveMicros);
+    const nextTrial = reserveSyntheticTrial((trialSnap.data() || { reservedMicros: 0, preparationCalls: 0, assessmentCalls: 0 }) as SyntheticTrialLedger, request.purpose, built.reserveMicros, revalidationAuthorized);
     if (budget.calls >= config.dailyCallLimit || budget.reservedMicros + built.reserveMicros > config.dailyBudgetMicros) throw new Error('AI_DAILY_BUDGET_EXHAUSTED');
     transaction.set(budgetRef, { schoolId, day, calls: budget.calls + 1, reservedMicros: budget.reservedMicros + built.reserveMicros, updatedAt: FieldValue.serverTimestamp() });
     transaction.set(trialRef, { ...nextTrial, trialId: PEDAGOGY_SYNTHETIC_TRIAL_ID, updatedAt: FieldValue.serverTimestamp() });

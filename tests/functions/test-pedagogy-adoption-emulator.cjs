@@ -54,6 +54,14 @@ const context = role => ({ auth: { uid: prefix + '-' + role, token: {} } });
     await qualityRef.update({ expectedAnswer: '2/6 = 1/3' });
     await checkQuality();
     console.log('ASSESSMENT_QUALITY_GATE_EMULATOR_PASS: synthetic stored rows only; manual correction unblocks mechanical checks, no provider call');
+    await qualityRef.update({ questionType: 'multiple_choice', choices: ['7', '8'], correctAnswer: '8', expectedAnswer: '3 + 4 = 7' });
+    await assert.rejects(checkQuality(), error => error.code === 'failed-precondition');
+    await qualityRef.update({ correctAnswer: '7' });
+    await checkQuality();
+    await qualityRef.update({ choices: ['1/2', '2/4'], correctAnswer: '1/2', expectedAnswer: '1/2' });
+    await assert.rejects(checkQuality(), error => error.code === 'failed-precondition');
+    await qualityRef.update({ choices: ['1/2', '1/4'] });
+    await checkQuality();
     console.log('CURRICULUM_ADOPTION_EMULATOR_PASS: scope, received decision, versions, concurrency, legacy preservation; no real pedagogical approval');
   } finally {
     await db.doc('assessmentItems/' + prefix + '-quality').delete();

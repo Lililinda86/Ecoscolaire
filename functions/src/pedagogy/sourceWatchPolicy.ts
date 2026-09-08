@@ -1,6 +1,8 @@
 export const SOURCE_WATCH_MAX_BYTES = 2 * 1024 * 1024;
 export const SOURCE_WATCH_TIMEOUT_MS = 15_000;
-export const SOURCE_WATCH_HOSTS = new Set(['minedub.cm', 'www.minedub.cm', 'minesec.gov.cm', 'www.minesec.gov.cm', 'files.minesec.gov.cm', 'ceduc.cm', 'www.ceduc.cm']);
+// CEDUC identity/access rights are not established; do not silently authorize
+// a guessed domain. MINESUP has no demonstrated applicable category here.
+export const SOURCE_WATCH_HOSTS = new Set(['minedub.cm', 'www.minedub.cm', 'minesec.gov.cm', 'www.minesec.gov.cm', 'files.minesec.gov.cm']);
 export const SYNTHETIC_WATCH_URL = 'https://raw.githubusercontent.com/Lililinda86/Ecoscolaire/staging/tests/fixtures/pedagogy-watch-source.txt';
 
 // An allowlisted host authorizes a bounded public fetch, not a claim of official

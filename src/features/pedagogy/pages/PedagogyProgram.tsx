@@ -4,6 +4,7 @@ import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
 import { adoptCurriculumProgram } from '../services/pedagogyService';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 import { curriculumProvenanceLabel, curriculumProvenanceLink } from '../services/curriculumProvenance';
+import { CurriculumCoverage } from '../components/CurriculumCoverage';
 
 export default function PedagogyProgram() {
   const { db, currentSchool } = useAppContext();
@@ -43,6 +44,7 @@ function ProgramScope({ yearId }: { yearId?: string }) {
   return <main className="pedagogy-page">
     <PedagogyHeader title="Programme de référence" description="Consignez la décision reçue pour une version du catalogue. Publication et adoption ne prouvent pas son authenticité." />
     <PedagogyNav />
+    <CurriculumCoverage yearId={yearId} programs={workspace.programs} adoptions={workspace.adoptions} unavailable={workspace.loading || Boolean(workspace.error)} />
     {workspace.error && <div className="pedagogy-alert pedagogy-alert--error">{workspace.error}</div>}
     <section className="pedagogy-grid">
       <article className="pedagogy-card">

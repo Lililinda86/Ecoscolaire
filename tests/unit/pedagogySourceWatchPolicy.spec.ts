@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { sourceWatchUrl, sourceWatchInterval, sourceWatchChange, SYNTHETIC_WATCH_URL } from '../../functions/src/pedagogy/sourceWatchPolicy';
 
 describe('bounded source-watch policy', () => {
-  it.each(['https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels', 'https://www.minedub.cm/', 'https://www.ceduc.cm/'])('allows an explicitly listed public host without claiming authenticity: %s', url => {
+  it.each(['https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels', 'https://www.minedub.cm/'])('allows an explicitly listed public host without claiming authenticity: %s', url => {
     expect(sourceWatchUrl(url, false)).toBe(url);
   });
   it.each(['http://www.minesec.gov.cm/', 'https://user:password@www.minesec.gov.cm/', 'https://www.minesec.gov.cm:8443/', 'https://www.minesec.gov.cm/?token=private', 'https://www.minesec.gov.cm/#fragment', 'https://localhost/', 'https://127.0.0.1/', 'https://[::1]/', 'https://www.minesec.gov.cm.attacker.invalid/', 'file:///etc/passwd', 'invalid'])('rejects unsafe/unauthorized source: %s', url => {
     expect(() => sourceWatchUrl(url, false)).toThrow();
   });
   it('restricts the original controlled-change fixture to explicit synthetic Staging', () => {
+    expect(() => sourceWatchUrl('https://www.ceduc.cm/', false)).toThrow('SOURCE_HOST_NOT_AUTHORIZED');
     expect(() => sourceWatchUrl(SYNTHETIC_WATCH_URL, false)).toThrow();
     expect(sourceWatchUrl(SYNTHETIC_WATCH_URL, true)).toBe(SYNTHETIC_WATCH_URL);
     expect(() => sourceWatchUrl(SYNTHETIC_WATCH_URL.replace('/staging/', '/main/'), true)).toThrow();

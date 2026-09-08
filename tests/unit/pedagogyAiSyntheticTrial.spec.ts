@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { reserveSyntheticTrial } from '../../functions/src/pedagogy/aiSyntheticTrial';
 const empty = { reservedMicros: 0, preparationCalls: 0, assessmentCalls: 0 };
+it('permits only two additional assessments under explicit non-resetting revalidation', () => {
+  const prior = { reservedMicros: 496062, preparationCalls: 5, assessmentCalls: 5 };
+  const six = reserveSyntheticTrial(prior, 'weekly_assessment', 20000, true);
+  const seven = reserveSyntheticTrial(six, 'weekly_assessment', 20000, true);
+  expect(seven).toEqual({ reservedMicros: 536062, preparationCalls: 5, assessmentCalls: 7 });
+  expect(() => reserveSyntheticTrial(seven, 'weekly_assessment', 1, true)).toThrow('AI_TRIAL_ALLOWANCE_EXHAUSTED');
+  expect(() => reserveSyntheticTrial(prior, 'preparation_analysis', 1, true)).toThrow('AI_REVALIDATION_STATE_INVALID');
+  expect(() => reserveSyntheticTrial(empty, 'weekly_assessment', 1, true)).toThrow('AI_REVALIDATION_STATE_INVALID');
+});
 describe('single authorized synthetic trial allowance (no provider calls)', () => {
   it('permits exactly five document and five assessment reservations within USD 2', () => {
     let ledger = empty;
