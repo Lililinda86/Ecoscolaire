@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck:frontend": "tsc -b",
     "vercel-build": "node scripts/build-vercel.mjs",
     "build:staging": "node scripts/validate-firebase-environment.mjs --mode staging && tsc -b && vite build --mode staging",
     "build:production": "node scripts/validate-firebase-environment.mjs --mode production && tsc -b && vite build --mode production",

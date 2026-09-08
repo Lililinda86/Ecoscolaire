@@ -12,7 +12,7 @@ describe('Students transport persistence contract', () => {
     expect(source).toContain("transportPickupPoint: finalStudent.transportPickupPoint ?? ''");
   });
 
-  it('keeps stable inputs and a read-only summary without displaying a tariff', () => {
+  it('keeps stable inputs and explains the server-authoritative prospective tariff', () => {
     expect(source).toContain('data-testid="student-transport-zone-pk"');
     expect(source).toContain('data-testid="student-transport-neighborhood"');
     expect(source).toContain('data-testid="student-transport-pickup-point"');
@@ -22,7 +22,10 @@ describe('Students transport persistence contract', () => {
       source.indexOf('data-testid="student-transport-summary"'),
       source.indexOf('{/* Récapitulatif compact */}')
     );
-    expect(summary).not.toMatch(/FCFA|tarif/i);
+    expect(summary).toContain('Tarif calculé par le serveur.');
+    expect(summary).toContain('les périodes déjà dues sont conservées');
+    expect(source).toContain('<TransportTariffPreview schoolId={currentSchool.id} classId={currentStudent.classId} zonePk={currentStudent.transportZonePk}');
+    expect(summary).not.toMatch(/\b(?:4000|5000)\b/);
   });
 
   it('uses the same separated-data contract for create and edit', () => {

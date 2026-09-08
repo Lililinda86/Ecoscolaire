@@ -1,3 +1,6 @@
+import { readFrozenFinance } from './frozenFinanceProjection';
+export { getSchoolFeeCatalog, manageSchoolFee } from './schoolFeeCatalog';
+export { setStudentTransportPlan } from './studentTransportPlan';
 import * as functions from 'firebase-functions';
 export * from './importStudents';
 export * from './academic/bulkAddSubjectsToClasses';
@@ -17,7 +20,6 @@ import {
   makeTuitionDiscountSlotId
 } from './utils/discountHelpers';
 import {
-  resolveStudentFinanceData,
   writeStudentFinanceProjection
 } from './studentFinanceProjection';
 import { calculateCollectedPaymentTotal, calculateNetExpenseTotal } from './expenseLedger';
@@ -222,7 +224,7 @@ export const campayWebhook = functions.https.onRequest(async (req, res) => {
 
         const studentFinanceRef = db.collection('studentFinance').doc(txData.studentId);
         const studentFinanceSnap = await transaction.get(studentFinanceRef);
-        const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
+        const studentFinancial = await readFrozenFinance(transaction, db, student, studentFinanceSnap);
 
         // Read 3: Counter
         const counterRef = db.collection('counters').doc(`receipts_${txData.schoolId}`);
@@ -658,7 +660,7 @@ export const initiatePayment = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Student does not belong to this school.');
   }
   const studentFinanceSnap = await db.collection('studentFinance').doc(studentId).get();
-  const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
+  const studentFinancial = await db.runTransaction(transaction => readFrozenFinance(transaction, db, student, studentFinanceSnap));
 
   // 4. Fetch Tuition Discount Slot if applicable
   let hasValidSlot = false;
@@ -1201,8 +1203,9 @@ export const updateStudentFinancialStatus = functions.firestore
   .onWrite(async (change) => {
     const paymentData = change.after.exists ? change.after.data() : change.before.data();
     if (!paymentData || !paymentData.studentId) return null;
-    if (!change.before.exists && (paymentData.byRecordCashPayment || paymentData.bycampayWebhook)) {
-      console.log('Skipping legacy financial status recalculation for atomic payment creation');
+    if (!change.before.exists && (paymentData.byRecordCashPayment || paymentData.bycampayWebhook || paymentData.byReversePayment)) {
+      // Cash collections and their compensating entries already update projections in one transaction.
+      console.log('Skipping legacy financial status recalculation for atomic payment creation or reversal');
       return null;
     }
 
@@ -1230,7 +1233,7 @@ export const updateStudentFinancialStatus = functions.firestore
 
       const studentFinanceRef = db.collection('studentFinance').doc(studentId);
       const studentFinanceSnap = await transaction.get(studentFinanceRef);
-      const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
+      const studentFinancial = await readFrozenFinance(transaction, db, student, studentFinanceSnap);
 
       // Read school for discount-aware tuition status
       let schoolForTrigger: admin.firestore.DocumentData | null = null;
@@ -1838,7 +1841,7 @@ const recordCashPaymentLegacy = functions.https.onCall(async (data, context) => 
     }
     const studentFinanceRef = db.collection('studentFinance').doc(studentId);
     const studentFinanceSnap = await transaction.get(studentFinanceRef);
-    const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
+    const studentFinancial = await readFrozenFinance(transaction, db, student, studentFinanceSnap);
 
     // 4. Fetch Class Context
     const classId = student.classId || '';
@@ -2429,7 +2432,7 @@ export const createTuitionDiscount = functions.https.onCall(async (data, context
     const schoolId = student.schoolId;
     const academicYear = student.academicYear;
     const studentFinanceSnap = await transaction.get(db.collection('studentFinance').doc(cleanStudentId));
-    const studentFinancial = resolveStudentFinanceData(student, studentFinanceSnap);
+    const studentFinancial = await readFrozenFinance(transaction, db, student, studentFinanceSnap);
 
     if (!schoolId || !academicYear) {
       throw new functions.https.HttpsError('failed-precondition', 'Student schoolId or academicYear is missing.');

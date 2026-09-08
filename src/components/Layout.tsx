@@ -216,16 +216,15 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                 </>
               )}
 
-              {currentUser && ['superAdmin', 'owner', 'director'].includes(currentUser.role) && (
+              {currentUser && ['superAdmin', 'owner', 'director', 'secretary'].includes(currentUser.role) && (
                 <>
                   <div className="sidebar-category">PARAMÈTRES</div>
-                  <NavLink to="/audit" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-audit">
-                    <ShieldAlert size={20} />
-                    Audit Logs
-                  </NavLink>
+                  {['superAdmin', 'owner', 'director'].includes(currentUser.role) && <NavLink to="/audit" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-audit">
+                    <ShieldAlert size={20} />Audit Logs
+                  </NavLink>}
                   <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''} data-testid="nav-settings">
                     <Settings size={20} />
-                    Paramètres
+                    {currentUser.role === 'secretary' ? 'Tarifs financiers' : 'Paramètres'}
                   </NavLink>
                 </>
               )}

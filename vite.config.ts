@@ -19,6 +19,8 @@ export default defineConfig({
         icons: [] // Browser can fallback to default if missing, or we can add one later
       },
       workbox: {
+        // Keep the financial catalogue bundle in the offline shell (currently ~2.4 MB).
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,

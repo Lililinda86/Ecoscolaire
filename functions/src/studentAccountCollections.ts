@@ -1,4 +1,7 @@
+import { freezeObligations, snapshotsFrom } from './financialObligationSnapshots';
+import { resolveCanonicalClassCycle } from './classCycle';
 import * as admin from 'firebase-admin';
+import { readStudentFees, writePendingFees, PendingFeeAssignment } from './studentFeeAssignments';
 import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -25,6 +28,9 @@ interface RequestedLine {
 }
 
 interface AccountLine extends CollectionQuote {
+  category?: string;
+  tariffVersion?: string;
+  zonePk?: number | null;
   key: string;
   type: AccountLineType;
   label: string;
@@ -48,7 +54,7 @@ const requireRequestId = (value: unknown): string => {
 
 export const lineKey = (line: Pick<RequestedLine, 'type' | 'installment' | 'period' | 'feeId'>): string => {
   if (line.type === 'tuition') return `tuition:${line.installment}`;
-  if (line.type === 'transport') return 'transport';
+  if (line.type === 'transport') return line.period ? `transport:${line.period}` : 'transport';
   if (line.type === 'other') return `other:${line.feeId}`;
   return line.type;
 };
@@ -71,15 +77,22 @@ const parseRequestedLines = (value: unknown): RequestedLine[] => {
       throw httpsError('invalid-argument', `allocations[${index}].installment is invalid.`, 'INVALID_INSTALLMENT');
     }
     const feeId = type === 'other' ? collectionInternals.requireId(source.feeId, `allocations[${index}].feeId`) : null;
+    const period = type === 'transport' && source.period != null ? String(source.period) : null;
+    if (period && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+      throw httpsError('invalid-argument', 'Invalid transport month.', 'INVALID_TRANSPORT_PERIOD');
+    }
     return {
       type,
       installment: installment as RequestedLine['installment'],
-      period: null,
+      period,
       feeId,
       amount: collectionInternals.requireMoney(source.amount, `allocations[${index}].amount`)
     };
   });
   const keys = lines.map(lineKey);
+  if (lines.some(l => l.type === 'transport' && !l.period) && lines.filter(l => l.type === 'transport').length > 1) {
+    throw httpsError('invalid-argument', 'Do not mix aggregate and monthly transport.', 'DUPLICATE_ALLOCATION');
+  }
   if (new Set(keys).size !== keys.length) {
     throw httpsError('invalid-argument', 'Each financial obligation can appear only once.', 'DUPLICATE_ALLOCATION');
   }
@@ -140,6 +153,7 @@ const configuredOtherFees = (school: Data, student: Data, classData: Data): Arra
       ? Object.entries(catalog as Data).map(([id, value]) => ({ id, ...(value as Data) }))
       : [];
   return entries.flatMap(entry => {
+    if (entry.schemaVersion === 2) return [];
     if (entry.active === false || typeof entry.id !== 'string' || !entry.id.trim()
         || typeof entry.label !== 'string' || !entry.label.trim()
         || typeof entry.amount !== 'number' || !Number.isSafeInteger(entry.amount) || entry.amount <= 0) return [];
@@ -164,7 +178,7 @@ export const buildAccountLines = async (
   schoolId: string,
   studentId: string,
   academicYear: string
-): Promise<{ lines: AccountLine[]; base: Awaited<ReturnType<typeof collectionInternals.readQuoteContext>> }> => {
+): Promise<{ lines: AccountLine[]; base: Awaited<ReturnType<typeof collectionInternals.readQuoteContext>>; pendingFees: PendingFeeAssignment[] }> => {
   const baseInput = collectionInternals.parseQuoteInput({ schoolId, studentId, academicYear, type: 'registration_fee' });
   const base = await collectionInternals.readQuoteContext(transaction, db, uid, baseInput);
   const lines: AccountLine[] = [{
@@ -196,7 +210,7 @@ export const buildAccountLines = async (
   }
   const payments = base.payments.filter(payment => payment.schoolId === schoolId && payment.academicYear === academicYear);
   const globalFees = base.school.globalFees && typeof base.school.globalFees === 'object' ? base.school.globalFees as Data : {};
-  const uniformGross = base.finance.feeUniforms ?? globalFees.feeUniforms;
+  const uniformGross = snapshotsFrom(base.finance).uniforms?.grossExpectedAmount ?? base.finance.feeUniforms ?? globalFees.feeUniforms;
   if (typeof uniformGross === 'number' && Number.isSafeInteger(uniformGross) && uniformGross > 0) {
     const quote = simpleQuote(uniformGross, payments.reduce((sum, payment) =>
       collectionInternals.safeAdd(sum, paymentLineAmount(payment, 'uniforms'), 'uniformPaid'), 0));
@@ -205,12 +219,53 @@ export const buildAccountLines = async (
   }
   for (const fee of configuredOtherFees(base.school, base.student, base.classData)) {
     const key = `other:${fee.id}`;
-    const quote = simpleQuote(fee.amount, payments.reduce((sum, payment) =>
+    const quote = simpleQuote(snapshotsFrom(base.finance)[key]?.grossExpectedAmount ?? fee.amount, payments.reduce((sum, payment) =>
       collectionInternals.safeAdd(sum, paymentLineAmount(payment, key), 'otherFeePaid'), 0));
     lines.push({ ...quote, key, type: 'other', label: fee.label, installment: null,
       period: null, feeId: fee.id, selectable: quote.remainingBalance > 0 });
   }
-  return { lines, base };
+  const assigned = await readStudentFees(transaction, db, schoolId, studentId, academicYear, base.school, base.student, base.classData);
+  for (const fee of assigned.fees) {
+    const key = `other:${fee.id}`;
+    const paid = payments.reduce((sum, payment) => collectionInternals.safeAdd(sum, paymentLineAmount(payment, key), 'catalogFeePaid'), 0);
+    const quote = simpleQuote(fee.amount, paid);
+    const today = collectionInternals.getDoualaDate();
+    const dueDate = fee.dueDate;
+    const overdue = !!dueDate && dueDate < today && quote.remainingBalance > 0;
+    lines.push({ ...quote, key, type: 'other', label: fee.label, category: fee.category, installment: null, period: null, feeId: fee.id,
+      tariffVersion: String(fee.versionId || fee.id),
+      originalDueDate: dueDate, effectiveDueDate: dueDate, nextDueDate: quote.remainingBalance > 0 ? dueDate : null,
+      overdue, dueStatus: quote.remainingBalance === 0 ? 'PAID' : !dueDate ? 'UNCONFIGURED' : overdue ? 'OVERDUE' : dueDate > today ? 'NOT_DUE' : 'DUE_TODAY',
+      selectable: quote.remainingBalance > 0 });
+  }
+  return { lines, base, pendingFees: assigned.pending };
+};
+
+export const monthlyLines = (lines: AccountLine[]): AccountLine[] => lines.flatMap(line => {
+  if (line.type !== 'transport') return [line];
+  const quote = line as AccountLine & TransportCollectionQuote;
+  return quote.installments.map(item => ({ ...line, ...item, key: `transport:${item.period}`, period: item.period,
+    label: `Transport — ${item.period}${item.zonePk == null ? '' : ` — PK${item.zonePk}`}`, selectable: item.remainingBalance > 0 }));
+});
+
+export const accountGroups = (lines: AccountLine[]) => {
+  const definitions = [
+    ['registration', 'Inscription'], ['tuition', 'Scolarité'], ['transport', 'Transport'],
+    ['uniforms', 'Tenues'], ['activities', 'Activités & événements'], ['other', 'Autres frais']
+  ];
+  const groupKey = (line: AccountLine): string => {
+    if (line.type === 'registration_fee') return 'registration';
+    if (line.type === 'tuition' || line.type === 'transport') return line.type;
+    if (line.type === 'uniforms' || ['uniform', 'sports_uniform'].includes(line.category || '')) return 'uniforms';
+    if (['activity', 'excursion', 'event', 'photo', 'exam'].includes(line.category || '')) return 'activities';
+    return 'other';
+  };
+  return definitions.flatMap(([key, label]) => {
+    const items = lines.filter(line => groupKey(line) === key);
+    const transportRates = key === 'transport' ? [...new Map(items.map(line => [`${line.zonePk}:${line.grossExpectedAmount}`,
+      { zonePk: line.zonePk ?? null, monthlyAmount: line.grossExpectedAmount }])).values()] : [];
+    return items.length ? [{ key, label, lineKeys: items.map(line => line.key), totals: accountTotals(items), transportRates }] : [];
+  });
 };
 
 export const getStudentFinancialAccount = functions.https.onCall(async (raw, context) => {
@@ -221,19 +276,32 @@ export const getStudentFinancialAccount = functions.https.onCall(async (raw, con
   const academicYear = collectionInternals.requireAcademicYear(source.academicYear);
   const db = admin.firestore();
   return db.runTransaction(async transaction => {
-    const { lines, base } = await buildAccountLines(transaction, db, context.auth!.uid, schoolId, studentId, academicYear);
+    const { lines, base, pendingFees } = await buildAccountLines(transaction, db, context.auth!.uid, schoolId, studentId, academicYear);
+    writePendingFees(transaction, pendingFees);
+    freezeObligations(transaction, db, snapshotsFrom(base.finance), {
+      schoolId, studentId, academicYear, classId: String(base.student.classId || ''),
+      cycle: resolveCanonicalClassCycle(base.classData), tariffVersion: String(base.school.financialTariffVersion || 'legacy-v3')
+    }, monthlyLines(lines));
     return {
       student: { id: studentId, name: base.student.name || '', matricule: base.student.matricule || '',
         classId: base.student.classId || '', className: base.classData.name || '' },
       school: { id: schoolId, name: base.school.name || 'EcoScolaire' },
       academicYear,
       totals: accountTotals(lines),
-      lines
+      groups: accountGroups(source.monthlyTransport === true ? monthlyLines(lines) : lines),
+      lines: source.monthlyTransport === true ? monthlyLines(lines) : lines
     };
   });
 });
 
 export const recordCashCollection = functions.https.onCall(async (raw, context) => {
+  const receiptSummary = (receipt: Data) => ({
+    schoolName: receipt.schoolName || '', studentName: receipt.studentName || '',
+    matricule: receipt.studentRegistrationNumber || '', className: receipt.className || '',
+    academicYear: receipt.academicYear || '', issuedAt: receipt.issuedAt || receipt.paymentDate || receipt.date || '',
+    cashier: receipt.collectedByName || receipt.collectedByUserId || '',
+    accountRemainingBalance: receipt.accountRemainingBalance ?? null
+  });
   if (!context.auth?.uid) throw httpsError('unauthenticated', 'Authentication required.', 'UNAUTHENTICATED');
   const source = (raw || {}) as Data;
   const schoolId = collectionInternals.requireId(source.schoolId, 'schoolId');
@@ -251,6 +319,13 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
   return db.runTransaction(async transaction => {
     const paymentRef = db.collection('payments').doc(collectionId);
     const receiptRef = db.collection('receipts').doc(collectionId);
+    // Replays disclose financial data too: authorize before returning a stored receipt.
+    const user = (await transaction.get(db.collection('users').doc(uid))).data() || {};
+    if ((user.active !== true && user.isActive !== true) || user.status === 'inactive'
+        || !['owner', 'director', 'accountant', 'secretary', 'superAdmin'].includes(String(user.role))
+        || (user.role !== 'superAdmin' && user.schoolId !== schoolId)) {
+      throw httpsError('permission-denied', 'Access denied.', 'PERMISSION_DENIED');
+    }
     const [paymentSnap, receiptSnap] = await Promise.all([transaction.get(paymentRef), transaction.get(receiptRef)]);
     if (paymentSnap.exists || receiptSnap.exists) {
       if (!paymentSnap.exists || !receiptSnap.exists || paymentSnap.data()?.requestFingerprint !== fingerprint
@@ -260,16 +335,16 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
       const receipt = receiptSnap.data() || {};
       return { collectionId, paymentId: collectionId, receiptId: collectionId,
         receiptNumber: receipt.receiptNumber, amount: receipt.amount, lineItems: receipt.lineItems || [],
-        remainingBalance: receipt.remainingBalance, idempotentReplay: true };
+        remainingBalance: receipt.remainingBalance, receipt: receiptSummary(receipt), idempotentReplay: true };
     }
 
-    const { lines: accountLines, base } = await buildAccountLines(transaction, db, uid, schoolId, studentId, academicYear);
-    const accountByKey = new Map(accountLines.map(line => [line.key, line]));
+    const { lines: accountLines, base, pendingFees } = await buildAccountLines(transaction, db, uid, schoolId, studentId, academicYear);
+    const accountByKey = new Map([...accountLines, ...monthlyLines(accountLines)].map(line => [line.key, line]));
     const lineItems = requested.map((item, sequence) => {
       const quote = accountByKey.get(lineKey(item));
       if (!quote) throw httpsError('failed-precondition', 'The selected fee is not applicable.', 'FEE_NOT_APPLICABLE');
       if (quote.remainingBalance <= 0) throw httpsError('failed-precondition', 'A selected fee is already paid.', 'NO_REMAINING_BALANCE');
-      if (item.amount > quote.remainingBalance && item.type !== 'transport') {
+      if (item.amount > quote.remainingBalance && (item.type !== 'transport' || item.period)) {
         throw httpsError('failed-precondition', 'A line exceeds its remaining balance.', 'OVERPAYMENT_DENIED');
       }
       const allocatedAmount = item.type === 'transport' ? Math.min(item.amount, quote.remainingBalance) : item.amount;
@@ -314,10 +389,17 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
     const receiptNumber = `REC-${date.slice(0, 4)}-${String(nextNumber).padStart(4, '0')}`;
     const transportLine = lineItems.find(line => line.type === 'transport');
     const transportQuote = accountByKey.get('transport') as TransportCollectionQuote | undefined;
-    const transportPlan = transportLine && transportQuote ? planTransportAllocations(
-      transportQuote.installments.map(item => ({ period: item.period, remainingBalance: item.remainingBalance })),
-      transportLine.amount) : null;
-    if (transportPlan && transportLine) {
+    const transportLines = lineItems.filter(line => line.type === 'transport');
+    const plans = transportQuote ? transportLines.map(line => planTransportAllocations(
+      transportQuote.installments.filter(item => !line.period || item.period === line.period)
+        .map(item => ({ period: item.period, remainingBalance: item.remainingBalance })), line.amount)) : [];
+    const transportPlan = plans.length ? { allocations: plans.flatMap(p => p.allocations),
+      allocatedAmount: plans.reduce((sum, p) => collectionInternals.safeAdd(sum, p.allocatedAmount, 'transportAllocated'), 0),
+      creditAmount: plans.reduce((sum, p) => collectionInternals.safeAdd(sum, p.creditAmount, 'transportCredit'), 0) } : null;
+    const transportNewPaid = transportQuote ? collectionInternals.safeAdd(transportQuote.previousPaid,
+      transportLines.reduce((sum, l) => collectionInternals.safeAdd(sum, l.amount, 'transportReceived'), 0), 'transportNewPaid') : 0;
+    transportLines.forEach((line, i) => Object.assign(line, { allocations: plans[i].allocations }));
+    if (transportPlan && transportLine && !transportLine.period) {
       transportLine.remainingBalance = transportQuote!.remainingBalance - transportPlan.allocatedAmount;
       transportLine.transportCredit = transportPlan.creditAmount;
       transportLine.newPaid = collectionInternals.safeAdd(transportQuote!.previousPaid, transportLine.amount, 'transportNewPaid');
@@ -336,8 +418,14 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
       studentName: base.student.name || '', studentRegistrationNumber: base.student.matricule || '',
       classId: base.student.classId || '', className: base.classData.name || '', schoolName: base.school.name || 'EcoScolaire',
       collectedByUserId: uid, collectedByName: base.user.name || base.user.displayName || base.user.email || uid,
-      paymentDate: date };
+      paymentDate: date, issuedAt: new Date().toISOString(),
+      accountRemainingBalance: accountTotals(accountLines).totalRemaining - lineItems.reduce((sum, line) => sum + line.allocatedAmount, 0) };
     transaction.create(paymentRef, paymentData);
+    writePendingFees(transaction, pendingFees);
+    freezeObligations(transaction, db, snapshotsFrom(base.finance), {
+      schoolId, studentId, academicYear, classId: String(base.student.classId || ''),
+      cycle: resolveCanonicalClassCycle(base.classData), tariffVersion: String(base.school.financialTariffVersion || 'legacy-v3')
+    }, monthlyLines(accountLines));
     transaction.create(receiptRef, receiptData);
     transaction.set(counterRef, { lastReceiptNumber: nextNumber }, { merge: true });
     transaction.set(cashLedgerRef, { id: cashLedgerId, schoolId, date, status: 'open',
@@ -368,7 +456,7 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
         base.payments, base.moratoriums, schoolId, academicYear, date, pendingPayment));
     if (transportPlan && transportQuote && transportLine) Object.assign(financePatch,
       collectionInternals.buildCanonicalTransportProjection(base.finance, transportQuote,
-        transportPlan.allocations, transportLine.newPaid));
+        transportPlan.allocations, transportNewPaid));
     const uniform = lineItems.find(line => line.type === 'uniforms');
     if (uniform) Object.assign(financePatch, { uniformExpected: uniform.netExpectedAmount,
       uniformPaid: uniform.newPaid, uniformStatus: uniform.remainingBalance === 0 ? 'paid' : 'partial' });
@@ -423,6 +511,6 @@ export const recordCashCollection = functions.https.onCall(async (raw, context) 
     transaction.create(db.collection('audit_logs').doc(), { ...collectionInternals.auditData(
       'RECEIPT_CREATED', schoolId, uid, 'RECEIPT', collectionId, { receiptNumber }), ...fixture });
     return { collectionId, paymentId: collectionId, receiptId: collectionId, receiptNumber,
-      amount: total, lineItems, remainingBalance, idempotentReplay: false };
+      amount: total, lineItems, remainingBalance, receipt: receiptSummary(receiptData), idempotentReplay: false };
   });
 });
