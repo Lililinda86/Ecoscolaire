@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+const project='ecoscolaire-c5861';
+assert.equal(process.env.FIREBASE_PROJECT_ID,project);
+const token=execFileSync('gcloud',['auth','print-access-token'],{encoding:'utf8'}).trim();
+const headers={Authorization:`Bearer ${token}`,'x-goog-user-project':project};
+const get=async url=>{const r=await fetch(url,{headers});assert.equal(r.status,200,'Rules metadata read failed');return r.json();};
+const release=await get(`https://firebaserules.googleapis.com/v1/projects/${project}/releases/cloud.firestore`);
+const rules=await get('https://firebaserules.googleapis.com/v1/'+release.rulesetName);
+const deployed=rules.source.files.find(f=>f.name==='firestore.rules');assert.ok(deployed);
+const normalize=s=>s.replaceAll('\r\n','\n').trim();
+assert.equal(normalize(deployed.content),normalize(fs.readFileSync('firestore.rules','utf8')),'Deployed Rules differ from source');
+console.log(JSON.stringify({rules:'PASS',ruleset:release.rulesetName,sha256:createHash('sha256').update(normalize(deployed.content)).digest('hex')}));

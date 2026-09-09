@@ -7,3 +7,5 @@ The generic Production workflow retains all existing backup, branch/project, fai
 Read-only baseline captured before merge includes school, students/classes, private finance, obligations, payments, receipts, advantages/moratoria, allocations, transport plans and ledgers. Production checks must not call a financial getter that lazily creates obligations. Use document reads, compiled-source/Rules provenance and authorization rejection checks instead. No Production fixture or payment is authorized.
 
 Rollback target remains e1f236ae5c370e9de5ccf9efaa99d53483b9b1a4, with source archive and recent backup retained. Never import/recalculate financial data automatically during rollback.
+
+Vercel Production waits for the exact merged SHA's successful Firebase backend workflow before building/publishing. Preview builds remain independent. The backend verifies the deployed Rules source hash after deployment. This avoids exposing the new frontend while the old backend is still active.

@@ -112,6 +112,9 @@ jobs:
             printf '%s: %s\n' "$function_name" "$status"
             test "$status" = ACTIVE
           done
+      - name: Verify deployed Rules match candidate source
+        if: steps.limited.outputs.enabled == 'true'
+        run: node scripts/verify-production-rules-source.mjs
       # LIMITED_RELEASE_END
 
       - name: Deploy Firebase Rules and Functions

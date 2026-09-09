@@ -1,3 +1,4 @@
+import { waitForProductionBackend } from './wait-production-backend.mjs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,9 +23,10 @@ export const resolveVercelBuildMode = (environment = process.env) => {
   );
 };
 
-export const runVercelBuild = (environment = process.env) => {
+export const runVercelBuild = async (environment = process.env) => {
   const mode = resolveVercelBuildMode(environment);
   console.log(`Vercel build target selected: ${mode}`);
+  if (mode === 'production') await waitForProductionBackend(environment);
   const npmEntrypoint = environment.npm_execpath;
   const command = npmEntrypoint ? process.execPath : 'npm';
   const args = npmEntrypoint
@@ -46,7 +48,7 @@ const currentFile = fileURLToPath(import.meta.url);
 const invokedFile = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (invokedFile === currentFile) {
   try {
-    runVercelBuild();
+    await runVercelBuild();
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
