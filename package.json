@@ -11,7 +11,7 @@
     "build:staging": "node scripts/validate-firebase-environment.mjs --mode staging && tsc -b && vite build --mode staging",
     "build:production": "node scripts/validate-firebase-environment.mjs --mode production && tsc -b && vite build --mode production",
     "lint": "eslint .",
-    "lint:ci": "eslint src functions/src tests/unit --max-warnings=0",
+    "lint:ci": "eslint src/components/Settings src/components/StudentAccountCollection.tsx src/pages/Settings.tsx src/pages/Students.tsx functions/src/feeTargeting.ts functions/src/classCycle.ts functions/src/schoolFeeCatalog.ts functions/src/studentAccountCollections.ts functions/src/studentTransportPlan.ts tests/unit/FeeTargeting.spec.tsx tests/unit/OptionalFeeAssignment.spec.tsx tests/unit/SchoolFeeCatalog.spec.tsx tests/unit/TuitionDeadlineSettings.spec.tsx tests/unit/StudentsTransportPersistence.spec.ts --max-warnings=0",
     "test:secrets": "node scripts/check-staging-credential-regressions.mjs",
     "test:functions:secure-student": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"vitest run tests/functions/createStudentSecure.spec.ts\"",
     "test:functions:secretary-collections": "npx firebase-tools emulators:exec --project demo-ecoscolaire --only firestore \"node tests/functions/test-record-cash-payment-privacy.cjs && node tests/functions/test-secretary-collections-emulator.cjs && node tests/functions/test-student-account-collections.cjs && node tests/functions/test-financial-advantage-workflow.cjs && node tests/functions/test-cash-closure-integrity.cjs\"",

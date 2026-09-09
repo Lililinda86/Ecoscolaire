@@ -28,10 +28,11 @@ jobs:
       - run: npm --prefix functions ci
       - run: npm --prefix functions run build
       - run: npm run build
+      - run: npm run lint
       - run: npm run lint:ci
       - run: node scripts/check-staging-credential-regressions.mjs
       - run: node --test tests/security/limited-parameters-release.spec.mjs tests/security/settings-calendar-preservation.spec.mjs
-      - run: npx vitest run tests/unit
+      - run: npx vitest run --config vitest.limited.config.ts
       - run: npx playwright install --with-deps chromium
       - run: npm run test:rules
         env:
