@@ -8,6 +8,8 @@ Implémentation locale : manifeste documentaire déterministe 34/12/22 ; vue Pro
 
 Contrôles locaux exécutés : typecheck frontend/Functions PASS ; compilation Functions PASS ; lint ciblé PASS ; 9 tests UI ciblés PASS ; contrôle des 34 fiches et génération reproductible PASS. Régressions complètes locales en cours ; contrôles émulateurs et recette Staging non encore exécutés pour cette version.
 
+Mise à jour : régression locale complète PASS (134 fichiers / 825 tests). PR #242 ouverte. Premier build CI bloqué par la taille du bundle principal (2,21 MB, limite PWA 2 MiB). Correction ciblée : chargement différé de la page Programme, selon le mécanisme existant des Ressources ; limite de cache inchangée. Ajout d’une vérification ITALO Staging en lecture seule après recette synthétique.
+
 Plan et reprise : CURRICULUM_REVIEW_EXECUTION.md. Prochaine étape : PR vers staging, CI Linux puis recette exacte. OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
 
 La compilation a régénéré des fichiers suivis sous functions/lib ; ces sorties ne sont pas incluses dans la PR et restent préservées localement. Les sources sont compilées à neuf par la CI.

@@ -277,7 +277,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for function_name in recordTeachingConfirmations savePedagogyClassPolicy recordPedagogyObservations savePedagogyFridayConfiguration pedagogyFridayScheduler publishPedagogyAssessmentToGrades recordPedagogyResults managePedagogyRemediation savePedagogySourceWatch pedagogySourceWatchScheduler; do
+          for function_name in recordCurriculumProposalDecisions recordTeachingConfirmations savePedagogyClassPolicy recordPedagogyObservations savePedagogyFridayConfiguration pedagogyFridayScheduler publishPedagogyAssessmentToGrades recordPedagogyResults managePedagogyRemediation savePedagogySourceWatch pedagogySourceWatchScheduler; do
             status="$(gcloud functions describe "$function_name" --project "$FIREBASE_PROJECT_ID" --region us-central1 --format='value(status)')"
             printf '%s: %s\n' "$function_name" "$status"
             test "$status" = ACTIVE

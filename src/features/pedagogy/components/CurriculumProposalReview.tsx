@@ -54,8 +54,8 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
     <p>Revue des correspondances documentaires, pas adoption globale d’un curriculum. Une approbation ne certifie ni l’applicabilité actuelle ni les matières locales. Aucune décision n’est précochée.</p>
     <div className="curriculum-review-summary" aria-label="Synthèse des propositions" aria-live="polite">
       <span>{rows.length} classes actives</span><span>{rows.filter(r => r.proposal.highConfidence).length} propositions forte confiance</span><span>{rows.filter(r => !r.proposal.highConfidence).length} à examiner</span>
-      <span>{decisions.filter(d => d?.decision === 'APPROVED').length} approuvées</span><span>{decisions.filter(d => d?.decision === 'REQUEST_CHANGE').length} corrections demandées</span><span>{decisions.filter(d => d?.decision === 'NOT_APPLICABLE').length} non applicables</span><span>{decisions.filter(d => !d).length} décisions en attente</span>
-      <span>{rows.filter((r, i) => r.proposal.missingSource && decisions[i]?.decision !== 'NOT_APPLICABLE').length} en attente de source officielle suffisante</span>
+      {!resource.loading && !resource.error && schoolId && yearId ? <><span>{decisions.filter(d => d?.decision === 'APPROVED').length} approuvées</span><span>{decisions.filter(d => d?.decision === 'REQUEST_CHANGE').length} corrections demandées</span><span>{decisions.filter(d => d?.decision === 'NOT_APPLICABLE').length} non applicables</span><span>{decisions.filter(d => !d).length} décisions en attente</span>
+      <span>{rows.filter((r, i) => r.proposal.missingSource && decisions[i]?.decision !== 'NOT_APPLICABLE').length} en attente de source officielle suffisante</span></> : <span>Compteurs de décisions indisponibles jusqu’à lecture confirmée.</span>}
     </div>
     <p>Les cas à examiner incluent les rattachements préscolaires conditionnels. L’attente de source suffisante inclut les dossiers partiels et programmes locaux, pas uniquement l’absence de PDF.</p>
     {resource.loading && <p role="status">Chargement des décisions…</p>}
@@ -83,7 +83,7 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
             <h5>DOCUMENT / VERSION / SOURCE</h5>{p.sources.map(s => <p key={s.url}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a><br />{s.detail}</p>)}{!p.sources.length && <p>Source officielle manquante pour le programme proposé.</p>}
             <dl><dt>MATIÈRES / DOMAINES COUVERTS</dt><dd>{p.covered}</dd><dt>MATIÈRES / DOMAINES MANQUANTS</dt><dd>{p.missing}</dd><dt>CORRESPONDANCES CERTAINES</dt><dd>{p.certain}</dd><dt>CORRESPONDANCES À CONFIRMER</dt><dd>{p.uncertain}</dd><dt>JUSTIFICATION</dt><dd>{p.rationale}</dd><dt>DATE DOCUMENTAIRE</dt><dd>{p.sourceDate} — constats locaux historiques ITALO, pas inventaire en temps réel.</dd><dt>sourceVersion</dt><dd>{p.sourceVersion}</dd><dt>mappingVersion</dt><dd>{p.mappingVersion}</dd></dl>
           </details>
-          <p>Décision humaine actuelle : <strong>{existing ? labels[existing.decision] : 'EN ATTENTE'}</strong></p>
+          <p>Décision humaine actuelle : <strong>{resource.loading || resource.error || !yearId ? 'LECTURE NON CONFIRMÉE' : existing ? labels[existing.decision] : 'EN ATTENTE'}</strong></p>
           {existing && <p>Par {existing.decidedBy} — {existing.decidedAt ? new Date(existing.decidedAt.seconds * 1000).toLocaleString() : 'date serveur en cours'} — {existing.decisionNote} (révision {existing.revision})</p>}
           {resource.data.some(d => d.classId === row.classId && d.mappingVersion !== p.mappingVersion) && <p>Une décision existe sur une ancienne version ; elle ne vaut pas validation de cette proposition.</p>}
           {owner && <fieldset disabled={locked || Boolean(confirmation)}><legend>Décision humaine — {p.id}</legend>

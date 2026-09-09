@@ -28,7 +28,6 @@ import Communication from './pages/Communication';
 import AuditLogs from './pages/AuditLogs';
 import AcademicPeriods from './pages/AcademicPeriods';
 import PedagogyDashboard from './features/pedagogy/pages/PedagogyDashboard';
-import PedagogyProgram from './features/pedagogy/pages/PedagogyProgram';
 import PedagogyPlanning from './features/pedagogy/pages/PedagogyPlanning';
 import PedagogyHistory from './features/pedagogy/pages/PedagogyHistory';
 import PedagogyPreparations from './features/pedagogy/pages/PedagogyPreparations';
@@ -42,6 +41,7 @@ import PedagogyResults from './features/pedagogy/pages/PedagogyResults';
 import PedagogyStudentFollowUp from './features/pedagogy/pages/PedagogyStudentFollowUp';
 import { lazy, Suspense } from 'react';
 const PedagogyResources = lazy(() => import('./features/pedagogy/pages/PedagogyResources'));
+const PedagogyProgram = lazy(() => import('./features/pedagogy/pages/PedagogyProgram'));
 
 import Diagnostic from './pages/Diagnostic';
 
@@ -124,7 +124,7 @@ function App() {
         <Route path="/report-cards" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><ReportCards /></Layout></ProtectedRoute>} />
         <Route path="/academic-periods" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'teacher']}><Layout><AcademicPeriods /></Layout></ProtectedRoute>} />
         <Route path="/pedagogy" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><PedagogyDashboard /></Layout></ProtectedRoute>} />
-        <Route path="/pedagogy/program" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><PedagogyProgram /></Layout></ProtectedRoute>} />
+        <Route path="/pedagogy/program" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><Suspense fallback={<p>Chargement du référentiel…</p>}><PedagogyProgram /></Suspense></Layout></ProtectedRoute>} />
         <Route path="/pedagogy/planning" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><PedagogyPlanning /></Layout></ProtectedRoute>} />
         <Route path="/pedagogy/history" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary', 'boardViewer']}><Layout><PedagogyHistory /></Layout></ProtectedRoute>} />
         <Route path="/pedagogy/preparations" element={<ProtectedRoute requireSchool allowedRoles={['superAdmin', 'owner', 'director', 'secretary']}><Layout><PedagogyPreparations /></Layout></ProtectedRoute>} />

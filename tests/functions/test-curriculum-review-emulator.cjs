@@ -38,6 +38,7 @@ const call = (items, role = 'owner', extra = {}) => fn.run({ schoolId, academicY
       const d = doc.data(); assert.equal(d.decidedBy, schoolId + '-owner'); assert.ok(d.decidedAt.toMillis());
       assert.equal(d.adoptionChanged, false); assert.equal(d.sourceVersion.length, 64); assert.equal(d.mappingVersion.length, 64);
       assert.equal((await doc.ref.collection('history').get()).size, d.revision);
+      if (d.proposalId === 'D27') assert.equal((await doc.ref.collection('history').doc('1').get()).data().decision, 'REQUEST_CHANGE');
     }
     assert.equal((await db.collection('audit_logs').where('schoolId', '==', schoolId).get()).size, 14);
     console.log('CURRICULUM_REVIEW_BACKEND PASS: owner, tenant, 34 mappings, source guards, atomic batch, idempotency, immutable history and audit');
