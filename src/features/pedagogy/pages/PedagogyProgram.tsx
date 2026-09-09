@@ -61,14 +61,17 @@ function ProgramScope({ yearId }: { yearId?: string }) {
         {selectedProgram && <section aria-label="Programme à examiner" className="pedagogy-card">
           <h3>{selectedProgram.title}</h3>
           <p>Version : {selectedProgram.version}. Nature : {curriculumProvenanceLabel(selectedProgram.sourceType)}.</p>
+          <p>Autorité : {selectedProgram.authority || 'non renseignée'}. Couverture : {selectedProgram.coverage || 'non établie'}. Applicabilité : {selectedProgram.applicability || 'à vérifier'}.</p>
+          {selectedProgram.subjectNames?.length ? <details open><summary>Matières/domaines de cette référence</summary><ul>{selectedProgram.subjectNames.map(name => <li key={name}>{name}</li>)}</ul><p>Sommaire : pages PDF {selectedProgram.sourcePdfPages?.join(', ') || 'non renseignées'}. Liste documentaire, pas une affectation locale ou un volume horaire.</p></details> : <p>Matières/domaines du programme : non renseignés.</p>}
+          {selectedProgram.provenance?.note && <p>{selectedProgram.provenance.note}</p>}
           <p>Classes concernées par le niveau sélectionné : {(db?.classes || []).filter(item => item.schoolId === currentSchool?.id && item.isActive !== false && Boolean(levelId) && item.catalogLevelId === levelId).map(item => item.name).join(', ') || 'Choisir un niveau configuré.'}</p>
           <p>Pourquoi cette proposition ? Sélection manuelle dans le catalogue ; aucune correspondance automatique certifiée. Vérifiez les matières, la version et l’applicabilité avant de transmettre une décision.</p>
           <p>Éléments restant à vérifier : couverture des matières/domaines, authenticité documentaire, édition applicable et droits. Un programme de démonstration n’est pas un programme officiel.</p>
           {curriculumProvenanceLink(selectedProgram.provenance?.sourceUrl) ? <a href={curriculumProvenanceLink(selectedProgram.provenance?.sourceUrl)!} target="_blank" rel="noopener noreferrer">Consulter la source du programme</a> : <p>Source documentaire non renseignée.</p>}
         </section>}
         <label>Auteur de la décision reçue<input value={decisionBy} maxLength={150} onChange={event => { setDecisionBy(event.target.value); setReceived(false); }} /></label>
-        <label>Type de décision reçue<select value={reviewOutcome} onChange={event => { setReviewOutcome(event.target.value as typeof reviewOutcome); setReceived(false); }}><option value="">Choisir la décision reçue…</option><option value="approve">APPROUVER</option><option value="request_correction">DEMANDER CORRECTION</option><option value="not_applicable">NON APPLICABLE</option></select></label>
         {selectedProgram && levelId && currentSchool && <CurriculumUnitDetails schoolId={currentSchool.id} programId={selectedProgram.id} levelId={levelId} />}
+        <label>Type de décision reçue<select value={reviewOutcome} onChange={event => { setReviewOutcome(event.target.value as typeof reviewOutcome); setReceived(false); }}><option value="">Choisir la décision reçue…</option><option value="approve">APPROUVER</option><option value="request_correction">DEMANDER CORRECTION</option><option value="not_applicable">NON APPLICABLE</option></select></label>
         <label>Date de la décision<input type="date" value={decisionDate} onChange={event => { setDecisionDate(event.target.value); setReceived(false); }} /></label>
         <label>Référence ou note de transmission<textarea value={decisionReference} maxLength={1000} onChange={event => { setDecisionReference(event.target.value); setReceived(false); }} /></label>
         <label><input type="checkbox" checked={received} onChange={event => setReceived(event.target.checked)} />Je confirme avoir reçu cette décision pour ce niveau et cette version.</label>

@@ -1,5 +1,29 @@
 # Remplissage pédagogique — exécution en cours
 
+## État complémentaire après 25efadd
+
+Gate Linux 34313816879 : PASS intégral (statique, Functions, Rules Firestore,
+Storage, A4 et navigateurs A/B/C/D). CI 34313819827 et sécurité financière
+34313819839 : PASS. PR 238 encore brouillon, pas encore intégrée à ce stade.
+
+Import Staging additif vérifié : 8 curriculumPrograms MINEDUB partiels, 2 unités
+reformulées (CP FR / Class 1 EN seulement), 25 références de matières/domaines dans
+le catalogue ITALO. Aucun écrasement ; readback PASS, dry-run suivant zéro création.
+Pas d'adoption, d'horaire, de coefficient, d'obligation disciplinaire, d'affectation
+enseignante ou de classSubject créé par cet import. Les programmes préscolaires
+n'ont pas d'unité rattachée arbitrairement aux années ITALO. Les PDF restent privés.
+
+Cinq recettes navigateur préparées dans des tenants synthétiques jetables : les
+états curriculum/plan/modèle/préparation reçue/enseignement sont des fixtures
+explicitement synthétiques ; observations ou résultats et remédiation utilisent
+les vrais formulaires/Functions. Préscolaire sans note. Leur exécution sur cette
+nouvelle version reste PENDING jusqu'au gate Linux puis au Staging exact.
+Le laboratoire Ressources reste une simulation de lecture, pas ces écritures.
+
+Prochaine étape : gate sur le prochain SHA, diagnostic des échecs éventuels,
+puis PR prête/merge staging normal, déploiement et gate exact sans OpenAI.
+Les sections suivantes conservent l'historique et ne remplacent pas cet état.
+
 ## Reprise active après 243d2e9
 
 PR 238 vers staging, branche codex/pedagogy-content-completion, code publié.

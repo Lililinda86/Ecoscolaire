@@ -11,6 +11,11 @@ export interface CurriculumProgram {
   status: 'draft' | 'published' | 'archived';
   sourceType: 'official' | 'mock';
   checksum?: string;
+  authority?: string;
+  coverage?: string;
+  applicability?: string;
+  subjectNames?: string[];
+  sourcePdfPages?: number[];
   provenance?: { label?: string; note?: string; sourceUrl?: string };
 }
 
