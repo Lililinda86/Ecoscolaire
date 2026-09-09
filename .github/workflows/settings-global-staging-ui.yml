@@ -18,8 +18,8 @@ jobs:
       group: all-school-fees-staging-validation
       cancel-in-progress: false
     env:
-      EXPECTED_STAGING_SHA: 9bac81340bf003551ac96802d60dbd93ca9665cf
-      STAGING_APP_URL: https://ecoscolaire-5khssa318-linda-lemofouet-s-projects.vercel.app
+      EXPECTED_STAGING_SHA: 99c2daacd8ead63c9337456ea72c81bfe4f822b5
+      STAGING_APP_URL: https://ecoscolaire-o2n01ucdn-linda-lemofouet-s-projects.vercel.app
       ALL_FEES_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
       GOOGLE_CLOUD_PROJECT: ecoscolaire-staging
       VITE_FIREBASE_PROJECT_ID: ecoscolaire-staging

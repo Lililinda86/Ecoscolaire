@@ -103,6 +103,8 @@ try {
   const studentId = students.primary18;
   await denied(call('getStudentFinancialAccount', { studentId, academicYear: year }, 'foreign'));
 
+  await seed('grades', `${schoolId}-legacy-grade`, { id: `${schoolId}-legacy-grade`, schoolId, studentId, subjectId: 'legacy-test', date: '2025-10-01', score: 12, maxScore: 20, status: 'legacy' });
+  const legacyGrade = (await db.collection('grades').doc(`${schoolId}-legacy-grade`).get()).data();
   browser = await chromium.launch({ headless: true });
   const errors = [];
   async function login(role) {
@@ -148,6 +150,13 @@ try {
   await owner.getByRole('button',{name:'Supprimer le logo',exact:true}).click();
   await expect.poll(async()=> (await db.collection('schools').doc(schoolId).get()).data().logoUrl).toBeNull();
   pass('LOGO UPLOAD / AUTO SAVE / PREVIEW / REMOVE');
+  await owner.getByRole('button',{name:'Gérer les années et périodes',exact:true}).click();
+  await expect(owner).toHaveURL(`${origin}/#/academic-periods`);
+  await expect(owner.getByTestId('academic-periods-page')).toBeVisible({timeout:30000});
+  assert.deepEqual((await db.collection('grades').doc(`${schoolId}-legacy-grade`).get()).data(),legacyGrade);
+  await owner.goto(`${origin}/#/settings`);
+  pass('NEW YEAR ACTION OPENS CANONICAL CALENDAR / EXISTING LEGACY GRADE UNCHANGED');
+
   await nav(owner,'Année académique');
   await owner.getByRole('button',{name:'Modifier les dates',exact:true}).click();
   const yearModal=owner.locator('div').filter({has:owner.getByRole('heading',{name:"Modifier les dates de l'année scolaire",exact:true})}).filter({has:owner.getByRole('button',{name:'Enregistrer',exact:true})}).last();
@@ -203,6 +212,11 @@ try {
   await nav(director,'Finances & tarifs');
   for (const [key,label] of [['T1','1re'],['T2','2e'],['T3','3e']]) await expect(director.getByLabel(`Échéance ${label} tranche`,{exact:true})).toHaveValue((await db.collection('academicYears').doc(yearId).get()).data().tuitionPaymentDeadlines[key]);
   await director.getByText('Créer un nouveau frais',{exact:true}).click();
+  for (const type of ['uniform','sports_uniform','ceremony_uniform','other_uniform','activity_kit','event','excursion','school_trip','cultural_activity','activity','photo','supplies','books','canteen','childcare','contribution','other','exam','exceptional']) {
+    await director.getByLabel('Type de frais').selectOption(type);
+    await expect(director.getByLabel('Type de frais')).toHaveValue(type);
+  }
+  pass('ALL 19 CATALOGUE TYPE CHOICES');
   await director.getByLabel('Type de frais').selectOption('exam');
   await director.getByLabel('Libellé précis du frais',{exact:true}).fill('UX-VALIDATION-FEE');
   await director.getByLabel('Montant (FCFA)',{exact:true}).fill('4321');
@@ -254,6 +268,7 @@ try {
   pass('UX-VALIDATION-FEE PUBLICATION / EXACT TARGET / LABEL AMOUNT DUE PAID REMAINING / NO PAYMENT');
   assert.deepEqual((await db.collection('classes').where('schoolId','==',schoolId).get()).docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id)),classBefore);
   for(const collection of ['payments','receipts']) assert.equal((await db.collection(collection).where('schoolId','==',schoolId).get()).size,0);
+  assert.deepEqual((await db.collection('grades').doc(`${schoolId}-legacy-grade`).get()).data(),legacyGrade);
   assert.deepEqual(errors,[]);
   await owner.goto(`${origin}/#/settings`); await nav(owner,'Établissement');
   await owner.screenshot({path:'all-fees-global-owner.png',fullPage:true});
@@ -262,7 +277,7 @@ try {
   if (browser) await browser.close();
   const collections = ['studentFinancialObligations', 'studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
     'paymentAllocations', 'transportPaymentAllocations', 'audit_logs', 'cashLedgerDays', 'cashClosures', 'studentPrivate', 'studentFinance',
-    'studentParentPrivate', 'studentParentFinance', 'students', 'classes', 'periods', 'teachingWeeks', 'academicYears'];
+    'studentParentPrivate', 'studentParentFinance', 'students', 'classes', 'grades', 'periods', 'teachingWeeks', 'academicYears'];
   // Allow fixture-only async projections to finish, then remove only this run's school data.
   await pause(5000);
   for (let attempt = 0; attempt < 2; attempt++) {
