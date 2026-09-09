@@ -23,6 +23,9 @@ jobs:
           node-version: 20
       - name: Test secret guard
         run: node --test tests/security/secret-guard.spec.mjs
+      - name: Preserve academic history from Settings
+        run: node --test tests/security/settings-calendar-preservation.spec.mjs
+
       - name: Reject tracked staging credentials
         run: node scripts/check-staging-credential-regressions.mjs
       - name: Validate production deployment manifest
