@@ -5,6 +5,7 @@ import { adoptCurriculumProgram } from '../services/pedagogyService';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 import { curriculumProvenanceLabel, curriculumProvenanceLink } from '../services/curriculumProvenance';
 import { CurriculumCoverage } from '../components/CurriculumCoverage';
+import { CurriculumUnitDetails } from '../components/CurriculumUnitDetails';
 
 export default function PedagogyProgram() {
   const { db, currentSchool } = useAppContext();
@@ -52,7 +53,16 @@ function ProgramScope({ yearId }: { yearId?: string }) {
         <fieldset disabled={readOnly || busy || uncertain || workspace.loading || Boolean(workspace.error)}>
         <label>Niveau<select value={levelId} onChange={event => { setLevelId(event.target.value); setReceived(false); }}><option value="">Choisir…</option>{levels.map(level => <option key={level}>{level}</option>)}</select></label>
         <label>Programme<select value={programId} onChange={event => { setProgramId(event.target.value); setReceived(false); }}><option value="">Choisir…</option>{workspace.programs.map(program => <option key={program.id} value={program.id}>{program.title} · {program.version}</option>)}</select></label>
+        {selectedProgram && <section aria-label="Programme à examiner" className="pedagogy-card">
+          <h3>{selectedProgram.title}</h3>
+          <p>Version : {selectedProgram.version}. Nature : {curriculumProvenanceLabel(selectedProgram.sourceType)}.</p>
+          <p>Classes concernées par le niveau sélectionné : {(db?.classes || []).filter(item => item.schoolId === currentSchool?.id && item.isActive !== false && Boolean(levelId) && item.catalogLevelId === levelId).map(item => item.name).join(', ') || 'Choisir un niveau configuré.'}</p>
+          <p>Pourquoi cette proposition ? Sélection manuelle dans le catalogue ; aucune correspondance automatique certifiée. Vérifiez les matières, la version et l’applicabilité avant de transmettre une décision.</p>
+          <p>Éléments restant à vérifier : couverture des matières/domaines, authenticité documentaire, édition applicable et droits. Un programme de démonstration n’est pas un programme officiel.</p>
+          {curriculumProvenanceLink(selectedProgram.provenance?.sourceUrl) ? <a href={curriculumProvenanceLink(selectedProgram.provenance?.sourceUrl)!} target="_blank" rel="noopener noreferrer">Consulter la source du programme</a> : <p>Source documentaire non renseignée.</p>}
+        </section>}
         <label>Auteur de la décision reçue<input value={decisionBy} maxLength={150} onChange={event => { setDecisionBy(event.target.value); setReceived(false); }} /></label>
+        {selectedProgram && levelId && currentSchool && <CurriculumUnitDetails schoolId={currentSchool.id} programId={selectedProgram.id} levelId={levelId} />}
         <label>Date de la décision<input type="date" value={decisionDate} onChange={event => { setDecisionDate(event.target.value); setReceived(false); }} /></label>
         <label>Référence ou note de transmission<textarea value={decisionReference} maxLength={1000} onChange={event => { setDecisionReference(event.target.value); setReceived(false); }} /></label>
         <label><input type="checkbox" checked={received} onChange={event => setReceived(event.target.checked)} />Je confirme avoir reçu cette décision pour ce niveau et cette version.</label>

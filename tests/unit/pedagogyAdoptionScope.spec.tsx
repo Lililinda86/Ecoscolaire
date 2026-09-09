@@ -9,6 +9,7 @@ vi.mock('../../src/context/AppContext', () => ({ useAppContext: () => ({
     classes: [{ id: 'a-class', schoolId: 'a', catalogLevelId: 'primary-a' }, { id: 'b-class', schoolId: 'b', catalogLevelId: 'primary-b' }] },
 }) }));
 vi.mock('../../src/features/pedagogy/services/pedagogyService', () => ({ adoptCurriculumProgram: state.adopt }));
+vi.mock('../../src/features/pedagogy/services/curriculumUnits', () => ({ loadPublishedCurriculumUnits: async () => [] }));
 vi.mock('../../src/features/pedagogy/hooks/usePedagogyWorkspace', () => ({ usePedagogyWorkspace: () => ({
   programs: [{ id: 'program', title: 'Synthetic programme', version: 'v1', sourceType: 'mock' }], adoptions: [], error: '', loading: false, refresh: state.refresh,
 }) }));

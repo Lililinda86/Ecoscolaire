@@ -61,7 +61,7 @@ export default function PedagogyPlanning() {
       <button className="pedagogy-button pedagogy-button--secondary" disabled={readOnly || !year} onClick={() => void initialize()}>Initialiser les semaines</button>
       <button className="pedagogy-button" disabled={readOnly || !classId || !weekStartDate} onClick={() => void run(createProposal, 'Proposition générée.')}>{plan ? 'Regénérer la proposition' : 'Créer la proposition'}</button>
     </section>
-    <div className="pedagogy-alert">Progression planifiée uniquement — la progression réalisée sera alimentée par le Lot B.</div>
+    <div className="pedagogy-alert"><strong>Programme de référence ≠ planification Ecoscolaire.</strong> La répartition par semaine est une proposition pour le calendrier de l’établissement, pas une obligation ministérielle. La validation de l’enseignant doit être reçue puis enregistrée. Les cours réellement enseignés se confirment dans Préparations.</div>
     {plan && <section className="pedagogy-card">
       <div className="pedagogy-card-title"><div><h2>{classes.find(item => item.id === plan.classId)?.name || plan.classId}</h2><p>Semaine {plan.weekNumber}, du {plan.weekStartDate} au {plan.weekEndDate}</p></div><StatusBadge status={plan.status} /></div>
       {plan.teacherValidated && <p className="pedagogy-alert">Validation de l’enseignant enregistrée par la secrétaire</p>}

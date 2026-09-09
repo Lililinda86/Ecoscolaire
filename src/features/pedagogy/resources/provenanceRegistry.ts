@@ -1,5 +1,5 @@
 import { minedubDocuments } from './minedubVerified';
-export type ProvenanceStatus = 'OFFICIAL_VERIFIED' | 'OFFICIAL_PENDING_VERIFICATION' | 'COMPLEMENTARY_VERIFIED' | 'EXTERNAL_LINK_ONLY' | 'ITALO_INTERNAL' | 'MOCK' | 'REJECTED';
+export type ProvenanceStatus = 'OFFICIAL_VERIFIED' | 'OFFICIAL_PENDING_VERIFICATION' | 'COMPLEMENTARY_VERIFIED' | 'LINK_ONLY' | 'EXTERNAL_LINK_ONLY' | 'ITALO_INTERNAL' | 'MOCK' | 'REJECTED';
 export interface ProvenanceRecord {
   id: string; authority: 'MINEDUB' | 'MINESEC' | 'MINESUP' | 'CEDUC' | 'ITALO' | 'OTHER';
   issuingOrganization: string | null; hostingOrganization: string | null;
@@ -24,6 +24,17 @@ const metadata: Omit<ProvenanceRecord, 'id' | 'authority' | 'issuingOrganization
 };
 /** Hierarchy is authority scope, not a claim that any corpus has been authenticated. */
 export const provenanceRegistry: ProvenanceRecord[] = [
+  { ...metadata, id: 'minesec-vod', authority: 'MINESEC', issuingOrganization: 'Ministère des Enseignements Secondaires', hostingOrganization: 'MINESEC / CAMTEL',
+    title: 'MINESEC — ressources de télé-enseignement', officialUrl: 'https://vod.minesec.gov.cm/', retrievalUrl: 'https://vod.minesec.gov.cm/',
+    retrievedAt: '2026-09-09', verificationMethod: 'Page consultée sur le sous-domaine ministériel ; rubrique Télé-Enseignement / Distance Education et mention MINESEC / CAMTEL.',
+    status: 'LINK_ONLY', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    missingReason: 'Portail de ressources, pas un curriculum ni une preuve de couverture. Aucun média copié. Niveau, date, applicabilité et droits de chaque ressource à vérifier avant usage.' },
+  { ...metadata, id: 'minesec-distance-form-one-maths-candidate', authority: 'MINESEC', issuingOrganization: null, hostingOrganization: 'schoolfaqs.net',
+    title: 'Enseignement à distance — Mathematics, Form One (rattachement institutionnel à confirmer)', officialUrl: null,
+    retrievalUrl: 'https://minesec.schoolfaqs.net/learn/mathematics/form-one', language: 'en', levels: ['Form One'], subjects: ['Mathematics'],
+    retrievedAt: '2026-09-09', verificationMethod: 'Page publique consultée ; intitulés de modules présents, leçons affichées à zéro. Le logo ne constitue pas une authentification.',
+    status: 'LINK_ONLY', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    missingReason: 'Hébergement tiers : lien institutionnel canonique, édition et droits non confirmés. Ne pas adopter ni importer comme programme officiel. Aucun contenu de cours copié.' },
   ...minedubDocuments.map((document): ProvenanceRecord => ({ ...metadata,
     id: document.id, authority: 'MINEDUB', issuingOrganization: 'Ministère de l’Éducation de Base', hostingOrganization: 'MINEDUB', sourceType: 'curriculum',
     title: document.title, officialUrl: 'https://www.minedub.cm/wp-file-download-search/',
