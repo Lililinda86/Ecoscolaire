@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useState, type ReactNode } from 'react';
+import { SubjectReviewContext as Context } from '../hooks/useSubjectReview';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../../db/firebase';
 import { useScopedResource } from '../hooks/useScopedResource';
@@ -7,16 +8,15 @@ import type { StructuredReviewExcerpt } from '../resources/minedubVerified';
 import { minedubSubjectIndex } from '../resources/minedubSubjectIndex';
 import { minedubDocuments } from '../resources/minedubVerified';
 
-interface Row {
+export interface SubjectReviewRow {
   classId: string; className: string; catalogLevelId: string; mappings: SubjectMatch[]; safeCount: number;
   ambiguousCount: number; missingCount: number; mappingVersion: string; status: string;
   progressionSuggestions: ReturnType<typeof proposeDocumentaryProgression>;
   source: { title: string; sourceUrl: string; pdfPages: number[]; edition: string; sourceVersion: string; units: (StructuredReviewExcerpt & { catalogLevelId: string })[] };
 }
-interface SecondaryRow { classId: string; className: string; coverage: string; mappings: SubjectMatch[]; sources: { officialSubject: string; sources: { documentId: string; title: string; sourceUrl: string; sourceVersion: string; locator: string; note: string }[] }[] }
-interface State { rows: Row[]; secondaryRows: SecondaryRow[]; loading: boolean; error: string | null; refresh: () => Promise<void>; schoolId?: string; yearId?: string; owner: boolean }
-const Context = createContext<State | null>(null);
-const empty: { rows: Row[]; secondaryRows: SecondaryRow[] } = { rows: [], secondaryRows: [] };
+export interface SecondaryRow { classId: string; className: string; coverage: string; mappings: SubjectMatch[]; sources: { officialSubject: string; sources: { documentId: string; title: string; sourceUrl: string; sourceVersion: string; locator: string; note: string }[] }[] }
+export interface SubjectDecision { classId: string; officialSubject: string; decision: string; subjectId: string | null; revision: number; sourceVersion: string; mappingVersion: string; decisionNote: string }
+const empty: { rows: SubjectReviewRow[]; secondaryRows: SecondaryRow[]; decisions?: SubjectDecision[] } = { rows: [], secondaryRows: [], decisions: [] };
 export function SubjectMappingProvider({ schoolId, yearId, owner, children }: { schoolId?: string; yearId?: string; owner: boolean; children: ReactNode }) {
   const load = useCallback(async () => {
     if (!schoolId || !yearId) return empty;
