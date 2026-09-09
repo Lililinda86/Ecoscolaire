@@ -11,3 +11,6 @@
 .school-fee-group { border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; background: #fff; }
 .school-fee-group h3 { margin: 0 0 .35rem; }
 .school-fee-types, .school-fee-empty { color: #64748b; margin: .35rem 0 .75rem; overflow-wrap: anywhere; }
+.fee-target-list { max-height: 18rem; overflow-y: auto; } .school-fee-catalog fieldset { min-width: 0; margin-block: 1rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; } .fee-target-list label { min-height: 44px; overflow-wrap: anywhere; } .school-fee-catalog input[type=checkbox] { flex: 0 0 auto; width: 18px; height: 18px; } .fee-publication-review { padding: 1rem; border: 2px solid var(--primary-color); border-radius: 8px; overflow-wrap: anywhere; }
+
+.fee-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
