@@ -77,10 +77,11 @@ try {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('dialog', dialog => dialog.accept());
+  const dialogs = [];
+  page.on('dialog', dialog => { dialogs.push(dialog.message()); return dialog.accept(); });
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) await page.route(`${origin}/**`, route => route.continue({ headers: { ...route.request().headers(), 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
   const openTransport = async () => {
-    await page.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Transport', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Sections des paramÃ¨tres' }).getByRole('button', { name: 'Transport', exact: true }).click();
     await expect(page.getByTestId('italo-transport-policy-enabled')).toBeVisible();
   };
   const login = async role => {
@@ -95,11 +96,11 @@ try {
   await login('owner');
   const toggle = page.getByTestId('italo-transport-policy-enabled');
   const months = page.getByTestId('italo-transport-billing-periods');
-  const rates = [page.getByLabel('PK14 à PK33 — FCFA / mois'), page.getByLabel('PK34 à PK42 — FCFA / mois')];
+  const rates = [page.getByLabel('PK14 Ã  PK33 â€” FCFA / mois'), page.getByLabel('PK34 Ã  PK42 â€” FCFA / mois')];
   const save = async () => {
     await page.getByTestId('transport-save-reason').fill('Validation persistance Transport');
     await page.getByTestId('save-transport-settings').click();
-    await expect(page.getByTestId('transport-save-status')).toHaveText('Transport enregistré et confirmé par le serveur.');
+    await expect(page.getByTestId('transport-save-status')).toHaveText('Transport enregistrÃ© et confirmÃ© par le serveur.');
   };
   const refresh = async enabled => { await page.reload(); await openTransport(); await expect(toggle).toBeChecked({ checked: enabled }); };
   await expect(toggle).not.toBeChecked();
@@ -108,7 +109,7 @@ try {
   await toggle.check();
   await page.getByTestId('save-transport-settings').click();
   await expect(page.getByRole('alert')).toContainText('mois facturables');
-  await expect(page.getByTestId('transport-save-status')).toContainText('non enregistrées');
+  await expect(page.getByTestId('transport-save-status')).toContainText('non enregistrÃ©es');
   assert.equal((await read()).transportPolicy.feePolicyId, undefined);
   await record('MISSING MONTHS REJECTED VISIBLY / NO WRITE');
   await months.fill('2026-09, 2026-10');
@@ -135,7 +136,9 @@ try {
   assert.deepEqual((await read()).transportPolicy.pkRates, { pk14To33: 4000, pk34To42: 5000 });
   await record('4000 / 5000 RESTORED AND PERSISTED');
   const beforeMetadata = (await read()).transportPolicy;
+  const previousDialogs = dialogs.length;
   await page.getByRole('button', { name: 'Enregistrer les modifications', exact: true }).click();
+  await expect.poll(() => dialogs.slice(previousDialogs)).toContain('ParamÃ¨tres enregistrÃ©s avec succÃ¨s.');
   await expect.poll(async () => (await read()).transportPolicy).toEqual(beforeMetadata);
   await refresh(true); await record('GLOBAL SAVE DOES NOT OVERWRITE TRANSPORT');
   const current = await read();
