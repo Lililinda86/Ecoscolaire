@@ -9,3 +9,5 @@ Read-only baseline captured before merge includes school, students/classes, priv
 Rollback target remains e1f236ae5c370e9de5ccf9efaa99d53483b9b1a4, with source archive and recent backup retained. Never import/recalculate financial data automatically during rollback.
 
 Vercel Production waits for the exact merged SHA's successful Firebase backend workflow before building/publishing. Preview builds remain independent. The backend verifies the deployed Rules source hash after deployment. This avoids exposing the new frontend while the old backend is still active.
+
+Vercel build command is pinned in `vercel.json` to `npm run vercel-build`. Production dashboard settings previously bypassed the npm script; repository configuration now enforces backend-before-frontend publication. This changes deployment ordering only, with no product or financial source changes.
