@@ -1,5 +1,38 @@
 # Remplissage pédagogique — livraison technique Staging validée
 
+## Revue documentaire des 34 classes — 9 septembre 2026
+
+Nouvelles fonctionnalités gelées. Aucune écriture Staging, aucun déploiement,
+aucun appel OpenAI ni action Production pendant cette phase.
+
+Livrable courant : OWNER_CURRICULUM_PROPOSALS.md, 34 propositions en six groupes,
+avec sources, matières réellement affectées, recommandations et cases humaines
+vides. Les douze correspondances primaires sont recommandées à l'approbation
+de correspondance uniquement ; 22 autres fiches sont conditionnelles/à examiner.
+
+Recherche MINESEC : catalogues FR/EN accessibles par HTTP direct ; 91 dossiers
+publics parcourus, 81 PDF récupérés avec empreintes, conservés hors dépôt. Les
+index publiables sont des métadonnées, pas les textes. Contrôles dans
+MINESEC_SOURCE_ASSESSMENT.md et MINESEC_SOURCE_CHECKS.json. Les anciennes mentions
+« pas de source secondaire » sont des états historiques : 13 niveaux secondaires
+ont maintenant des propositions documentées partielles ; Première reste sans
+corpus général établi. Rien de ce nouveau fonds n'est importé dans Staging.
+
+Lecture locale ITALO : CP 2 matières, CE1 8, CE2 3 dans les révisions courantes ;
+31 autres classes sans affectation active retrouvée. Les classes de second cycle
+existent bien dans la configuration générale : la question des séries y est
+pertinente, pas dans toutes les classes. Aucun compte ou permission changé.
+
+Contrôles documentaires PASS : 34 jeux de champs, six groupes, zéro décision
+cochée, 81 empreintes PDF, exclusions/corrections des niveaux et des faux intitulés.
+UI Staging des 34 fiches groupées : NOT READY. Le dossier est prêt pour revue
+documentaire humaine ; aucune adoption de programme n'a été simulée pour créer
+une prétendue approbation groupée. Pas de nouveau gate applicatif revendiqué.
+
+Reprise locale : `node scripts/check-pedagogy-owner-proposals.mjs`, puis lire
+OWNER_CURRICULUM_PROPOSALS.md et les décisions effectivement reçues. Ne pas
+rejouer le crawl ni les anciennes commandes de déploiement sans nécessité.
+
 ## État final faisant foi — 9 septembre 2026
 
 SHA déployé et testé : `99c2daacd8ead63c9337456ea72c81bfe4f822b5`.

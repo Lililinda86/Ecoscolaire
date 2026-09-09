@@ -1,0 +1,1958 @@
+{
+  "authority": "MINESEC",
+  "rootPages": [
+    "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+    "https://www.minesec.gov.cm/web/index.php/en/systeme-educatif-en/progammes-d-etudes-en"
+  ],
+  "scope": "Public General Education folders linked from ministry; metadata only, not file authentication or current applicability",
+  "folders": [
+    {
+      "id": 48,
+      "path": [],
+      "listedAt": "2026-09-09T13:29:23.362Z",
+      "pageTitle": "GENERAL EDUCATION",
+      "items": [
+        {
+          "title": "1st cycle",
+          "folder": "51",
+          "url": "https://files.minesec.gov.cm/folder/51/1st_cycle"
+        },
+        {
+          "title": "2nd cycle",
+          "folder": "52",
+          "url": "https://files.minesec.gov.cm/folder/52/2nd_cycle"
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "path": [],
+      "listedAt": "2026-09-09T13:29:23.373Z",
+      "pageTitle": "ENSEIGNEMENT GENERAL",
+      "items": [
+        {
+          "title": "1er cycle",
+          "folder": "91",
+          "url": "https://files.minesec.gov.cm/folder/91/1er_cycle"
+        },
+        {
+          "title": "2nd cycle",
+          "folder": "123",
+          "url": "https://files.minesec.gov.cm/folder/123/2nd_cycle"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "path": [
+        "2nd cycle"
+      ],
+      "listedAt": "2026-09-09T13:29:24.640Z",
+      "pageTitle": "2nd cycle",
+      "items": [
+        {
+          "title": "L6 and UP6",
+          "folder": "63",
+          "url": "https://files.minesec.gov.cm/folder/63/L6_and_UP6"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "path": [
+        "1st cycle"
+      ],
+      "listedAt": "2026-09-09T13:29:24.641Z",
+      "pageTitle": "1st cycle",
+      "items": [
+        {
+          "title": "Form 1 and  Form 2",
+          "folder": "53",
+          "url": "https://files.minesec.gov.cm/folder/53/Form_1_and__Form_2"
+        },
+        {
+          "title": "Form 3 and Form 4",
+          "folder": "54",
+          "url": "https://files.minesec.gov.cm/folder/54/Form_3_and_Form_4"
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "path": [
+        "2nd cycle"
+      ],
+      "listedAt": "2026-09-09T13:29:25.938Z",
+      "pageTitle": "2nd cycle",
+      "items": [
+        {
+          "title": "PROGRAMME DE 1iere",
+          "folder": "146",
+          "url": "https://files.minesec.gov.cm/folder/146/PROGRAMME_DE_1iere"
+        },
+        {
+          "title": "PROGRAMME Tle",
+          "folder": "147",
+          "url": "https://files.minesec.gov.cm/folder/147/PROGRAMME_Tle"
+        },
+        {
+          "title": "PROGRAMMES 2nde",
+          "folder": "144",
+          "url": "https://files.minesec.gov.cm/folder/144/PROGRAMMES_2nde"
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "path": [
+        "1er cycle"
+      ],
+      "listedAt": "2026-09-09T13:29:25.939Z",
+      "pageTitle": "1er cycle",
+      "items": [
+        {
+          "title": "4ème-3ème",
+          "folder": "98",
+          "url": "https://files.minesec.gov.cm/folder/98/4ème-3ème"
+        },
+        {
+          "title": "6ème-5ème",
+          "folder": "92",
+          "url": "https://files.minesec.gov.cm/folder/92/6ème-5ème"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2"
+      ],
+      "listedAt": "2026-09-09T13:29:27.265Z",
+      "pageTitle": "Form 1 and  Form 2",
+      "items": [
+        {
+          "title": "IP-COMPUTER SCIENCES",
+          "folder": "55",
+          "url": "https://files.minesec.gov.cm/folder/55/IP-COMPUTER_SCIENCES"
+        },
+        {
+          "title": "IP-LANGUAGES",
+          "folder": "56",
+          "url": "https://files.minesec.gov.cm/folder/56/IP-LANGUAGES"
+        },
+        {
+          "title": "IP-Sciences",
+          "folder": "57",
+          "url": "https://files.minesec.gov.cm/folder/57/IP-Sciences"
+        },
+        {
+          "title": "IP-SOCIAL SCIENCES",
+          "folder": "58",
+          "url": "https://files.minesec.gov.cm/folder/58/IP-SOCIAL_SCIENCES"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6"
+      ],
+      "listedAt": "2026-09-09T13:29:27.309Z",
+      "pageTitle": "L6 and UP6",
+      "items": [
+        {
+          "title": "Bilinguisme - Bilinguism",
+          "folder": "64",
+          "url": "https://files.minesec.gov.cm/folder/64/Bilinguisme_-_Bilinguism"
+        },
+        {
+          "title": "Computer sciences and ITC",
+          "folder": "65",
+          "url": "https://files.minesec.gov.cm/folder/65/Computer_sciences_and_ITC"
+        },
+        {
+          "title": "IP-BIL",
+          "folder": "66",
+          "url": "https://files.minesec.gov.cm/folder/66/IP-BIL"
+        },
+        {
+          "title": "IP-computer sciences",
+          "folder": "67",
+          "url": "https://files.minesec.gov.cm/folder/67/IP-computer_sciences"
+        },
+        {
+          "title": "IP-Languages",
+          "folder": "68",
+          "url": "https://files.minesec.gov.cm/folder/68/IP-Languages"
+        },
+        {
+          "title": "IP-OSL",
+          "folder": "69",
+          "url": "https://files.minesec.gov.cm/folder/69/IP-OSL"
+        },
+        {
+          "title": "Languages",
+          "folder": "71",
+          "url": "https://files.minesec.gov.cm/folder/71/Languages"
+        },
+        {
+          "title": "Sciences",
+          "folder": "72",
+          "url": "https://files.minesec.gov.cm/folder/72/Sciences"
+        },
+        {
+          "title": "Social Sciences",
+          "folder": "73",
+          "url": "https://files.minesec.gov.cm/folder/73/Social_Sciences"
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME DE 1iere"
+      ],
+      "listedAt": "2026-09-09T13:29:28.591Z",
+      "pageTitle": "PROGRAMME DE 1iere",
+      "items": []
+    },
+    {
+      "id": 54,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4"
+      ],
+      "listedAt": "2026-09-09T13:29:28.623Z",
+      "pageTitle": "Form 3 and Form 4",
+      "items": [
+        {
+          "title": "IP-BIL",
+          "folder": "120",
+          "url": "https://files.minesec.gov.cm/folder/120/IP-BIL"
+        },
+        {
+          "title": "IP-INFO",
+          "folder": "121",
+          "url": "https://files.minesec.gov.cm/folder/121/IP-INFO"
+        },
+        {
+          "title": "IP-LAL",
+          "folder": "122",
+          "url": "https://files.minesec.gov.cm/folder/122/IP-LAL"
+        },
+        {
+          "title": "IP-SC",
+          "folder": "124",
+          "url": "https://files.minesec.gov.cm/folder/124/IP-SC"
+        },
+        {
+          "title": "IP-SH",
+          "folder": "126",
+          "url": "https://files.minesec.gov.cm/folder/126/IP-SH"
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde"
+      ],
+      "listedAt": "2026-09-09T13:29:29.965Z",
+      "pageTitle": "PROGRAMMES 2nde",
+      "items": [
+        {
+          "title": "IP-BIL",
+          "folder": "148",
+          "url": "https://files.minesec.gov.cm/folder/148/IP-BIL"
+        },
+        {
+          "title": "IP-INFO",
+          "folder": "149",
+          "url": "https://files.minesec.gov.cm/folder/149/IP-INFO"
+        },
+        {
+          "title": "IP-LAL",
+          "folder": "151",
+          "url": "https://files.minesec.gov.cm/folder/151/IP-LAL"
+        },
+        {
+          "title": "IP-SH-PROGRAMMES 2des ESG-EST",
+          "folder": "150",
+          "url": "https://files.minesec.gov.cm/folder/150/IP-SH-PROGRAMMES_2des_ESG-EST"
+        },
+        {
+          "title": "SCIENCE",
+          "folder": "152",
+          "url": "https://files.minesec.gov.cm/folder/152/SCIENCE"
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle"
+      ],
+      "listedAt": "2026-09-09T13:29:29.988Z",
+      "pageTitle": "PROGRAMME Tle",
+      "items": [
+        {
+          "title": "IP-BIL",
+          "folder": "175",
+          "url": "https://files.minesec.gov.cm/folder/175/IP-BIL"
+        },
+        {
+          "title": "IP-INFO",
+          "folder": "176",
+          "url": "https://files.minesec.gov.cm/folder/176/IP-INFO"
+        },
+        {
+          "title": "IP-LAL",
+          "folder": "177",
+          "url": "https://files.minesec.gov.cm/folder/177/IP-LAL"
+        },
+        {
+          "title": "IP-OVS",
+          "folder": "178",
+          "url": "https://files.minesec.gov.cm/folder/178/IP-OVS"
+        },
+        {
+          "title": "IP-SC",
+          "folder": "179",
+          "url": "https://files.minesec.gov.cm/folder/179/IP-SC"
+        },
+        {
+          "title": "IP-SH",
+          "folder": "180",
+          "url": "https://files.minesec.gov.cm/folder/180/IP-SH"
+        },
+        {
+          "title": "IP-Ti",
+          "folder": "181",
+          "url": "https://files.minesec.gov.cm/folder/181/IP-Ti"
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "path": [
+        "1er cycle",
+        "6ème-5ème"
+      ],
+      "listedAt": "2026-09-09T13:29:31.289Z",
+      "pageTitle": "6ème-5ème",
+      "items": [
+        {
+          "title": "IP-BIL",
+          "folder": "93",
+          "url": "https://files.minesec.gov.cm/folder/93/IP-BIL"
+        },
+        {
+          "title": "IP-INFO",
+          "folder": "94",
+          "url": "https://files.minesec.gov.cm/folder/94/IP-INFO"
+        },
+        {
+          "title": "IP-LAL",
+          "folder": "95",
+          "url": "https://files.minesec.gov.cm/folder/95/IP-LAL"
+        },
+        {
+          "title": "IP-Sciences",
+          "folder": "96",
+          "url": "https://files.minesec.gov.cm/folder/96/IP-Sciences"
+        },
+        {
+          "title": "IP-SH",
+          "folder": "97",
+          "url": "https://files.minesec.gov.cm/folder/97/IP-SH"
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "path": [
+        "1er cycle",
+        "4ème-3ème"
+      ],
+      "listedAt": "2026-09-09T13:29:31.295Z",
+      "pageTitle": "4ème-3ème",
+      "items": [
+        {
+          "title": "IP-BIL",
+          "folder": "99",
+          "url": "https://files.minesec.gov.cm/folder/99/IP-BIL"
+        },
+        {
+          "title": "IP-INFO",
+          "folder": "100",
+          "url": "https://files.minesec.gov.cm/folder/100/IP-INFO"
+        },
+        {
+          "title": "IP-LAL",
+          "folder": "101",
+          "url": "https://files.minesec.gov.cm/folder/101/IP-LAL"
+        },
+        {
+          "title": "IP-SC",
+          "folder": "115",
+          "url": "https://files.minesec.gov.cm/folder/115/IP-SC"
+        },
+        {
+          "title": "IP-SH",
+          "folder": "119",
+          "url": "https://files.minesec.gov.cm/folder/119/IP-SH"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-LANGUAGES"
+      ],
+      "listedAt": "2026-09-09T13:29:32.512Z",
+      "pageTitle": "IP-LANGUAGES",
+      "items": []
+    },
+    {
+      "id": 55,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-COMPUTER SCIENCES"
+      ],
+      "listedAt": "2026-09-09T13:29:32.514Z",
+      "pageTitle": "IP-COMPUTER SCIENCES",
+      "items": [
+        {
+          "title": "Computer Science  Sylabus Form1_2_11_aout_2014_mbalmayo.pdf",
+          "url": "https://files.minesec.gov.cm/c/Computer_Science__Sylabus_Form1_2_11_aout_2014_mbalmayo.pdf",
+          "fileId": "2"
+        },
+        {
+          "title": "Curriculum guide _prog_mbalmayo_aout_2014_2final.pdf",
+          "url": "https://files.minesec.gov.cm/d/Curriculum_guide__prog_mbalmayo_aout_2014_2final.pdf",
+          "fileId": "3"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-SOCIAL SCIENCES"
+      ],
+      "listedAt": "2026-09-09T13:29:33.693Z",
+      "pageTitle": "IP-SOCIAL SCIENCES",
+      "items": []
+    },
+    {
+      "id": 57,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences"
+      ],
+      "listedAt": "2026-09-09T13:29:33.725Z",
+      "pageTitle": "IP-Sciences",
+      "items": [
+        {
+          "title": "Biology",
+          "folder": "59",
+          "url": "https://files.minesec.gov.cm/folder/59/Biology"
+        },
+        {
+          "title": "Chemistry",
+          "folder": "60",
+          "url": "https://files.minesec.gov.cm/folder/60/Chemistry"
+        },
+        {
+          "title": "Mathematics",
+          "folder": "61",
+          "url": "https://files.minesec.gov.cm/folder/61/Mathematics"
+        },
+        {
+          "title": "Physics",
+          "folder": "62",
+          "url": "https://files.minesec.gov.cm/folder/62/Physics"
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Computer sciences and ITC"
+      ],
+      "listedAt": "2026-09-09T13:29:34.875Z",
+      "pageTitle": "Computer sciences and ITC",
+      "items": []
+    },
+    {
+      "id": 64,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Bilinguisme - Bilinguism"
+      ],
+      "listedAt": "2026-09-09T13:29:34.896Z",
+      "pageTitle": "Bilinguisme - Bilinguism",
+      "items": [
+        {
+          "title": "Pedagogic guide 1 for french as a second language.pdf",
+          "url": "https://files.minesec.gov.cm/1N/Pedagogic_guide_1_for_french_as_a_second_language.pdf",
+          "fileId": "11"
+        },
+        {
+          "title": "Pedagogic guide 2 for french as a second language.pdf",
+          "url": "https://files.minesec.gov.cm/1O/Pedagogic_guide_2_for_french_as_a_second_language.pdf",
+          "fileId": "12"
+        },
+        {
+          "title": "Pedagogic guide 3 for french as a second language.pdf",
+          "url": "https://files.minesec.gov.cm/1P/Pedagogic_guide_3_for_french_as_a_second_language.pdf",
+          "fileId": "13"
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-BIL"
+      ],
+      "listedAt": "2026-09-09T13:29:36.047Z",
+      "pageTitle": "IP-BIL",
+      "items": [
+        {
+          "title": "Syllabus French Upper Sixth Général Education.pdf",
+          "url": "https://files.minesec.gov.cm/1Q/Syllabus_French_Upper_Sixth_Général_Education.pdf",
+          "fileId": "14"
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-computer sciences"
+      ],
+      "listedAt": "2026-09-09T13:29:36.055Z",
+      "pageTitle": "IP-computer sciences",
+      "items": [
+        {
+          "title": "CS Syllabus Working Draft 25-082020.pdf",
+          "url": "https://files.minesec.gov.cm/1R/CS_Syllabus_Working_Draft_25-082020.pdf",
+          "fileId": "15"
+        },
+        {
+          "title": "ICT Syllabus Working Draft 25-082020.pdf",
+          "url": "https://files.minesec.gov.cm/1S/ICT_Syllabus_Working_Draft_25-082020.pdf",
+          "fileId": "16"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-OSL"
+      ],
+      "listedAt": "2026-09-09T13:29:37.221Z",
+      "pageTitle": "IP-OSL",
+      "items": []
+    },
+    {
+      "id": 68,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-Languages"
+      ],
+      "listedAt": "2026-09-09T13:29:37.221Z",
+      "pageTitle": "IP-Languages",
+      "items": [
+        {
+          "title": "LANG + LIT",
+          "folder": "70",
+          "url": "https://files.minesec.gov.cm/folder/70/LANG_+_LIT"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Languages"
+      ],
+      "listedAt": "2026-09-09T13:29:38.410Z",
+      "pageTitle": "Languages",
+      "items": []
+    },
+    {
+      "id": 72,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Sciences"
+      ],
+      "listedAt": "2026-09-09T13:29:38.430Z",
+      "pageTitle": "Sciences",
+      "items": []
+    },
+    {
+      "id": 73,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Social Sciences"
+      ],
+      "listedAt": "2026-09-09T13:29:39.600Z",
+      "pageTitle": "Social Sciences",
+      "items": []
+    },
+    {
+      "id": 120,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-BIL"
+      ],
+      "listedAt": "2026-09-09T13:29:39.609Z",
+      "pageTitle": "IP-BIL",
+      "items": [
+        {
+          "title": "ANGLAIS Syllabus Year 3 and year 4 tech. burnable.pdf",
+          "url": "https://files.minesec.gov.cm/2w/ANGLAIS_Syllabus_Year_3_and_year_4_tech._burnable.pdf",
+          "fileId": "56"
+        },
+        {
+          "title": "FRENCH AS SECOND LANGUAGE Form 3,  4 et 5 burnable.pdf",
+          "url": "https://files.minesec.gov.cm/2x/FRENCH_AS_SECOND_LANGUAGE_Form_3,__4_et_5_burnable.pdf",
+          "fileId": "57"
+        },
+        {
+          "title": "PEBS 345 french.pdf",
+          "url": "https://files.minesec.gov.cm/2y/PEBS_345_french.pdf",
+          "fileId": "58"
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-INFO"
+      ],
+      "listedAt": "2026-09-09T13:29:40.773Z",
+      "pageTitle": "IP-INFO",
+      "items": [
+        {
+          "title": "Computer Science Syllabus F3_4_5.pdf",
+          "url": "https://files.minesec.gov.cm/2z/Computer_Science_Syllabus_F3_4_5.pdf",
+          "fileId": "59"
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-LAL"
+      ],
+      "listedAt": "2026-09-09T13:29:40.774Z",
+      "pageTitle": "IP-LAL",
+      "items": [
+        {
+          "title": "Arts Langues et Culture Nationale",
+          "folder": "131",
+          "url": "https://files.minesec.gov.cm/folder/131/Arts_Langues_et_Culture_Nationale"
+        },
+        {
+          "title": "English Language and Literature in English Syllabuses for forms 3 to 5",
+          "folder": "132",
+          "url": "https://files.minesec.gov.cm/folder/132/English_Language_and_Literature_in_English_Syllabuses_for_forms_3_to_5"
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SH"
+      ],
+      "listedAt": "2026-09-09T13:29:41.956Z",
+      "pageTitle": "IP-SH",
+      "items": [
+        {
+          "title": "CIT. EDUC.- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "url": "https://files.minesec.gov.cm/4o/CIT._EDUC.-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "fileId": "72"
+        },
+        {
+          "title": "ECONS- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "url": "https://files.minesec.gov.cm/4p/ECONS-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "fileId": "73"
+        },
+        {
+          "title": "GEOG- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "url": "https://files.minesec.gov.cm/4q/GEOG-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "fileId": "74"
+        },
+        {
+          "title": "HIST- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "url": "https://files.minesec.gov.cm/4r/HIST-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "fileId": "75"
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC"
+      ],
+      "listedAt": "2026-09-09T13:29:41.984Z",
+      "pageTitle": "IP-SC",
+      "items": [
+        {
+          "title": "MATHS",
+          "folder": "136",
+          "url": "https://files.minesec.gov.cm/folder/136/MATHS"
+        },
+        {
+          "title": "PCT",
+          "folder": "137",
+          "url": "https://files.minesec.gov.cm/folder/137/PCT"
+        },
+        {
+          "title": "SVT",
+          "folder": "138",
+          "url": "https://files.minesec.gov.cm/folder/138/SVT"
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-INFO"
+      ],
+      "listedAt": "2026-09-09T13:29:43.130Z",
+      "pageTitle": "IP-INFO",
+      "items": [
+        {
+          "title": "programme seconde A.pdf",
+          "url": "https://files.minesec.gov.cm/4v/programme_seconde_A.pdf",
+          "fileId": "79"
+        },
+        {
+          "title": "programme seconde C.pdf",
+          "url": "https://files.minesec.gov.cm/4w/programme_seconde_C.pdf",
+          "fileId": "80"
+        },
+        {
+          "title": "programme seconde _EST.pdf",
+          "url": "https://files.minesec.gov.cm/4u/programme_seconde__EST.pdf",
+          "fileId": "78"
+        },
+        {
+          "title": "référentiel des competences final.pdf",
+          "url": "https://files.minesec.gov.cm/4x/référentiel_des_competences_final.pdf",
+          "fileId": "81"
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-BIL"
+      ],
+      "listedAt": "2026-09-09T13:29:43.146Z",
+      "pageTitle": "IP-BIL",
+      "items": [
+        {
+          "title": "ANGLAIS SYLLABUS 2DE edited.pdf",
+          "url": "https://files.minesec.gov.cm/4s/ANGLAIS_SYLLABUS_2DE_edited.pdf",
+          "fileId": "76"
+        },
+        {
+          "title": "SBEP 2nde NEW edited.doc prof.pdf",
+          "url": "https://files.minesec.gov.cm/4t/SBEP_2nde_NEW_edited.doc_prof.pdf",
+          "fileId": "77"
+        }
+      ]
+    },
+    {
+      "id": 150,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-SH-PROGRAMMES 2des ESG-EST"
+      ],
+      "listedAt": "2026-09-09T13:29:44.282Z",
+      "pageTitle": "IP-SH-PROGRAMMES 2des ESG-EST",
+      "items": []
+    },
+    {
+      "id": 151,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-LAL"
+      ],
+      "listedAt": "2026-09-09T13:29:44.317Z",
+      "pageTitle": "IP-LAL",
+      "items": [
+        {
+          "title": "ALCN",
+          "folder": "154",
+          "url": "https://files.minesec.gov.cm/folder/154/ALCN"
+        },
+        {
+          "title": "FRANCAIS",
+          "folder": "157",
+          "url": "https://files.minesec.gov.cm/folder/157/FRANCAIS"
+        },
+        {
+          "title": "LATIIN ET GREC",
+          "folder": "159",
+          "url": "https://files.minesec.gov.cm/folder/159/LATIIN_ET_GREC"
+        }
+      ]
+    },
+    {
+      "id": 152,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "SCIENCE"
+      ],
+      "listedAt": "2026-09-09T13:29:45.469Z",
+      "pageTitle": "SCIENCE",
+      "items": [
+        {
+          "title": "Programme de  SVTEEHB Classe de 2nde.pdf",
+          "url": "https://files.minesec.gov.cm/iu/Programme_de__SVTEEHB_Classe_de_2nde.pdf",
+          "fileId": "146"
+        },
+        {
+          "title": "Projet de programme de chimie 2nde C- Final.pdf",
+          "url": "https://files.minesec.gov.cm/iv/Projet_de_programme_de_chimie_2nde_C-_Final.pdf",
+          "fileId": "147"
+        },
+        {
+          "title": "Projet de programme de Physique 2nde C - Final.pdf",
+          "url": "https://files.minesec.gov.cm/iw/Projet_de_programme_de_Physique_2nde_C_-_Final.pdf",
+          "fileId": "148"
+        }
+      ]
+    },
+    {
+      "id": 175,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-BIL"
+      ],
+      "listedAt": "2026-09-09T13:29:45.488Z",
+      "pageTitle": "IP-BIL",
+      "items": [
+        {
+          "title": "ANGLAIS SYLLABUS GENERAL Tle.1docx prevalidated.pdf",
+          "url": "https://files.minesec.gov.cm/jf/ANGLAIS_SYLLABUS_GENERAL_Tle.1docx_prevalidated.pdf",
+          "fileId": "193"
+        },
+        {
+          "title": "ANGLAIS SYLLABUS GENERAL Tle.docx prevalidated.pdf",
+          "url": "https://files.minesec.gov.cm/jg/ANGLAIS_SYLLABUS_GENERAL_Tle.docx_prevalidated.pdf",
+          "fileId": "194"
+        },
+        {
+          "title": "ANNEXE 1 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE GENERAL LOWER AND UPPER SIXTH CLASSES.pdf",
+          "url": "https://files.minesec.gov.cm/AV/ANNEXE_1_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+          "fileId": "289"
+        },
+        {
+          "title": "ANNEXE 2 Arrêté 90-22 PROG LITTERATURE IN ENGLISH SYLLABUS ANGLOPHONE GENERAL LOWER AND UPPER SIXTH.pdf",
+          "url": "https://files.minesec.gov.cm/AW/ANNEXE_2_Arrêté_90-22_PROG_LITTERATURE_IN_ENGLISH_SYLLABUS_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH.pdf",
+          "fileId": "290"
+        },
+        {
+          "title": "ANNEXE 3 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE TECHNICAL LOWER AND UPPER SIXTH CLASSES.pdf",
+          "url": "https://files.minesec.gov.cm/AX/ANNEXE_3_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_TECHNICAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+          "fileId": "291"
+        }
+      ]
+    },
+    {
+      "id": 176,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-INFO"
+      ],
+      "listedAt": "2026-09-09T13:29:46.637Z",
+      "pageTitle": "IP-INFO",
+      "items": [
+        {
+          "title": "programme Terminales_A_06_08_2020.pdf",
+          "url": "https://files.minesec.gov.cm/jh/programme_Terminales_A_06_08_2020.pdf",
+          "fileId": "195"
+        },
+        {
+          "title": "programme_T CDE_06_08_2020.pdf",
+          "url": "https://files.minesec.gov.cm/ji/programme_T_CDE_06_08_2020.pdf",
+          "fileId": "196"
+        },
+        {
+          "title": "programme_T ESTP 06-08-2020.pdf",
+          "url": "https://files.minesec.gov.cm/jj/programme_T_ESTP_06-08-2020.pdf",
+          "fileId": "197"
+        },
+        {
+          "title": "programme_T TI_06_08_2020.pdf",
+          "url": "https://files.minesec.gov.cm/jk/programme_T_TI_06_08_2020.pdf",
+          "fileId": "198"
+        }
+      ]
+    },
+    {
+      "id": 177,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-LAL"
+      ],
+      "listedAt": "2026-09-09T13:29:46.666Z",
+      "pageTitle": "IP-LAL",
+      "items": [
+        {
+          "title": "LIT POS LEAN.pdf",
+          "url": "https://files.minesec.gov.cm/jl/LIT_POS_LEAN.pdf",
+          "fileId": "199"
+        }
+      ]
+    },
+    {
+      "id": 179,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-SC"
+      ],
+      "listedAt": "2026-09-09T13:29:47.832Z",
+      "pageTitle": "IP-SC",
+      "items": []
+    },
+    {
+      "id": 178,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-OVS"
+      ],
+      "listedAt": "2026-09-09T13:29:47.846Z",
+      "pageTitle": "IP-OVS",
+      "items": []
+    },
+    {
+      "id": 180,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-SH"
+      ],
+      "listedAt": "2026-09-09T13:29:49.014Z",
+      "pageTitle": "IP-SH",
+      "items": [
+        {
+          "title": "PROGRAMME GEO Tle-ESG.pdf",
+          "url": "https://files.minesec.gov.cm/jo/PROGRAMME_GEO_Tle-ESG.pdf",
+          "fileId": "202"
+        },
+        {
+          "title": "PROGRAMME GEO Tle-EST.pdf",
+          "url": "https://files.minesec.gov.cm/jp/PROGRAMME_GEO_Tle-EST.pdf",
+          "fileId": "203"
+        },
+        {
+          "title": "PROGRAMME HISTOIRE Tle-ESG.pdf",
+          "url": "https://files.minesec.gov.cm/jm/PROGRAMME_HISTOIRE_Tle-ESG.pdf",
+          "fileId": "200"
+        },
+        {
+          "title": "PROGRAMME HISTOIRE Tle-EST.pdf",
+          "url": "https://files.minesec.gov.cm/jn/PROGRAMME_HISTOIRE_Tle-EST.pdf",
+          "fileId": "201"
+        }
+      ]
+    },
+    {
+      "id": 181,
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-Ti"
+      ],
+      "listedAt": "2026-09-09T13:29:49.051Z",
+      "pageTitle": "IP-Ti",
+      "items": []
+    },
+    {
+      "id": 94,
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-INFO"
+      ],
+      "listedAt": "2026-09-09T13:29:50.242Z",
+      "pageTitle": "IP-INFO",
+      "items": [
+        {
+          "title": "guide pédagogique_prog_mbalmayo_aout_2014_2.pdf",
+          "url": "https://files.minesec.gov.cm/26/guide_pédagogique_prog_mbalmayo_aout_2014_2.pdf",
+          "fileId": "30"
+        },
+        {
+          "title": "Programme informatique 6ème et 5ème.pdf",
+          "url": "https://files.minesec.gov.cm/27/Programme_informatique_6ème_et_5ème.pdf",
+          "fileId": "31"
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-BIL"
+      ],
+      "listedAt": "2026-09-09T13:29:50.243Z",
+      "pageTitle": "IP-BIL",
+      "items": [
+        {
+          "title": "GUIDE PEDAGOGIQUE.pdf",
+          "url": "https://files.minesec.gov.cm/25/GUIDE_PEDAGOGIQUE.pdf",
+          "fileId": "29"
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-Sciences"
+      ],
+      "listedAt": "2026-09-09T13:29:51.408Z",
+      "pageTitle": "IP-Sciences",
+      "items": [
+        {
+          "title": "guidepédagogique.pdf",
+          "url": "https://files.minesec.gov.cm/2a/guidepédagogique.pdf",
+          "fileId": "34"
+        },
+        {
+          "title": "guidepédagogiques.pdf",
+          "url": "https://files.minesec.gov.cm/2c/guidepédagogiques.pdf",
+          "fileId": "36"
+        },
+        {
+          "title": "PROGRAMME MATH 6ème 5ème.pdf",
+          "url": "https://files.minesec.gov.cm/2b/PROGRAMME_MATH_6ème_5ème.pdf",
+          "fileId": "35"
+        },
+        {
+          "title": "sciences.pdf",
+          "url": "https://files.minesec.gov.cm/2d/sciences.pdf",
+          "fileId": "37"
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-LAL"
+      ],
+      "listedAt": "2026-09-09T13:29:51.408Z",
+      "pageTitle": "IP-LAL",
+      "items": [
+        {
+          "title": "Couverture guide pédagogique.pdf",
+          "url": "https://files.minesec.gov.cm/28/Couverture_guide_pédagogique.pdf",
+          "fileId": "32"
+        },
+        {
+          "title": "guide pedagogique.pdf",
+          "url": "https://files.minesec.gov.cm/29/guide_pedagogique.pdf",
+          "fileId": "33"
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-SH"
+      ],
+      "listedAt": "2026-09-09T13:29:52.570Z",
+      "pageTitle": "IP-SH",
+      "items": [
+        {
+          "title": "ECM 6E 5E ESG.pdf",
+          "url": "https://files.minesec.gov.cm/2e/ECM_6E_5E_ESG.pdf",
+          "fileId": "38"
+        },
+        {
+          "title": "GEOGRAPHIE 6e 5e ESG.pdf",
+          "url": "https://files.minesec.gov.cm/2f/GEOGRAPHIE_6e_5e_ESG.pdf",
+          "fileId": "39"
+        },
+        {
+          "title": "HISTOIRE 6e 5e ESG.pdf",
+          "url": "https://files.minesec.gov.cm/2g/HISTOIRE_6e_5e_ESG.pdf",
+          "fileId": "40"
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-BIL"
+      ],
+      "listedAt": "2026-09-09T13:29:52.570Z",
+      "pageTitle": "IP-BIL",
+      "items": [
+        {
+          "title": "ANGLAIS SBEP 4e syllabus FINAL.pdf",
+          "url": "https://files.minesec.gov.cm/2h/ANGLAIS_SBEP_4e_syllabus_FINAL.pdf",
+          "fileId": "41"
+        },
+        {
+          "title": "ANGLAIS Syllabus 4e ESG  burnable.pdf",
+          "url": "https://files.minesec.gov.cm/2i/ANGLAIS_Syllabus_4e_ESG__burnable.pdf",
+          "fileId": "42"
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL"
+      ],
+      "listedAt": "2026-09-09T13:29:53.741Z",
+      "pageTitle": "IP-LAL",
+      "items": [
+        {
+          "title": "Arts Langues et Culture Nationale",
+          "folder": "102",
+          "url": "https://files.minesec.gov.cm/folder/102/Arts_Langues_et_Culture_Nationale"
+        },
+        {
+          "title": "English Language and Literature in English  Syllabuses for forms 3 to 5",
+          "folder": "103",
+          "url": "https://files.minesec.gov.cm/folder/103/English_Language_and_Literature_in_English__Syllabuses_for_forms_3_to_5"
+        },
+        {
+          "title": "Français",
+          "folder": "104",
+          "url": "https://files.minesec.gov.cm/folder/104/Français"
+        },
+        {
+          "title": "Langues Vivantes 2",
+          "folder": "105",
+          "url": "https://files.minesec.gov.cm/folder/105/Langues_Vivantes_2"
+        },
+        {
+          "title": "Lettres Classiques",
+          "folder": "106",
+          "url": "https://files.minesec.gov.cm/folder/106/Lettres_Classiques"
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-INFO"
+      ],
+      "listedAt": "2026-09-09T13:29:53.792Z",
+      "pageTitle": "IP-INFO",
+      "items": []
+    },
+    {
+      "id": 119,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SH"
+      ],
+      "listedAt": "2026-09-09T13:29:54.992Z",
+      "pageTitle": "IP-SH",
+      "items": [
+        {
+          "title": "ECM 4ème et 3ème.pdf",
+          "url": "https://files.minesec.gov.cm/2t/ECM_4ème_et_3ème.pdf",
+          "fileId": "53"
+        },
+        {
+          "title": "Géographie 4ème et 3ème.pdf",
+          "url": "https://files.minesec.gov.cm/2u/Géographie_4ème_et_3ème.pdf",
+          "fileId": "54"
+        },
+        {
+          "title": "Histoire 4ème et 3ème.pdf",
+          "url": "https://files.minesec.gov.cm/2v/Histoire_4ème_et_3ème.pdf",
+          "fileId": "55"
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SC"
+      ],
+      "listedAt": "2026-09-09T13:29:55.008Z",
+      "pageTitle": "IP-SC",
+      "items": [
+        {
+          "title": "MATHS",
+          "folder": "118",
+          "url": "https://files.minesec.gov.cm/folder/118/MATHS"
+        },
+        {
+          "title": "PCT",
+          "folder": "116",
+          "url": "https://files.minesec.gov.cm/folder/116/PCT"
+        },
+        {
+          "title": "SVT",
+          "folder": "117",
+          "url": "https://files.minesec.gov.cm/folder/117/SVT"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Biology"
+      ],
+      "listedAt": "2026-09-09T13:29:56.173Z",
+      "pageTitle": "Biology",
+      "items": [
+        {
+          "title": "CBA Teachers Guide 8- 1.pdf",
+          "url": "https://files.minesec.gov.cm/e/CBA_Teachers_Guide_8-_1.pdf",
+          "fileId": "4"
+        },
+        {
+          "title": "CBA.pdf",
+          "url": "https://files.minesec.gov.cm/f/CBA.pdf",
+          "fileId": "5"
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Chemistry"
+      ],
+      "listedAt": "2026-09-09T13:29:56.189Z",
+      "pageTitle": "Chemistry",
+      "items": [
+        {
+          "title": "CBA Teachers Guide 8- 1.pdf",
+          "url": "https://files.minesec.gov.cm/g/CBA_Teachers_Guide_8-_1.pdf",
+          "fileId": "6"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Mathematics"
+      ],
+      "listedAt": "2026-09-09T13:29:57.341Z",
+      "pageTitle": "Mathematics",
+      "items": [
+        {
+          "title": "Final guide of Mathematics.pdf",
+          "url": "https://files.minesec.gov.cm/h/Final_guide_of_Mathematics.pdf",
+          "fileId": "7"
+        },
+        {
+          "title": "Maths syllabus mbalmayo.pdf",
+          "url": "https://files.minesec.gov.cm/i/Maths_syllabus_mbalmayo.pdf",
+          "fileId": "8"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Physics"
+      ],
+      "listedAt": "2026-09-09T13:29:57.368Z",
+      "pageTitle": "Physics",
+      "items": [
+        {
+          "title": "CBA Teachers Guide 8- 1.pdf",
+          "url": "https://files.minesec.gov.cm/j/CBA_Teachers_Guide_8-_1.pdf",
+          "fileId": "9"
+        },
+        {
+          "title": "NEW FORM ONE AND FORM TWO SYLLABUS1.pdf",
+          "url": "https://files.minesec.gov.cm/1M/NEW_FORM_ONE_AND_FORM_TWO_SYLLABUS1.pdf",
+          "fileId": "10"
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-Languages",
+        "LANG + LIT"
+      ],
+      "listedAt": "2026-09-09T13:29:58.534Z",
+      "pageTitle": "LANG + LIT",
+      "items": [
+        {
+          "title": "LIT POS LEAN.pdf",
+          "url": "https://files.minesec.gov.cm/1T/LIT_POS_LEAN.pdf",
+          "fileId": "17"
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale"
+      ],
+      "listedAt": "2026-09-09T13:29:58.541Z",
+      "pageTitle": "Arts Langues et Culture Nationale",
+      "items": [
+        {
+          "title": "Arts",
+          "folder": "133",
+          "url": "https://files.minesec.gov.cm/folder/133/Arts"
+        },
+        {
+          "title": "National Culture",
+          "folder": "134",
+          "url": "https://files.minesec.gov.cm/folder/134/National_Culture"
+        },
+        {
+          "title": "Nationales Languages",
+          "folder": "135",
+          "url": "https://files.minesec.gov.cm/folder/135/Nationales_Languages"
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "MATHS"
+      ],
+      "listedAt": "2026-09-09T13:29:59.752Z",
+      "pageTitle": "MATHS",
+      "items": [
+        {
+          "title": "Math syllabus for forma 3.pdf",
+          "url": "https://files.minesec.gov.cm/4e/Math_syllabus_for_forma_3.pdf",
+          "fileId": "62"
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-LAL",
+        "English Language and Literature in English Syllabuses for forms 3 to 5"
+      ],
+      "listedAt": "2026-09-09T13:29:59.757Z",
+      "pageTitle": "English Language and Literature in English Syllabuses for forms 3 to 5",
+      "items": []
+    },
+    {
+      "id": 137,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "PCT"
+      ],
+      "listedAt": "2026-09-09T13:30:01.086Z",
+      "pageTitle": "PCT",
+      "items": [
+        {
+          "title": "Chemestry",
+          "folder": "139",
+          "url": "https://files.minesec.gov.cm/folder/139/Chemestry"
+        },
+        {
+          "title": "Physics",
+          "folder": "140",
+          "url": "https://files.minesec.gov.cm/folder/140/Physics"
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "SVT"
+      ],
+      "listedAt": "2026-09-09T13:30:01.087Z",
+      "pageTitle": "SVT",
+      "items": [
+        {
+          "title": "Biol",
+          "folder": "141",
+          "url": "https://files.minesec.gov.cm/folder/141/Biol"
+        },
+        {
+          "title": "Geol",
+          "folder": "142",
+          "url": "https://files.minesec.gov.cm/folder/142/Geol"
+        },
+        {
+          "title": "Hbiol",
+          "folder": "143",
+          "url": "https://files.minesec.gov.cm/folder/143/Hbiol"
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-LAL",
+        "FRANCAIS"
+      ],
+      "listedAt": "2026-09-09T13:30:02.411Z",
+      "pageTitle": "FRANCAIS",
+      "items": [
+        {
+          "title": "COUVERTURE DES PROGRAMMES.pdf",
+          "url": "https://files.minesec.gov.cm/it/COUVERTURE_DES_PROGRAMMES.pdf",
+          "fileId": "145"
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-LAL",
+        "ALCN"
+      ],
+      "listedAt": "2026-09-09T13:30:02.412Z",
+      "pageTitle": "ALCN",
+      "items": [
+        {
+          "title": "Programme des arts 2nde.pdf",
+          "url": "https://files.minesec.gov.cm/is/Programme_des_arts_2nde.pdf",
+          "fileId": "144"
+        }
+      ]
+    },
+    {
+      "id": 159,
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-LAL",
+        "LATIIN ET GREC"
+      ],
+      "listedAt": "2026-09-09T13:30:03.663Z",
+      "pageTitle": "LATIIN ET GREC",
+      "items": []
+    },
+    {
+      "id": 102,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale"
+      ],
+      "listedAt": "2026-09-09T13:30:03.689Z",
+      "pageTitle": "Arts Langues et Culture Nationale",
+      "items": [
+        {
+          "title": "Arts",
+          "folder": "107",
+          "url": "https://files.minesec.gov.cm/folder/107/Arts"
+        },
+        {
+          "title": "Culture Nationale",
+          "folder": "108",
+          "url": "https://files.minesec.gov.cm/folder/108/Culture_Nationale"
+        },
+        {
+          "title": "Langues Nationales",
+          "folder": "109",
+          "url": "https://files.minesec.gov.cm/folder/109/Langues_Nationales"
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "English Language and Literature in English  Syllabuses for forms 3 to 5"
+      ],
+      "listedAt": "2026-09-09T13:30:04.892Z",
+      "pageTitle": "English Language and Literature in English  Syllabuses for forms 3 to 5",
+      "items": []
+    },
+    {
+      "id": 104,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Français"
+      ],
+      "listedAt": "2026-09-09T13:30:04.922Z",
+      "pageTitle": "Français",
+      "items": [
+        {
+          "title": "programmeFr1erelangue4em3eme.pdf",
+          "url": "https://files.minesec.gov.cm/2k/programmeFr1erelangue4em3eme.pdf",
+          "fileId": "44"
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2"
+      ],
+      "listedAt": "2026-09-09T13:30:06.144Z",
+      "pageTitle": "Langues Vivantes 2",
+      "items": [
+        {
+          "title": "Allemand",
+          "folder": "110",
+          "url": "https://files.minesec.gov.cm/folder/110/Allemand"
+        },
+        {
+          "title": "Arabe",
+          "folder": "111",
+          "url": "https://files.minesec.gov.cm/folder/111/Arabe"
+        },
+        {
+          "title": "Chinois",
+          "folder": "112",
+          "url": "https://files.minesec.gov.cm/folder/112/Chinois"
+        },
+        {
+          "title": "Espagnol",
+          "folder": "113",
+          "url": "https://files.minesec.gov.cm/folder/113/Espagnol"
+        },
+        {
+          "title": "Italien",
+          "folder": "114",
+          "url": "https://files.minesec.gov.cm/folder/114/Italien"
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Lettres Classiques"
+      ],
+      "listedAt": "2026-09-09T13:30:06.739Z",
+      "pageTitle": "Lettres Classiques",
+      "items": [
+        {
+          "title": "Latin_Grec.pdf",
+          "url": "https://files.minesec.gov.cm/2p/Latin_Grec.pdf",
+          "fileId": "49"
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SC",
+        "PCT"
+      ],
+      "listedAt": "2026-09-09T13:30:07.911Z",
+      "pageTitle": "PCT",
+      "items": []
+    },
+    {
+      "id": 118,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SC",
+        "MATHS"
+      ],
+      "listedAt": "2026-09-09T13:30:07.947Z",
+      "pageTitle": "MATHS",
+      "items": [
+        {
+          "title": "Mathématiques 4ème et 3ème.pdf",
+          "url": "https://files.minesec.gov.cm/2s/Mathématiques_4ème_et_3ème.pdf",
+          "fileId": "52"
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SC",
+        "SVT"
+      ],
+      "listedAt": "2026-09-09T13:30:09.105Z",
+      "pageTitle": "SVT",
+      "items": []
+    },
+    {
+      "id": 133,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale",
+        "Arts"
+      ],
+      "listedAt": "2026-09-09T13:30:09.127Z",
+      "pageTitle": "Arts",
+      "items": []
+    },
+    {
+      "id": 134,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale",
+        "National Culture"
+      ],
+      "listedAt": "2026-09-09T13:30:10.345Z",
+      "pageTitle": "National Culture",
+      "items": []
+    },
+    {
+      "id": 135,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale",
+        "Nationales Languages"
+      ],
+      "listedAt": "2026-09-09T13:30:10.353Z",
+      "pageTitle": "Nationales Languages",
+      "items": []
+    },
+    {
+      "id": 140,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "PCT",
+        "Physics"
+      ],
+      "listedAt": "2026-09-09T13:30:11.524Z",
+      "pageTitle": "Physics",
+      "items": [
+        {
+          "title": "PHYSICS teaching  SYLLABUS FOR FORM THREE TO FIVE final.pdf",
+          "url": "https://files.minesec.gov.cm/4f/PHYSICS_teaching__SYLLABUS_FOR_FORM_THREE_TO_FIVE_final.pdf",
+          "fileId": "63"
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "PCT",
+        "Chemestry"
+      ],
+      "listedAt": "2026-09-09T13:30:11.525Z",
+      "pageTitle": "Chemestry",
+      "items": [
+        {
+          "title": "Syllabus anglophone chemistry.pdf",
+          "url": "https://files.minesec.gov.cm/4g/Syllabus_anglophone_chemistry.pdf",
+          "fileId": "64"
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "SVT",
+        "Biol"
+      ],
+      "listedAt": "2026-09-09T13:30:12.779Z",
+      "pageTitle": "Biol",
+      "items": [
+        {
+          "title": "BIO F 3-4-5.pdf",
+          "url": "https://files.minesec.gov.cm/4l/BIO_F_3-4-5.pdf",
+          "fileId": "69"
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "SVT",
+        "Geol"
+      ],
+      "listedAt": "2026-09-09T13:30:12.781Z",
+      "pageTitle": "Geol",
+      "items": [
+        {
+          "title": "GEOL F3 &amp; 4.pdf",
+          "url": "https://files.minesec.gov.cm/4m/GEOL_F3_&amp;_4.pdf",
+          "fileId": "70"
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale",
+        "Arts"
+      ],
+      "listedAt": "2026-09-09T13:30:14.012Z",
+      "pageTitle": "Arts",
+      "items": [
+        {
+          "title": "Programme Education artistique 4e 3e.pdf",
+          "url": "https://files.minesec.gov.cm/2j/Programme_Education_artistique_4e_3e.pdf",
+          "fileId": "43"
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "SVT",
+        "Hbiol"
+      ],
+      "listedAt": "2026-09-09T13:30:14.034Z",
+      "pageTitle": "Hbiol",
+      "items": [
+        {
+          "title": "HBIO F 4 &amp; 5.pdf",
+          "url": "https://files.minesec.gov.cm/4n/HBIO_F_4_&amp;_5.pdf",
+          "fileId": "71"
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale",
+        "Culture Nationale"
+      ],
+      "listedAt": "2026-09-09T13:30:15.216Z",
+      "pageTitle": "Culture Nationale",
+      "items": []
+    },
+    {
+      "id": 109,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale",
+        "Langues Nationales"
+      ],
+      "listedAt": "2026-09-09T13:30:15.246Z",
+      "pageTitle": "Langues Nationales",
+      "items": []
+    },
+    {
+      "id": 110,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Allemand"
+      ],
+      "listedAt": "2026-09-09T13:30:16.414Z",
+      "pageTitle": "Allemand",
+      "items": [
+        {
+          "title": "Allemand.pdf",
+          "url": "https://files.minesec.gov.cm/2r/Allemand.pdf",
+          "fileId": "51"
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Arabe"
+      ],
+      "listedAt": "2026-09-09T13:30:16.487Z",
+      "pageTitle": "Arabe",
+      "items": [
+        {
+          "title": "programme_Arabe_4eme3eme.pdf",
+          "url": "https://files.minesec.gov.cm/2m/programme_Arabe_4eme3eme.pdf",
+          "fileId": "46"
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Espagnol"
+      ],
+      "listedAt": "2026-09-09T13:30:17.658Z",
+      "pageTitle": "Espagnol",
+      "items": [
+        {
+          "title": "programme_Espagnol_4eme3eme.pdf",
+          "url": "https://files.minesec.gov.cm/2o/programme_Espagnol_4eme3eme.pdf",
+          "fileId": "48"
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Chinois"
+      ],
+      "listedAt": "2026-09-09T13:30:17.704Z",
+      "pageTitle": "Chinois",
+      "items": [
+        {
+          "title": "programme_CHINOIS_4eme3eme.pdf",
+          "url": "https://files.minesec.gov.cm/2n/programme_CHINOIS_4eme3eme.pdf",
+          "fileId": "47"
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Italien"
+      ],
+      "listedAt": "2026-09-09T13:30:18.879Z",
+      "pageTitle": "Italien",
+      "items": [
+        {
+          "title": "Latin_Grec.pdf",
+          "url": "https://files.minesec.gov.cm/2q/Latin_Grec.pdf",
+          "fileId": "50"
+        }
+      ]
+    }
+  ]
+}

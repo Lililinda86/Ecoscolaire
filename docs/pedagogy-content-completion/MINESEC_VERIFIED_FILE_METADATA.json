@@ -1,0 +1,1418 @@
+{
+  "scope": "Metadata only. Ministry provenance and bytes verified; curriculum content, edition and applicable levels require individual review.",
+  "files": [
+    {
+      "title": "Computer Science  Sylabus Form1_2_11_aout_2014_mbalmayo.pdf",
+      "url": "https://files.minesec.gov.cm/c/Computer_Science__Sylabus_Form1_2_11_aout_2014_mbalmayo.pdf",
+      "fileId": "2",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-COMPUTER SCIENCES"
+      ],
+      "sha256": "d10490fa98c15fe4a561408eb3b42726356f87f2f5536232141ba215ba2d2d11",
+      "pages": 30,
+      "bytes": 1141518,
+      "retrievedAt": "2026-09-09T13:33:09.608Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Curriculum guide _prog_mbalmayo_aout_2014_2final.pdf",
+      "url": "https://files.minesec.gov.cm/d/Curriculum_guide__prog_mbalmayo_aout_2014_2final.pdf",
+      "fileId": "3",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-COMPUTER SCIENCES"
+      ],
+      "sha256": "1869e369b76127e56c2532f4f74b2c03cbe453321f232101f6897e81623a241f",
+      "pages": 8,
+      "bytes": 83634,
+      "retrievedAt": "2026-09-09T13:33:05.833Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Pedagogic guide 1 for french as a second language.pdf",
+      "url": "https://files.minesec.gov.cm/1N/Pedagogic_guide_1_for_french_as_a_second_language.pdf",
+      "fileId": "11",
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Bilinguisme - Bilinguism"
+      ],
+      "sha256": "d03fd2ffcd3ff3bcbe397f85362bffd7425ae55189ad7ae0567d38c41e2c749a",
+      "pages": 16,
+      "bytes": 548237,
+      "retrievedAt": "2026-09-09T13:33:14.838Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Pedagogic guide 2 for french as a second language.pdf",
+      "url": "https://files.minesec.gov.cm/1O/Pedagogic_guide_2_for_french_as_a_second_language.pdf",
+      "fileId": "12",
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Bilinguisme - Bilinguism"
+      ],
+      "sha256": "a7f5a8c3f4d5fc2125ee424518bc5e68799d0ce02b82c1ec4442e0fefaefaed0",
+      "pages": 2,
+      "bytes": 240351,
+      "retrievedAt": "2026-09-09T13:33:16.341Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Pedagogic guide 3 for french as a second language.pdf",
+      "url": "https://files.minesec.gov.cm/1P/Pedagogic_guide_3_for_french_as_a_second_language.pdf",
+      "fileId": "13",
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "Bilinguisme - Bilinguism"
+      ],
+      "sha256": "aba50a2cb02dbe694d22e90fb1d8485169314f3ef826b7042fd9dc638989aea9",
+      "pages": 7,
+      "bytes": 260233,
+      "retrievedAt": "2026-09-09T13:33:22.830Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Syllabus French Upper Sixth Général Education.pdf",
+      "url": "https://files.minesec.gov.cm/1Q/Syllabus_French_Upper_Sixth_Général_Education.pdf",
+      "fileId": "14",
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-BIL"
+      ],
+      "sha256": "4bf4503dadfec85f57cd99de2c27928df46e2c3e08d653e504fae23111be2a5c",
+      "pages": 11,
+      "bytes": 464576,
+      "retrievedAt": "2026-09-09T13:33:25.152Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "CS Syllabus Working Draft 25-082020.pdf",
+      "url": "https://files.minesec.gov.cm/1R/CS_Syllabus_Working_Draft_25-082020.pdf",
+      "fileId": "15",
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-computer sciences"
+      ],
+      "sha256": "eaba2cf11cae6b840561375b2929359003588c0e16263cb592afa38bac3cdbda",
+      "pages": 57,
+      "bytes": 1359242,
+      "retrievedAt": "2026-09-09T13:33:48.178Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ICT Syllabus Working Draft 25-082020.pdf",
+      "url": "https://files.minesec.gov.cm/1S/ICT_Syllabus_Working_Draft_25-082020.pdf",
+      "fileId": "16",
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-computer sciences"
+      ],
+      "sha256": "5f960641ad579d8427d8dbe74ab9e743f3a036028aac9fdb4a7e1948fc37ac7f",
+      "pages": 66,
+      "bytes": 1054586,
+      "retrievedAt": "2026-09-09T13:33:32.983Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANGLAIS Syllabus Year 3 and year 4 tech. burnable.pdf",
+      "url": "https://files.minesec.gov.cm/2w/ANGLAIS_Syllabus_Year_3_and_year_4_tech._burnable.pdf",
+      "fileId": "56",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-BIL"
+      ],
+      "sha256": "13ffa85184796df6e5b1de4e0d5cb6591a281e212b64ebf6af805c458f8e1db7",
+      "pages": 69,
+      "bytes": 2401564,
+      "retrievedAt": "2026-09-09T13:34:06.376Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "FRENCH AS SECOND LANGUAGE Form 3,  4 et 5 burnable.pdf",
+      "url": "https://files.minesec.gov.cm/2x/FRENCH_AS_SECOND_LANGUAGE_Form_3,__4_et_5_burnable.pdf",
+      "fileId": "57",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-BIL"
+      ],
+      "sha256": "9934c5735e1951e6c3a0b101f1e6805423f24798564c68f597d7aafbcfbf4cea",
+      "pages": 69,
+      "bytes": 2802207,
+      "retrievedAt": "2026-09-09T13:34:15.315Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "PEBS 345 french.pdf",
+      "url": "https://files.minesec.gov.cm/2y/PEBS_345_french.pdf",
+      "fileId": "58",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-BIL"
+      ],
+      "sha256": "0b894e0d059cfc6e45314eae4e7f0d8db141647ba2a5fc7aaf598574d448e86c",
+      "pages": 76,
+      "bytes": 2855418,
+      "retrievedAt": "2026-09-09T13:34:39.414Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Computer Science Syllabus F3_4_5.pdf",
+      "url": "https://files.minesec.gov.cm/2z/Computer_Science_Syllabus_F3_4_5.pdf",
+      "fileId": "59",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-INFO"
+      ],
+      "sha256": "ae22083710bf694539c1f37d250435670ffb2dc77a33bf4cd264b3d932d70691",
+      "pages": 40,
+      "bytes": 2282779,
+      "retrievedAt": "2026-09-09T13:34:47.305Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ECONS- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+      "url": "https://files.minesec.gov.cm/4p/ECONS-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+      "fileId": "73",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SH"
+      ],
+      "sha256": "ca49603e09aefb77d62d3ea9a1e2457aa00b70cbb5e2affcea1d7523a2dc35c4",
+      "pages": 68,
+      "bytes": 2027682,
+      "retrievedAt": "2026-09-09T13:35:45.114Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "CIT. EDUC.- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+      "url": "https://files.minesec.gov.cm/4o/CIT._EDUC.-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+      "fileId": "72",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SH"
+      ],
+      "sha256": "6e18dd1a1cc4d83e7a658309c1a34c8bcdb5dce0b4f332b8a5b594e3319afecb",
+      "pages": 57,
+      "bytes": 1929805,
+      "retrievedAt": "2026-09-09T13:35:58.908Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "GEOG- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+      "url": "https://files.minesec.gov.cm/4q/GEOG-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+      "fileId": "74",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SH"
+      ],
+      "sha256": "f67835e8f2d79e316ef88b7bda9327782cff07fb8cb073295473cc90f23f0ac9",
+      "pages": 71,
+      "bytes": 1809716,
+      "retrievedAt": "2026-09-09T13:36:11.637Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "HIST- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+      "url": "https://files.minesec.gov.cm/4r/HIST-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+      "fileId": "75",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SH"
+      ],
+      "sha256": "9ff5c6748ea02b702005191b283f49ab692295c8546e64c2c661e2df1b7f57ad",
+      "pages": 62,
+      "bytes": 1962445,
+      "retrievedAt": "2026-09-09T13:36:20.041Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme seconde A.pdf",
+      "url": "https://files.minesec.gov.cm/4v/programme_seconde_A.pdf",
+      "fileId": "79",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-INFO"
+      ],
+      "sha256": "e0227dfa71087e142f686ac96b4c0af42bdb7f64f25deb36e1435310e83587ce",
+      "pages": 5,
+      "bytes": 461597,
+      "retrievedAt": "2026-09-09T13:36:25.033Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme seconde C.pdf",
+      "url": "https://files.minesec.gov.cm/4w/programme_seconde_C.pdf",
+      "fileId": "80",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-INFO"
+      ],
+      "sha256": "8520bb291565e1ab4a543e0497c4911785393b6e08068d175198c445dbd0ee00",
+      "pages": 5,
+      "bytes": 465099,
+      "retrievedAt": "2026-09-09T13:36:25.942Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "référentiel des competences final.pdf",
+      "url": "https://files.minesec.gov.cm/4x/référentiel_des_competences_final.pdf",
+      "fileId": "81",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-INFO"
+      ],
+      "sha256": "701b06074f256802f3f067eae19b65cf4d5c3938dd69b8b8b54c6bfb18a4316e",
+      "pages": 3,
+      "bytes": 726167,
+      "retrievedAt": "2026-09-09T13:36:30.383Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme seconde _EST.pdf",
+      "url": "https://files.minesec.gov.cm/4u/programme_seconde__EST.pdf",
+      "fileId": "78",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-INFO"
+      ],
+      "sha256": "4253901ad9a713d869125d92496d375263007faa40a1c33e4e428230b55fa98c",
+      "pages": 6,
+      "bytes": 461965,
+      "retrievedAt": "2026-09-09T13:36:35.122Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANGLAIS SYLLABUS 2DE edited.pdf",
+      "url": "https://files.minesec.gov.cm/4s/ANGLAIS_SYLLABUS_2DE_edited.pdf",
+      "fileId": "76",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-BIL"
+      ],
+      "sha256": "49607b27a03dcd82cee30fbeeac5a9fa74cab3dcd60013600f13a7a5037eeee7",
+      "pages": 33,
+      "bytes": 755140,
+      "retrievedAt": "2026-09-09T13:36:40.381Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "SBEP 2nde NEW edited.doc prof.pdf",
+      "url": "https://files.minesec.gov.cm/4t/SBEP_2nde_NEW_edited.doc_prof.pdf",
+      "fileId": "77",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-BIL"
+      ],
+      "sha256": "665b3f59d4595c72ceee68d2b795576224499f3f62ec170f4541656e60dfb13a",
+      "pages": 42,
+      "bytes": 778391,
+      "retrievedAt": "2026-09-09T13:36:46.531Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Projet de programme de chimie 2nde C- Final.pdf",
+      "url": "https://files.minesec.gov.cm/iv/Projet_de_programme_de_chimie_2nde_C-_Final.pdf",
+      "fileId": "147",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "SCIENCE"
+      ],
+      "sha256": "ab086b94c3c655b66d0c9ccbcec98055ed4634cd1574da52e590c292f0cfa0df",
+      "pages": 13,
+      "bytes": 434637,
+      "retrievedAt": "2026-09-09T13:36:51.087Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Programme de  SVTEEHB Classe de 2nde.pdf",
+      "url": "https://files.minesec.gov.cm/iu/Programme_de__SVTEEHB_Classe_de_2nde.pdf",
+      "fileId": "146",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "SCIENCE"
+      ],
+      "sha256": "c37fdb268904e06b19ee956e68cce17cc288fb53ea413e0d9fa3b31f796aa0cd",
+      "pages": 23,
+      "bytes": 798132,
+      "retrievedAt": "2026-09-09T13:36:51.953Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Projet de programme de Physique 2nde C - Final.pdf",
+      "url": "https://files.minesec.gov.cm/iw/Projet_de_programme_de_Physique_2nde_C_-_Final.pdf",
+      "fileId": "148",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "SCIENCE"
+      ],
+      "sha256": "ea434ca8a94b2b0ca2d2e769a41f8534660e02cf3bd61fb8f70c2e852834adca",
+      "pages": 14,
+      "bytes": 284383,
+      "retrievedAt": "2026-09-09T13:36:55.691Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANGLAIS SYLLABUS GENERAL Tle.1docx prevalidated.pdf",
+      "url": "https://files.minesec.gov.cm/jf/ANGLAIS_SYLLABUS_GENERAL_Tle.1docx_prevalidated.pdf",
+      "fileId": "193",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-BIL"
+      ],
+      "sha256": "59dfe506b314da0ac58da1eebecf9bbc85610dfb40837d97b8c5e54d2c225d49",
+      "pages": 19,
+      "bytes": 551206,
+      "retrievedAt": "2026-09-09T13:36:56.449Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANGLAIS SYLLABUS GENERAL Tle.docx prevalidated.pdf",
+      "url": "https://files.minesec.gov.cm/jg/ANGLAIS_SYLLABUS_GENERAL_Tle.docx_prevalidated.pdf",
+      "fileId": "194",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-BIL"
+      ],
+      "sha256": "3040ed297e5ce899437e79b5a74b5213f446b40b903c78219841548e3dfa85f1",
+      "pages": 11,
+      "bytes": 464667,
+      "retrievedAt": "2026-09-09T13:37:02.198Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANNEXE 1 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE GENERAL LOWER AND UPPER SIXTH CLASSES.pdf",
+      "url": "https://files.minesec.gov.cm/AV/ANNEXE_1_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+      "fileId": "289",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-BIL"
+      ],
+      "sha256": "e2e4b344e01415b87a34ec96baab90a91e6067cf24ea9802d33ee80f3d36529c",
+      "pages": 30,
+      "bytes": 420756,
+      "retrievedAt": "2026-09-09T13:37:04.439Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANNEXE 2 Arrêté 90-22 PROG LITTERATURE IN ENGLISH SYLLABUS ANGLOPHONE GENERAL LOWER AND UPPER SIXTH.pdf",
+      "url": "https://files.minesec.gov.cm/AW/ANNEXE_2_Arrêté_90-22_PROG_LITTERATURE_IN_ENGLISH_SYLLABUS_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH.pdf",
+      "fileId": "290",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-BIL"
+      ],
+      "sha256": "9f4e07834bf396fa134ef57f0f8bb734b9efc81cb8ac648d5f5e43547720a925",
+      "pages": 33,
+      "bytes": 590572,
+      "retrievedAt": "2026-09-09T13:37:10.829Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANNEXE 3 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE TECHNICAL LOWER AND UPPER SIXTH CLASSES.pdf",
+      "url": "https://files.minesec.gov.cm/AX/ANNEXE_3_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_TECHNICAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+      "fileId": "291",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-BIL"
+      ],
+      "sha256": "3150a4e33d9b1f52667546253aacd39f4f6feb92690b4160335c297508af13c2",
+      "pages": 24,
+      "bytes": 381097,
+      "retrievedAt": "2026-09-09T13:37:12.501Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme Terminales_A_06_08_2020.pdf",
+      "url": "https://files.minesec.gov.cm/jh/programme_Terminales_A_06_08_2020.pdf",
+      "fileId": "195",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-INFO"
+      ],
+      "sha256": "edd57aa4b50d94fc3f5b516ba48d82cc5c3922ea9e799c355bdf4473dcf30f68",
+      "pages": 18,
+      "bytes": 709247,
+      "retrievedAt": "2026-09-09T13:37:19.103Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme_T CDE_06_08_2020.pdf",
+      "url": "https://files.minesec.gov.cm/ji/programme_T_CDE_06_08_2020.pdf",
+      "fileId": "196",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-INFO"
+      ],
+      "sha256": "e87218788ca22b3f263623114cfdf2b7427f14a39e2f363b12f1e82c6766dbe8",
+      "pages": 17,
+      "bytes": 701333,
+      "retrievedAt": "2026-09-09T13:37:19.414Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme_T ESTP 06-08-2020.pdf",
+      "url": "https://files.minesec.gov.cm/jj/programme_T_ESTP_06-08-2020.pdf",
+      "fileId": "197",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-INFO"
+      ],
+      "sha256": "7b22d792f61773c35eabeaddfa0faa0c52b25920f10f15d4a9f66897b8b97756",
+      "pages": 17,
+      "bytes": 775030,
+      "retrievedAt": "2026-09-09T13:37:26.922Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme_T TI_06_08_2020.pdf",
+      "url": "https://files.minesec.gov.cm/jk/programme_T_TI_06_08_2020.pdf",
+      "fileId": "198",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-INFO"
+      ],
+      "sha256": "b6f18b34db72396fb525c5598a6fd30b719b821b4a3a2fb7677379ade8c1ce6a",
+      "pages": 30,
+      "bytes": 752693,
+      "retrievedAt": "2026-09-09T13:37:28.269Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "PROGRAMME GEO Tle-ESG.pdf",
+      "url": "https://files.minesec.gov.cm/jo/PROGRAMME_GEO_Tle-ESG.pdf",
+      "fileId": "202",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-SH"
+      ],
+      "sha256": "7c66c838011881c44d020c8212b57078e00dd3100bfab431ac10032bbacd7fe3",
+      "pages": 18,
+      "bytes": 420295,
+      "retrievedAt": "2026-09-09T13:37:33.716Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "LIT POS LEAN.pdf",
+      "url": "https://files.minesec.gov.cm/jl/LIT_POS_LEAN.pdf",
+      "fileId": "199",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-LAL"
+      ],
+      "sha256": "0ff27e3cb6ea72a5acc5916f3171e68c74d75ad36d754ab95989ccd5cd278004",
+      "pages": 30,
+      "bytes": 960988,
+      "retrievedAt": "2026-09-09T13:37:40.307Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "PROGRAMME GEO Tle-EST.pdf",
+      "url": "https://files.minesec.gov.cm/jp/PROGRAMME_GEO_Tle-EST.pdf",
+      "fileId": "203",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-SH"
+      ],
+      "sha256": "f9e1754f9bd6d64423b3aceb1c0b4955fecf7197424bac1cf5e06a463f41240d",
+      "pages": 14,
+      "bytes": 363999,
+      "retrievedAt": "2026-09-09T13:37:43.980Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "PROGRAMME HISTOIRE Tle-ESG.pdf",
+      "url": "https://files.minesec.gov.cm/jm/PROGRAMME_HISTOIRE_Tle-ESG.pdf",
+      "fileId": "200",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-SH"
+      ],
+      "sha256": "645c25956acb2cceee2cef35629348e7dc2363f054acc7e9b7d558be7b28491e",
+      "pages": 18,
+      "bytes": 407844,
+      "retrievedAt": "2026-09-09T13:37:45.366Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "guide pédagogique_prog_mbalmayo_aout_2014_2.pdf",
+      "url": "https://files.minesec.gov.cm/26/guide_pédagogique_prog_mbalmayo_aout_2014_2.pdf",
+      "fileId": "30",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-INFO"
+      ],
+      "sha256": "ab59b6b66d253c8147ef5457207d7e50e1b636e326b44719bd62f50105e4bb78",
+      "pages": 11,
+      "bytes": 131793,
+      "retrievedAt": "2026-09-09T13:37:48.783Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "PROGRAMME HISTOIRE Tle-EST.pdf",
+      "url": "https://files.minesec.gov.cm/jn/PROGRAMME_HISTOIRE_Tle-EST.pdf",
+      "fileId": "201",
+      "path": [
+        "2nd cycle",
+        "PROGRAMME Tle",
+        "IP-SH"
+      ],
+      "sha256": "cd018f8aa704c93f9f0dd535e34e8c4a33b1a4496501778907cb84f14b3f5848",
+      "pages": 16,
+      "bytes": 394918,
+      "retrievedAt": "2026-09-09T13:37:50.448Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "GUIDE PEDAGOGIQUE.pdf",
+      "url": "https://files.minesec.gov.cm/25/GUIDE_PEDAGOGIQUE.pdf",
+      "fileId": "29",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-BIL"
+      ],
+      "sha256": "20813d2521955e4ec569b9066b96cac25e7b452ead8f3cd657d8f8e0b29e926d",
+      "pages": 44,
+      "bytes": 366430,
+      "retrievedAt": "2026-09-09T13:37:54.912Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Programme informatique 6ème et 5ème.pdf",
+      "url": "https://files.minesec.gov.cm/27/Programme_informatique_6ème_et_5ème.pdf",
+      "fileId": "31",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-INFO"
+      ],
+      "sha256": "e5c68ffdbe2b4518bfdca278385407134d55ca54b40deda12dca47870984ef4d",
+      "pages": 31,
+      "bytes": 911970,
+      "retrievedAt": "2026-09-09T13:37:58.765Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "guidepédagogique.pdf",
+      "url": "https://files.minesec.gov.cm/2a/guidepédagogique.pdf",
+      "fileId": "34",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-Sciences"
+      ],
+      "sha256": "e0f410479d386a7f27cf1a964cdde9773bdc0cb99b30de5aaab4cac1a4e00c92",
+      "pages": 19,
+      "bytes": 185071,
+      "retrievedAt": "2026-09-09T13:38:03.519Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "guidepédagogiques.pdf",
+      "url": "https://files.minesec.gov.cm/2c/guidepédagogiques.pdf",
+      "fileId": "36",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-Sciences"
+      ],
+      "sha256": "d5270c68d59a90b4d9ec93489c9965b7e8a76d6fdd2ef9485c704e0a6100254a",
+      "pages": 11,
+      "bytes": 183010,
+      "retrievedAt": "2026-09-09T13:38:05.263Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "sciences.pdf",
+      "url": "https://files.minesec.gov.cm/2d/sciences.pdf",
+      "fileId": "37",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-Sciences"
+      ],
+      "sha256": "6550ff982523ef020ff4d806e4a6645bc57443a7a7532a75ea6545f2fe902d3f",
+      "pages": 36,
+      "bytes": 990632,
+      "retrievedAt": "2026-09-09T13:38:15.001Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "PROGRAMME MATH 6ème 5ème.pdf",
+      "url": "https://files.minesec.gov.cm/2b/PROGRAMME_MATH_6ème_5ème.pdf",
+      "fileId": "35",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-Sciences"
+      ],
+      "sha256": "1217f04a544a884779c1067037c89bfe57e0b8dbcef06264411d8a35072eedad",
+      "pages": 49,
+      "bytes": 1068297,
+      "retrievedAt": "2026-09-09T13:38:19.790Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Couverture guide pédagogique.pdf",
+      "url": "https://files.minesec.gov.cm/28/Couverture_guide_pédagogique.pdf",
+      "fileId": "32",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-LAL"
+      ],
+      "sha256": "b2c8d4acedd8d1b033dad0f3933cdc3434d1c5d52202c1b96d67ce0c882ed6f3",
+      "pages": 1,
+      "bytes": 44976,
+      "retrievedAt": "2026-09-09T13:38:22.765Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "guide pedagogique.pdf",
+      "url": "https://files.minesec.gov.cm/29/guide_pedagogique.pdf",
+      "fileId": "33",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-LAL"
+      ],
+      "sha256": "a4d9c28a277183134a73015b662304a7149981f12eec9c57d503ee7fe0e8f29c",
+      "pages": 38,
+      "bytes": 311574,
+      "retrievedAt": "2026-09-09T13:38:23.703Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ECM 6E 5E ESG.pdf",
+      "url": "https://files.minesec.gov.cm/2e/ECM_6E_5E_ESG.pdf",
+      "fileId": "38",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-SH"
+      ],
+      "sha256": "0ccc7a55cdb16a94cdef2b495168e1f1e6c592c4e5837958acb0c61a3931f161",
+      "pages": 55,
+      "bytes": 1164531,
+      "retrievedAt": "2026-09-09T13:38:36.210Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "GEOGRAPHIE 6e 5e ESG.pdf",
+      "url": "https://files.minesec.gov.cm/2f/GEOGRAPHIE_6e_5e_ESG.pdf",
+      "fileId": "39",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-SH"
+      ],
+      "sha256": "3a07507c00a8c82977fa8d51a8a8935f44f46c949a3b1140f4c8fe436e3e8ee4",
+      "pages": 53,
+      "bytes": 1218289,
+      "retrievedAt": "2026-09-09T13:38:44.151Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "HISTOIRE 6e 5e ESG.pdf",
+      "url": "https://files.minesec.gov.cm/2g/HISTOIRE_6e_5e_ESG.pdf",
+      "fileId": "40",
+      "path": [
+        "1er cycle",
+        "6ème-5ème",
+        "IP-SH"
+      ],
+      "sha256": "95a97e1f62675667376b84502c8258565f92e6bcb6c3d7e217b5ec6dc2e11844",
+      "pages": 62,
+      "bytes": 1210803,
+      "retrievedAt": "2026-09-09T13:38:57.490Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANGLAIS SBEP 4e syllabus FINAL.pdf",
+      "url": "https://files.minesec.gov.cm/2h/ANGLAIS_SBEP_4e_syllabus_FINAL.pdf",
+      "fileId": "41",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-BIL"
+      ],
+      "sha256": "a5695f3a0dea342c44691acac5f5fa68e3ec826bed6aff65d7ee831088a1c224",
+      "pages": 69,
+      "bytes": 2863228,
+      "retrievedAt": "2026-09-09T13:39:05.949Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ECM 4ème et 3ème.pdf",
+      "url": "https://files.minesec.gov.cm/2t/ECM_4ème_et_3ème.pdf",
+      "fileId": "53",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SH"
+      ],
+      "sha256": "082c3a8803ba6524fe138458044d68c18409df94066802bd6a4169c4ea42f863",
+      "pages": 48,
+      "bytes": 1870524,
+      "retrievedAt": "2026-09-09T13:39:16.154Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "ANGLAIS Syllabus 4e ESG  burnable.pdf",
+      "url": "https://files.minesec.gov.cm/2i/ANGLAIS_Syllabus_4e_ESG__burnable.pdf",
+      "fileId": "42",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-BIL"
+      ],
+      "sha256": "9e7e9e6534dd97d0c7d0971c4dca51b74c0e348dfce6b1a91d2d49a30ac383be",
+      "pages": 62,
+      "bytes": 2452489,
+      "retrievedAt": "2026-09-09T13:39:28.308Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Géographie 4ème et 3ème.pdf",
+      "url": "https://files.minesec.gov.cm/2u/Géographie_4ème_et_3ème.pdf",
+      "fileId": "54",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SH"
+      ],
+      "sha256": "648ea882f92b2f7930b8c28c9f81fc2f167c80f35a065defac53491af398a6f4",
+      "pages": 60,
+      "bytes": 1891274,
+      "retrievedAt": "2026-09-09T13:39:47.864Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Histoire 4ème et 3ème.pdf",
+      "url": "https://files.minesec.gov.cm/2v/Histoire_4ème_et_3ème.pdf",
+      "fileId": "55",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SH"
+      ],
+      "sha256": "912c6cf1bf9c4f2587048629c850863ff62aca49f67b0e036e096154ae5e165b",
+      "pages": 54,
+      "bytes": 1908761,
+      "retrievedAt": "2026-09-09T13:39:49.005Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "CBA Teachers Guide 8- 1.pdf",
+      "url": "https://files.minesec.gov.cm/e/CBA_Teachers_Guide_8-_1.pdf",
+      "fileId": "4",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Biology"
+      ],
+      "sha256": "b22259f168a7f2169deeec1e5769df71c1a60a190a1cc2a1c66ef7d3911eee8a",
+      "pages": 35,
+      "bytes": 1028068,
+      "retrievedAt": "2026-09-09T13:39:57.455Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "CBA.pdf",
+      "url": "https://files.minesec.gov.cm/f/CBA.pdf",
+      "fileId": "5",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Biology"
+      ],
+      "sha256": "81a6f1e193ac0d59b37d655d6a6abdfb1b7b6a93dfc71e5d0a52d2bf4eeada81",
+      "pages": 44,
+      "bytes": 1206718,
+      "retrievedAt": "2026-09-09T13:40:05.368Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Final guide of Mathematics.pdf",
+      "url": "https://files.minesec.gov.cm/h/Final_guide_of_Mathematics.pdf",
+      "fileId": "7",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Mathematics"
+      ],
+      "sha256": "7c88900410e0775bf1738531cd142fdcedbd4bd3577bc1a20a6bcbb58e78a067",
+      "pages": 16,
+      "bytes": 138260,
+      "retrievedAt": "2026-09-09T13:40:08.909Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "CBA Teachers Guide 8- 1.pdf",
+      "url": "https://files.minesec.gov.cm/g/CBA_Teachers_Guide_8-_1.pdf",
+      "fileId": "6",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Chemistry"
+      ],
+      "sha256": "00c598f75ca46ce0e50513bcdd75a28f12ba609c2a3972d9af4aacfa4731f3c3",
+      "pages": 35,
+      "bytes": 1027821,
+      "retrievedAt": "2026-09-09T13:40:14.068Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "CBA Teachers Guide 8- 1.pdf",
+      "url": "https://files.minesec.gov.cm/j/CBA_Teachers_Guide_8-_1.pdf",
+      "fileId": "9",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Physics"
+      ],
+      "sha256": "c176e122b73ec5a934a6b78f0dbdd8de09e0d6412a78e68b811b4e91e7973efb",
+      "pages": 34,
+      "bytes": 1027005,
+      "retrievedAt": "2026-09-09T13:40:22.375Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Maths syllabus mbalmayo.pdf",
+      "url": "https://files.minesec.gov.cm/i/Maths_syllabus_mbalmayo.pdf",
+      "fileId": "8",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Mathematics"
+      ],
+      "sha256": "ea6a51e29b09f6fcf8284209b60cf4e850cfb8068fa6f21b7fcfaaa8263ce123",
+      "pages": 49,
+      "bytes": 1322953,
+      "retrievedAt": "2026-09-09T13:40:31.496Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "LIT POS LEAN.pdf",
+      "url": "https://files.minesec.gov.cm/1T/LIT_POS_LEAN.pdf",
+      "fileId": "17",
+      "path": [
+        "2nd cycle",
+        "L6 and UP6",
+        "IP-Languages",
+        "LANG + LIT"
+      ],
+      "sha256": "0ff27e3cb6ea72a5acc5916f3171e68c74d75ad36d754ab95989ccd5cd278004",
+      "pages": 30,
+      "bytes": 960988,
+      "retrievedAt": "2026-09-09T13:40:39.149Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "NEW FORM ONE AND FORM TWO SYLLABUS1.pdf",
+      "url": "https://files.minesec.gov.cm/1M/NEW_FORM_ONE_AND_FORM_TWO_SYLLABUS1.pdf",
+      "fileId": "10",
+      "path": [
+        "1st cycle",
+        "Form 1 and  Form 2",
+        "IP-Sciences",
+        "Physics"
+      ],
+      "sha256": "17704bfd54400210c3e0f591f62dc5d5206eb09b2e2da5a753226abe2c057c06",
+      "pages": 38,
+      "bytes": 1253338,
+      "retrievedAt": "2026-09-09T13:40:48.689Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "COUVERTURE DES PROGRAMMES.pdf",
+      "url": "https://files.minesec.gov.cm/it/COUVERTURE_DES_PROGRAMMES.pdf",
+      "fileId": "145",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-LAL",
+        "FRANCAIS"
+      ],
+      "sha256": "ac759f37972b9dbb77e8e7becf9e1be9d5aa97c72fa618edc9672a989f8aad10",
+      "pages": 1,
+      "bytes": 188715,
+      "retrievedAt": "2026-09-09T13:40:52.855Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Math syllabus for forma 3.pdf",
+      "url": "https://files.minesec.gov.cm/4e/Math_syllabus_for_forma_3.pdf",
+      "fileId": "62",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "MATHS"
+      ],
+      "sha256": "bb223c3a4ca837ba132bc8b766d2c76130c05005be061f6dbcc893dbf56e7676",
+      "pages": 78,
+      "bytes": 2801184,
+      "retrievedAt": "2026-09-09T13:41:14.780Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Programme des arts 2nde.pdf",
+      "url": "https://files.minesec.gov.cm/is/Programme_des_arts_2nde.pdf",
+      "fileId": "144",
+      "path": [
+        "2nd cycle",
+        "PROGRAMMES 2nde",
+        "IP-LAL",
+        "ALCN"
+      ],
+      "sha256": "647eb0122908301e49b76ef434af6e24c0d19cedbd5a631a00ab6a897d976a84",
+      "pages": 32,
+      "bytes": 1233117,
+      "retrievedAt": "2026-09-09T13:41:29.710Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programmeFr1erelangue4em3eme.pdf",
+      "url": "https://files.minesec.gov.cm/2k/programmeFr1erelangue4em3eme.pdf",
+      "fileId": "44",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Français"
+      ],
+      "sha256": "b854324d1c5506bba6e948dfda4448438d45f1b964d74d47c707db3581dd7411",
+      "pages": 66,
+      "bytes": 3028333,
+      "retrievedAt": "2026-09-09T13:41:37.711Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Mathématiques 4ème et 3ème.pdf",
+      "url": "https://files.minesec.gov.cm/2s/Mathématiques_4ème_et_3ème.pdf",
+      "fileId": "52",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-SC",
+        "MATHS"
+      ],
+      "sha256": "05aba9a71ff5165998855a2558ceea1749c0d46ef7b0a71d238c37d851e01a9c",
+      "pages": 45,
+      "bytes": 3022243,
+      "retrievedAt": "2026-09-09T13:41:46.293Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Latin_Grec.pdf",
+      "url": "https://files.minesec.gov.cm/2p/Latin_Grec.pdf",
+      "fileId": "49",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Lettres Classiques"
+      ],
+      "sha256": "aa650becea7a0939fe35d4255611c126fdba94216a2823f85f2c35fe470cf388",
+      "pages": 42,
+      "bytes": 1739602,
+      "retrievedAt": "2026-09-09T13:41:55.835Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "PHYSICS teaching  SYLLABUS FOR FORM THREE TO FIVE final.pdf",
+      "url": "https://files.minesec.gov.cm/4f/PHYSICS_teaching__SYLLABUS_FOR_FORM_THREE_TO_FIVE_final.pdf",
+      "fileId": "63",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "PCT",
+        "Physics"
+      ],
+      "sha256": "3bb72390b762a074ba06fbc0e422ec247bb1f55aa0cf247fa7a14e8874b6478e",
+      "pages": 58,
+      "bytes": 2672883,
+      "retrievedAt": "2026-09-09T13:42:04.560Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Syllabus anglophone chemistry.pdf",
+      "url": "https://files.minesec.gov.cm/4g/Syllabus_anglophone_chemistry.pdf",
+      "fileId": "64",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "PCT",
+        "Chemestry"
+      ],
+      "sha256": "b654814a359c3bdb72457884e2d3514b010308a0fe6ebbf13942480c66048443",
+      "pages": 49,
+      "bytes": 2534152,
+      "retrievedAt": "2026-09-09T13:42:17.983Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "GEOL F3 &amp; 4.pdf",
+      "url": "https://files.minesec.gov.cm/4m/GEOL_F3_&_4.pdf",
+      "fileId": "70",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "SVT",
+        "Geol"
+      ],
+      "sha256": "f55383d8a59554e60adde5b1d0a87d62a2cfd54d209bc7532f1ed2c9f9b94c8c",
+      "pages": 39,
+      "bytes": 2209658,
+      "retrievedAt": "2026-09-09T13:42:36.037Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "BIO F 3-4-5.pdf",
+      "url": "https://files.minesec.gov.cm/4l/BIO_F_3-4-5.pdf",
+      "fileId": "69",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "SVT",
+        "Biol"
+      ],
+      "sha256": "4d77a1caaccd55a78d3dd831704204732ac8108fb030064bbdda5d305d93ccd5",
+      "pages": 55,
+      "bytes": 2229590,
+      "retrievedAt": "2026-09-09T13:42:37.433Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Programme Education artistique 4e 3e.pdf",
+      "url": "https://files.minesec.gov.cm/2j/Programme_Education_artistique_4e_3e.pdf",
+      "fileId": "43",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Arts Langues et Culture Nationale",
+        "Arts"
+      ],
+      "sha256": "d9c3725ebf41b9b38bb850754eb5efd8205d0b5aac70d9a32cd3617eb1dafa66",
+      "pages": 36,
+      "bytes": 2509728,
+      "retrievedAt": "2026-09-09T13:42:54.439Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "HBIO F 4 &amp; 5.pdf",
+      "url": "https://files.minesec.gov.cm/4n/HBIO_F_4_&_5.pdf",
+      "fileId": "71",
+      "path": [
+        "1st cycle",
+        "Form 3 and Form 4",
+        "IP-SC",
+        "SVT",
+        "Hbiol"
+      ],
+      "sha256": "aadb075970d56bbb40f58024e210b7a636fbc4d335f68163b76aa003c8b16e4f",
+      "pages": 47,
+      "bytes": 2135962,
+      "retrievedAt": "2026-09-09T13:42:58.565Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Allemand.pdf",
+      "url": "https://files.minesec.gov.cm/2r/Allemand.pdf",
+      "fileId": "51",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Allemand"
+      ],
+      "sha256": "6e151d6f478e685de34809b593a34ba38da4496b8267a7185cdd47bcbac03314",
+      "pages": 46,
+      "bytes": 2833837,
+      "retrievedAt": "2026-09-09T13:43:07.044Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme_Arabe_4eme3eme.pdf",
+      "url": "https://files.minesec.gov.cm/2m/programme_Arabe_4eme3eme.pdf",
+      "fileId": "46",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Arabe"
+      ],
+      "sha256": "d4f6487f30cba9e57b983656729cb09a4555d72ea9c8022d79063950cd667524",
+      "pages": 34,
+      "bytes": 2165436,
+      "retrievedAt": "2026-09-09T13:43:15.020Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme_CHINOIS_4eme3eme.pdf",
+      "url": "https://files.minesec.gov.cm/2n/programme_CHINOIS_4eme3eme.pdf",
+      "fileId": "47",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Chinois"
+      ],
+      "sha256": "981102cf58a22c0971e22ba4c2ebc8f4031048ebac852fc17984a1cc17d269b6",
+      "pages": 40,
+      "bytes": 1884283,
+      "retrievedAt": "2026-09-09T13:43:24.713Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "programme_Espagnol_4eme3eme.pdf",
+      "url": "https://files.minesec.gov.cm/2o/programme_Espagnol_4eme3eme.pdf",
+      "fileId": "48",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Espagnol"
+      ],
+      "sha256": "81a2b14d42e7272a2c731330bed38a9a9f737756ffe32e54e241ccfdf1af45ba",
+      "pages": 51,
+      "bytes": 1901733,
+      "retrievedAt": "2026-09-09T13:43:30.824Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    },
+    {
+      "title": "Latin_Grec.pdf",
+      "url": "https://files.minesec.gov.cm/2q/Latin_Grec.pdf",
+      "fileId": "50",
+      "path": [
+        "1er cycle",
+        "4ème-3ème",
+        "IP-LAL",
+        "Langues Vivantes 2",
+        "Italien"
+      ],
+      "sha256": "aa650becea7a0939fe35d4255611c126fdba94216a2823f85f2c35fe470cf388",
+      "pages": 42,
+      "bytes": 1739602,
+      "retrievedAt": "2026-09-09T13:43:36.929Z",
+      "status": "MINISTRY_HOSTED_PDF_RETRIEVED",
+      "currentApplicability": "NOT_ESTABLISHED",
+      "rights": "LINK_METADATA_ONLY"
+    }
+  ]
+}
