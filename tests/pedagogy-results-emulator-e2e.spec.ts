@@ -161,7 +161,7 @@ for (const reviewCase of [
       await expect(paper).not.toContainText('Synthetic answer');
       await page.getByLabel('Exemplaire de la banque').selectOption('correction');
       await expect(paper).toContainText('Synthetic answer');
-      await expect(paper).toContainText('BROUILLON — À VALIDER PAR L’ENSEIGNANT');
+      await expect(paper).toContainText(reviewCase.section === 'anglophone' ? 'DRAFT - TEACHER APPROVAL REQUIRED' : 'BROUILLON — À VALIDER PAR L’ENSEIGNANT');
       for (const width of [390, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth), 'Bank must not overflow the viewport').toBeLessThanOrEqual(width + 1);

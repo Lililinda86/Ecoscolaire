@@ -1,5 +1,16 @@
 # Remplissage pédagogique — exécution en cours
 
+## Diagnostic de la première recette cinq contextes
+
+Gate 34314426019 : primaire FR et secondaire FR PASS ; deux échecs EN car le
+test attendait le filigrane français alors que le produit affichait correctement
+`DRAFT - TEACHER APPROVAL REQUIRED`. Préscolaire : sélecteur getByLabel exact sur
+un label contenant les options d'un select. Reproduction locale Chromium sur HTML
+minimal : labelExact=0, roleExact=1. Correction vers les noms accessibles des
+combobox et délais d'action bornés ; aucune permission ni logique métier modifiée.
+Readback des dix extraits primaires supplémentaires PASS ; import suivant zéro
+création. Le gate du correctif doit encore être exécuté avant merge.
+
 ## Extension des extraits primaires
 
 Douze extraits mathématiques primaires structurés (un par niveau SIL/CP/CE1/CE2/
