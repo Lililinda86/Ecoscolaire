@@ -240,12 +240,14 @@ try {
   await secretary.goto(`${origin}/#/payments`); await secretary.getByTestId('open-cash-payment').click();
   await secretary.getByTestId('cash-payment-student').selectOption(studentId);
   const amount=secretary.getByLabel('Montant reçu pour UX-VALIDATION-FEE',{exact:true});
+  await amount.waitFor({state:'attached',timeout:30000});
   const group=amount.locator('xpath=ancestor::details[contains(@class,"account-fee-group")]');
   if(await group.count() && await group.getAttribute('open')===null) await group.locator('summary').click();
   await expect(amount).toBeVisible({timeout:30000});
   // Verify displayed due/paid/remaining values in the fee's own card.
   const card=secretary.locator('.obligation-values').filter({hasText:/4[\s\u00a0\u202f]?321/});
   await expect(card).toContainText('Montant dû'); await expect(card).toContainText('Déjà payé'); await expect(card).toContainText('Reste à payer');
+  await expect(card.locator('span').filter({hasText:'Déjà payé'})).toContainText(/0\s*FCFA/);
   await secretary.screenshot({path:'all-fees-global-unpaid.png',fullPage:true});
   await secretary.getByTestId('cash-payment-student').selectOption(students.primary36);
   await expect(amount).toHaveCount(0,{timeout:30000});
