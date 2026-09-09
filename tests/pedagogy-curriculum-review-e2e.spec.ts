@@ -5,7 +5,8 @@ import { initializeFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { curriculumReviewProposals as proposals } from '../src/features/pedagogy/resources/curriculumReviewManifest';
 import { loginAs } from './helpers/auth';
-import { DEFAULT_SUBJECT_CATALOG } from '../functions/src/academic/defaultSubjectCatalog';
+import { createRequire } from 'node:module';
+const { DEFAULT_SUBJECT_CATALOG } = createRequire(import.meta.url)('../functions/lib/academic/defaultSubjectCatalog.js') as typeof import('../functions/src/academic/defaultSubjectCatalog');
 
 test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation and responsive', async ({ page }) => {
   const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire';
