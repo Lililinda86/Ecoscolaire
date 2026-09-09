@@ -1,5 +1,9 @@
 # CONTENT COMPLETION FINAL REPORT
 
+## Livraison complémentaire courante : revue propriétaire des 34 propositions
+
+Le nouvel espace de validation est livré et testé sur Staging `d1f7c854ddfc855dc377bf40ef6aebf570b69dfb` (PR #242). Rapport détaillé et compteurs vérifiés : `CURRICULUM_REVIEW_DELIVERY.md`. Recette exacte : https://github.com/Lililinda86/Ecoscolaire/actions/runs/34366188898 — PASS. Les 34 décisions humaines sont encore en attente. Aucun appel OpenAI ni passage Production. Le bilan de remplissage antérieur ci-dessous reste conservé comme historique et ne constitue pas une déclaration de complétude pédagogique.
+
 Livraison du 9 septembre 2026. Validation technique réussie ; contenu partiel,
 prêt pour revue humaine, sans déclaration de complétude pédagogique.
 
