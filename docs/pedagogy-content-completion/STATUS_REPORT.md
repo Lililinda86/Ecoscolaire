@@ -1,5 +1,14 @@
 # Remplissage pédagogique — exécution en cours
 
+## Extension des extraits primaires
+
+Douze extraits mathématiques primaires structurés (un par niveau SIL/CP/CE1/CE2/
+CM1/CM2 et Class 1–6) issus des colonnes exactes des six PDF MINEDUB déjà vérifiés.
+Deux extraits préscolaires restent sans équivalence ITALO forcée : 14 extraits dans
+l'application, dont 12 destinés à curriculumUnits. Aucun horaire ni leçon détaillée
+inventé. Les anciennes mentions de « deux extraits primaires » ci-dessous décrivent
+l'import initial. Couverture toujours PARTIAL, pas un programme annuel complet.
+
 ## Rattachement technique final des niveaux
 
 Les six classes maternelles historiques ont désormais leur catalogLevelId issu

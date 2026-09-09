@@ -31,6 +31,10 @@ sans copie/indexation de corpus ni confusion avec une autorité ministérielle.
 
 Réutilisation du fonds déjà vérifié : huit documents 2018 et deux variantes, empreintes
 dans `src/features/pedagogy/resources/minedubVerified.ts`. Sommaires de disciplines,
-métadonnées et quatre reformulations brèves dans l'application ; seuls deux extraits
-primaires ont une correspondance technique de niveau non ambiguë importée au catalogue.
+métadonnées et quatorze reformulations brèves dans l'application ; douze extraits
+primaires ont une correspondance technique de niveau non ambiguë, un par classe.
+Pages utilisées : FR niveau 1 PDF 71 (imprimée 72), FR niveau 2 PDF 79 (80), FR
+niveau 3 PDF 74 (75), EN niveau 1 PDF 48 (48), EN niveau 2 PDF 49 (50), EN niveau
+3 PDF 50 (51). Chaque reformulation utilise la colonne du niveau indiqué ; aucun
+volume horaire extrait d'un autre contexte ni reproduction intégrale de tableau.
 Authenticité documentaire distincte de l'applicabilité actuelle et de l'adoption.

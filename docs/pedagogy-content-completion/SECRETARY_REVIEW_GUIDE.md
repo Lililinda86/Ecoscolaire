@@ -37,8 +37,8 @@ non-applicabilité est historisée sans modifier l'adoption active. Une approbat
 reste une décision locale, pas une certification ministérielle de la source.
 
 Les références sans unité publiée pour le niveau ne peuvent pas être adoptées
-par simple ressemblance. CP FR et Class 1 EN disposent chacun d'un extrait court
-structuré : cela ne suffit pas à couvrir leur année scolaire.
+par simple ressemblance. Chacun des douze niveaux primaires dispose d'un extrait
+court structuré en mathématiques : cela ne suffit pas à couvrir son année scolaire.
 
 ## 4. Travail quotidien
 

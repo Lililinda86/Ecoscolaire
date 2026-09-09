@@ -32,14 +32,15 @@ for (const doc of refs) {
     provenance: { label: 'Métadonnées et reformulations courtes issues du document MINEDUB', sourceUrl: sourceUrl(doc), note: 'Édition 2018 authentifiée, applicabilité actuelle et validation pédagogique non établies. Pas une importation intégrale. Les sommaires ne fixent ni horaires locaux ni obligations de classe.' },
   } });
 }
-// Only the two source columns with an unambiguous existing primary catalog level.
+// Source columns with an unambiguous existing primary catalog level.
 // Nursery year mapping remains a human decision, so no school-level unit is forged.
-for (const [excerptId, level] of [['primary-fr-sharing', 'fr-primary-cp'], ['primary-en-sharing', 'en-primary-1']]) {
+const primaryLevels = { SIL: 'fr-primary-sil', CP: 'fr-primary-cp', CE1: 'fr-primary-ce1', CE2: 'fr-primary-ce2', CM1: 'fr-primary-cm1', CM2: 'fr-primary-cm2', 'Class 1': 'en-primary-1', 'Class 2': 'en-primary-2', 'Class 3': 'en-primary-3', 'Class 4': 'en-primary-4', 'Class 5': 'en-primary-5', 'Class 6': 'en-primary-6' };
+for (const [excerptId, level] of structuredReviewExcerpts.filter(row => primaryLevels[row.level]).map(row => [row.id, primaryLevels[row.level]])) {
   const excerpt = structuredReviewExcerpts.find(row => row.id === excerptId);
   const doc = refs.find(row => row.id === excerpt.documentId);
   const id = excerpt.id + '-review-2018-v1';
   expected.push({ path: 'curriculumUnits/' + id, data: { id, programId: doc.id + '-review-2018-v1', catalogLevelId: level, subjectId: 'mathematics', subjectName: excerpt.subject,
-    title: excerpt.officialUnit || 'Partage — extrait localisé', domain: excerpt.domain, objective: excerpt.objectiveParaphrase, competency: excerpt.competencyParaphrase,
+    title: excerpt.officialUnit || (excerpt.id === 'primary-en-sharing' ? 'Partage — extrait localisé' : excerpt.domain + ' — extrait localisé'), domain: excerpt.domain, objective: excerpt.objectiveParaphrase, competency: excerpt.competencyParaphrase,
     sequence: 1, status: 'published', sourceType: 'official', sourceUrl: sourceUrl(doc), sourceLocator: 'PDF ' + excerpt.sourcePdfPage + ' — ' + excerpt.sourceLocator,
     verificationStatus: excerpt.status, coverage: 'PARTIAL', sourceChecksum: doc.sha,
   } });
@@ -91,5 +92,5 @@ if (apply && missing.length) {
   const result = await fetch(base + ':commit', { method: 'POST', headers, body: JSON.stringify({ writes }) });
   if (!result.ok) throw new Error('Atomic create failed: ' + result.status);
   for (const document of missing) if ((await get(document.path))?.importChecksum !== document.data.importChecksum) throw new Error('Readback failed.');
-  console.log(JSON.stringify({ readback: 'PASS', created: counts, existingDocumentsOverwritten: 0 }));
+  console.log(JSON.stringify({ readback: 'PASS', createdDocuments: missing.length, expectedCatalog: counts, existingDocumentsOverwritten: 0 }));
 }

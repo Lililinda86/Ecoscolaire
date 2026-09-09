@@ -8,6 +8,10 @@ Statuts de préparation documentaire : **CONFIGURED 0 ; PARTIAL 12 ;
 PENDING_HUMAN_MAPPING 9 ; MISSING_OFFICIAL_SOURCE 13**. Aucun pourcentage global
 de complétude pédagogique n'est déduit de ces comptes.
 
+Extension : les douze niveaux primaires disposent désormais chacun d'un extrait
+mathématique reformulé, paginé et rattaché à sa colonne source. Les descriptions
+ci-dessous restent une synthèse des lacunes du corpus annuel et des affectations.
+
 | Classes | Nombre | Statut | Motif / prochaine décision |
 | --- | ---: | --- | --- |
 | SIL, CP | 2 | PARTIAL | MINEDUB FR niveau 1, sommaire de 10 disciplines ; un extrait CP, pas de corpus complet ni adoption |

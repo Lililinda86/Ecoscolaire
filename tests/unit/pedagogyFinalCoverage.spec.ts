@@ -43,7 +43,8 @@ it('keeps authentication, rights, adoption and partial structuring separate', ()
   expect(verified).toHaveLength(10);
   expect(verified.every(row => row.edition === '2018' && row.effectiveDate === null && row.rightsStatus === 'UNKNOWN' && row.storagePolicy === 'LINK_ONLY')).toBe(true);
   expect(new Set(verified.map(row => row.checksumSha256)).size).toBe(10);
-  expect(structuredReviewExcerpts).toHaveLength(4);
+  expect(structuredReviewExcerpts).toHaveLength(14);
+  expect(new Set(structuredReviewExcerpts.filter(row => row.documentId.includes('primary')).map(row => row.level)).size).toBe(12);
   for (const excerpt of structuredReviewExcerpts) {
     expect(verified.some(row => row.id === excerpt.documentId)).toBe(true);
     expect(excerpt.sourcePdfPage).toBeGreaterThan(0);

@@ -12,7 +12,7 @@ export function ClassReferenceBrowser() {
   const match = classroom ? referenceForClass(classroom.name, classroom.section || classroom.type || '') : null;
   const source = provenanceRegistry.find(item => item.id === match?.documentId);
   const index = minedubSubjectIndex.find(item => item.documentId === match?.documentId);
-  const excerpts = structuredReviewExcerpts.filter(item => item.documentId === match?.documentId);
+  const excerpts = structuredReviewExcerpts.filter(item => item.documentId === match?.documentId && (!item.documentId.includes('primary') || item.level.toLowerCase() === classroom?.name.trim().toLowerCase()));
   return <section className="pedagogy-card"><h2>Référentiel par classe</h2>
     <label>Classe à consulter<select value={classroom?.id || ''} onChange={event => setClassId(event.target.value)}><option value="">Choisir une classe…</option>{classes.map(item => <option key={item.id} value={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
     {match && <><p><strong>{match.status}</strong> — {match.reason}</p>
