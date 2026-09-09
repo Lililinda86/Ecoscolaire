@@ -1,0 +1,155 @@
+{
+  "environment": "ecoscolaire-staging",
+  "schoolId": "school-italo-official",
+  "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+  "readAt": "2026-09-09T15:53:04.099Z",
+  "writes": 0,
+  "primary": [
+    {
+      "className": "CE1",
+      "catalogLevelId": "fr-primary-ce1",
+      "sourceDocumentId": "minedub-fr-primary-2",
+      "officialSubjects": 10,
+      "exact": 3,
+      "safeAliases": 3,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "Class 3",
+      "catalogLevelId": "en-primary-3",
+      "sourceDocumentId": "minedub-en-primary-2",
+      "officialSubjects": 10,
+      "exact": 4,
+      "safeAliases": 2,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "Class 1",
+      "catalogLevelId": "en-primary-1",
+      "sourceDocumentId": "minedub-en-primary-1",
+      "officialSubjects": 10,
+      "exact": 5,
+      "safeAliases": 2,
+      "ambiguous": 3,
+      "missingLocal": 0
+    },
+    {
+      "className": "CM2",
+      "catalogLevelId": "fr-primary-cm2",
+      "sourceDocumentId": "minedub-fr-primary-3",
+      "officialSubjects": 10,
+      "exact": 3,
+      "safeAliases": 3,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "CE2",
+      "catalogLevelId": "fr-primary-ce2",
+      "sourceDocumentId": "minedub-fr-primary-2",
+      "officialSubjects": 10,
+      "exact": 3,
+      "safeAliases": 3,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "Class 5",
+      "catalogLevelId": "en-primary-5",
+      "sourceDocumentId": "minedub-en-primary-3",
+      "officialSubjects": 10,
+      "exact": 4,
+      "safeAliases": 2,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "Class 6",
+      "catalogLevelId": "en-primary-6",
+      "sourceDocumentId": "minedub-en-primary-3",
+      "officialSubjects": 10,
+      "exact": 4,
+      "safeAliases": 2,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "CP",
+      "catalogLevelId": "fr-primary-cp",
+      "sourceDocumentId": "minedub-fr-primary-1",
+      "officialSubjects": 10,
+      "exact": 2,
+      "safeAliases": 5,
+      "ambiguous": 3,
+      "missingLocal": 0
+    },
+    {
+      "className": "CM1",
+      "catalogLevelId": "fr-primary-cm1",
+      "sourceDocumentId": "minedub-fr-primary-3",
+      "officialSubjects": 10,
+      "exact": 3,
+      "safeAliases": 3,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "SIL",
+      "catalogLevelId": "fr-primary-sil",
+      "sourceDocumentId": "minedub-fr-primary-1",
+      "officialSubjects": 10,
+      "exact": 2,
+      "safeAliases": 5,
+      "ambiguous": 3,
+      "missingLocal": 0
+    },
+    {
+      "className": "Class 4",
+      "catalogLevelId": "en-primary-4",
+      "sourceDocumentId": "minedub-en-primary-2",
+      "officialSubjects": 10,
+      "exact": 4,
+      "safeAliases": 2,
+      "ambiguous": 4,
+      "missingLocal": 0
+    },
+    {
+      "className": "Class 2",
+      "catalogLevelId": "en-primary-2",
+      "sourceDocumentId": "minedub-en-primary-1",
+      "officialSubjects": 10,
+      "exact": 5,
+      "safeAliases": 2,
+      "ambiguous": 3,
+      "missingLocal": 0
+    }
+  ],
+  "subjectsInCatalog": 97,
+  "programsExisting": 13,
+  "assignmentsExisting": 2,
+  "classesWithoutConfiguredSubjects": 31,
+  "secondCycleSeries": [
+    {
+      "className": "Lower Sixth",
+      "series": null
+    },
+    {
+      "className": "Upper Sixth",
+      "series": null
+    },
+    {
+      "className": "1re",
+      "series": null
+    },
+    {
+      "className": "2nde",
+      "series": null
+    },
+    {
+      "className": "Terminale",
+      "series": null
+    }
+  ]
+}

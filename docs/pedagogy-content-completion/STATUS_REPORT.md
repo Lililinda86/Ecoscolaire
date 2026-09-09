@@ -1,5 +1,15 @@
 # Remplissage pédagogique — livraison technique Staging validée
 
+## Livraison courante terminée — revue des 34 propositions
+
+Staging `d1f7c854ddfc855dc377bf40ef6aebf570b69dfb`, PR #242 MERGED. Déploiement 34364587150 PASS ; gate exact 34366188898 PASS, y compris reçu frontend, services déployés et lecture seule ITALO. URL : https://ecoscolaire-hegxiowix-linda-lemofouet-s-projects.vercel.app/#/pedagogy/program.
+
+34 propositions, six groupes (6/6/4/4/7/7), 12 fortes, 22 à examiner dont 18 à source insuffisante. Décisions ITALO observées : 0 approuvée, 0 correction, 0 non applicable, 34 en attente. Les décisions synthétiques et fixtures de recette ont été nettoyées. 825 tests unitaires PASS et recette Staging complète PASS.
+
+Rapport courant : CURRICULUM_REVIEW_DELIVERY.md. Guide : OWNER_CURRICULUM_REVIEW_GUIDE.md. Reprise : aucune opération technique requise ; attendre les décisions explicites de la propriétaire. READY FOR OWNER CURRICULUM REVIEW: YES. READY FOR PRODUCTION AUTHORIZATION: NO. OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
+
+Les sections ci-dessous sont le journal chronologique des étapes et des livraisons précédentes ; leurs états « en cours » ne remplacent pas ce résultat final.
+
 ## Mission active : mise en revue Staging des 34 propositions
 
 Le mandat courant autorise uniquement l’espace de validation demandé, ses contrôles et sa livraison Staging. Le gel documentaire ci-dessous décrit la phase précédente.

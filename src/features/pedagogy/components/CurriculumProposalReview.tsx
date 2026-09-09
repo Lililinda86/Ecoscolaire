@@ -7,6 +7,7 @@ import { useScopedResource } from '../hooks/useScopedResource';
 import { readBoundedDocuments } from '../services/boundedQuery';
 import { curriculumReviewProposals } from '../resources/curriculumReviewManifest';
 import './curriculumProposalReview.css';
+import { SubjectMappingProvider, SubjectMappingReview, OtherSubjectReferences } from './SubjectMappingReview';
 
 type Proposal = typeof curriculumReviewProposals[number];
 type Decision = 'APPROVED' | 'REQUEST_CHANGE' | 'NOT_APPLICABLE';
@@ -19,10 +20,10 @@ const currentProposalDecision = (decisions: ProposalDecision[], row: Row) => dec
 export function CurriculumProposalReview({ yearId }: { yearId?: string }) {
   const { db, currentSchool, currentUser } = useAppContext();
   const schoolId = currentSchool?.id;
-  return <ReviewScope key={JSON.stringify([schoolId, yearId, currentUser?.id, currentUser?.role])} schoolId={schoolId} yearId={yearId} owner={currentUser?.role === 'owner'} rows={(db?.classes || []).filter(c => c.schoolId === schoolId && c.isActive !== false).flatMap(c => {
+  return <SubjectMappingProvider key={JSON.stringify([schoolId, yearId, currentUser?.id, currentUser?.role])} schoolId={schoolId} yearId={yearId} owner={currentUser?.role === 'owner'}><ReviewScope schoolId={schoolId} yearId={yearId} owner={currentUser?.role === 'owner'} rows={(db?.classes || []).filter(c => c.schoolId === schoolId && c.isActive !== false).flatMap(c => {
     const proposal = curriculumReviewProposals.find(p => p.catalogLevelId === c.catalogLevelId);
     return proposal ? [{ classId: c.id, className: c.name, proposal }] : [];
-  })} />;
+  })} /></SubjectMappingProvider>;
 }
 
 export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: string; yearId?: string; owner: boolean; rows: Row[] }) {
@@ -83,6 +84,8 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
             <h5>DOCUMENT / VERSION / SOURCE</h5>{p.sources.map(s => <p key={s.url}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a><br />{s.detail}</p>)}{!p.sources.length && <p>Source officielle manquante pour le programme proposé.</p>}
             <dl><dt>MATIÈRES / DOMAINES COUVERTS</dt><dd>{p.covered}</dd><dt>MATIÈRES / DOMAINES MANQUANTS</dt><dd>{p.missing}</dd><dt>CORRESPONDANCES CERTAINES</dt><dd>{p.certain}</dd><dt>CORRESPONDANCES À CONFIRMER</dt><dd>{p.uncertain}</dd><dt>JUSTIFICATION</dt><dd>{p.rationale}</dd><dt>DATE DOCUMENTAIRE</dt><dd>{p.sourceDate} — constats locaux historiques ITALO, pas inventaire en temps réel.</dd><dt>sourceVersion</dt><dd>{p.sourceVersion}</dd><dt>mappingVersion</dt><dd>{p.mappingVersion}</dd></dl>
           </details>
+          {p.highConfidence && <SubjectMappingReview classId={row.classId} />}
+          {!p.highConfidence && <OtherSubjectReferences classId={row.classId} levelId={p.catalogLevelId} />}
           <p>Décision humaine actuelle : <strong>{resource.loading || resource.error || !yearId ? 'LECTURE NON CONFIRMÉE' : existing ? labels[existing.decision] : 'EN ATTENTE'}</strong></p>
           {existing && <p>Par {existing.decidedBy} — {existing.decidedAt ? new Date(existing.decidedAt.seconds * 1000).toLocaleString() : 'date serveur en cours'} — {existing.decisionNote} (révision {existing.revision})</p>}
           {resource.data.some(d => d.classId === row.classId && d.mappingVersion !== p.mappingVersion) && <p>Une décision existe sur une ancienne version ; elle ne vaut pas validation de cette proposition.</p>}
