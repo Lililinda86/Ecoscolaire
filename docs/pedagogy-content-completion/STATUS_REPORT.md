@@ -1,4 +1,57 @@
-# Remplissage pédagogique — exécution en cours
+# Remplissage pédagogique — livraison technique Staging validée
+
+## État final faisant foi — 9 septembre 2026
+
+SHA déployé et testé : `99c2daacd8ead63c9337456ea72c81bfe4f822b5`.
+Déploiement 34316453874 SUCCESS ; gate consolidé exact 34316962304 SUCCESS,
+y compris navigateur live, cinq contextes et nettoyages ciblés.
+URL : https://ecoscolaire-o2n01ucdn-linda-lemofouet-s-projects.vercel.app
+PR 238 fusionnée ; correctifs Settings des PR 237/240 préservés.
+Rapport faisant foi : [FINAL_REPORT.md](FINAL_REPORT.md).
+Les sections suivantes sont un journal historique, pas des commandes à rejouer.
+Contenu PARTIEL prêt pour revue humaine ; produit pédagogiquement complet : NON.
+OpenAI : zéro appel pendant cette reprise. Production : aucune action.
+Branche locale : codex/pedagogy-content-completion ; worktree :
+ecoscolaire-pedagogy-content-completion. Le checkpoint documentaire final est local
+uniquement et ne remplace pas le SHA déployé ci-dessus. Aucune fixture de cette
+recette conservée. Prochaine étape : revue humaine selon SECRETARY_REVIEW_GUIDE.md,
+pas de nouveau déploiement ni passage Production automatique.
+
+## SHA courant après fusion concurrente PR 240
+
+Le déploiement 34315982579 de 5d63299 a réussi. Avant le dispatch, la garde SHA a
+détecté la PR Settings 240 ; aucun test live sur 5d63299 n'a été lancé. Son correctif
+de préservation du calendrier est conservé par fast-forward, sans conflit.
+SHA courant : `99c2daacd8ead63c9337456ea72c81bfe4f822b5`.
+Déploiement 34316453874 en cours ; Preview 6343458146 success :
+https://ecoscolaire-o2n01ucdn-linda-lemofouet-s-projects.vercel.app.
+Gate consolidé exact lancé : 34316962304, confirmation RUN_PEDAGOGY_STAGING_SYNTHETIC.
+Ses contrôles live exigent le succès du déploiement exact. Aucun appel OpenAI.
+Les mentions 5d63299 ci-dessous décrivent la livraison Pédagogie avant la PR 240.
+
+## Livraison fusionnée — recette exacte encore en attente
+
+PR 238 MERGED le 9 septembre 2026. SHA staging :
+`5d632993f8631dae94a0c8636f43101b84ef399b`.
+Le travail Settings PR 237 est préservé (base 9bac813, fusion dans 73625d7).
+Gate combiné 34315530071 PASS : 133 fichiers / 820 tests unitaires, Functions,
+Rules, Storage, A4, A/B/C et cinq contextes navigateur ; nettoyages exacts vérifiés.
+CI 34315532376 et sécurité financière 34315532420 PASS.
+
+Déploiement Firebase du SHA fusionné : run 34315982579 en cours après les trois
+CI obligatoires PASS. Preview Vercel du même SHA : déploiement 6343377824 success,
+URL protégée https://ecoscolaire-8je360dxq-linda-lemofouet-s-projects.vercel.app.
+NE PAS considérer la recette Staging exacte comme PASS avant sa propre exécution.
+
+Reprise exacte après succès du déploiement :
+`gh workflow run pedagogy-release-gate.yml --ref staging -f expected_sha=5d632993f8631dae94a0c8636f43101b84ef399b -f app_url=https://ecoscolaire-8je360dxq-linda-lemofouet-s-projects.vercel.app -f confirmation=RUN_PEDAGOGY_STAGING_SYNTHETIC`
+Cette confirmation n'exécute aucun appel OpenAI. Pas de cleanup global, pas de main.
+
+Compteurs ITALO relus : 34 classes, 97 entrées subjects (dont 25 ajouts de références),
+38 classSubjects, 13 classPrograms, 0 adoption, 0 planning, 0 préparation locale.
+Catalogue global : 9 programmes (8 références partielles + 1 démonstration),
+17 unités (12 extraits primaires sourcés + 5 de démonstration). Tous les 34 niveaux
+techniques sont rattachés ; aucune décision pédagogique réelle créée.
 
 ## Diagnostic de la première recette cinq contextes
 
