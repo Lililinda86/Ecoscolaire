@@ -5,6 +5,8 @@ import { initializeFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { curriculumReviewProposals as proposals } from '../src/features/pedagogy/resources/curriculumReviewManifest';
 import { loginAs } from './helpers/auth';
+import { createRequire } from 'node:module';
+const { DEFAULT_SUBJECT_CATALOG } = createRequire(import.meta.url)('../functions/lib/academic/defaultSubjectCatalog.js') as typeof import('../functions/src/academic/defaultSubjectCatalog');
 
 test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation and responsive', async ({ page }) => {
   const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire';
@@ -23,7 +25,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await put('schools/' + prefix, { id: prefix, name: 'Synthetic curriculum review school', schoolCode: 'SYNTHETIC', activeAcademicYearId: yearId, academicYear: '2026-2027', subscriptionStatus: 'active', isActive: true });
     await put('academicYears/' + yearId, { id: yearId, schoolId: prefix, name: '2026-2027', status: 'active', startDate: '2026-08-01', endDate: '2027-07-31' });
     for (const p of proposals) await put('classes/' + prefix + '-' + p.id, { id: prefix + '-' + p.id, schoolId: prefix, name: p.name, catalogLevelId: p.catalogLevelId, section: p.section === 'Francophone' ? 'francophone' : 'anglophone', type: p.section === 'Francophone' ? 'francophone' : 'anglophone', cycle: p.catalogLevelId.includes('secondary') ? 'secondary' : p.catalogLevelId.includes('primary') ? 'primary' : 'nursery', isActive: true, isTestFixture: true });
-    for (const [id, name, section] of [['math-fr', 'Mathématiques', 'francophone'], ['english-fr', 'Anglais', 'francophone'], ['history-fr', 'Histoire', 'francophone'], ['science-en', 'Science and Technology', 'anglophone'], ['math-en', 'Mathematics', 'anglophone']]) await put('subjects/' + prefix + '-' + id, { id: prefix + '-' + id, schoolId: prefix, name, section, cycles: ['primary'], isActive: true });
+    for (const subject of DEFAULT_SUBJECT_CATALOG.filter(s => s.cycles.includes('primary'))) await put('subjects/' + prefix + '-' + subject.internalCode, { ...subject, id: prefix + '-' + subject.internalCode, schoolId: prefix, isActive: true });
     const email = prefix + '@example.invalid', password = randomBytes(24).toString('base64url');
     await auth.createUser({ uid: ownerId, email, password }); authIds.push(ownerId);
     await auth.setCustomUserClaims(ownerId, { role: 'owner', schoolId: prefix });
@@ -37,10 +39,14 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await expect(review.getByText('34 classes actives', { exact: true })).toBeVisible();
     await expect(review.getByTestId(/^proposal-/)).toHaveCount(34);
     await expect(review.getByText('0 approuvées', { exact: true })).toBeVisible();
-    for (const group of new Set(proposals.map(p => p.group))) await expect(review.getByRole('heading', { name: group, exact: true })).toBeVisible();
-    await expect(review.getByRole('checkbox')).toHaveCount(12);
+    await expect(review.getByTestId('primary-level-review')).toHaveCount(12);
+    await expect(review.getByTestId('primary-safe-mapping')).toHaveCount(76);
+    await expect(review.getByTestId('primary-ambiguous-mapping')).toHaveCount(44);
+    await expect(review.getByText('MAPPINGS SÛRS : 0/76 validés', { exact: true })).toBeVisible();
     for (const box of await review.getByRole('checkbox').all()) await expect(box).not.toBeChecked();
     for (const select of await review.getByRole('combobox').all()) await expect(select).toHaveValue('');
+    await review.getByText('Dossiers documentaires complets — 34 niveaux et revues séparées', { exact: true }).click();
+    for (const group of new Set(proposals.map(p => p.group))) await expect(review.getByRole('heading', { name: group, exact: true })).toBeVisible();
     phase = 'responsive'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
@@ -64,7 +70,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true); }
     await subjectReview.getByRole('button', { name: 'APPLIQUER LES CORRESPONDANCES SÛRES — SIL', exact: true }).click();
     let subjectDialog = page.getByRole('dialog', { name: 'Confirmer les matières — SIL', exact: true });
-    await expect(subjectDialog.locator('li')).toHaveCount(2);
+    await expect(subjectDialog.locator('li')).toHaveCount(7);
     await subjectDialog.getByRole('button', { name: 'Annuler', exact: true }).click();
     expect((await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get()).size).toBe(0);
     await subjectReview.getByRole('button', { name: 'APPLIQUER LES CORRESPONDANCES SÛRES — SIL', exact: true }).click();
@@ -73,7 +79,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await expect(subjectReview.getByText('État : PROPOSÉ — non adopté, non publié', { exact: true })).toBeVisible();
     const subjectMappings = await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get();
     expect(subjectMappings.size).toBe(1);
-    expect(subjectMappings.docs[0].data().links).toHaveLength(2);
+    expect(subjectMappings.docs[0].data().links).toHaveLength(7);
     expect(subjectMappings.docs[0].data().status).toBe('proposed');
     expect(subjectMappings.docs[0].data().adoptionChanged).toBe(false);
     expect((await db.collection('schoolCurriculumAdoptions').where('schoolId', '==', prefix).get()).size).toBe(0);
@@ -90,11 +96,11 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     phase = 'batch'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     for (const id of ['D01', 'D07']) await review.getByLabel('Sélectionner ' + id, { exact: true }).check();
     await review.getByLabel('Note de décision groupée').fill('SYNTHETIC: selected mappings only. No real approval.');
-    await review.getByRole('button', { name: 'APPROUVER LES SÉLECTIONNÉES' }).click();
+    await review.getByRole('button', { name: 'APPROUVER LES NIVEAUX SÉLECTIONNÉS' }).click();
     await expect(confirmation.locator('li')).toHaveCount(2);
     await confirmation.getByRole('button', { name: 'Annuler' }).click();
     await expect(review.getByText('0 approuvées', { exact: true })).toBeVisible();
-    await review.getByRole('button', { name: 'APPROUVER LES SÉLECTIONNÉES' }).click();
+    await review.getByRole('button', { name: 'APPROUVER LES NIVEAUX SÉLECTIONNÉS' }).click();
     await confirmation.getByRole('button', { name: 'CONFIRMER L’ENREGISTREMENT' }).click();
     await expect(review.getByText('2 approuvées', { exact: true })).toBeVisible();
     await review.getByLabel('Choix — D27', { exact: true }).selectOption('NOT_APPLICABLE');
@@ -111,6 +117,41 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
       expect((await d.ref.collection('history').get()).size).toBe(d.data().revision);
     }
     expect((await db.collection('audit_logs').where('schoolId', '==', prefix).get()).docs.filter(d => d.data().action === 'CURRICULUM_PROPOSAL_DECIDED')).toHaveLength(4);
+    phase = 'primary-owner-steps'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
+    await review.getByText('Dossiers documentaires complets — 34 niveaux et revues séparées', { exact: true }).click();
+    // The legacy proposal does not count as a human subject approval.
+    await expect(review.getByText('MAPPINGS SÛRS : 0/76 validés', { exact: true })).toBeVisible();
+    for (const p of proposals.filter(p => p.highConfidence)) await review.getByRole('checkbox', { name: 'Sélectionner les mappings sûrs — ' + p.name, exact: true }).check();
+    await review.getByRole('button', { name: 'APPLIQUER LES CORRESPONDANCES SÛRES SÉLECTIONNÉES', exact: true }).click();
+    const mappingDialog = page.getByRole('dialog', { name: 'Confirmer les correspondances sélectionnées', exact: true });
+    await expect(mappingDialog.getByText('12 classe(s) · 76 correspondance(s)', { exact: true })).toBeVisible();
+    for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true); }
+    await mappingDialog.getByRole('button', { name: 'Annuler', exact: true }).click();
+    await expect(review.getByText('MAPPINGS SÛRS : 0/76 validés', { exact: true })).toBeVisible();
+    await review.getByRole('button', { name: 'APPLIQUER LES CORRESPONDANCES SÛRES SÉLECTIONNÉES', exact: true }).click();
+    await mappingDialog.getByRole('button', { name: 'CONFIRMER LES DÉCISIONS DE MATIÈRES', exact: true }).click();
+    await expect(review.getByText('MAPPINGS SÛRS : 76/76 validés', { exact: true })).toBeVisible();
+    await expect(review.getByText('AMBIGUÏTÉS : 0/44 résolues', { exact: true })).toBeVisible();
+    const ambiguity = review.getByTestId('primary-ambiguous-mapping').first();
+    await ambiguity.getByRole('combobox', { name: /Décision ambiguë/ }).selectOption('DEFER');
+    await ambiguity.getByRole('textbox').fill('SYNTHETIC: postpone documentary mapping only');
+    await ambiguity.getByRole('button', { name: 'Examiner et confirmer la décision' }).click();
+    await mappingDialog.getByRole('button', { name: 'CONFIRMER LES DÉCISIONS DE MATIÈRES', exact: true }).click();
+    await expect(ambiguity.getByText('Décision actuelle : À revoir plus tard', { exact: true })).toBeVisible();
+    await expect(review.getByText('AMBIGUÏTÉS : 0/44 résolues', { exact: true })).toBeVisible();
+    await ambiguity.getByRole('combobox', { name: /Décision ambiguë/ }).selectOption('LINK');
+    const candidate = ambiguity.getByRole('combobox', { name: /Matière candidate/ });
+    await candidate.selectOption({ index: 1 });
+    await ambiguity.getByRole('textbox').fill('SYNTHETIC: explicit owner documentary link only');
+    await ambiguity.getByRole('button', { name: 'Examiner et confirmer la décision' }).click();
+    await mappingDialog.getByRole('button', { name: 'CONFIRMER LES DÉCISIONS DE MATIÈRES', exact: true }).click();
+    await expect(review.getByText('AMBIGUÏTÉS : 1/44 résolues', { exact: true })).toBeVisible();
+    const subjectDecisions = (await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get()).docs.filter(d => d.data().scope === 'OWNER_DOCUMENTARY_SUBJECT_DECISION');
+    expect(subjectDecisions).toHaveLength(77);
+    for (const d of subjectDecisions) { expect(d.data().decidedBy).toBe(ownerId); expect(d.data().decidedAt.toMillis()).toBeGreaterThan(0); expect((await d.ref.collection('history').get()).size).toBe(d.data().revision); }
+    for (const name of ['teacherAssignments', 'classSubjects', 'classPrograms', 'schoolCurriculumAdoptions', 'teachingPlans', 'timetableEntries']) expect((await db.collection(name).where('schoolId', '==', prefix).get()).empty).toBe(true);
+    expect((await db.collection('audit_logs').where('schoolId', '==', prefix).get()).docs.filter(d => d.data().action === 'CURRICULUM_SUBJECT_MAPPING_DECIDED')).toHaveLength(78);
+    console.log('PRIMARY_OWNER_LIVE PASS: 12 levels, 76 safe, 44 ambiguous, no preselection, confirmed group, individual defer/link, versions/history/audit, no implicit adoption/assignment/hours/coefficients, responsive 360/768/1440.');
     await page.reload(); await expect(review.getByText('2 approuvées', { exact: true })).toBeVisible();
     // Same synthetic identity loses approval controls immediately after role reload.
     await db.doc('users/' + ownerId).update({ role: 'secretary' });
@@ -124,7 +165,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     throw error;
   } finally {
     for (const name of ['curriculumSubjectMappings', 'curriculumProposalReviews', 'curriculumReviewRequests', 'audit_logs']) for (const d of (await db.collection(name).where('schoolId', '==', prefix).get()).docs) {
-      if (name === 'curriculumProposalReviews') for (const h of (await d.ref.collection('history').get()).docs) paths.push(h.ref.path);
+      if (name === 'curriculumProposalReviews' || name === 'curriculumSubjectMappings') for (const h of (await d.ref.collection('history').get()).docs) paths.push(h.ref.path);
       paths.push(d.ref.path);
     }
     const unique = [...new Set(paths)];

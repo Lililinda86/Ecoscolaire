@@ -10,13 +10,14 @@ vi.mock('../../src/context/AppContext', () => ({ useAppContext: () => ({ current
 import { CurriculumProposalReview, ReviewScope } from '../../src/features/pedagogy/components/CurriculumProposalReview';
 import { curriculumReviewProposals as proposals } from '../../src/features/pedagogy/resources/curriculumReviewManifest';
 const rows = proposals.map(proposal => ({ classId: proposal.id, className: proposal.name, proposal }));
-const renderAll = () => render(<ReviewScope schoolId="a" yearId="year" owner rows={rows} />);
+const renderAll = () => { const result = render(<ReviewScope schoolId="a" yearId="year" owner rows={rows} />); fireEvent.click(screen.getByText('Dossiers documentaires complets — 34 niveaux et revues séparées')); return result; };
 afterEach(() => { cleanup(); state.load.mockReset().mockResolvedValue([]); state.call.mockReset().mockResolvedValue({ data: {} }); state.school = 'a'; state.role = 'owner'; });
 it('renders all 34 proposals and six groups with 12 recommendations and no preselection', async () => {
   renderAll(); await screen.findByText('34 classes actives');
   expect(screen.getAllByTestId(/^proposal-/)).toHaveLength(34);
   expect(new Set(proposals.map(p => p.group)).size).toBe(6);
-  expect(screen.getAllByRole('checkbox')).toHaveLength(12);
+  expect(screen.getAllByTestId('primary-level-review')).toHaveLength(12);
+  expect(screen.getAllByRole('checkbox')).toHaveLength(24);
   for (const checkbox of screen.getAllByRole('checkbox')) expect((checkbox as HTMLInputElement).checked).toBe(false);
   for (const select of screen.getAllByRole('combobox')) expect((select as HTMLSelectElement).value).toBe('');
   expect(screen.getByText('12 propositions forte confiance')).toBeTruthy();
@@ -38,9 +39,9 @@ it('group approval includes only explicitly selected high confidence rows and ca
   renderAll(); await waitFor(() => expect(screen.queryByText('Chargement des décisions…')).toBeNull());
   fireEvent.click(screen.getByLabelText('Sélectionner D01')); fireEvent.click(screen.getByLabelText('Sélectionner D07'));
   fireEvent.change(screen.getByLabelText('Note de décision groupée'), { target: { value: 'Synthetic group' } });
-  fireEvent.click(screen.getByRole('button', { name: 'APPROUVER LES SÉLECTIONNÉES' }));
+  fireEvent.click(screen.getByRole('button', { name: 'APPROUVER LES NIVEAUX SÉLECTIONNÉS' }));
   fireEvent.click(screen.getByRole('button', { name: 'Annuler' })); expect(state.call).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'APPROUVER LES SÉLECTIONNÉES' }));
+  fireEvent.click(screen.getByRole('button', { name: 'APPROUVER LES NIVEAUX SÉLECTIONNÉS' }));
   fireEvent.click(screen.getByRole('button', { name: 'CONFIRMER L’ENREGISTREMENT' }));
   await waitFor(() => expect(state.call).toHaveBeenCalledTimes(1));
   expect(state.call.mock.calls[0][0].items.map((i: { classId: string }) => i.classId)).toEqual(['D01', 'D07']);

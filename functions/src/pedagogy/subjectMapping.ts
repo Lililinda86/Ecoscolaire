@@ -15,12 +15,15 @@ const version = 'subject-mapping-v1';
 /** Stores proposed local links only: no classProgram publication, requirement,
  * teacher assignment, documentary decision or curriculum adoption is changed. */
 export const reviewCurriculumSubjectMappings = functions.https.onCall(async (data, context) => {
-  if (!['preview', 'apply'].includes(data?.action)) throw new functions.https.HttpsError('invalid-argument', 'Action invalide.');
+  if (!['preview', 'apply', 'decide'].includes(data?.action)) throw new functions.https.HttpsError('invalid-argument', 'Action invalide.');
   const applying = data.action === 'apply';
-  const { actor, schoolId } = await requirePedagogyActor(context, data.schoolId, applying ? ['owner'] : readers);
+  const deciding = data.action === 'decide';
+  const writing = applying || deciding;
+  const { actor, schoolId } = await requirePedagogyActor(context, data.schoolId, writing ? ['owner'] : readers);
   const academicYearId = requireId(data.academicYearId, 'academicYearId');
   const classId = applying ? requireId(data.classId, 'classId') : null;
   if (applying && (data.confirmed !== true || typeof data.expectedVersion !== 'string')) throw new functions.https.HttpsError('invalid-argument', 'Récapitulatif confirmé requis.');
+  if (deciding && (data.confirmed !== true || !Array.isArray(data.items) || !data.items.length || data.items.length > 120)) throw new functions.https.HttpsError('invalid-argument', 'Sélection explicite et confirmation requises (1 à 120 matières).');
   const db = admin.firestore();
   return db.runTransaction(async tx => {
     const [user, year, catalogSnap, classesSnap, previousSnap, weeksSnap] = await Promise.all([
@@ -31,7 +34,7 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
       tx.get(db.collection('teachingWeeks').where('schoolId', '==', schoolId).limit(1001)),
     ]);
     const u = user.data();
-    if (!u || u.isActive !== true || !(applying ? ['owner'] : readers).includes(u.role) || (u.role !== 'superAdmin' && u.schoolId !== schoolId)) throw new functions.https.HttpsError('permission-denied', 'Droits modifiés.');
+    if (!u || u.isActive !== true || !(writing ? ['owner'] : readers).includes(u.role) || (u.role !== 'superAdmin' && u.schoolId !== schoolId)) throw new functions.https.HttpsError('permission-denied', 'Droits modifiés.');
     if (year.data()?.schoolId !== schoolId || year.data()?.status !== 'active' || !active(year.data()!)) throw new functions.https.HttpsError('failed-precondition', 'Année active requise.');
     if (catalogSnap.size > 1000 || classesSnap.size > 500 || previousSnap.size > 2000 || weeksSnap.size > 1000) throw new functions.https.HttpsError('resource-exhausted', 'Limite de lecture atteinte.');
     const catalog = catalogSnap.docs.map(doc => {
@@ -53,13 +56,51 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
       const progressionSuggestions = previous?.status === 'proposed' ? proposeDocumentaryProgression(schoolId, academicYearId, cls.catalogLevelId, mappings, source.units, weeksSnap.docs.map(w => ({ ...w.data(), id: w.id } as DocumentaryWeek))) : [];
       return [{ classId: doc.id, className: cls.name, catalogLevelId: cls.catalogLevelId, source, mappings, sourceVersion, mappingVersion, safeCount: safe.length, ambiguousCount: mappings.filter(m => m.status === 'AMBIGUOUS').length, missingCount: mappings.filter(m => m.status === 'MISSING_LOCAL_SUBJECT').length, id, status: previous?.status || 'not_applied', appliedBy: previous?.appliedBy || null, progressionSuggestions }];
     });
+    if (deciding) {
+      const prepared = data.items.map((item: Record<string, unknown>) => {
+        const row = rows.find(r => r.classId === item.classId);
+        if (!row) throw new functions.https.HttpsError('permission-denied', 'Classe primaire du périmètre requise.');
+        if (row.mappingVersion !== item.mappingVersion || row.sourceVersion !== item.sourceVersion) throw new functions.https.HttpsError('aborted', 'Source ou catalogue modifié : rechargez.');
+        const mapping = row.mappings.find(m => m.officialSubject === item.officialSubject);
+        if (!mapping || !Number.isInteger(item.expectedRevision) || Number(item.expectedRevision) < 0) throw new functions.https.HttpsError('invalid-argument', 'Matière et révision requises.');
+        const safe = mapping.status === 'EXACT' || mapping.status === 'SAFE_ALIAS';
+        const allowed = safe ? ['APPROVED'] : mapping.status === 'AMBIGUOUS' ? ['LINK', 'KEEP_DISTINCT', 'NOT_APPLICABLE', 'DEFER'] : [];
+        if (!allowed.includes(String(item.decision)) || (data.items.length > 1 && !safe)) throw new functions.https.HttpsError('invalid-argument', 'Groupée sûre uniquement ; ambiguïté individuelle.');
+        const subjectId = safe ? mapping.localMatch!.id : ['LINK', 'KEEP_DISTINCT'].includes(String(item.decision)) ? requireId(item.subjectId, 'subjectId') : null;
+        if (!safe && subjectId && !mapping.candidates.some(c => c.id === subjectId)) throw new functions.https.HttpsError('invalid-argument', 'Choisir explicitement une matière locale candidate.');
+        if (typeof item.decisionNote !== 'string' || item.decisionNote.length > 2000 || (!safe && !item.decisionNote.trim())) throw new functions.https.HttpsError('invalid-argument', 'Justification humaine requise pour une ambiguïté.');
+        const id = digest(['owner-subject-review-v1', schoolId, academicYearId, row.classId, row.sourceVersion, row.mappingVersion, mapping.officialSubject]);
+        const previous = previousSnap.docs.find(d => d.id === id)?.data();
+        const same = previous && previous.decision === item.decision && previous.subjectId === subjectId && previous.decisionNote === item.decisionNote.trim();
+        if (previous && same && Number(item.expectedRevision) <= previous.revision) return { id, skip: true, row, mapping, item, subjectId };
+        if ((previous?.revision || 0) !== item.expectedRevision) throw new functions.https.HttpsError('aborted', 'Décision concurrente : rechargez.');
+        return { id, skip: false, row, mapping, item, subjectId };
+      });
+      if (new Set(prepared.map((p: { id: string }) => p.id)).size !== prepared.length) throw new functions.https.HttpsError('invalid-argument', 'Matière dupliquée.');
+      for (const p of prepared) {
+        if (p.skip) continue;
+        const record = { schoolId, academicYearId, classId: p.row.classId, catalogLevelId: p.row.catalogLevelId,
+          officialSubject: p.mapping.officialSubject, subjectId: p.subjectId, matchStatus: p.mapping.status,
+          decision: p.item.decision, decisionNote: p.item.decisionNote.trim(), revision: Number(p.item.expectedRevision) + 1,
+          sourceVersion: p.row.sourceVersion, mappingVersion: p.row.mappingVersion, sourceDocumentId: p.row.source.documentId,
+          decidedBy: actor.uid, decidedAt: FieldValue.serverTimestamp(), scope: 'OWNER_DOCUMENTARY_SUBJECT_DECISION',
+          adoptionChanged: false, classProgramPublished: false };
+        const ref = db.collection('curriculumSubjectMappings').doc(p.id);
+        tx.set(ref, record);
+        tx.create(ref.collection('history').doc(String(record.revision)), record);
+        audit(tx, actor, schoolId, 'CURRICULUM_SUBJECT_MAPPING_DECIDED', 'curriculumSubjectMapping', p.id,
+          { academicYearId, classId: record.classId, decision: record.decision, revision: record.revision, sourceVersion: record.sourceVersion, mappingVersion: record.mappingVersion });
+      }
+      return { recordedCount: prepared.filter((p: { skip: boolean }) => !p.skip).length, idempotent: prepared.every((p: { skip: boolean }) => p.skip) };
+    }
     if (!applying) {
       const secondaryRows = classesSnap.docs.filter(doc => active(doc.data())).flatMap(doc => {
         const cls = doc.data(), reference = secondarySubjectSources.find(s => s.catalogLevelId === cls.catalogLevelId);
         if (!reference || (cls.academicYearId && cls.academicYearId !== academicYearId) || ((cls.section || cls.type) && (cls.section || cls.type) !== reference.section) || (cls.cycle && cls.cycle !== 'secondary') || cls.educationType === 'technical') return [];
         return [{ classId: doc.id, className: cls.name, coverage: reference.coverage, mappings: matchOfficialSubjects(reference.subjects.map(s => s.officialSubject), catalog, schoolId, reference.section as 'francophone' | 'anglophone', 'secondary'), sources: reference.subjects, autoApplyAllowed: false }];
       });
-      return { rows, secondaryRows, scope: 'PROPOSED_SUBJECT_LINKS_ONLY' };
+      const decisions = previousSnap.docs.filter(d => d.data().scope === 'OWNER_DOCUMENTARY_SUBJECT_DECISION' && d.data().academicYearId === academicYearId).map(d => ({ ...d.data(), id: d.id }));
+      return { rows, secondaryRows, decisions, scope: 'PROPOSED_SUBJECT_LINKS_ONLY' };
     }
     const row = rows.find(r => r.classId === classId);
     if (!row) throw new functions.https.HttpsError('failed-precondition', 'Classe primaire compatible requise.');

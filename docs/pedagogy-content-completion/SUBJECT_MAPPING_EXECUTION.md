@@ -40,6 +40,17 @@ Mandat reçu le 9 septembre 2026. Base Staging vérifiée par fetch :
 
 ## État
 
+LIVRAISON TERMINÉE — PR #245 fusionnée, Staging
+58128cc6011c2c074941e72c6ad4eecea7b960ec. Déploiement 34375130006 PASS ;
+gate exact 34376834668 tentative 2 PASS ; 838 tests unitaires, règles et A/B/C/D.
+Premier passage live : un timeout de suivi primaire FR, quatre appels serveur 200,
+nettoyage vérifié. Relance du seul job sur SHA inchangé : cinq contextes PASS.
+Cause racine non démontrée, incident non reproduit, aucun test affaibli.
+Douze unités réellement importées, zéro écrasement, second dry-run zéro création.
+Les fixtures des deux tentatives sont nettoyées. OpenAI 0, Production NO.
+Reprise : revue humaine des correspondances, voir SUBJECT_MAPPING_DELIVERY.md.
+Le bloc ci-dessous est le journal initial historique, pas l'état courant.
+
 EN COURS — PR #245, commit initial c39e0ba, CI Linux 34373360696.
 Typechecks frontend/Functions, lint ciblé et 18 tests unitaires ciblés PASS.
 Tests émulateurs, CI complète et recette Staging : EN ATTENTE, pas déclarés PASS.

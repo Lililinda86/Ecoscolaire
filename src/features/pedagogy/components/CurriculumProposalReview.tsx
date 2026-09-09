@@ -8,6 +8,7 @@ import { readBoundedDocuments } from '../services/boundedQuery';
 import { curriculumReviewProposals } from '../resources/curriculumReviewManifest';
 import './curriculumProposalReview.css';
 import { SubjectMappingProvider, SubjectMappingReview, OtherSubjectReferences } from './SubjectMappingReview';
+import { PrimarySubjectSteps } from './PrimarySubjectSteps';
 
 type Proposal = typeof curriculumReviewProposals[number];
 type Decision = 'APPROVED' | 'REQUEST_CHANGE' | 'NOT_APPLICABLE';
@@ -38,6 +39,8 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
   const [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState('');
   const decisions = rows.map(row => currentProposalDecision(resource.data, row));
+  const primary = rows.filter(row => row.proposal.highConfidence);
+  const approvedLevels = resource.error || resource.loading ? [] : primary.filter(row => currentProposalDecision(resource.data, row)?.decision === 'APPROVED').map(row => row.classId);
   const locked = !owner || busy || resource.loading || Boolean(resource.error) || uncertain || !yearId || !schoolId;
   const submit = async () => {
     if (locked || !confirmation?.length) return;
@@ -62,16 +65,28 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
     {resource.loading && <p role="status">Chargement des décisions…</p>}
     {(resource.error || message) && <p role="status">{resource.error || message}</p>}
     {!owner && <p>Consultation seule : les décisions sont réservées à la propriétaire (owner).</p>}
-    {owner && <fieldset disabled={locked}><legend>Revue groupée — forte confiance uniquement</legend>
+    <section aria-label="Étape 1 — Valider les niveaux"><h3>Étape 1 — Valider les niveaux</h3>
+      <p>{primary.length} rattachements primaires à forte confiance. Sélectionnez uniquement les niveaux que vous souhaitez approuver.</p>
+      {primary.map(row => <article key={row.classId} data-testid="primary-level-review"><h4>{row.className} → {row.proposal.program}</h4><p>Forte confiance — {row.proposal.rationale}</p>
+        <p>{row.proposal.sources.map(s => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">{s.title} </a>)}</p>
+        <p>État : {resource.loading || resource.error ? 'Lecture non confirmée' : currentProposalDecision(resource.data, row)?.decision === 'APPROVED' ? 'NIVEAU VALIDÉ' : 'À valider'}</p>
+        {owner && <label><input type="checkbox" aria-label={'Sélectionner niveau — ' + row.className} checked={selected.includes(row.classId)} disabled={locked || Boolean(confirmation)} onChange={e => setSelected(v => e.target.checked ? [...new Set([...v, row.classId])] : v.filter(id => id !== row.classId))} />Sélectionner ce niveau</label>}
+        <details><summary>Voir les détails</summary><p>{row.proposal.sources.map(s => s.detail).join(' ; ')}</p><p>sourceVersion : {row.proposal.sourceVersion}</p><p>mappingVersion : {row.proposal.mappingVersion}</p></details>
+      </article>)}
+    {owner && <fieldset disabled={locked}><legend>Approbation des niveaux sélectionnés</legend>
       <p>{selected.length} sélectionnée(s). Aucune sélection automatique.</p>
       <label>Note de décision groupée<textarea maxLength={2000} value={groupNote} onChange={e => setGroupNote(e.target.value)} /></label>
-      <button type="button" disabled={!selected.length || !groupNote.trim()} onClick={() => setConfirmation(rows.filter(r => r.proposal.highConfidence && selected.includes(r.classId)).map(row => ({ row, decision: 'APPROVED', note: groupNote.trim() })))}>APPROUVER LES SÉLECTIONNÉES</button>
+      <button type="button" disabled={!selected.length || !groupNote.trim()} onClick={() => setConfirmation(rows.filter(r => r.proposal.highConfidence && selected.includes(r.classId)).map(row => ({ row, decision: 'APPROVED', note: groupNote.trim() })))}>APPROUVER LES NIVEAUX SÉLECTIONNÉS</button>
     </fieldset>}
+    </section>
+    <PrimarySubjectSteps approvedLevels={approvedLevels} levelsAvailable={primary.length} levelsLoading={resource.loading || Boolean(resource.error)} />
+    <p>Préscolaire : {rows.filter(r => /preschool|nursery/.test(r.proposal.catalogLevelId)).length} niveaux, prochaine revue séparée avec les réserves existantes. Secondaire : correspondances partielles conservées, aucune application groupée.</p>
     {confirmation && <div role="dialog" aria-modal="true" aria-label="Confirmer les décisions" className="curriculum-review-confirm">
       <h3>Confirmer les décisions</h3><p>Vérifiez chaque classe et la version avant enregistrement. Les anciennes décisions restent dans l’historique.</p>
-      <ul>{confirmation.map(({ row, decision, note }) => <li key={row.classId}>{row.proposal.name} — {labels[decision]} — {note}<br />Source : {row.proposal.sourceVersion}<br />Correspondance : {row.proposal.mappingVersion}</li>)}</ul>
+      <p>{confirmation.length} niveau(x) sélectionné(s).</p><ul>{confirmation.map(({ row, decision, note }) => <li key={row.classId}>{row.proposal.name} — {labels[decision]} — {note}<details><summary>Voir les détails</summary>Source : {row.proposal.sourceVersion}<br />Correspondance : {row.proposal.mappingVersion}</details></li>)}</ul>
       <button type="button" disabled={locked} onClick={() => void submit()}>CONFIRMER L’ENREGISTREMENT</button><button type="button" disabled={busy} onClick={() => setConfirmation(null)}>Annuler</button>
     </div>}
+    <details><summary>Dossiers documentaires complets — 34 niveaux et revues séparées</summary>
     {[...new Set(curriculumReviewProposals.map(p => p.group))].map(group => <section key={group} aria-label={group}><h3>{group}</h3>
       {rows.filter(r => r.proposal.group === group).sort((a, b) => Number(b.proposal.highConfidence) - Number(a.proposal.highConfidence) || Number(a.proposal.missingSource) - Number(b.proposal.missingSource) || a.proposal.id.localeCompare(b.proposal.id)).map(row => {
         const p = row.proposal, existing = currentProposalDecision(resource.data, row);
@@ -97,5 +112,6 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
         </article>;
       })}
     </section>)}
+    </details>
   </section>;
 }
