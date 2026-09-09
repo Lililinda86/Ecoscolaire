@@ -1,0 +1,63 @@
+name: Global Settings Staging validation
+on:
+  pull_request:
+    branches: [staging]
+    paths:
+      - 'scripts/test-settings-global-staging.mjs'
+      - '.github/workflows/settings-global-staging-ui.yml'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  all-fees-staging:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'codex/settings-global-validation'
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 25
+    concurrency:
+      group: all-school-fees-staging-validation
+      cancel-in-progress: false
+    env:
+      EXPECTED_STAGING_SHA: 9bac81340bf003551ac96802d60dbd93ca9665cf
+      STAGING_APP_URL: https://ecoscolaire-5khssa318-linda-lemofouet-s-projects.vercel.app
+      ALL_FEES_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      GOOGLE_CLOUD_PROJECT: ecoscolaire-staging
+      VITE_FIREBASE_PROJECT_ID: ecoscolaire-staging
+      VITE_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Verify exact Staging backend and frontend release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/staging)" = "$EXPECTED_STAGING_SHA"
+          git diff --exit-code "$EXPECTED_STAGING_SHA" HEAD -- src functions public firestore.rules storage.rules package.json package-lock.json vite.config.ts index.html
+          printf '%s' "$STAGING_APP_URL" | grep -Eq '^https://ecoscolaire-[a-z0-9]+-linda-lemofouet-s-projects\.vercel\.app$'
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-staging.yml/runs" -f head_sha="$EXPECTED_STAGING_SHA" -f branch=staging -f event=push -f per_page=100 > /tmp/all-fees-runs.json
+          node scripts/verify-exact-deployment-run.mjs /tmp/all-fees-runs.json "$EXPECTED_STAGING_SHA" '.github/workflows/deploy-staging.yml' staging
+          deployment_id="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/deployments" -f sha="$EXPECTED_STAGING_SHA" -f environment=Preview -f per_page=100 --jq '.[0].id')"
+          gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" | jq -e --arg url "$STAGING_APP_URL" 'map(select(.state == "success" and .environment_url == $url)) | length >= 1'
+          echo 'TARGET_DEPLOYMENT_VERIFIED=true' >> "$GITHUB_ENV"
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/test-settings-global-staging.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: settings-global-staging
+          path: |
+            all-fees-*.png
+            all-fees-receipt.pdf
+          if-no-files-found: ignore
