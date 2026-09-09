@@ -3,7 +3,8 @@ import { randomBytes } from 'node:crypto';
 import { initializeApp, applicationDefault, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { chromium, expect } from '@playwright/test';
+import { chromium, expect as baseExpect } from '@playwright/test';
+const expect = baseExpect.configure({ timeout: 30000 });
 
 const project = 'ecoscolaire-staging';
 assert.equal(process.env.VITE_FIREBASE_PROJECT_ID, project);
@@ -162,7 +163,13 @@ try {
   const yearModal=owner.locator('div').filter({has:owner.getByRole('heading',{name:"Modifier les dates de l'année scolaire",exact:true})}).filter({has:owner.getByRole('button',{name:'Enregistrer',exact:true})}).last();
   await yearModal.locator('input[type=date]').nth(0).fill('2026-08-25');
   await yearModal.locator('input[type=date]').nth(1).fill('2027-07-05');
-  await yearModal.getByRole('button',{name:'Enregistrer',exact:true}).click();
+  const [boundsResponse] = await Promise.all([
+    owner.waitForResponse(response=>response.url().endsWith('/updateAcademicYearBounds'),{timeout:45000}),
+    yearModal.getByRole('button',{name:'Enregistrer',exact:true}).click()
+  ]);
+  const boundsResult = await boundsResponse.json();
+  assert.equal(boundsResponse.status(),200,JSON.stringify(boundsResult));
+  assert.equal(boundsResult.result?.success,true,JSON.stringify(boundsResult));
   await expect.poll(async()=> (await db.collection('academicYears').doc(yearId).get()).data().startDate).toBe('2026-08-25');
   await owner.getByTestId('add-academic-period').click();
   await owner.locator('#periodNameInput').fill('UX Trimestre');
