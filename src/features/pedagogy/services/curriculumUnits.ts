@@ -1,6 +1,12 @@
 import { collection, query, where } from 'firebase/firestore';
 import { db } from '../../../db/firebase';
 import { readBoundedDocuments } from './boundedQuery';
+import { pedagogyAdoptionId } from '../ids';
+
+export interface CurriculumReviewDecision { id: string; schoolId: string; reviewOutcome: 'request_correction' | 'not_applicable'; declaredBy: string; effectiveDate: string; reference: string; programVersion: string }
+export async function loadCurriculumReviewDecisions(schoolId: string, yearId: string, levelId: string) {
+  return readBoundedDocuments<CurriculumReviewDecision>(query(collection(db, 'schoolCurriculumAdoptions', pedagogyAdoptionId(schoolId, yearId, levelId), 'reviewDecisions'), where('schoolId', '==', schoolId)), 200, 'Décisions de revue');
+}
 
 export interface CurriculumUnitDetail {
   id: string; programId: string; catalogLevelId: string; subjectId: string;

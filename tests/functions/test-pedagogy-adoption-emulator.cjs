@@ -41,6 +41,14 @@ const context = role => ({ auth: { uid: prefix + '-' + role, token: {} } });
     assert.equal((await ref.collection('versions').doc('0').get()).data().curriculumProgramId, 'synthetic-legacy');
     assert.equal((await ref.collection('versions').doc('0').get()).data().decision, undefined);
     assert.equal((await ref.collection('versions').get()).size, 2);
+    for (const reviewOutcome of ['request_correction', 'not_applicable']) {
+      const result = await adoptCurriculumProgram.run({ ...input, expectedRevision: 1, reviewOutcome }, context('secretary'));
+      assert.equal(result.adoptionChanged, false);
+      const decision = (await ref.collection('reviewDecisions').doc(result.reviewDecisionId).get()).data();
+      assert.equal(decision.reviewOutcome, reviewOutcome);
+      assert.equal(decision.declarationReceived, true);
+      assert.equal((await ref.get()).data().revision, 1);
+    }
     await db.doc('curriculumPrograms/' + programId).update({ status: 'archived' });
     await assert.rejects(adoptCurriculumProgram.run({ ...input, expectedRevision: 1 }, context('secretary')), error => error.code === 'failed-precondition');
     assert.equal((await ref.get()).data().revision, 1);
@@ -79,6 +87,7 @@ const context = role => ({ auth: { uid: prefix + '-' + role, token: {} } });
   } finally {
     await db.doc('assessmentItems/' + prefix + '-quality').delete();
     for (const version of (await ref.collection('versions').get()).docs) await version.ref.delete();
+    for (const decision of (await ref.collection('reviewDecisions').get()).docs) await decision.ref.delete();
     await ref.delete();
     for (const doc of (await db.collection('audit_logs').where('schoolId', '==', schoolId).get()).docs) await doc.ref.delete();
     for (const role of ['secretary', 'boardViewer', 'foreign']) await db.doc('users/' + prefix + '-' + role).delete();

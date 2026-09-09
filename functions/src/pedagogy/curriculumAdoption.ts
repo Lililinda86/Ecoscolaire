@@ -10,6 +10,8 @@ export const adoptCurriculumProgram = functions.https.onCall(async (data, contex
   const academicYearId = requireId(data?.academicYearId, 'academicYearId');
   const catalogLevelId = requireId(data?.catalogLevelId, 'catalogLevelId');
   const curriculumProgramId = requireId(data?.curriculumProgramId, 'curriculumProgramId');
+  const reviewOutcome = data?.reviewOutcome ?? 'approve';
+  if (!['approve', 'request_correction', 'not_applicable'].includes(reviewOutcome)) throw new functions.https.HttpsError('invalid-argument', 'Type de décision invalide.');
   const text = (value: unknown, max: number) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
   const date = data?.decisionDate;
   const parsed = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date + 'T00:00:00Z') : null;
@@ -21,6 +23,7 @@ export const adoptCurriculumProgram = functions.https.onCall(async (data, contex
   }
   const db = admin.firestore();
   const ref = db.collection('schoolCurriculumAdoptions').doc(adoptionId(schoolId, academicYearId, catalogLevelId));
+  const reviewRef = ref.collection('reviewDecisions').doc();
   return db.runTransaction(async transaction => {
     const [year, program, previous, units] = await Promise.all([
       transaction.get(db.collection('academicYears').doc(academicYearId)),
@@ -33,6 +36,14 @@ export const adoptCurriculumProgram = functions.https.onCall(async (data, contex
     if (yearData.status !== 'active' || yearData.isActive === false || yearData.active === false) throw new functions.https.HttpsError('failed-precondition', 'Année scolaire inactive.');
     if (!programData || programData.status !== 'published') throw new functions.https.HttpsError('failed-precondition', 'Version du catalogue non publiée.');
     if (programData.version !== data.expectedProgramVersion || (old?.revision || 0) !== data.expectedRevision) throw new functions.https.HttpsError('aborted', 'Version modifiée : rechargez avant de consigner la décision.');
+    if (reviewOutcome !== 'approve') {
+      transaction.create(reviewRef, { id: reviewRef.id, schoolId, academicYearId, catalogLevelId, curriculumProgramId,
+        programVersion: programData.version, reviewOutcome, declarationReceived: true, declaredBy: data.decisionBy.trim(),
+        effectiveDate: date, reference: data.decisionReference.trim(), recordedBy: actor.uid, recordedAt: FieldValue.serverTimestamp(),
+        adoptionChanged: false, sourceAuthentication: 'not_established_by_review' });
+      audit(transaction, actor, schoolId, 'CURRICULUM_REVIEW_RECORDED', 'schoolCurriculumReview', reviewRef.id, { academicYearId, catalogLevelId, curriculumProgramId, reviewOutcome });
+      return { reviewDecisionId: reviewRef.id, reviewOutcome, adoptionChanged: false };
+    }
     if (units.size > 500) throw new functions.https.HttpsError('resource-exhausted', 'Plus de500 unités pour ce niveau : contrôle documentaire requis.');
     if (!units.docs.some(unit => unit.data().status === 'published')) throw new functions.https.HttpsError('failed-precondition', 'Ce programme ne contient aucune unité publiée pour le niveau choisi.');
     const revision = (old?.revision || 0) + 1;

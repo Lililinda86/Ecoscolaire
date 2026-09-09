@@ -9,7 +9,7 @@ vi.mock('../../src/context/AppContext', () => ({ useAppContext: () => ({
     classes: [{ id: 'a-class', schoolId: 'a', catalogLevelId: 'primary-a' }, { id: 'b-class', schoolId: 'b', catalogLevelId: 'primary-b' }] },
 }) }));
 vi.mock('../../src/features/pedagogy/services/pedagogyService', () => ({ adoptCurriculumProgram: state.adopt }));
-vi.mock('../../src/features/pedagogy/services/curriculumUnits', () => ({ loadPublishedCurriculumUnits: async () => [] }));
+vi.mock('../../src/features/pedagogy/services/curriculumUnits', () => ({ loadPublishedCurriculumUnits: async () => [], loadCurriculumReviewDecisions: async () => [] }));
 vi.mock('../../src/features/pedagogy/hooks/usePedagogyWorkspace', () => ({ usePedagogyWorkspace: () => ({
   programs: [{ id: 'program', title: 'Synthetic programme', version: 'v1', sourceType: 'mock' }], adoptions: [], error: '', loading: false, refresh: state.refresh,
 }) }));
@@ -18,10 +18,23 @@ afterEach(() => { cleanup(); state.schoolId = 'a'; state.role = 'secretary'; sta
 const fill = () => {
   fireEvent.change(screen.getByLabelText('Niveau'), { target: { value: 'primary-a' } });
   fireEvent.change(screen.getByLabelText('Programme'), { target: { value: 'program' } });
+  fireEvent.change(screen.getByLabelText('Type de décision reçue'), { target: { value: 'approve' } });
   fireEvent.change(screen.getByLabelText('Auteur de la décision reçue'), { target: { value: 'Synthetic reviewer' } });
   fireEvent.change(screen.getByLabelText('Date de la décision'), { target: { value: '2026-09-01' } });
   fireEvent.change(screen.getByLabelText('Référence ou note de transmission'), { target: { value: 'Synthetic decision only' } });
 };
+it('records a correction request only after explicit receipt and never defaults an approval', async () => {
+  state.adopt.mockResolvedValue({ adoptionChanged: false });
+  render(<MemoryRouter><PedagogyProgram /></MemoryRouter>);
+  expect((screen.getByLabelText('Type de décision reçue') as HTMLSelectElement).value).toBe('');
+  fill();
+  fireEvent.change(screen.getByLabelText('Type de décision reçue'), { target: { value: 'request_correction' } });
+  expect((screen.getByRole('button', { name: 'Enregistrer la demande de correction' }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la demande de correction' }));
+  await waitFor(() => expect(state.adopt).toHaveBeenCalledWith(expect.objectContaining({ reviewOutcome: 'request_correction', declarationReceived: true })));
+  await screen.findByText('Décision reçue enregistrée. Aucune adoption créée ou modifiée.');
+});
 it('requires an explicit received decision and sends the consulted versions', async () => {
   state.adopt.mockResolvedValue({ revision: 1 });
   render(<MemoryRouter><PedagogyProgram /></MemoryRouter>); fill();
