@@ -42,7 +42,8 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
     const rows = classesSnap.docs.filter(doc => active(doc.data()) && (!doc.data().academicYearId || doc.data().academicYearId === academicYearId)).flatMap(doc => {
       const cls = doc.data();
       const source = subjectMappingSources.find(s => s.documentId === primaryDocumentByLevel[cls.catalogLevelId]);
-      if (!source || !['francophone', 'anglophone'].includes(source.section) || (cls.section && cls.section !== source.section)) return [];
+      const section = cls.section || cls.type;
+      if (!source || !['francophone', 'anglophone'].includes(source.section) || (section && section !== source.section) || (cls.cycle && cls.cycle !== 'primary') || cls.educationType === 'technical') return [];
       const mappings = matchOfficialSubjects(source.names, catalog, schoolId, source.section as 'francophone' | 'anglophone');
       const safe = mappings.filter(m => m.localMatch !== null);
       const sourceVersion = source.sourceVersion;
@@ -55,7 +56,7 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
     if (!applying) {
       const secondaryRows = classesSnap.docs.filter(doc => active(doc.data())).flatMap(doc => {
         const cls = doc.data(), reference = secondarySubjectSources.find(s => s.catalogLevelId === cls.catalogLevelId);
-        if (!reference || (cls.academicYearId && cls.academicYearId !== academicYearId)) return [];
+        if (!reference || (cls.academicYearId && cls.academicYearId !== academicYearId) || ((cls.section || cls.type) && (cls.section || cls.type) !== reference.section) || (cls.cycle && cls.cycle !== 'secondary') || cls.educationType === 'technical') return [];
         return [{ classId: doc.id, className: cls.name, coverage: reference.coverage, mappings: matchOfficialSubjects(reference.subjects.map(s => s.officialSubject), catalog, schoolId, reference.section as 'francophone' | 'anglophone', 'secondary'), sources: reference.subjects, autoApplyAllowed: false }];
       });
       return { rows, secondaryRows, scope: 'PROPOSED_SUBJECT_LINKS_ONLY' };

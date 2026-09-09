@@ -15,6 +15,11 @@ const call = (action, role = 'owner', extra = {}) => fn.run({ schoolId, academic
     for (const [id, name] of [['math', 'Mathématiques'], ['ang', 'Anglais'], ['history', 'Histoire'], ['arts', 'Arts et culture']]) await db.doc('subjects/' + schoolId + '-' + id).create({ schoolId, name, section: 'francophone', cycles: ['primary'], isActive: true });
     const preview = await call('preview'); assert.equal(preview.rows.length, 12);
     const row = preview.rows.find(r => r.catalogLevelId === 'fr-primary-sil');
+    await db.doc('classes/' + row.classId).update({ cycle: 'secondary' });
+    assert.equal((await call('preview')).rows.length, 11);
+    await db.doc('classes/' + row.classId).update({ cycle: 'primary', type: 'anglophone' });
+    assert.equal((await call('preview')).rows.length, 11);
+    await db.doc('classes/' + row.classId).update({ type: 'francophone' });
     assert.equal(row.safeCount, 2); assert.equal(row.ambiguousCount, 2);
     assert.equal((await call('preview', 'secretary')).rows.length, 12);
     await assert.rejects(call('preview', 'foreign'), e => e.code === 'permission-denied');
