@@ -8,6 +8,7 @@ import { CurriculumCoverage } from '../components/CurriculumCoverage';
 import { CurriculumUnitDetails } from '../components/CurriculumUnitDetails';
 import { ClassReferenceBrowser } from '../components/ClassReferenceBrowser';
 import { CurriculumReviewHistory } from '../components/CurriculumReviewHistory';
+import { CurriculumProposalReview } from '../components/CurriculumProposalReview';
 
 export default function PedagogyProgram() {
   const { db, currentSchool } = useAppContext();
@@ -49,6 +50,7 @@ function ProgramScope({ yearId }: { yearId?: string }) {
   return <main className="pedagogy-page">
     <PedagogyHeader title="Programme de référence" description="Consignez la décision reçue pour une version du catalogue. Publication et adoption ne prouvent pas son authenticité." />
     <PedagogyNav />
+    <CurriculumProposalReview yearId={yearId} />
     <ClassReferenceBrowser key={currentSchool?.id} />
     <CurriculumCoverage yearId={yearId} programs={workspace.programs} adoptions={workspace.adoptions} unavailable={workspace.loading || Boolean(workspace.error)} />
     {workspace.error && <div className="pedagogy-alert pedagogy-alert--error">{workspace.error}</div>}

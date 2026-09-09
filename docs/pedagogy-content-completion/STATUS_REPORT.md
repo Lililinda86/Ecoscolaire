@@ -1,5 +1,17 @@
 # Remplissage pédagogique — livraison technique Staging validée
 
+## Mission active : mise en revue Staging des 34 propositions
+
+Le mandat courant autorise uniquement l’espace de validation demandé, ses contrôles et sa livraison Staging. Le gel documentaire ci-dessous décrit la phase précédente.
+
+Implémentation locale : manifeste documentaire déterministe 34/12/22 ; vue Programme en six groupes ; décisions owner exclusivement via callable, note et confirmation explicites, versions source/correspondance, transaction atomique et historique immuable avec audit. Aucune décision métier réelle enregistrée.
+
+Contrôles locaux exécutés : typecheck frontend/Functions PASS ; compilation Functions PASS ; lint ciblé PASS ; 9 tests UI ciblés PASS ; contrôle des 34 fiches et génération reproductible PASS. Régressions complètes locales en cours ; contrôles émulateurs et recette Staging non encore exécutés pour cette version.
+
+Plan et reprise : CURRICULUM_REVIEW_EXECUTION.md. Prochaine étape : PR vers staging, CI Linux puis recette exacte. OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
+
+La compilation a régénéré des fichiers suivis sous functions/lib ; ces sorties ne sont pas incluses dans la PR et restent préservées localement. Les sources sont compilées à neuf par la CI.
+
 ## Revue documentaire des 34 classes — 9 septembre 2026
 
 Nouvelles fonctionnalités gelées. Aucune écriture Staging, aucun déploiement,
