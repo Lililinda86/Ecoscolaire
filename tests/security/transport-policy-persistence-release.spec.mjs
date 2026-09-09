@@ -5,7 +5,7 @@ import test from 'node:test';
 const base = '8965b81e2fd49a0c84b7f3c8c0b6fb859ac1f802';
 const read = path => fs.readFileSync(path, 'utf8');
 test('transport fix preserves backend business logic, RBAC, rules and historical tests', () => {
-  const changes = execFileSync('git', ['diff', '--name-only', base, '--', 'functions', 'firestore.rules', 'storage.rules', 'firestore.indexes.json', 'tests'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+  const changes = execFileSync('git', ['diff', '--name-only', base, 'HEAD', '--', 'functions', 'firestore.rules', 'storage.rules', 'firestore.indexes.json', 'tests'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
   assert.deepEqual(changes.sort(), ['tests/security/transport-policy-persistence-release.spec.mjs', 'tests/unit/transportSettings.spec.ts']);
 });
 test('isolated staging pipeline cannot publish Production', () => {

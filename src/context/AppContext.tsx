@@ -199,6 +199,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 
   const updateLocalState = (patch: Partial<Database> | ((prev: Database) => Partial<Database>)) => {
+    // Keep consumers of currentSchool aligned with a confirmed school snapshot.
+    if (typeof patch !== 'function' && patch.school && patch.school.id === currentSchool?.id) {
+      setCurrentSchool(patch.school);
+    }
     setDb(prev => {
       if (!prev) return null;
       const resolvedPatch = typeof patch === 'function' ? patch(prev) : patch;
