@@ -1,5 +1,28 @@
 # Remplissage pédagogique — livraison technique Staging validée
 
+## Mission matières — livraison Staging validée
+
+PR #245 MERGED le 9 septembre 2026 à 16:11 UTC. SHA Staging :
+`58128cc6011c2c074941e72c6ad4eecea7b960ec`. Gate candidat 34374343080 PASS :
+136 fichiers / 838 tests unitaires, règles, backend, navigateur et régressions.
+Déploiement 34375130006 PASS. Recette exacte 34376834668 tentative 2 PASS.
+URL : https://ecoscolaire-97qfraa7r-linda-lemofouet-s-projects.vercel.app/#/pedagogy/program.
+Première tentative : timeout d'affichage du suivi primaire FR, appels serveur 200,
+fixtures nettoyées. Relance ciblée sans changement : cinq contextes PASS ; incident
+non reproduit, cause racine non démontrée. Voir le rapport pour les preuves.
+Douze nouvelles unités de sciences importées ; lecture PASS, zéro écrasement ;
+second dry-run zéro création. Aucune adoption ni matière de classe modifiée.
+Les 34 décisions réelles sont encore en attente (lecture CI 16:44 UTC).
+Branche `codex/pedagogy-subject-mapping`, même worktree dédié ; modifications
+générées functions/lib préservées et non publiées. Aucun OpenAI ni Production.
+Reprise : revue owner des douze propositions de matières, ambiguïtés et séries
+locales. Aucun travail technique restant pour cette livraison ; aucun passage Production.
+Toutes les fixtures live ont été nettoyées et vérifiées. Liens sûrs ITALO non
+appliqués par l'agent ; 31 classes sans matière active configurée restent 31.
+Voir SUBJECT_MAPPING_EXECUTION.md et SUBJECT_MAPPING_DELIVERY.md.
+
+Les bilans ci-dessous sont historiques et ne remplacent pas ce nouvel état.
+
 ## Livraison courante terminée — revue des 34 propositions
 
 Staging `d1f7c854ddfc855dc377bf40ef6aebf570b69dfb`, PR #242 MERGED. Déploiement 34364587150 PASS ; gate exact 34366188898 PASS, y compris reçu frontend, services déployés et lecture seule ITALO. URL : https://ecoscolaire-hegxiowix-linda-lemofouet-s-projects.vercel.app/#/pedagogy/program.
