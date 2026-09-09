@@ -5,6 +5,7 @@ import { adoptionId, addDaysIso, mondayIso, teachingPlanId, teachingWeekId } fro
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { deterministicPlanningGenerator, GeneratorSubject, GeneratorUnit } from './planningGenerator';
 export { recordTeachingConfirmations } from './teachingConfirmations';
+export { reviewCurriculumSubjectMappings } from './subjectMapping';
 export { savePedagogyClassPolicy } from './classPolicies';
 export { recordPedagogyObservations } from './observations';
 export { savePedagogyFridayConfiguration, pedagogyFridayScheduler } from './fridayAutomation';

@@ -23,6 +23,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await put('schools/' + prefix, { id: prefix, name: 'Synthetic curriculum review school', schoolCode: 'SYNTHETIC', activeAcademicYearId: yearId, academicYear: '2026-2027', subscriptionStatus: 'active', isActive: true });
     await put('academicYears/' + yearId, { id: yearId, schoolId: prefix, name: '2026-2027', status: 'active', startDate: '2026-08-01', endDate: '2027-07-31' });
     for (const p of proposals) await put('classes/' + prefix + '-' + p.id, { id: prefix + '-' + p.id, schoolId: prefix, name: p.name, catalogLevelId: p.catalogLevelId, section: p.section === 'Francophone' ? 'francophone' : 'anglophone', type: p.section === 'Francophone' ? 'francophone' : 'anglophone', cycle: p.catalogLevelId.includes('secondary') ? 'secondary' : p.catalogLevelId.includes('primary') ? 'primary' : 'nursery', isActive: true, isTestFixture: true });
+    for (const [id, name, section] of [['math-fr', 'Mathématiques', 'francophone'], ['english-fr', 'Anglais', 'francophone'], ['history-fr', 'Histoire', 'francophone'], ['science-en', 'Science and Technology', 'anglophone'], ['math-en', 'Mathematics', 'anglophone']]) await put('subjects/' + prefix + '-' + id, { id: prefix + '-' + id, schoolId: prefix, name, section, cycles: ['primary'], isActive: true });
     const email = prefix + '@example.invalid', password = randomBytes(24).toString('base64url');
     await auth.createUser({ uid: ownerId, email, password }); authIds.push(ownerId);
     await auth.setCustomUserClaims(ownerId, { role: 'owner', schoolId: prefix });
@@ -43,11 +44,32 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     phase = 'responsive'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
-      await review.getByTestId('proposal-D27').locator('summary').click();
+      await review.getByTestId('proposal-D27').getByText('Documents, couverture et justification — D27', { exact: true }).click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-      await review.getByTestId('proposal-D27').locator('summary').click();
+      await review.getByTestId('proposal-D27').getByText('Documents, couverture et justification — D27', { exact: true }).click();
     }
     phase = 'individual'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
+    const subjectReview = review.getByRole('region', { name: 'Matières proposées — SIL', exact: true });
+    await expect(subjectReview.getByText(/10 matières\/domaines officiels identifiés/)).toBeVisible();
+    expect((await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get()).size).toBe(0);
+    await subjectReview.getByText('Voir les matières — SIL', { exact: true }).click();
+    for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true); }
+    await subjectReview.getByRole('button', { name: 'APPLIQUER LES CORRESPONDANCES SÛRES — SIL', exact: true }).click();
+    let subjectDialog = page.getByRole('dialog', { name: 'Confirmer les matières — SIL', exact: true });
+    await expect(subjectDialog.locator('li')).toHaveCount(2);
+    await subjectDialog.getByRole('button', { name: 'Annuler', exact: true }).click();
+    expect((await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get()).size).toBe(0);
+    await subjectReview.getByRole('button', { name: 'APPLIQUER LES CORRESPONDANCES SÛRES — SIL', exact: true }).click();
+    subjectDialog = page.getByRole('dialog', { name: 'Confirmer les matières — SIL', exact: true });
+    await subjectDialog.getByRole('button', { name: 'CONFIRMER LES CORRESPONDANCES SÛRES', exact: true }).click();
+    await expect(subjectReview.getByText('État : PROPOSÉ — non adopté, non publié', { exact: true })).toBeVisible();
+    const subjectMappings = await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get();
+    expect(subjectMappings.size).toBe(1);
+    expect(subjectMappings.docs[0].data().links).toHaveLength(2);
+    expect(subjectMappings.docs[0].data().status).toBe('proposed');
+    expect(subjectMappings.docs[0].data().adoptionChanged).toBe(false);
+    expect((await db.collection('schoolCurriculumAdoptions').where('schoolId', '==', prefix).get()).size).toBe(0);
+    expect((await db.collection('audit_logs').where('schoolId', '==', prefix).get()).docs.filter(d => d.data().action === 'CURRICULUM_SAFE_SUBJECT_MAPPINGS_PROPOSED')).toHaveLength(1);
     await review.getByLabel('Choix — D27', { exact: true }).selectOption('REQUEST_CHANGE');
     await review.getByLabel('Note — D27', { exact: true }).fill('SYNTHETIC: official source required. No real decision.');
     await review.getByRole('button', { name: 'Enregistrer la décision — D27', exact: true }).click();
@@ -84,14 +106,15 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     // Same synthetic identity loses approval controls immediately after role reload.
     await db.doc('users/' + ownerId).update({ role: 'secretary' });
     await auth.setCustomUserClaims(ownerId, { role: 'secretary', schoolId: prefix });
-    await page.reload(); await expect(review.getByText(/Consultation seule/)).toBeVisible();
+    await page.reload(); await expect(review.getByText('Consultation seule : les décisions sont réservées à la propriétaire (owner).', { exact: true })).toBeVisible();
+    await expect(review.getByRole('button', { name: /APPLIQUER LES CORRESPONDANCES SÛRES/ })).toHaveCount(0);
     await expect(review.getByRole('checkbox')).toHaveCount(0); await expect(review.getByRole('combobox')).toHaveCount(0);
     console.log('CURRICULUM_REVIEW_LIVE PASS: 34/12/22, six groups, no preselection, individual/group decisions, audit, versions, foreign tenant exclusion, secretary read-only, responsive 360/768/1440. OPENAI CALLS: 0');
   } catch (error) {
     console.log('CURRICULUM_REVIEW_FAILED_PHASE=' + phase);
     throw error;
   } finally {
-    for (const name of ['curriculumProposalReviews', 'curriculumReviewRequests', 'audit_logs']) for (const d of (await db.collection(name).where('schoolId', '==', prefix).get()).docs) {
+    for (const name of ['curriculumSubjectMappings', 'curriculumProposalReviews', 'curriculumReviewRequests', 'audit_logs']) for (const d of (await db.collection(name).where('schoolId', '==', prefix).get()).docs) {
       if (name === 'curriculumProposalReviews') for (const h of (await d.ref.collection('history').get()).docs) paths.push(h.ref.path);
       paths.push(d.ref.path);
     }

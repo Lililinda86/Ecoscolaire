@@ -17,6 +17,7 @@ const readTs = path => {
   return mod.exports;
 };
 const { minedubDocuments, structuredReviewExcerpts } = readTs('../src/features/pedagogy/resources/minedubVerified.ts');
+const { additionalVerifiedUnits } = readTs('../src/features/pedagogy/resources/additionalVerifiedUnits.ts');
 const { minedubSubjectIndex } = readTs('../src/features/pedagogy/resources/minedubSubjectIndex.ts');
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const sourceUrl = doc => 'https://www.minedub.cm/download/350/archives/' + doc.download;
@@ -35,14 +36,15 @@ for (const doc of refs) {
 // Source columns with an unambiguous existing primary catalog level.
 // Nursery year mapping remains a human decision, so no school-level unit is forged.
 const primaryLevels = { SIL: 'fr-primary-sil', CP: 'fr-primary-cp', CE1: 'fr-primary-ce1', CE2: 'fr-primary-ce2', CM1: 'fr-primary-cm1', CM2: 'fr-primary-cm2', 'Class 1': 'en-primary-1', 'Class 2': 'en-primary-2', 'Class 3': 'en-primary-3', 'Class 4': 'en-primary-4', 'Class 5': 'en-primary-5', 'Class 6': 'en-primary-6' };
-for (const [excerptId, level] of structuredReviewExcerpts.filter(row => primaryLevels[row.level]).map(row => [row.id, primaryLevels[row.level]])) {
-  const excerpt = structuredReviewExcerpts.find(row => row.id === excerptId);
+for (const [excerptId, level] of [...structuredReviewExcerpts, ...additionalVerifiedUnits].filter(row => primaryLevels[row.level]).map(row => [row.id, primaryLevels[row.level]])) {
+  const excerpt = [...structuredReviewExcerpts, ...additionalVerifiedUnits].find(row => row.id === excerptId);
   const doc = refs.find(row => row.id === excerpt.documentId);
   const id = excerpt.id + '-review-2018-v1';
-  expected.push({ path: 'curriculumUnits/' + id, data: { id, programId: doc.id + '-review-2018-v1', catalogLevelId: level, subjectId: 'mathematics', subjectName: excerpt.subject,
+  expected.push({ path: 'curriculumUnits/' + id, data: { id, programId: doc.id + '-review-2018-v1', catalogLevelId: level, subjectId: additionalVerifiedUnits.includes(excerpt) ? 'science-and-technology' : 'mathematics', subjectName: excerpt.subject,
     title: excerpt.officialUnit || (excerpt.id === 'primary-en-sharing' ? 'Partage — extrait localisé' : excerpt.domain + ' — extrait localisé'), domain: excerpt.domain, objective: excerpt.objectiveParaphrase, competency: excerpt.competencyParaphrase,
     sequence: 1, status: 'published', sourceType: 'official', sourceUrl: sourceUrl(doc), sourceLocator: 'PDF ' + excerpt.sourcePdfPage + ' — ' + excerpt.sourceLocator,
     verificationStatus: excerpt.status, coverage: 'PARTIAL', sourceChecksum: doc.sha,
+    ...(additionalVerifiedUnits.includes(excerpt) ? { sourceDocumentId: doc.id, sourcePage: excerpt.sourcePdfPage, sourcePrintedPage: excerpt.sourcePrintedPage, theme: excerpt.officialUnit, officialLesson: excerpt.officialLesson, sequence: 2 } : {}),
   } });
 }
 const encode = value => value === null ? { nullValue: null } : typeof value === 'string' ? { stringValue: value } : typeof value === 'boolean' ? { booleanValue: value } : typeof value === 'number' ? { integerValue: String(value) } : Array.isArray(value) ? { arrayValue: { values: value.map(encode) } } : { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, encode(item)])) } };
