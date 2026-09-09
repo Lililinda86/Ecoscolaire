@@ -181,6 +181,20 @@ try {
   await owner.getByTestId('report-card-period').selectOption(periodId);
   await expect(owner.getByTestId('report-card-period')).toHaveValue(periodId);
   pass('CLOSED PERIOD BLOCKS NEW GRADING / REMAINS AVAILABLE FOR REPORT CARDS');
+  await owner.goto(`${origin}/#/pedagogy/planning`);
+  await owner.getByRole('button',{name:'Initialiser les semaines',exact:true}).click();
+  await expect(owner.getByText('Semaines prêtes.',{exact:true})).toBeVisible({timeout:30000});
+  const weeks=await db.collection('teachingWeeks').where('schoolId','==',schoolId).get();
+  assert.ok(weeks.size>0);
+  for(const item of weeks.docs) {
+    assert.equal(item.data().academicYearId,yearId);
+    assert.ok(item.data().weekStartDate>='2026-08-25' && item.data().weekStartDate<='2027-07-05');
+  }
+  assert.ok(weeks.docs.some(item=>item.data().periodId===periodId));
+  await owner.getByRole('button',{name:'Initialiser les semaines',exact:true}).click();
+  await expect.poll(async()=> (await db.collection('teachingWeeks').where('schoolId','==',schoolId).get()).size).toBe(weeks.size);
+  pass('PEDAGOGY WEEKS USE YEAR BOUNDS AND PERIOD IDS / NO DUPLICATES');
+
 
   await denied(call('manageAcademicPeriod',{action:'OPEN',schoolId,academicYearId:yearId,periodId}));
   const director=await login('director'); await nav(director,'Établissement');
@@ -188,7 +202,7 @@ try {
   await expect(director.locator('input[name=new-admin-pin]')).toHaveCount(0);
   await nav(director,'Finances & tarifs');
   for (const [key,label] of [['T1','1re'],['T2','2e'],['T3','3e']]) await expect(director.getByLabel(`Échéance ${label} tranche`,{exact:true})).toHaveValue((await db.collection('academicYears').doc(yearId).get()).data().tuitionPaymentDeadlines[key]);
-  await director.getByRole('button',{name:'Créer un nouveau frais',exact:true}).click();
+  await director.getByText('Créer un nouveau frais',{exact:true}).click();
   await director.getByLabel('Type de frais').selectOption('exam');
   await director.getByLabel('Libellé précis du frais',{exact:true}).fill('UX-VALIDATION-FEE');
   await director.getByLabel('Montant (FCFA)',{exact:true}).fill('4321');
@@ -222,7 +236,7 @@ try {
   assert.equal(line.grossExpectedAmount,4321); assert.equal(line.netExpectedAmount,4321); assert.equal(line.previousPaid,0); assert.equal(line.remainingBalance,4321);
   for(const id of Object.values(students).filter(id=>id!==studentId)) assert.equal((await account(id)).lines.some(l=>l.feeId===fee.id),false);
   const secretary=await login('secretary');
-  await expect(secretary.getByRole('button',{name:'Créer un nouveau frais',exact:true})).toHaveCount(0);
+  await expect(secretary.getByText('Créer un nouveau frais',{exact:true})).toHaveCount(0);
   await secretary.goto(`${origin}/#/payments`); await secretary.getByTestId('open-cash-payment').click();
   await secretary.getByTestId('cash-payment-student').selectOption(studentId);
   const amount=secretary.getByLabel('Montant reçu pour UX-VALIDATION-FEE',{exact:true});
@@ -246,7 +260,7 @@ try {
   if (browser) await browser.close();
   const collections = ['studentFinancialObligations', 'studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
     'paymentAllocations', 'transportPaymentAllocations', 'audit_logs', 'cashLedgerDays', 'cashClosures', 'studentPrivate', 'studentFinance',
-    'studentParentPrivate', 'studentParentFinance', 'students', 'classes', 'periods', 'academicYears'];
+    'studentParentPrivate', 'studentParentFinance', 'students', 'classes', 'periods', 'teachingWeeks', 'academicYears'];
   // Allow fixture-only async projections to finish, then remove only this run's school data.
   await pause(5000);
   for (let attempt = 0; attempt < 2; attempt++) {
