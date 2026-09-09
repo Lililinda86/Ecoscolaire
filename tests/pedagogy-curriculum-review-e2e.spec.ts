@@ -51,6 +51,14 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     phase = 'individual'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     const subjectReview = review.getByRole('region', { name: 'Matières proposées — SIL', exact: true });
     await expect(subjectReview.getByText(/10 matières\/domaines officiels identifiés/)).toBeVisible();
+    await expect(review.getByRole('heading', { name: 'MATIÈRES PROPOSÉES POUR ITALO', exact: true })).toHaveCount(12);
+    for (const name of ['CE1', 'Class 3']) {
+      const primary = review.getByRole('region', { name: 'Matières proposées — ' + name, exact: true });
+      await expect(primary.getByText(/10 matières\/domaines officiels identifiés/)).toBeVisible();
+      await primary.getByText('Voir les matières — ' + name, { exact: true }).click();
+      await expect(primary.getByText('Unités structurées disponibles — couverture partielle', { exact: true })).toBeVisible();
+      await primary.getByText('Voir les matières — ' + name, { exact: true }).click();
+    }
     expect((await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get()).size).toBe(0);
     await subjectReview.getByText('Voir les matières — SIL', { exact: true }).click();
     for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true); }
@@ -70,6 +78,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     expect(subjectMappings.docs[0].data().adoptionChanged).toBe(false);
     expect((await db.collection('schoolCurriculumAdoptions').where('schoolId', '==', prefix).get()).size).toBe(0);
     expect((await db.collection('audit_logs').where('schoolId', '==', prefix).get()).docs.filter(d => d.data().action === 'CURRICULUM_SAFE_SUBJECT_MAPPINGS_PROPOSED')).toHaveLength(1);
+    console.log('SUBJECT_MAPPING_LIVE PASS: twelve primary proposals, CE1/Class3 sources and units, safe-only confirmed owner write, cancellation, audit, no adoption, responsive 360/768/1440.');
     await review.getByLabel('Choix — D27', { exact: true }).selectOption('REQUEST_CHANGE');
     await review.getByLabel('Note — D27', { exact: true }).fill('SYNTHETIC: official source required. No real decision.');
     await review.getByRole('button', { name: 'Enregistrer la décision — D27', exact: true }).click();

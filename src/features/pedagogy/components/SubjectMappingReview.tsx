@@ -5,6 +5,7 @@ import { useScopedResource } from '../hooks/useScopedResource';
 import type { SubjectMatch, proposeDocumentaryProgression } from '../services/subjectMapping';
 import type { StructuredReviewExcerpt } from '../resources/minedubVerified';
 import { minedubSubjectIndex } from '../resources/minedubSubjectIndex';
+import { minedubDocuments } from '../resources/minedubVerified';
 
 interface Row {
   classId: string; className: string; catalogLevelId: string; mappings: SubjectMatch[]; safeCount: number;
@@ -33,7 +34,8 @@ export function OtherSubjectReferences({ classId, levelId }: { classId: string; 
   const nursery = /preschool|nursery/.test(levelId);
   if (nursery) {
     const source = minedubSubjectIndex.find(s => s.documentId === (levelId.startsWith('fr-') ? 'minedub-fr-nursery' : 'minedub-en-nursery'))!;
-    return <details><summary>Domaines MINEDUB — repères pour un programme local</summary><p>Domaines disponibles, sans établir une équivalence officielle de ce niveau ITALO. Les propositions conditionnelles et ITALO_EARLY_YEARS_PROGRAM restent inchangés.</p><ul>{source.names.map(name => <li key={name}>{name}</li>)}</ul><p>Source : {source.documentId}, sommaire PDF {source.pdfPages.join(', ')}. Aucune application automatique.</p></details>;
+    const document = minedubDocuments.find(d => d.id === source.documentId)!;
+    return <details><summary>Domaines MINEDUB — repères pour un programme local</summary><p>Domaines disponibles, sans établir une équivalence officielle de ce niveau ITALO. Les propositions conditionnelles et ITALO_EARLY_YEARS_PROGRAM restent inchangés.</p><ul>{source.names.map(name => <li key={name}>{name}</li>)}</ul><p>Source : <a href={'https://www.minedub.cm/download/350/archives/' + document.download} target="_blank" rel="noopener noreferrer">{document.title}</a>, sommaire PDF {source.pdfPages.join(', ')}. Aucune application automatique.</p></details>;
   }
   if (scope.loading) return <p>Chargement des correspondances disciplinaires partielles…</p>;
   if (scope.error) return <p>{scope.error}</p>;
