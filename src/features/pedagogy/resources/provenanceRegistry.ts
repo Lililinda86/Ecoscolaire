@@ -24,6 +24,16 @@ const metadata: Omit<ProvenanceRecord, 'id' | 'authority' | 'issuingOrganization
 };
 /** Hierarchy is authority scope, not a claim that any corpus has been authenticated. */
 export const provenanceRegistry: ProvenanceRecord[] = [
+  { ...metadata, id: 'minesec-seconde-english-2018-pending', authority: 'MINESEC', issuingOrganization: 'Ministère des Enseignements Secondaires — Inspection générale des enseignements', hostingOrganization: 'MINESEC', sourceType: 'curriculum',
+    title: 'English to Francophones — Seconde, 2018', officialUrl: 'https://files.minesec.gov.cm/direct/view.php?/ANGLAIS_SYLLABUS_2DE_edited.pdf=&s=4s', retrievalUrl: 'https://files.minesec.gov.cm/direct/view.php?/ANGLAIS_SYLLABUS_2DE_edited.pdf=&s=4s',
+    edition: '2018', language: 'en', section: 'francophone', levels: ['Seconde'], subjects: ['Anglais'], retrievedAt: '2026-09-09', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    verificationMethod: 'PDF de 33 pages consulté via le chemin institutionnel direct ; couverture p.1 et tableau des séries p.8. Téléchargement local expiré : empreinte non calculée.',
+    missingReason: 'Document consultable mais arrêté p.2 non numéroté/non daté ; version actuellement applicable et checksum à confirmer. Page 8 distingue série A et C/D : ne pas attribuer un volume unique sans connaître la série. Aucune adoption ni republication.' },
+  { ...metadata, id: 'gce-board-examinations', authority: 'OTHER', issuingOrganization: 'Cameroon GCE Board', hostingOrganization: 'Cameroon GCE Board', sourceType: 'exam',
+    title: 'GCE Board — règlements, syllabus et accès aux annales', officialUrl: 'https://camgceb.org/examinations/', retrievalUrl: 'https://camgceb.org/examinations/', retrievedAt: '2026-09-09',
+    status: 'LINK_ONLY', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    verificationMethod: 'Page de l’organisme d’examens consultée ; modalités de mise à disposition des règlements, syllabus et annales.',
+    missingReason: 'Le Board indique une distribution des syllabus aux centres reconnus et la vente d’annales via ses bureaux. Aucun achat ni copie effectué. Les listes de matières d’examen ne valent pas curriculum pour chaque année.' },
   { ...metadata, id: 'minesec-vod', authority: 'MINESEC', issuingOrganization: 'Ministère des Enseignements Secondaires', hostingOrganization: 'MINESEC / CAMTEL',
     title: 'MINESEC — ressources de télé-enseignement', officialUrl: 'https://vod.minesec.gov.cm/', retrievalUrl: 'https://vod.minesec.gov.cm/',
     retrievedAt: '2026-09-09', verificationMethod: 'Page consultée sur le sous-domaine ministériel ; rubrique Télé-Enseignement / Distance Education et mention MINESEC / CAMTEL.',

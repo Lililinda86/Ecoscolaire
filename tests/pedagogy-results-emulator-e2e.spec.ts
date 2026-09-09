@@ -24,6 +24,27 @@ test('Lot D: secretary transfers subject assessments and records received canoni
     await auth.createUser({ uid: f.secretaryId, email, password }); createdAuth = true;
     await auth.setCustomUserClaims(f.secretaryId, { role: 'secretary', schoolId: f.schoolId });
     await loginAs(page, email, password);
+    await test.step('Five isolated review examples and responsive resources', async () => {
+      await page.goto('/#/pedagogy/resources');
+      await expect(page.getByRole('heading', { name: 'Cinq parcours de revue synthétiques' })).toBeVisible();
+      const review = page.getByRole('region', { name: 'Laboratoire synthétique de revue' });
+      for (const id of ['original-nursery-fr-v1', 'original-primary-fr-v1', 'original-primary-en-v1', 'original-secondary-fr-v1', 'original-secondary-en-v1']) {
+        await review.getByLabel('Parcours synthétique').selectOption(id);
+        await expect(review.getByText('Étape 1 / 9', { exact: true })).toBeVisible();
+        for (let step = 1; step < 9; step++) await review.getByRole('button', { name: 'Étape suivante (simulation)' }).click();
+        await expect(review.getByRole('heading', { name: 'Remédiation — simulation' })).toBeVisible();
+        await review.getByRole('button', { name: 'Réinitialiser la simulation' }).click();
+      }
+      for (const width of [360, 768, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+      }
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.goto('/#/pedagogy/program');
+      await page.getByLabel('Classe à consulter').selectOption(f.classId);
+      await expect(page.getByRole('heading', { name: 'Matières documentées' })).toBeVisible();
+      await expect(page.getByText('Mathématiques', { exact: true })).toBeVisible();
+    }, { timeout: 60000 });
     await page.goto('/#/pedagogy/results');
     await expect(page.getByRole('heading', { name: 'Résultats et suivi' })).toBeVisible();
     await expect(page.getByText('Synthetic weekly assessment · version 1, correction 0')).toBeVisible();

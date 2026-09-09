@@ -28,6 +28,7 @@ const examples: Record<string, { assessment: string; correction: string; remedia
     remediation: 'For an evidenced difficulty, use small constant multipliers and explicit calculations with teacher agreement. Record a new observation; never infer progress from completion alone.',
   },
 };
+export const syntheticReviewCases = ids.map(id => ({ template: originalTemplates.find(item => item.id === id)!, ...examples[id] }));
 export function pedagogicalReviewPackText(): string {
   return ['# PEDAGOGICAL_REVIEW_PACK',
     'STATUS: DRAFT — HUMAN APPROVAL NOT PERFORMED',
