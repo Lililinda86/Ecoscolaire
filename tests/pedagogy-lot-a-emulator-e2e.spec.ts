@@ -405,7 +405,7 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
         .getByRole("link", { name: "Planification", exact: true })
         .click();
       await expect(
-        page.getByText(/Progression planifiée uniquement/),
+        page.getByText('Programme de référence ≠ planification Ecoscolaire.', { exact: true }),
       ).toBeVisible();
       await expect(page.getByText(/^Progression réalisée$/)).toHaveCount(0);
       await page.getByLabel("Classe").selectOption(fixture.classId);

@@ -1,5 +1,5 @@
 import { minedubDocuments } from './minedubVerified';
-export type ProvenanceStatus = 'OFFICIAL_VERIFIED' | 'OFFICIAL_PENDING_VERIFICATION' | 'COMPLEMENTARY_VERIFIED' | 'EXTERNAL_LINK_ONLY' | 'ITALO_INTERNAL' | 'MOCK' | 'REJECTED';
+export type ProvenanceStatus = 'OFFICIAL_VERIFIED' | 'OFFICIAL_PENDING_VERIFICATION' | 'COMPLEMENTARY_VERIFIED' | 'LINK_ONLY' | 'EXTERNAL_LINK_ONLY' | 'ITALO_INTERNAL' | 'MOCK' | 'REJECTED';
 export interface ProvenanceRecord {
   id: string; authority: 'MINEDUB' | 'MINESEC' | 'MINESUP' | 'CEDUC' | 'ITALO' | 'OTHER';
   issuingOrganization: string | null; hostingOrganization: string | null;
@@ -24,6 +24,27 @@ const metadata: Omit<ProvenanceRecord, 'id' | 'authority' | 'issuingOrganization
 };
 /** Hierarchy is authority scope, not a claim that any corpus has been authenticated. */
 export const provenanceRegistry: ProvenanceRecord[] = [
+  { ...metadata, id: 'minesec-seconde-english-2018-pending', authority: 'MINESEC', issuingOrganization: 'Ministère des Enseignements Secondaires — Inspection générale des enseignements', hostingOrganization: 'MINESEC', sourceType: 'curriculum',
+    title: 'English to Francophones — Seconde, 2018', officialUrl: 'https://files.minesec.gov.cm/direct/view.php?/ANGLAIS_SYLLABUS_2DE_edited.pdf=&s=4s', retrievalUrl: 'https://files.minesec.gov.cm/direct/view.php?/ANGLAIS_SYLLABUS_2DE_edited.pdf=&s=4s',
+    edition: '2018', language: 'en', section: 'francophone', levels: ['Seconde'], subjects: ['Anglais'], retrievedAt: '2026-09-09', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    verificationMethod: 'PDF de 33 pages consulté via le chemin institutionnel direct ; couverture p.1 et tableau des séries p.8. Téléchargement local expiré : empreinte non calculée.',
+    missingReason: 'Document consultable mais arrêté p.2 non numéroté/non daté ; version actuellement applicable et checksum à confirmer. Page 8 distingue série A et C/D : ne pas attribuer un volume unique sans connaître la série. Aucune adoption ni republication.' },
+  { ...metadata, id: 'gce-board-examinations', authority: 'OTHER', issuingOrganization: 'Cameroon GCE Board', hostingOrganization: 'Cameroon GCE Board', sourceType: 'exam',
+    title: 'GCE Board — règlements, syllabus et accès aux annales', officialUrl: 'https://camgceb.org/examinations/', retrievalUrl: 'https://camgceb.org/examinations/', retrievedAt: '2026-09-09',
+    status: 'LINK_ONLY', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    verificationMethod: 'Page de l’organisme d’examens consultée ; modalités de mise à disposition des règlements, syllabus et annales.',
+    missingReason: 'Le Board indique une distribution des syllabus aux centres reconnus et la vente d’annales via ses bureaux. Aucun achat ni copie effectué. Les listes de matières d’examen ne valent pas curriculum pour chaque année.' },
+  { ...metadata, id: 'minesec-vod', authority: 'MINESEC', issuingOrganization: 'Ministère des Enseignements Secondaires', hostingOrganization: 'MINESEC / CAMTEL',
+    title: 'MINESEC — ressources de télé-enseignement', officialUrl: 'https://vod.minesec.gov.cm/', retrievalUrl: 'https://vod.minesec.gov.cm/',
+    retrievedAt: '2026-09-09', verificationMethod: 'Page consultée sur le sous-domaine ministériel ; rubrique Télé-Enseignement / Distance Education et mention MINESEC / CAMTEL.',
+    status: 'LINK_ONLY', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    missingReason: 'Portail de ressources, pas un curriculum ni une preuve de couverture. Aucun média copié. Niveau, date, applicabilité et droits de chaque ressource à vérifier avant usage.' },
+  { ...metadata, id: 'minesec-distance-form-one-maths-candidate', authority: 'MINESEC', issuingOrganization: null, hostingOrganization: 'schoolfaqs.net',
+    title: 'Enseignement à distance — Mathematics, Form One (rattachement institutionnel à confirmer)', officialUrl: null,
+    retrievalUrl: 'https://minesec.schoolfaqs.net/learn/mathematics/form-one', language: 'en', levels: ['Form One'], subjects: ['Mathematics'],
+    retrievedAt: '2026-09-09', verificationMethod: 'Page publique consultée ; intitulés de modules présents, leçons affichées à zéro. Le logo ne constitue pas une authentification.',
+    status: 'LINK_ONLY', accessStatus: 'AVAILABLE', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    missingReason: 'Hébergement tiers : lien institutionnel canonique, édition et droits non confirmés. Ne pas adopter ni importer comme programme officiel. Aucun contenu de cours copié.' },
   ...minedubDocuments.map((document): ProvenanceRecord => ({ ...metadata,
     id: document.id, authority: 'MINEDUB', issuingOrganization: 'Ministère de l’Éducation de Base', hostingOrganization: 'MINEDUB', sourceType: 'curriculum',
     title: document.title, officialUrl: 'https://www.minedub.cm/wp-file-download-search/',
@@ -48,8 +69,8 @@ export const provenanceRegistry: ProvenanceRecord[] = [
     accessStatus: 'AVAILABLE', applicability: 'NOT_APPLICABLE', status: 'EXTERNAL_LINK_ONLY', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
     missingReason: 'Page des missions consultée le 8 septembre 2026. Aucune pertinence curriculaire directe établie pour les classes ITALO visées. Pas de veille ni d’import MINESUP activé.' },
   { ...metadata, id: 'ceduc-pending', authority: 'CEDUC', issuingOrganization: null, hostingOrganization: null,
-    title: 'CEDUC — bibliothèque complémentaire à identifier', officialUrl: null, retrievalUrl: null, status: 'EXTERNAL_LINK_ONLY',
-    missingReason: 'Identité canonique, organisme, catalogue, droits de consultation/indexation/stockage et API non établis. Aucun abonnement, API ou accès inventé. Ne bloque pas le fonds principal.' },
+    title: 'CEDUC — candidat Communauté Éducative Camerounaise', officialUrl: null, retrievalUrl: 'https://www.linkedin.com/company/ceduc-cm', status: 'LINK_ONLY', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',
+    missingReason: 'Une présentation publique CEDUC.CM décrit la Communauté Éducative Camerounaise et le partage de cours/épreuves. Identité juridique, URL canonique active et droits document par document restent non confirmés. La mention de ressources libres ne vaut pas licence globale. Aucune indexation de contenu, copie ou connexion payante. Ne bloque pas le fonds principal.' },
   { ...metadata, id: 'ebase-links', authority: 'OTHER', issuingOrganization: null, hostingOrganization: 'eBASE',
     title: 'eBASE — copies de curricula primaires, liens seulement', officialUrl: null,
     retrievalUrl: 'https://ebaselearning.org/resources/curriculum-policy-documents', status: 'EXTERNAL_LINK_ONLY', rightsStatus: 'LINK_ONLY', storagePolicy: 'LINK_ONLY',

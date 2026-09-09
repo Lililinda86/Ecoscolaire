@@ -5,6 +5,9 @@ import { adoptCurriculumProgram } from '../services/pedagogyService';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 import { curriculumProvenanceLabel, curriculumProvenanceLink } from '../services/curriculumProvenance';
 import { CurriculumCoverage } from '../components/CurriculumCoverage';
+import { CurriculumUnitDetails } from '../components/CurriculumUnitDetails';
+import { ClassReferenceBrowser } from '../components/ClassReferenceBrowser';
+import { CurriculumReviewHistory } from '../components/CurriculumReviewHistory';
 
 export default function PedagogyProgram() {
   const { db, currentSchool } = useAppContext();
@@ -25,39 +28,56 @@ function ProgramScope({ yearId }: { yearId?: string }) {
   const [decisionDate, setDecisionDate] = useState('');
   const [decisionReference, setDecisionReference] = useState('');
   const [received, setReceived] = useState(false);
+  const [reviewOutcome, setReviewOutcome] = useState<'' | 'approve' | 'request_correction' | 'not_applicable'>('');
+  const [reviewVersion, setReviewVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const readOnly = currentUser?.role === 'boardViewer';
   const selectedProgram = workspace.programs.find(program => program.id === programId);
   const adopt = async () => {
-    if (!currentSchool?.id || !year?.id || !levels.includes(levelId) || !selectedProgram || busy || uncertain || !received || readOnly) return;
+    if (!currentSchool?.id || !year?.id || !levels.includes(levelId) || !selectedProgram || busy || uncertain || !received || !reviewOutcome || readOnly) return;
     setBusy(true);
     setMessage('Enregistrement…');
     try {
       await adoptCurriculumProgram({ schoolId: currentSchool.id, academicYearId: year.id, catalogLevelId: levelId, curriculumProgramId: programId,
         expectedRevision: workspace.adoptions.find(item => item.catalogLevelId === levelId)?.revision || 0,
-        expectedProgramVersion: selectedProgram.version, declarationReceived: received, decisionBy, decisionDate, decisionReference });
-      setReceived(false); await workspace.refresh(); setMessage('Décision reçue enregistrée. Cette adoption ne certifie pas la source documentaire.');
+        expectedProgramVersion: selectedProgram.version, declarationReceived: received, decisionBy, decisionDate, decisionReference, reviewOutcome });
+      setReceived(false); setReviewVersion(value => value + 1); await workspace.refresh(); setMessage(reviewOutcome === 'approve' ? 'Décision reçue enregistrée. Cette adoption ne certifie pas la source documentaire.' : 'Décision reçue enregistrée. Aucune adoption créée ou modifiée.');
     } catch (error) { setUncertain(true); setMessage((error instanceof Error ? error.message : 'Adoption impossible.') + ' Rechargez et vérifiez l’état avant toute nouvelle saisie.'); }
     finally { setBusy(false); }
   };
   return <main className="pedagogy-page">
     <PedagogyHeader title="Programme de référence" description="Consignez la décision reçue pour une version du catalogue. Publication et adoption ne prouvent pas son authenticité." />
     <PedagogyNav />
+    <ClassReferenceBrowser key={currentSchool?.id} />
     <CurriculumCoverage yearId={yearId} programs={workspace.programs} adoptions={workspace.adoptions} unavailable={workspace.loading || Boolean(workspace.error)} />
     {workspace.error && <div className="pedagogy-alert pedagogy-alert--error">{workspace.error}</div>}
     <section className="pedagogy-grid">
       <article className="pedagogy-card">
         <h2>Adoption par niveau</h2><p>Année : <strong>{year?.name || 'non configurée'}</strong></p>
         <fieldset disabled={readOnly || busy || uncertain || workspace.loading || Boolean(workspace.error)}>
-        <label>Niveau<select value={levelId} onChange={event => { setLevelId(event.target.value); setReceived(false); }}><option value="">Choisir…</option>{levels.map(level => <option key={level}>{level}</option>)}</select></label>
-        <label>Programme<select value={programId} onChange={event => { setProgramId(event.target.value); setReceived(false); }}><option value="">Choisir…</option>{workspace.programs.map(program => <option key={program.id} value={program.id}>{program.title} · {program.version}</option>)}</select></label>
+        <label>Niveau<select value={levelId} onChange={event => { setLevelId(event.target.value); setReceived(false); setReviewOutcome(''); }}><option value="">Choisir…</option>{levels.map(level => <option key={level}>{level}</option>)}</select></label>
+        <label>Programme<select value={programId} onChange={event => { setProgramId(event.target.value); setReceived(false); setReviewOutcome(''); }}><option value="">Choisir…</option>{workspace.programs.map(program => <option key={program.id} value={program.id}>{program.title} · {program.version}</option>)}</select></label>
+        {selectedProgram && <section aria-label="Programme à examiner" className="pedagogy-card">
+          <h3>{selectedProgram.title}</h3>
+          <p>Version : {selectedProgram.version}. Nature : {curriculumProvenanceLabel(selectedProgram.sourceType)}.</p>
+          <p>Autorité : {selectedProgram.authority || 'non renseignée'}. Couverture : {selectedProgram.coverage || 'non établie'}. Applicabilité : {selectedProgram.applicability || 'à vérifier'}.</p>
+          {selectedProgram.subjectNames?.length ? <details open><summary>Matières/domaines de cette référence</summary><ul>{selectedProgram.subjectNames.map(name => <li key={name}>{name}</li>)}</ul><p>Sommaire : pages PDF {selectedProgram.sourcePdfPages?.join(', ') || 'non renseignées'}. Liste documentaire, pas une affectation locale ou un volume horaire.</p></details> : <p>Matières/domaines du programme : non renseignés.</p>}
+          {selectedProgram.provenance?.note && <p>{selectedProgram.provenance.note}</p>}
+          <p>Classes concernées par le niveau sélectionné : {(db?.classes || []).filter(item => item.schoolId === currentSchool?.id && item.isActive !== false && Boolean(levelId) && item.catalogLevelId === levelId).map(item => item.name).join(', ') || 'Choisir un niveau configuré.'}</p>
+          <p>Pourquoi cette proposition ? Sélection manuelle dans le catalogue ; aucune correspondance automatique certifiée. Vérifiez les matières, la version et l’applicabilité avant de transmettre une décision.</p>
+          <p>Éléments restant à vérifier : couverture des matières/domaines, authenticité documentaire, édition applicable et droits. Un programme de démonstration n’est pas un programme officiel.</p>
+          {curriculumProvenanceLink(selectedProgram.provenance?.sourceUrl) ? <a href={curriculumProvenanceLink(selectedProgram.provenance?.sourceUrl)!} target="_blank" rel="noopener noreferrer">Consulter la source du programme</a> : <p>Source documentaire non renseignée.</p>}
+        </section>}
         <label>Auteur de la décision reçue<input value={decisionBy} maxLength={150} onChange={event => { setDecisionBy(event.target.value); setReceived(false); }} /></label>
+        {selectedProgram && levelId && currentSchool && <CurriculumUnitDetails schoolId={currentSchool.id} programId={selectedProgram.id} levelId={levelId} />}
+        <label>Type de décision reçue<select value={reviewOutcome} onChange={event => { setReviewOutcome(event.target.value as typeof reviewOutcome); setReceived(false); }}><option value="">Choisir la décision reçue…</option><option value="approve">APPROUVER</option><option value="request_correction">DEMANDER CORRECTION</option><option value="not_applicable">NON APPLICABLE</option></select></label>
         <label>Date de la décision<input type="date" value={decisionDate} onChange={event => { setDecisionDate(event.target.value); setReceived(false); }} /></label>
         <label>Référence ou note de transmission<textarea value={decisionReference} maxLength={1000} onChange={event => { setDecisionReference(event.target.value); setReceived(false); }} /></label>
         <label><input type="checkbox" checked={received} onChange={event => setReceived(event.target.checked)} />Je confirme avoir reçu cette décision pour ce niveau et cette version.</label>
-        <button className="pedagogy-button" disabled={!year || !levels.includes(levelId) || !selectedProgram || !received || !decisionBy.trim() || !decisionDate || !decisionReference.trim()} onClick={() => void adopt()}>Enregistrer la décision d’adoption</button>
+        <button className="pedagogy-button" disabled={!year || !levels.includes(levelId) || !selectedProgram || !reviewOutcome || !received || !decisionBy.trim() || !decisionDate || !decisionReference.trim()} onClick={() => void adopt()}>{reviewOutcome === 'request_correction' ? 'Enregistrer la demande de correction' : reviewOutcome === 'not_applicable' ? 'Enregistrer la non-applicabilité' : 'Enregistrer la décision d’adoption'}</button>
         </fieldset>
+        {currentSchool && year && levelId && <CurriculumReviewHistory key={JSON.stringify([currentSchool.id, year.id, levelId, reviewVersion])} schoolId={currentSchool.id} yearId={year.id} levelId={levelId} />}
         {uncertain && <button className="pedagogy-button" onClick={() => window.location.reload()}>Recharger et vérifier l’état</button>}
         {readOnly && <small>Consultation seule pour le Conseil.</small>}{message && <p>{message}</p>}
       </article>

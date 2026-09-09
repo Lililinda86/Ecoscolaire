@@ -397,16 +397,7 @@ const FullSettings: React.FC = () => {
   };
 
   const handleNewAcademicYear = () => {
-    if(window.confirm("NOUVELLE ANNÉE : Voulez-vous réinitialiser les données pédagogiques courantes ? Les écritures financières publiées resteront conservées et immuables.")) {
-      safeMergeDB({
-        ...db,
-        grades: [],
-        attendance: [],
-        staffAttendance: []
-        // Retains all financial ledgers, students, classes, staff and inventory.
-      });
-      alert("L'application a été rafraîchie avec succès pour entamer la nouvelle année scolaire !");
-    }
+    navigate('/academic-periods');
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -821,10 +812,10 @@ const FullSettings: React.FC = () => {
         <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '2rem' }}>
           
           <div style={{ flex: 1 }}>
-            <h3 style={{ color: 'var(--primary-color)', margin: '0 0 1rem 0' }}>Rafraîchir (Nouvelle Année)</h3>
+            <h3 style={{ color: 'var(--primary-color)', margin: '0 0 1rem 0' }}>Année académique — gestion et historique</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>Réinitialise les données pédagogiques courantes et <strong>conserve les paiements, reçus, élèves et classes</strong>.</p>
             <button onClick={handleNewAcademicYear} style={{ background: 'var(--primary-color)' }}>
-              Passer à la Nouvelle Année
+              Gérer les années et périodes
             </button>
           </div>
 
