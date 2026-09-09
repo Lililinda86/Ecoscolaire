@@ -12,6 +12,8 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
   const emulator = projectId === 'demo-ecoscolaire' && Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
   if (!(staging && projectId === 'ecoscolaire-staging') && !emulator) throw new Error('Explicit Staging or complete demo emulators required. Production forbidden.');
   test.setTimeout(300_000);
+  page.setDefaultTimeout(15_000);
+  let phase = 'seed';
   const prefix = 'curriculum-review-' + randomBytes(8).toString('hex');
   const app = initializeApp({ projectId }, prefix), db = initializeFirestore(app, { preferRest: staging }), auth = getAuth(app);
   const yearId = prefix + '-year', ownerId = prefix + '-owner';
@@ -28,6 +30,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     // Foreign review must never appear in this tenant or influence counters.
     await put('curriculumProposalReviews/' + prefix + '-foreign', { schoolId: prefix + '-foreign', academicYearId: yearId, classId: prefix + '-D01', proposalId: 'D01', sourceVersion: proposals[0].sourceVersion, mappingVersion: proposals[0].mappingVersion, decision: 'APPROVED', revision: 99 });
     await loginAs(page, email, password);
+    phase = 'render'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     await page.goto('/#/pedagogy/program');
     const review = page.getByRole('region', { name: 'Validation du référentiel', exact: true });
     await expect(review.getByText('34 classes actives', { exact: true })).toBeVisible();
@@ -37,12 +40,14 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await expect(review.getByRole('checkbox')).toHaveCount(12);
     for (const box of await review.getByRole('checkbox').all()) await expect(box).not.toBeChecked();
     for (const select of await review.getByRole('combobox').all()) await expect(select).toHaveValue('');
+    phase = 'responsive'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       await review.getByTestId('proposal-D27').locator('summary').click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
       await review.getByTestId('proposal-D27').locator('summary').click();
     }
+    phase = 'individual'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     await review.getByLabel('Choix — D27', { exact: true }).selectOption('REQUEST_CHANGE');
     await review.getByLabel('Note — D27', { exact: true }).fill('SYNTHETIC: official source required. No real decision.');
     await review.getByRole('button', { name: 'Enregistrer la décision — D27', exact: true }).click();
@@ -51,6 +56,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     expect((await db.collection('curriculumProposalReviews').where('schoolId', '==', prefix).get()).size).toBe(0);
     await confirmation.getByRole('button', { name: 'CONFIRMER L’ENREGISTREMENT' }).click();
     await expect(review.getByText('1 corrections demandées', { exact: true })).toBeVisible();
+    phase = 'batch'; console.log('CURRICULUM_REVIEW_PHASE=' + phase);
     for (const id of ['D01', 'D07']) await review.getByLabel('Sélectionner ' + id, { exact: true }).check();
     await review.getByLabel('Note de décision groupée').fill('SYNTHETIC: selected mappings only. No real approval.');
     await review.getByRole('button', { name: 'APPROUVER LES SÉLECTIONNÉES' }).click();
@@ -81,6 +87,9 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await page.reload(); await expect(review.getByText(/Consultation seule/)).toBeVisible();
     await expect(review.getByRole('checkbox')).toHaveCount(0); await expect(review.getByRole('combobox')).toHaveCount(0);
     console.log('CURRICULUM_REVIEW_LIVE PASS: 34/12/22, six groups, no preselection, individual/group decisions, audit, versions, foreign tenant exclusion, secretary read-only, responsive 360/768/1440. OPENAI CALLS: 0');
+  } catch (error) {
+    console.log('CURRICULUM_REVIEW_FAILED_PHASE=' + phase);
+    throw error;
   } finally {
     for (const name of ['curriculumProposalReviews', 'curriculumReviewRequests', 'audit_logs']) for (const d of (await db.collection(name).where('schoolId', '==', prefix).get()).docs) {
       if (name === 'curriculumProposalReviews') for (const h of (await d.ref.collection('history').get()).docs) paths.push(h.ref.path);
