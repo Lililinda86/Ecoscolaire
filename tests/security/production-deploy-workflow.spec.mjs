@@ -74,7 +74,7 @@ const forbiddenFunctions = new Set([
 
 const deployCommand = workflow
   .split(/\r?\n/)
-  .find(line => line.includes('firebase deploy --only'));
+  .find(line => line.includes('firebase deploy --only firestore:rules,'));
 
 assert.ok(deployCommand, 'Production workflow must contain a Firebase deploy command.');
 

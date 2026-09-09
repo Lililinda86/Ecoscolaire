@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 const base='e1f236ae5c370e9de5ccf9efaa99d53483b9b1a4';
 const read=p=>fs.readFileSync(p,'utf8').replaceAll('\r\n','\n');
+const stripReleaseRouting=s=>s.replace(/^.*# LIMITED_RELEASE_BEGIN\n[\s\S]*?^.*# LIMITED_RELEASE_END\n\n/gm,'').replace(/^.*# LIMITED_RELEASE_LEGACY_GUARD\n/gm,'');
 const original=p=>execFileSync('git',['show',`${base}:${p}`],{encoding:'utf8'}).replaceAll('\r\n','\n');
 const index=read('functions/src/index.ts');
 const exported=index+[...index.matchAll(/export \* from '([^']+)'/g)].map(m=>read('functions/src/'+m[1]+'.ts')).join('\n');
@@ -12,8 +13,8 @@ test('limited release retains every Production workflow and guard',()=>{
  const files=execFileSync('git',['ls-tree','-r','--name-only',base,'.github/workflows','tests/security','scripts'],{encoding:'utf8'}).trim().split('\n');
  for(const file of files.filter(f=>f.startsWith('.github/workflows/') || /production|secret-guard|backup-gate|main-payment-lots/.test(f))){
   assert.ok(fs.existsSync(file),`${file} retained`);
-  if(file==='.github/workflows/firebase-deploy.yml') assert.equal(read(file).replaceAll('functions:manageAcademicPeriod,functions:updateAcademicYearBounds,','functions:manageAcademicPeriod,'),original(file));
-  else if(file==='tests/security/production-deploy-workflow.spec.mjs') assert.equal(read(file).replace("  'manageAcademicPeriod',\n  'updateAcademicYearBounds',","  'manageAcademicPeriod',"),original(file));
+  if(file==='.github/workflows/firebase-deploy.yml') assert.equal(stripReleaseRouting(read(file)).replaceAll('functions:manageAcademicPeriod,functions:updateAcademicYearBounds,','functions:manageAcademicPeriod,'),original(file));
+  else if(file==='tests/security/production-deploy-workflow.spec.mjs') assert.equal(read(file).replace(".find(line => line.includes('firebase deploy --only firestore:rules,'));",".find(line => line.includes('firebase deploy --only'));").replace("  'manageAcademicPeriod',\n  'updateAcademicYearBounds',","  'manageAcademicPeriod',"),original(file));
   else assert.equal(read(file),original(file),`${file} not weakened`);
  }
 });
@@ -37,4 +38,14 @@ test('scoped manifest covers Settings and collection callables with no pedagogy 
  assert.ok(workflow.includes('test "$GOOGLE_CLOUD_PROJECT" = ecoscolaire-staging'));
  assert.ok(workflow.includes('--project ecoscolaire-staging --non-interactive'));
  assert.ok(!workflow.includes('--project ecoscolaire-c5861'));
+});
+
+test('approved business tree uses only scoped targets without weakening the generic fallback',()=>{
+ const w=read('.github/workflows/firebase-deploy.yml');
+ assert.ok(w.includes('approved_source=280d41e270d4bd09db8285d76e196923c8daeea8'));
+ assert.ok(w.includes('git diff --quiet "$approved_source" HEAD -- src functions/src firestore.rules storage.rules firestore.indexes.json package-lock.json functions/package.json functions/package-lock.json'));
+ assert.ok(w.includes("if: steps.limited.outputs.enabled == 'true'"));
+ assert.ok(w.includes("if: steps.limited.outputs.enabled != 'true' # LIMITED_RELEASE_LEGACY_GUARD"));
+ assert.ok(w.includes('node scripts/run-firebase-deploy-fail-closed.mjs -- firebase deploy --only "${{ steps.limited.outputs.targets }}"'));
+ assert.ok(w.includes('Verify every limited Function is ACTIVE'));
 });

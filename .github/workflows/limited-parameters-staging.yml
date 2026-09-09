@@ -1,7 +1,7 @@
 name: Limited Parameters Staging
 on:
   push:
-    branches: [codex/limited-parameters-production]
+    branches: [codex/limited-parameters-production, codex/limited-parameters-go-live]
 permissions:
   contents: read
   actions: read
@@ -41,6 +41,7 @@ jobs:
       - name: Financial integration on Firestore emulator
         run: firebase emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-all-school-fees.cjs && node tests/functions/test-student-account-collections.cjs && node tests/functions/test-financial-advantage-workflow.cjs && node tests/functions/test-financial-tariff-snapshots.cjs && node tests/security/all-school-fees-rules.mjs"
   staging:
+    if: github.ref == 'refs/heads/codex/limited-parameters-production'
     needs: quality
     runs-on: ubuntu-latest
     environment: staging
