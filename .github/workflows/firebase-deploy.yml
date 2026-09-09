@@ -88,6 +88,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Exact approved frontend-only Transport release: verify the existing backend.
+          git fetch --no-tags origin 872692c5897c6283ec761d1193aeb0ae5a7790e9 8965b81e2fd49a0c84b7f3c8c0b6fb859ac1f802
+          if node scripts/transport-production-routing.mjs; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            echo 'verification_only=true' >> "$GITHUB_OUTPUT"
+            echo 'TRANSPORT: unchanged Functions and Rules; verification only.'
+            exit 0
+          fi
           approved_source=280d41e270d4bd09db8285d76e196923c8daeea8
           git fetch --no-tags origin "$approved_source"
           if git diff --quiet "$approved_source" HEAD -- src functions/src firestore.rules storage.rules firestore.indexes.json package-lock.json functions/package.json functions/package-lock.json; then
@@ -99,7 +107,7 @@ jobs:
           fi
 
       - name: Deploy approved limited Rules and Functions
-        if: steps.limited.outputs.enabled == 'true'
+        if: steps.limited.outputs.enabled == 'true' && steps.limited.outputs.verification_only != 'true'
         run: node scripts/run-firebase-deploy-fail-closed.mjs -- firebase deploy --only "${{ steps.limited.outputs.targets }}" --project "$FIREBASE_PROJECT_ID" --non-interactive
 
       - name: Verify every limited Function is ACTIVE
