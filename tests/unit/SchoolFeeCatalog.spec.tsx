@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 const mocks = vi.hoisted(() => ({ role: 'secretary' }));
 import { SchoolFeeCatalog } from '../../src/components/Settings/SchoolFeeCatalog';
 vi.mock('../../src/db/firebase', () => ({ functions: {} }));
@@ -56,4 +56,28 @@ it('offers every required subtype to directors while preserving free labels', as
     'Activité culturelle', 'Fournitures / supports', 'Autre libellé libre']) {
     expect(screen.getByRole('option', { name })).toBeTruthy();
   }
+});
+
+it('makes empty sections and legacy management actionable for directors', async () => {
+  mocks.role = 'director';
+  render(<SchoolFeeCatalog />);
+  expect(screen.queryByText('Aucun tarif configuré dans cette section.')).toBeNull();
+  await screen.findByText('Tenue de sport test');
+  expect(screen.getByRole('button', { name: 'Ajouter — Frais ponctuels' })).toBeTruthy();
+  const legacy = within(screen.getByText('Ancien frais conservé').closest('li')!);
+  expect(legacy.getByRole('button', { name: 'Modifier le frais' })).toBeTruthy();
+  expect(legacy.getByRole('button', { name: 'Désactiver les nouvelles affectations' })).toBeTruthy();
+  fireEvent.click(legacy.getByRole('button', { name: 'Modifier le frais' }));
+  expect((screen.getByLabelText('Montant (FCFA)') as HTMLInputElement).value).toBe('2500');
+  expect((screen.getByLabelText('Précisez le libellé du frais') as HTMLInputElement).value).toBe('Ancien frais conservé');
+  expect(screen.getByLabelText('Motif de la modification du frais')).toBeTruthy();
+});
+
+it('shows effective transport defaults even when optional stored rates are absent', async () => {
+  const { FinancialSettingsReadOnly } = await import('../../src/components/Settings/FinancialSettingsReadOnly');
+  render(<FinancialSettingsReadOnly />);
+  const transport = screen.getByRole('region', { name: 'Transport' }).textContent!.replace(/\s/g, '');
+  expect(transport).toContain('4000FCFA/mois');
+  expect(transport).toContain('5000FCFA/mois');
+  expect(screen.queryByRole('button', { name: 'Ajouter un frais' })).toBeNull();
 });

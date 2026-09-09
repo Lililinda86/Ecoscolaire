@@ -82,8 +82,44 @@ jobs:
             exit 1
           fi
 
+      # LIMITED_RELEASE_BEGIN
+      - name: Select approved limited release targets
+        id: limited
+        shell: bash
+        run: |
+          set -euo pipefail
+          approved_source=280d41e270d4bd09db8285d76e196923c8daeea8
+          git fetch --no-tags origin "$approved_source"
+          if git diff --quiet "$approved_source" HEAD -- src functions/src firestore.rules storage.rules firestore.indexes.json package-lock.json functions/package.json functions/package-lock.json; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            targets="$(node -e 'console.log(["firestore:rules",...require("./scripts/limited-parameters-functions.json").map(n=>"functions:"+n)].join(","))')"
+            echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy approved limited Rules and Functions
+        if: steps.limited.outputs.enabled == 'true'
+        run: node scripts/run-firebase-deploy-fail-closed.mjs -- firebase deploy --only "${{ steps.limited.outputs.targets }}" --project "$FIREBASE_PROJECT_ID" --non-interactive
+
+      - name: Verify every limited Function is ACTIVE
+        if: steps.limited.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for function_name in $(node -e 'console.log(require("./scripts/limited-parameters-functions.json").join(" "))'); do
+            status="$(gcloud functions describe "$function_name" --project "$FIREBASE_PROJECT_ID" --region us-central1 --format='value(status)')"
+            printf '%s: %s\n' "$function_name" "$status"
+            test "$status" = ACTIVE
+          done
+      - name: Verify deployed Rules match candidate source
+        if: steps.limited.outputs.enabled == 'true'
+        run: node scripts/verify-production-rules-source.mjs
+      # LIMITED_RELEASE_END
+
       - name: Deploy Firebase Rules and Functions
-        run: node scripts/run-firebase-deploy-fail-closed.mjs -- firebase deploy --only firestore:rules,functions:createStudentSecure,functions:enforceStudentSaasLimits,functions:initiatePayment,functions:campayWebhook,functions:onPaymentCreated,functions:updateStudentFinancialStatus,functions:recordCashPayment,functions:reversePayment,functions:createTuitionDiscount,functions:approveTuitionDiscount,functions:createFinancialBenefit,functions:approveFinancialBenefit,functions:cancelFinancialBenefit,functions:getCollectionQuote,functions:getStudentFinancialAccount,functions:recordCashCollection,functions:reverseCashCollection,functions:closeCashDrawer,functions:getBoardViewerGovernanceSummary,functions:recordAuthenticatedAudit,functions:createExpense,functions:reverseExpense,functions:assignStudentToClass,functions:recordStudentAttendance,functions:manageStaff,functions:linkStaffToUser,functions:unlinkStaffFromUser,functions:manageAcademicPeriod,functions:ensureClassProgramDraft,functions:updateClassProgramDraft,functions:publishClassProgramDraft,functions:archiveClassProgram,functions:manageTeacherAssignment,functions:manageEvaluation,functions:recordGradesBatch,functions:manageReportCard,functions:submitFinancialBenefit,functions:rejectFinancialBenefit,functions:createPaymentMoratorium,functions:submitPaymentMoratorium,functions:approvePaymentMoratorium,functions:rejectPaymentMoratorium,functions:getSchoolFeeCatalog,functions:manageSchoolFee,functions:setStudentTransportPlan --project "$FIREBASE_PROJECT_ID" --non-interactive
+        if: steps.limited.outputs.enabled != 'true' # LIMITED_RELEASE_LEGACY_GUARD
+        run: node scripts/run-firebase-deploy-fail-closed.mjs -- firebase deploy --only firestore:rules,functions:createStudentSecure,functions:enforceStudentSaasLimits,functions:initiatePayment,functions:campayWebhook,functions:onPaymentCreated,functions:updateStudentFinancialStatus,functions:recordCashPayment,functions:reversePayment,functions:createTuitionDiscount,functions:approveTuitionDiscount,functions:createFinancialBenefit,functions:approveFinancialBenefit,functions:cancelFinancialBenefit,functions:getCollectionQuote,functions:getStudentFinancialAccount,functions:recordCashCollection,functions:reverseCashCollection,functions:closeCashDrawer,functions:getBoardViewerGovernanceSummary,functions:recordAuthenticatedAudit,functions:createExpense,functions:reverseExpense,functions:assignStudentToClass,functions:recordStudentAttendance,functions:manageStaff,functions:linkStaffToUser,functions:unlinkStaffFromUser,functions:manageAcademicPeriod,functions:updateAcademicYearBounds,functions:ensureClassProgramDraft,functions:updateClassProgramDraft,functions:publishClassProgramDraft,functions:archiveClassProgram,functions:manageTeacherAssignment,functions:manageEvaluation,functions:recordGradesBatch,functions:manageReportCard,functions:submitFinancialBenefit,functions:rejectFinancialBenefit,functions:createPaymentMoratorium,functions:submitPaymentMoratorium,functions:approvePaymentMoratorium,functions:rejectPaymentMoratorium,functions:getSchoolFeeCatalog,functions:manageSchoolFee,functions:setStudentTransportPlan --project "$FIREBASE_PROJECT_ID" --non-interactive
 
       - name: Verify advantage workflow Functions are ACTIVE
         shell: bash

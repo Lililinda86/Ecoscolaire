@@ -39,4 +39,22 @@ describe('TuitionDeadlineSettings', () => {
     expect(getConfiguredTuitionInstallments({ feeT1: 70000, feeT2: 50000, feeT3: 0 }))
       .toEqual(['T1', 'T2']);
   });
+
+  it('discovers installments from class fees when legacy student projections are zero', () => {
+    const legacyProjection = { feeT1: 0, feeT2: 0, feeT3: 0 };
+    const classFees85k = { t1: 40000, t2: 30000, t3: 15000 };
+    const classFees120k = { t1: 60000, t2: 40000, t3: 20000 };
+
+    expect(getConfiguredTuitionInstallments(legacyProjection)).toEqual([]);
+    expect(getConfiguredTuitionInstallments({
+      feeT1: classFees85k.t1,
+      feeT2: classFees85k.t2,
+      feeT3: classFees85k.t3
+    })).toEqual(['T1', 'T2', 'T3']);
+    expect(getConfiguredTuitionInstallments({
+      feeT1: classFees120k.t1,
+      feeT2: classFees120k.t2,
+      feeT3: classFees120k.t3
+    })).toEqual(['T1', 'T2', 'T3']);
+  });
 });

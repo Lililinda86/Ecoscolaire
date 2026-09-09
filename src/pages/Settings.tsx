@@ -1,21 +1,20 @@
+import { activeFeeClass } from '../../functions/src/feeTargeting';
 import { financialSettingsPayload, stableConfiguration } from '../utils/financialSettingsPayload';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../db/firebase';
 import './Settings.css';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { SchoolFeeCatalog } from '../components/Settings/SchoolFeeCatalog';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { Edit2, Trash2, BookOpen } from 'lucide-react';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
-import Modal from '../components/Modal';
 import { sortClasses } from '../utils/sortClasses';
 import { getClassOptionLabel } from '../utils/classCatalog';
 import type { School, EducationCycle } from '../types';
 import { AcademicCalendarSettings } from '../components/Settings/AcademicCalendarSettings';
 import { TuitionDeadlineSettings } from '../components/Settings/TuitionDeadlineSettings';
 import { FinancialSettingsReadOnly } from '../components/Settings/FinancialSettingsReadOnly';
-import { SchoolFeeCatalog } from '../components/Settings/SchoolFeeCatalog';
 import {
   validateTuitionPaymentDeadlines,
   type TuitionPaymentDeadlines
@@ -24,9 +23,6 @@ import {
 const FullSettings: React.FC = () => {
   const { db, safeMergeDB, updateLocalState, currentUser } = useAppContext();
   const navigate = useNavigate();
-  const [newClass, setNewClass] = useState({ name: '', type: 'francophone' as 'francophone' | 'anglophone' });
-  const [isSubjModalOpen, setSubjModalOpen] = useState(false);
-  const [currentClassId, setCurrentClassId] = useState('');
   const [campaySecretInput, setCampaySecretInput] = useState('');
   const [isSavingTuitionDeadlines, setIsSavingTuitionDeadlines] = useState(false);
   const [draftTuitionDeadlines, setDraftTuitionDeadlines] = useState<TuitionPaymentDeadlines>({
@@ -82,7 +78,6 @@ const FullSettings: React.FC = () => {
       setIsSavingTuitionDeadlines(false);
     }
   };
-
 
   const [draftCycleNames, setDraftCycleNames] = useState({
     nursery: '',
@@ -401,40 +396,8 @@ const FullSettings: React.FC = () => {
     }
   };
 
-  const handleAddClass = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newClass.name.trim()) return;
-    const newDb = { ...db, classes: [...db.classes, { id: crypto.randomUUID(), name: newClass.name, type: newClass.type }] };
-    safeMergeDB(newDb);
-    setNewClass({ name: '', type: 'francophone' });
-  };
-
-  const handleDeleteClass = (id: string) => {
-    if (confirm("Voulez-vous vraiment supprimer cette classe ?")) {
-      safeMergeDB({ ...db, classes: db.classes.filter(c => c.id !== id) });
-    }
-  };
-
-  const handleEditClass = (id: string, oldName: string) => {
-    const name = prompt("Modifier le nom de la classe :", oldName);
-    if (name && name.trim()) {
-      safeMergeDB({ ...db, classes: db.classes.map(c => c.id === id ? { ...c, name: name.trim() } : c) });
-    }
-  };
-
-
-
   const handleNewAcademicYear = () => {
-    if(window.confirm("NOUVELLE ANNÉE : Voulez-vous réinitialiser les données pédagogiques courantes ? Les écritures financières publiées resteront conservées et immuables.")) {
-      safeMergeDB({
-        ...db,
-        grades: [],
-        attendance: [],
-        staffAttendance: []
-        // Retains all financial ledgers, students, classes, staff and inventory.
-      });
-      alert("L'application a été rafraîchie avec succès pour entamer la nouvelle année scolaire !");
-    }
+    navigate('/academic-periods');
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -513,8 +476,15 @@ const FullSettings: React.FC = () => {
         </button>
       </div>
 
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <nav className="settings-sections" aria-label="Sections des paramètres">{[['institution', 'Établissement'], ['cycles-classes', 'Cycles & classes'], ['academic-calendar', 'Année académique'], ['financial-tariff-version', 'Finances & tarifs'], ['transport-configuration', 'Transport'], ['documents-receipts', 'Documents & reçus'], ['school-policies', 'Politiques'], ['roles-validations', 'Rôles & validations']].map(([id, label]) => <button type="button" key={id} onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })}>{label}</button>)}</nav>
+        <p>Administration : les actions financières sont accessibles à la direction et au propriétaire. Chaque publication conserve les obligations déjà établies. Les informations d’établissement sont enregistrées par le propriétaire.</p>
+        <nav className="settings-sections" aria-label="Sections des paramètres">{[['institution', 'Établissement'], ['cycles-classes', 'Cycles & classes'], ['academic-calendar', 'Année académique'], ['fee-catalog-title', 'Finances & tarifs'], ['transport-configuration', 'Transport'], ['documents-receipts', 'Documents & reçus'], ['school-policies', 'Politiques'], ['roles-validations', 'Rôles & validations']].map(([id, label]) => <button type="button" key={id} onClick={() => {
+          const target = document.getElementById(id);
+          let parent = target?.parentElement;
+          while (parent) { if (parent instanceof HTMLDetailsElement) parent.open = true; parent = parent.parentElement; }
+          target?.scrollIntoView({ behavior: 'smooth' });
+        }}>{label}</button>)}</nav>
+      <details className="card" style={{ marginBottom: '2rem' }}><summary>Établissement, cycles & sécurité</summary>
+
         <h2 id="institution">Informations de l'Établissement</h2>
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div style={{ flex: 1 }}>
@@ -786,6 +756,7 @@ const FullSettings: React.FC = () => {
           />
         </div>
 
+        {canEditInstitution && <>
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div style={{ flex: 1 }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Nouveau Code PIN Administrateur</label>
@@ -837,19 +808,21 @@ const FullSettings: React.FC = () => {
           </div>
         </div>
 
+        </>}
         <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '2rem' }}>
           
           <div style={{ flex: 1 }}>
-            <h3 style={{ color: 'var(--primary-color)', margin: '0 0 1rem 0' }}>Rafraîchir (Nouvelle Année)</h3>
+            <h3 style={{ color: 'var(--primary-color)', margin: '0 0 1rem 0' }}>Année académique — gestion et historique</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>Réinitialise les données pédagogiques courantes et <strong>conserve les paiements, reçus, élèves et classes</strong>.</p>
             <button onClick={handleNewAcademicYear} style={{ background: 'var(--primary-color)' }}>
-              Passer à la Nouvelle Année
+              Gérer les années et périodes
             </button>
           </div>
 
         </div>
-      </div>
+      </details>
 
+      <details className="card" open><summary>Finances &amp; tarifs</summary>
       <TuitionDeadlineSettings
         academicYearName={activeAcademicYear?.name || ''}
         value={draftTuitionDeadlines}
@@ -865,7 +838,7 @@ const FullSettings: React.FC = () => {
         <button type="button" disabled={isSaving || !canEditFees} onClick={() => void handleSaveChanges(true)}>Enregistrer les tarifs</button>
         {!canEditInstitution && <p>Vous pouvez publier les tarifs. Les informations générales de l’établissement restent réservées au propriétaire.</p>}
       </section>
-      <div className="card">
+      <details className="card"><summary>Tarifs par défaut</summary>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-color)' }}>
           ⚙️ Comptabilité : Frais par Défaut
         </h2>
@@ -930,9 +903,9 @@ const FullSettings: React.FC = () => {
                 />
              </div>
         </div>
-      </div>
+      </details>
 
-      <div className="card">
+      <details className="card"><summary>Frais scolaires par classe</summary>
         <h2>Frais scolaires par classe</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
           Définissez les frais applicables à chaque classe.
@@ -950,9 +923,9 @@ const FullSettings: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {sortClasses(db.classes).map(c => (
+              {sortClasses(db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId))).map(c => (
                 <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{getClassOptionLabel(c, db.classes)}</td>
+                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{getClassOptionLabel(c, db.classes.filter(item => activeFeeClass(item, db.school?.id || '', db.school?.activeAcademicYearId)))}</td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.registration || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], registration: e.target.value } }))} /></td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.tuition || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], tuition: e.target.value } }))} /></td>
                   <td style={{ padding: '0.25rem' }}><input disabled={!canEditFees} placeholder="-" style={{ width: '100px', padding: '0.35rem' }} value={draftClassFees[c.name]?.t1 || ''} onChange={(e) => setDraftClassFees(prev => ({ ...prev, [c.name]: { ...prev[c.name], t1: e.target.value } }))} /></td>
@@ -964,14 +937,20 @@ const FullSettings: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
 
-      <div className="card" style={{ marginBottom: '2rem' }}>
+      </details>
+      <details className="card" style={{ marginBottom: '2rem' }}><summary>Politiques, transport & documents</summary>
         <h2 id="school-policies">Politiques d'établissement</h2>
         <h3 id="roles-validations">Rôles &amp; validations</h3>
         <p>La secrétaire consulte les tarifs, encaisse et soumet les demandes d’avantages. La direction et le propriétaire approuvent ou refusent selon leurs droits. Les tarifs officiels ne sont pas modifiables pendant l’encaissement.</p>
+        <div className="fee-actions">
+          <button type="button" onClick={() => navigate('/users')}>Gérer les utilisateurs et leurs rôles</button>
+          <button type="button" onClick={() => navigate('/validations')}>Ouvrir les demandes de validation</button>
+        </div>
         <h3 id="documents-receipts">Documents &amp; reçus</h3>
         <p>Chaque encaissement génère un reçu global ventilé, imprimable et téléchargeable en PDF. Les anciens paiements et reçus restent consultables depuis Encaissement.</p>
+        <button type="button" onClick={() => navigate('/payments')}>Consulter les encaissements et reçus</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
           <input
             type="checkbox"
@@ -1024,9 +1003,9 @@ const FullSettings: React.FC = () => {
             Seul un administrateur principal (Propriétaire/SuperAdmin) peut modifier cette politique.
           </p>
         )}
-      </div>
+      </details>
 
-      <div className="card">
+      <details className="card"><summary>Matières</summary>
         <h2>Gestion des matières</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
           Le catalogue des matières est désormais géré depuis le module académique centralisé.
@@ -1034,66 +1013,15 @@ const FullSettings: React.FC = () => {
         <button onClick={() => navigate('/subjects-program')}>
           Ouvrir le catalogue des matières
         </button>
-      </div>
+      </details>
 
-      <div className="card" style={{ marginTop: '2rem' }}>
+      <details className="card" style={{ marginTop: '2rem' }}><summary>Classes</summary>
         <h2>Gestion des classes</h2>
-        <form onSubmit={handleAddClass} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          <input required value={newClass.name} onChange={e => setNewClass({...newClass, name: e.target.value})} placeholder="Nom de la classe..." style={{ flex: 1 }} />
-          <select value={newClass.type} onChange={e => setNewClass({...newClass, type: e.target.value as 'francophone' | 'anglophone'})}>
-            <option value="francophone">Francophone</option>
-            <option value="anglophone">Anglophone</option>
-          </select>
-          <button type="submit">Ajouter</button>
-        </form>
-
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>
-            {sortClasses(db.classes).map(c => (
-              <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '0.75rem' }}>{getClassOptionLabel(c, db.classes)} <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>({c.type})</span></td>
-                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                  <button className="secondary" style={{ padding: '0.25rem 0.5rem', marginRight: '0.5rem' }} onClick={() => { setCurrentClassId(c.id); setSubjModalOpen(true); }} title="Gérer les matières de cette classe"><BookOpen size={14} /></button>
-                  <button className="secondary" style={{ padding: '0.25rem 0.5rem', marginRight: '0.5rem' }} onClick={() => handleEditClass(c.id, c.name)} title="Modifier le nom"><Edit2 size={14} /></button>
-                  <button className="secondary" style={{ padding: '0.25rem 0.5rem', color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClass(c.id)} title="Supprimer"><Trash2 size={14} /></button>
-                </td>
-              </tr>
-            ))}
-            {db.classes.length === 0 && <tr><td colSpan={2} style={{ padding: '1rem', color: 'var(--text-muted)' }}>Aucune classe</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      <Modal isOpen={isSubjModalOpen} onClose={() => setSubjModalOpen(false)} title="Matières de la classe">
-        {(() => {
-           const cls = db.classes.find(c => c.id === currentClassId);
-           if (!cls) return null;
-           const clsSubjects = cls.subjects || [];
-           return (
-             <div>
-               <p style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>Cochez les matières enseignées en <strong>{getClassOptionLabel(cls, db.classes)}</strong> :</p>
-               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
-                 {db.subjects.map(s => {
-                    const isChecked = clsSubjects.includes(s.id);
-                    return (
-                      <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', background: isChecked ? 'rgba(79, 70, 229, 0.05)' : 'transparent' }}>
-                        <input type="checkbox" checked={isChecked} onChange={(e) => {
-                           const newSubjects = e.target.checked ? [...clsSubjects, s.id] : clsSubjects.filter(id => id !== s.id);
-                           const newDb = { ...db, classes: db.classes.map(c => c.id === currentClassId ? { ...c, subjects: newSubjects } : c) };
-                           safeMergeDB(newDb);
-                        }} />
-                        <span style={{ fontWeight: isChecked ? 500 : 400 }}>{s.name}</span>
-                      </label>
-                    )
-                 })}
-               </div>
-               {db.subjects.length === 0 && <p style={{ color: 'var(--danger)' }}>Aucune matière globale n'est disponible. Ajoutez d'abord vos matières dans le menu Paramètres.</p>}
-               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                 <button onClick={() => setSubjModalOpen(false)}>Fermer</button>
-               </div>
-             </div>
-           );
-        })()}
-      </Modal>
+        <p>Gérez les classes, cycles et sections dans Classes. Configurez les matières et leurs affectations dans Programmes par classe. Les données historiques restent conservées.</p>
+        <button type="button" onClick={() => navigate('/classes')}>Ouvrir la gestion des classes</button>
+        <button type="button" onClick={() => navigate('/subjects-program')}>Configurer les matières par classe</button>
+        <ul>{sortClasses(db.classes.filter(c => activeFeeClass(c, db.school?.id || '', db.school?.activeAcademicYearId))).map(c => <li key={c.id}>{getClassOptionLabel(c, db.classes.filter(item => activeFeeClass(item, db.school?.id || '', db.school?.activeAcademicYearId)))}</li>)}</ul>
+      </details>
 
       {db.school && currentUser && (
         <AcademicCalendarSettings 

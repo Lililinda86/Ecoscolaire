@@ -16,6 +16,7 @@ export const resolveCanonicalClassCycle = (classData: Record<string, unknown>): 
   const name = normalizeClassValue(classData.name);
   if (/^(6|5|4|3)e(me)?$/.test(name) || /^form [1-4]$/.test(name)) return 'secondary';
   if (['sil', 'cp', 'ce1', 'ce2', 'cm1', 'cm2'].includes(name) || /^class [1-6]$/.test(name)) return 'primary';
+  if (/^(maternelle )?(petite|moyenne|grande) section$/.test(name)) return 'nursery';
   if (name === 'pre maternelle' || name === 'pre nursery' || /^(maternelle|nursery) [1-3]$/.test(name)) return 'nursery';
   return 'unknown';
 };
