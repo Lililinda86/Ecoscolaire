@@ -29,6 +29,18 @@ beforeEach(async () => {
 });
 
 describe('Pedagogy Lot A read matrix and backend-only writes', () => {
+  test('proposal reviews and immutable history are tenant scoped and server writable only', async () => {
+    for (const path of ['curriculumProposalReviews/review-a', 'curriculumProposalReviews/review-a/history/1']) {
+      await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), path), { schoolId: 'school-a', decision: 'REQUEST_CHANGE' }));
+      for (const role of ['owner', 'secretary']) await assertSucceeds(getDoc(doc(env.authenticatedContext('pedagogy-' + role).firestore(), path)));
+      for (const uid of ['pedagogy-owner-b', 'pedagogy-teacher', 'pedagogy-parent']) await assertFails(getDoc(doc(env.authenticatedContext(uid).firestore(), path)));
+      await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+      for (const role of ['owner', 'secretary', 'superAdmin']) {
+        const target = doc(env.authenticatedContext('pedagogy-' + role).firestore(), path);
+        await assertFails(updateDoc(target, { decision: 'APPROVED' })); await assertFails(deleteDoc(target));
+      }
+    }
+  });
   test('curriculum review decisions are scoped and backend-only', async () => {
     const path = 'schoolCurriculumAdoptions/adoption-a/reviewDecisions/decision-a';
     await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), path), { schoolId: 'school-a', reviewOutcome: 'not_applicable' }));

@@ -45,6 +45,7 @@ const schoolData = (snap: admin.firestore.DocumentSnapshot, schoolId: string, la
 };
 
 export { adoptCurriculumProgram } from './curriculumAdoption';
+export { recordCurriculumProposalDecisions } from './curriculumReview';
 
 export const ensureTeachingWeeks = functions.https.onCall(async (data, context) => {
   const { actor, schoolId } = await requirePedagogyActor(context, data?.schoolId);

@@ -80,6 +80,8 @@ jobs:
       - name: Lint Pedagogy only
         run: npx eslint "functions/src/pedagogy/**/*.ts" "src/features/pedagogy/**/*.{ts,tsx}" "tests/unit/pedagogyDomain.spec.ts" "tests/unit/pedagogyPreparations.spec.ts" "tests/unit/pedagogyWeeklyAssessments.spec.ts" "tests/security/pedagogy-rules.spec.mjs" "tests/security/pedagogy-lot-b-rules.spec.mjs" "tests/security/pedagogy-lot-c-rules.spec.mjs" "tests/security/pedagogy-storage-rules.spec.mjs" "tests/pedagogy-lot-a-emulator-e2e.spec.ts" "tests/pedagogy-lot-b-emulator-e2e.spec.ts" "tests/pedagogy-lot-c-emulator-e2e.spec.ts" --max-warnings=0
       - name: Additional pedagogy regression lint
+        run: node scripts/build-curriculum-review-manifest.mjs --check && npx eslint tests/pedagogy-curriculum-review-e2e.spec.ts --max-warnings=0
+      - name: Existing pedagogy regression lint
         run: npx eslint "tests/unit/pedagogy*.spec.{ts,tsx}" "tests/pedagogy-results-emulator-e2e.spec.ts" --max-warnings=0
       - name: Full unit regression
         run: npx vitest run --config vitest.config.ts
@@ -123,7 +125,7 @@ jobs:
       - name: Isolated disposable emulator secret override
         run: node scripts/prepare-pedagogy-emulator.mjs demo-ecoscolaire
       - name: Teaching confirmation Functions authorization and concurrency
-        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs && node tests/functions/test-pedagogy-source-watch-emulator.cjs && node tests/functions/test-pedagogy-adoption-emulator.cjs"
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs && node tests/functions/test-pedagogy-source-watch-emulator.cjs && node tests/functions/test-pedagogy-adoption-emulator.cjs && node tests/functions/test-curriculum-review-emulator.cjs"
       - run: npx playwright install --with-deps chromium
       - name: Synthetic bilingual A4 print regression
         env:
@@ -145,7 +147,7 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: demo-ecoscolaire.appspot.com
           VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
           VITE_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
-        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore,auth,functions "npx playwright test tests/pedagogy-lot-a-emulator-e2e.spec.ts --workers=1"
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore,auth,functions "npx playwright test tests/pedagogy-curriculum-review-e2e.spec.ts tests/pedagogy-lot-a-emulator-e2e.spec.ts --workers=1"
       - name: Pedagogy Lot B browser workflow
         env:
           VITE_USE_FIREBASE_EMULATORS: "true"

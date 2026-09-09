@@ -1,5 +1,10 @@
 # État des 34 classes ITALO
 
+Actualisation documentaire : voir OWNER_CURRICULUM_PROPOSALS.md et
+MINESEC_SOURCE_ASSESSMENT.md. Les sources secondaires retrouvées depuis cet
+inventaire n'ont PAS été importées dans Staging. Les comptes ci-dessous décrivent
+la livraison applicative antérieure, pas la nouvelle disponibilité des sources.
+
 Lecture Staging du 9 septembre 2026, année 2026–2027. Toutes les 34 classes sont
 rattachées techniquement au catalogue. Cela n'établit ni l'ouverture effective,
 ni la complétude des affectations de matières, ni une adoption officielle.

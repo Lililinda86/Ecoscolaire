@@ -1,0 +1,644 @@
+{
+  "sourceDate": "2026-09-09",
+  "humanDecisionsRecorded": 0,
+  "classes": [
+    {
+      "id": "D01",
+      "group": "A. PRIMAIRE FR",
+      "name": "SIL",
+      "cycle": "Primaire",
+      "lang": "fr",
+      "proposal": "MINEDUB FR niveau 1, colonne SIL",
+      "sourceIds": [
+        "minedub-fr-primary-1"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D02",
+      "group": "A. PRIMAIRE FR",
+      "name": "CP",
+      "cycle": "Primaire",
+      "lang": "fr",
+      "proposal": "MINEDUB FR niveau 1, colonne CP",
+      "sourceIds": [
+        "minedub-fr-primary-1"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": [
+        "Anglais",
+        "Arts et culture"
+      ]
+    },
+    {
+      "id": "D03",
+      "group": "A. PRIMAIRE FR",
+      "name": "CE1",
+      "cycle": "Primaire",
+      "lang": "fr",
+      "proposal": "MINEDUB FR niveau 2, colonne CE1",
+      "sourceIds": [
+        "minedub-fr-primary-2"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": [
+        "Anglais",
+        "Arts et culture",
+        "Éducation à la citoyenneté et morale",
+        "Éducation à l’environnement et au développement durable",
+        "Éducation physique et sportive",
+        "Français",
+        "Géographie",
+        "Éducation à la santé, à l’hygiène et à la sécurité"
+      ]
+    },
+    {
+      "id": "D04",
+      "group": "A. PRIMAIRE FR",
+      "name": "CE2",
+      "cycle": "Primaire",
+      "lang": "fr",
+      "proposal": "MINEDUB FR niveau 2, colonne CE2",
+      "sourceIds": [
+        "minedub-fr-primary-2"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": [
+        "Anglais",
+        "Français",
+        "Histoire"
+      ]
+    },
+    {
+      "id": "D05",
+      "group": "A. PRIMAIRE FR",
+      "name": "CM1",
+      "cycle": "Primaire",
+      "lang": "fr",
+      "proposal": "MINEDUB FR niveau 3, colonne CM1",
+      "sourceIds": [
+        "minedub-fr-primary-3"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D06",
+      "group": "A. PRIMAIRE FR",
+      "name": "CM2",
+      "cycle": "Primaire",
+      "lang": "fr",
+      "proposal": "MINEDUB FR niveau 3, colonne CM2",
+      "sourceIds": [
+        "minedub-fr-primary-3"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D07",
+      "group": "B. PRIMAIRE EN",
+      "name": "Class 1",
+      "cycle": "Primaire",
+      "lang": "en",
+      "proposal": "MINEDUB EN niveau 1, colonne Class 1",
+      "sourceIds": [
+        "minedub-en-primary-1"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D08",
+      "group": "B. PRIMAIRE EN",
+      "name": "Class 2",
+      "cycle": "Primaire",
+      "lang": "en",
+      "proposal": "MINEDUB EN niveau 1, colonne Class 2",
+      "sourceIds": [
+        "minedub-en-primary-1"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D09",
+      "group": "B. PRIMAIRE EN",
+      "name": "Class 3",
+      "cycle": "Primaire",
+      "lang": "en",
+      "proposal": "MINEDUB EN niveau 2, colonne Class 3",
+      "sourceIds": [
+        "minedub-en-primary-2"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D10",
+      "group": "B. PRIMAIRE EN",
+      "name": "Class 4",
+      "cycle": "Primaire",
+      "lang": "en",
+      "proposal": "MINEDUB EN niveau 2, colonne Class 4",
+      "sourceIds": [
+        "minedub-en-primary-2"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D11",
+      "group": "B. PRIMAIRE EN",
+      "name": "Class 5",
+      "cycle": "Primaire",
+      "lang": "en",
+      "proposal": "MINEDUB EN niveau 3, colonne Class 5",
+      "sourceIds": [
+        "minedub-en-primary-3"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D12",
+      "group": "B. PRIMAIRE EN",
+      "name": "Class 6",
+      "cycle": "Primaire",
+      "lang": "en",
+      "proposal": "MINEDUB EN niveau 3, colonne Class 6",
+      "sourceIds": [
+        "minedub-en-primary-3"
+      ],
+      "recommendation": "APPROUVER",
+      "confidence": "FORTE — correspondance documentaire classe/niveau uniquement",
+      "missing": "Applicabilité 2026–2027 à confirmer ; compléter les matières locales, unités annuelles, horaires/coefficients et adoption séparément.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D13",
+      "group": "C. PRÉSCOLAIRE FR",
+      "name": "Maternelle 2 — Moyenne Section",
+      "cycle": "Préscolaire",
+      "lang": "fr",
+      "proposal": "Proposition conditionnelle : 1ère année du curriculum MINEDUB 2018",
+      "sourceIds": [
+        "minedub-fr-nursery"
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "PROBABLE — organisation locale à confirmer",
+      "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
+      "probable": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
+      "localSubjects": []
+    },
+    {
+      "id": "D14",
+      "group": "C. PRÉSCOLAIRE FR",
+      "name": "Maternelle 3 — Grande Section",
+      "cycle": "Préscolaire",
+      "lang": "fr",
+      "proposal": "Proposition conditionnelle : 2ème année du curriculum MINEDUB 2018",
+      "sourceIds": [
+        "minedub-fr-nursery"
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "PROBABLE — organisation locale à confirmer",
+      "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
+      "probable": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
+      "localSubjects": []
+    },
+    {
+      "id": "D15",
+      "group": "C. PRÉSCOLAIRE FR",
+      "name": "Maternelle 1 — Petite Section",
+      "cycle": "Préscolaire",
+      "lang": "fr",
+      "proposal": "ITALO_EARLY_YEARS_PROGRAM — parcours local distinct, non présenté comme curriculum ministériel",
+      "sourceIds": [
+        "minedub-fr-nursery"
+      ],
+      "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
+      "confidence": "À EXAMINER",
+      "missing": "Aucun curriculum ministériel distinct authentifié pour ce niveau antérieur ; objectifs, activités et validation du programme local à formaliser.",
+      "probable": "Utiliser les domaines préscolaires comme repères d’adaptation, jamais copier l’ensemble des attendus de la dernière année.",
+      "localSubjects": []
+    },
+    {
+      "id": "D16",
+      "group": "C. PRÉSCOLAIRE FR",
+      "name": "Pré-maternelle",
+      "cycle": "Préscolaire",
+      "lang": "fr",
+      "proposal": "ITALO_EARLY_YEARS_PROGRAM — parcours local distinct, non présenté comme curriculum ministériel",
+      "sourceIds": [],
+      "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
+      "confidence": "À EXAMINER",
+      "missing": "Aucun curriculum ministériel distinct authentifié pour ce niveau antérieur ; objectifs, activités et validation du programme local à formaliser.",
+      "probable": "Utiliser les domaines préscolaires comme repères d’adaptation, jamais copier l’ensemble des attendus de la dernière année.",
+      "localSubjects": []
+    },
+    {
+      "id": "D17",
+      "group": "D. PRÉSCOLAIRE EN",
+      "name": "Nursery 2",
+      "cycle": "Préscolaire",
+      "lang": "en",
+      "proposal": "Proposition conditionnelle : Nursery One du curriculum MINEDUB 2018",
+      "sourceIds": [
+        "minedub-en-nursery"
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "PROBABLE — organisation locale à confirmer",
+      "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
+      "probable": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
+      "localSubjects": []
+    },
+    {
+      "id": "D18",
+      "group": "D. PRÉSCOLAIRE EN",
+      "name": "Nursery 3",
+      "cycle": "Préscolaire",
+      "lang": "en",
+      "proposal": "Proposition conditionnelle : Nursery Two du curriculum MINEDUB 2018",
+      "sourceIds": [
+        "minedub-en-nursery"
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "PROBABLE — organisation locale à confirmer",
+      "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
+      "probable": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
+      "localSubjects": []
+    },
+    {
+      "id": "D19",
+      "group": "D. PRÉSCOLAIRE EN",
+      "name": "Nursery 1",
+      "cycle": "Préscolaire",
+      "lang": "en",
+      "proposal": "ITALO_EARLY_YEARS_PROGRAM — parcours local distinct, non présenté comme curriculum ministériel",
+      "sourceIds": [
+        "minedub-en-nursery"
+      ],
+      "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
+      "confidence": "À EXAMINER",
+      "missing": "Aucun curriculum ministériel distinct authentifié pour ce niveau antérieur ; objectifs, activités et validation du programme local à formaliser.",
+      "probable": "Utiliser les domaines préscolaires comme repères d’adaptation, jamais copier l’ensemble des attendus de la dernière année.",
+      "localSubjects": []
+    },
+    {
+      "id": "D20",
+      "group": "D. PRÉSCOLAIRE EN",
+      "name": "Pre-Nursery",
+      "cycle": "Préscolaire",
+      "lang": "en",
+      "proposal": "ITALO_EARLY_YEARS_PROGRAM — parcours local distinct, non présenté comme curriculum ministériel",
+      "sourceIds": [],
+      "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
+      "confidence": "À EXAMINER",
+      "missing": "Aucun curriculum ministériel distinct authentifié pour ce niveau antérieur ; objectifs, activités et validation du programme local à formaliser.",
+      "probable": "Utiliser les domaines préscolaires comme repères d’adaptation, jamais copier l’ensemble des attendus de la dernière année.",
+      "localSubjects": []
+    },
+    {
+      "id": "D21",
+      "group": "E. SECONDAIRE FR",
+      "name": "6e",
+      "cycle": "Secondaire général — premier cycle",
+      "lang": "fr",
+      "proposal": "Programmes MINESEC 6e : mathématiques, informatique, sciences, citoyenneté/morale, géographie et histoire",
+      "sourceIds": [
+        35,
+        31,
+        37,
+        38,
+        39,
+        40
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "Anglais/français complets 6e–5e, EPS, travail manuel, langues/cultures nationales : MISSING_OFFICIAL_SOURCE pour un programme disciplinaire applicable au niveau, même si cités dans le cadre général.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D22",
+      "group": "E. SECONDAIRE FR",
+      "name": "5e",
+      "cycle": "Secondaire général — premier cycle",
+      "lang": "fr",
+      "proposal": "Programmes MINESEC 5e : mathématiques, informatique, sciences, citoyenneté/morale, géographie et histoire",
+      "sourceIds": [
+        35,
+        31,
+        37,
+        38,
+        39,
+        40
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "Anglais/français complets 6e–5e, EPS, travail manuel, langues/cultures nationales : MISSING_OFFICIAL_SOURCE pour un programme disciplinaire applicable au niveau, même si cités dans le cadre général.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D23",
+      "group": "E. SECONDAIRE FR",
+      "name": "4e",
+      "cycle": "Secondaire général — premier cycle",
+      "lang": "fr",
+      "proposal": "Programmes MINESEC 4e : français première langue, mathématiques, citoyenneté/morale, géographie, histoire et éducation artistique, anglais",
+      "sourceIds": [
+        44,
+        52,
+        53,
+        54,
+        55,
+        43,
+        42,
+        51,
+        46,
+        48,
+        47,
+        49
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "PCT, SVT, informatique, EPS et travail manuel : MISSING_OFFICIAL_SOURCE dans les dossiers consultés. LV2 et langues anciennes à retenir seulement si enseignées.",
+      "probable": "OPTIONAL_SUBJECT candidats documentés : allemand, arabe, espagnol, chinois, latin/grec. Leur présence dans un dossier ne les rend pas obligatoires pour ITALO.",
+      "localSubjects": []
+    },
+    {
+      "id": "D24",
+      "group": "E. SECONDAIRE FR",
+      "name": "3e",
+      "cycle": "Secondaire général — premier cycle",
+      "lang": "fr",
+      "proposal": "Programmes MINESEC 3e : français première langue, mathématiques, citoyenneté/morale, géographie, histoire et éducation artistique, anglais pour francophones",
+      "sourceIds": [
+        44,
+        52,
+        53,
+        54,
+        55,
+        43,
+        42,
+        51,
+        46,
+        48,
+        47,
+        49
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "PCT, SVT, informatique, EPS et travail manuel : MISSING_OFFICIAL_SOURCE dans les dossiers consultés. LV2 et langues anciennes à retenir seulement si enseignées.",
+      "probable": "OPTIONAL_SUBJECT candidats documentés : allemand, arabe, espagnol, chinois, latin/grec. Leur présence dans un dossier ne les rend pas obligatoires pour ITALO.",
+      "localSubjects": []
+    },
+    {
+      "id": "D25",
+      "group": "E. SECONDAIRE FR",
+      "name": "2nde",
+      "cycle": "Secondaire général — second cycle",
+      "lang": "fr",
+      "proposal": "Anglais pour francophones ; informatique A ou C ; SVTEEHB uniquement 2nde C ; arts uniquement A1/A2/A3/A4 ; projets physique/chimie C séparés.",
+      "sourceIds": [
+        76,
+        79,
+        80,
+        146,
+        144,
+        147,
+        148
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "À EXAMINER — série et versions",
+      "missing": "Série locale non renseignée ; français complet, mathématiques, histoire/géographie et autres disciplines : MISSING_OFFICIAL_SOURCE pour une pièce exploitable. Physique/chimie portent le statut de projet.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D26",
+      "group": "E. SECONDAIRE FR",
+      "name": "Terminale",
+      "cycle": "Secondaire général — second cycle",
+      "lang": "fr",
+      "proposal": "Histoire et géographie ESG ; informatique A/ABI/SH/AC ou C/D/E suivant la série réelle",
+      "sourceIds": [
+        200,
+        202,
+        195,
+        196
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "À EXAMINER — série et versions",
+      "missing": "Série locale non renseignée ; programmes de français, mathématiques/sciences et autres matières : MISSING_OFFICIAL_SOURCE ; ne pas importer les variantes EST. Les fichiers intitulés anglais Terminale contiennent Upper Sixth/technique : exclus de cette correspondance FR.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D27",
+      "group": "E. SECONDAIRE FR",
+      "name": "1re",
+      "cycle": "Secondaire général — second cycle",
+      "lang": "fr",
+      "proposal": "Aucune proposition de corpus de Première général suffisamment établie dans le dossier officiel consulté",
+      "sourceIds": [],
+      "recommendation": "ATTENDRE SOURCE OFFICIELLE",
+      "confidence": "À EXAMINER",
+      "missing": "Dossier officiel Première vide lors de la lecture ; programme de Terminale TI non substituable. Source disciplinaire et série à obtenir, sans inventer de choix pour le premier cycle.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D28",
+      "group": "F. SECONDAIRE EN",
+      "name": "Form 1",
+      "cycle": "Secondary general — first cycle",
+      "lang": "en",
+      "proposal": "MINESEC Form 1: Computer Science, Mathematics, Biology and Physics",
+      "sourceIds": [
+        2,
+        8,
+        5,
+        10
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "Chemistry : guide retrouvé mais pas de syllabus distinct établi ; English, French, History, Geography, Citizenship, EPS et autres matières : MISSING_OFFICIAL_SOURCE au niveau exact.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D29",
+      "group": "F. SECONDAIRE EN",
+      "name": "Form 2",
+      "cycle": "Secondary general — first cycle",
+      "lang": "en",
+      "proposal": "MINESEC Form 2: Computer Science, Mathematics, Biology and Physics",
+      "sourceIds": [
+        2,
+        8,
+        5,
+        10
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "Chemistry : guide retrouvé mais pas de syllabus distinct établi ; English, French, History, Geography, Citizenship, EPS et autres matières : MISSING_OFFICIAL_SOURCE au niveau exact.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D30",
+      "group": "F. SECONDAIRE EN",
+      "name": "Form 3",
+      "cycle": "Secondary general — first cycle",
+      "lang": "en",
+      "proposal": "MINESEC Form 3: Mathematics, Computer Science, French second language, Physics, Chemistry, Biology, Citizenship, Economics, Geography, History",
+      "sourceIds": [
+        62,
+        59,
+        57,
+        63,
+        64,
+        69,
+        72,
+        73,
+        74,
+        75
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "English Language/Literature : répertoire sans pièce retrouvée ; EPS et autres matières sans syllabus applicable établi. Géologie ne couvre pas Form 3 ; Human Biology ne couvre pas automatiquement Form 3. Liste des matières obligatoire/optionnelle à vérifier dans les pièces et le programme local.",
+      "probable": "Aucune correspondance locale supplémentaire établie. Chimie : couverture contradictoire Forms 1/2 versus Forms 3/4/5 ; matrices internes PDF pp.14–15 et sections retiennent Forms 3–5. Correspondance proposée avec réserve explicite.",
+      "localSubjects": []
+    },
+    {
+      "id": "D31",
+      "group": "F. SECONDAIRE EN",
+      "name": "Form 4",
+      "cycle": "Secondary general — first cycle",
+      "lang": "en",
+      "proposal": "MINESEC Form 4: Mathematics, Computer Science, French second language, Physics, Chemistry, Biology, Citizenship, Economics, Geography, History, Human Biology, Geology",
+      "sourceIds": [
+        62,
+        59,
+        57,
+        63,
+        64,
+        69,
+        72,
+        73,
+        74,
+        75,
+        71,
+        70
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "English Language/Literature : répertoire sans pièce retrouvée ; EPS et autres matières sans syllabus applicable établi. Géologie ne couvre pas Form 3 ; Human Biology ne couvre pas automatiquement Form 3. Liste des matières obligatoire/optionnelle à vérifier dans les pièces et le programme local.",
+      "probable": "Aucune correspondance locale supplémentaire établie. Chimie : couverture contradictoire Forms 1/2 versus Forms 3/4/5 ; matrices internes PDF pp.14–15 et sections retiennent Forms 3–5. Correspondance proposée avec réserve explicite.",
+      "localSubjects": []
+    },
+    {
+      "id": "D32",
+      "group": "F. SECONDAIRE EN",
+      "name": "Form 5",
+      "cycle": "Secondary general — first cycle",
+      "lang": "en",
+      "proposal": "MINESEC Form 5: Mathematics, Computer Science, French second language, Physics, Chemistry, Biology, Citizenship, Economics, Geography, History, Human Biology, Geology",
+      "sourceIds": [
+        62,
+        59,
+        57,
+        63,
+        64,
+        69,
+        72,
+        73,
+        74,
+        75,
+        71,
+        70
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "FORTE sur les niveaux des pièces retrouvées ; couverture incomplète",
+      "missing": "English Language/Literature : répertoire sans pièce retrouvée ; EPS et autres matières sans syllabus applicable établi. Géologie ne couvre pas Form 3 ; Human Biology ne couvre pas automatiquement Form 3. Liste des matières obligatoire/optionnelle à vérifier dans les pièces et le programme local.",
+      "probable": "Aucune correspondance locale supplémentaire établie. Chimie : couverture contradictoire Forms 1/2 versus Forms 3/4/5 ; matrices internes PDF pp.14–15 et sections retiennent Forms 3–5. Correspondance proposée avec réserve explicite.",
+      "localSubjects": []
+    },
+    {
+      "id": "D33",
+      "group": "F. SECONDAIRE EN",
+      "name": "Lower Sixth",
+      "cycle": "Secondary general — second cycle",
+      "lang": "en",
+      "proposal": "MINESEC Lower Sixth: English Language et Literature in English, annexes identifiées 90/22 ; Computer Science/ICT conservés comme working drafts",
+      "sourceIds": [
+        289,
+        290,
+        15,
+        16
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "À EXAMINER — annexes et combinaison",
+      "missing": "Combinaison de matières non renseignée. Autres disciplines : MISSING_OFFICIAL_SOURCE pour un syllabus applicable. French Upper Sixth « Général » exclu car couverture « enseignement technique ». Working drafts informatiques non approuvables comme textes définitifs.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    },
+    {
+      "id": "D34",
+      "group": "F. SECONDAIRE EN",
+      "name": "Upper Sixth",
+      "cycle": "Secondary general — second cycle",
+      "lang": "en",
+      "proposal": "MINESEC Upper Sixth: English Language et Literature in English, annexes identifiées 90/22 ; Computer Science/ICT conservés comme working drafts",
+      "sourceIds": [
+        289,
+        290,
+        15,
+        16
+      ],
+      "recommendation": "DEMANDER CORRECTION",
+      "confidence": "À EXAMINER — annexes et combinaison",
+      "missing": "Combinaison de matières non renseignée. Autres disciplines : MISSING_OFFICIAL_SOURCE pour un syllabus applicable. French Upper Sixth « Général » exclu car couverture « enseignement technique ». Working drafts informatiques non approuvables comme textes définitifs.",
+      "probable": "Aucune correspondance locale supplémentaire établie.",
+      "localSubjects": []
+    }
+  ]
+}

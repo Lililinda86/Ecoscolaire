@@ -1,4 +1,106 @@
-# Remplissage pédagogique — exécution en cours
+# Remplissage pédagogique — livraison technique Staging validée
+
+## Mission active : mise en revue Staging des 34 propositions
+
+Le mandat courant autorise uniquement l’espace de validation demandé, ses contrôles et sa livraison Staging. Le gel documentaire ci-dessous décrit la phase précédente.
+
+Implémentation locale : manifeste documentaire déterministe 34/12/22 ; vue Programme en six groupes ; décisions owner exclusivement via callable, note et confirmation explicites, versions source/correspondance, transaction atomique et historique immuable avec audit. Aucune décision métier réelle enregistrée.
+
+Contrôles locaux exécutés : typecheck frontend/Functions PASS ; compilation Functions PASS ; lint ciblé PASS ; 9 tests UI ciblés PASS ; contrôle des 34 fiches et génération reproductible PASS. Régressions complètes locales en cours ; contrôles émulateurs et recette Staging non encore exécutés pour cette version.
+
+Mise à jour : régression locale complète PASS (134 fichiers / 825 tests). PR #242 ouverte. Premier build CI bloqué par la taille du bundle principal (2,21 MB, limite PWA 2 MiB). Correction ciblée : chargement différé de la page Programme, selon le mécanisme existant des Ressources ; limite de cache inchangée. Ajout d’une vérification ITALO Staging en lecture seule après recette synthétique.
+
+Passage CI 4038282 : static gates, frontend, Vercel et contrôles serveur/règles PASS. Recette navigateur : affichage 34/six groupes et responsive exécutés ; échec du sélecteur exact « Choix — D27 » (libellé implicite du select), avant décision. Nettoyage de la fixture confirmé. Correction : aria-label explicite sur les champs ; pas de modification des permissions pour résoudre le test. Approbation individuelle distinguée de la groupée : 4 rattachements préscolaires documentés mais conditionnels soumis à décision owner individuelle ; 18 dossiers sans source suffisante non approuvables ; groupée limitée aux 12 fortes.
+
+Plan et reprise : CURRICULUM_REVIEW_EXECUTION.md. Prochaine étape : PR vers staging, CI Linux puis recette exacte. OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
+
+La compilation a régénéré des fichiers suivis sous functions/lib ; ces sorties ne sont pas incluses dans la PR et restent préservées localement. Les sources sont compilées à neuf par la CI.
+
+## Revue documentaire des 34 classes — 9 septembre 2026
+
+Nouvelles fonctionnalités gelées. Aucune écriture Staging, aucun déploiement,
+aucun appel OpenAI ni action Production pendant cette phase.
+
+Livrable courant : OWNER_CURRICULUM_PROPOSALS.md, 34 propositions en six groupes,
+avec sources, matières réellement affectées, recommandations et cases humaines
+vides. Les douze correspondances primaires sont recommandées à l'approbation
+de correspondance uniquement ; 22 autres fiches sont conditionnelles/à examiner.
+
+Recherche MINESEC : catalogues FR/EN accessibles par HTTP direct ; 91 dossiers
+publics parcourus, 81 PDF récupérés avec empreintes, conservés hors dépôt. Les
+index publiables sont des métadonnées, pas les textes. Contrôles dans
+MINESEC_SOURCE_ASSESSMENT.md et MINESEC_SOURCE_CHECKS.json. Les anciennes mentions
+« pas de source secondaire » sont des états historiques : 13 niveaux secondaires
+ont maintenant des propositions documentées partielles ; Première reste sans
+corpus général établi. Rien de ce nouveau fonds n'est importé dans Staging.
+
+Lecture locale ITALO : CP 2 matières, CE1 8, CE2 3 dans les révisions courantes ;
+31 autres classes sans affectation active retrouvée. Les classes de second cycle
+existent bien dans la configuration générale : la question des séries y est
+pertinente, pas dans toutes les classes. Aucun compte ou permission changé.
+
+Contrôles documentaires PASS : 34 jeux de champs, six groupes, zéro décision
+cochée, 81 empreintes PDF, exclusions/corrections des niveaux et des faux intitulés.
+UI Staging des 34 fiches groupées : NOT READY. Le dossier est prêt pour revue
+documentaire humaine ; aucune adoption de programme n'a été simulée pour créer
+une prétendue approbation groupée. Pas de nouveau gate applicatif revendiqué.
+
+Reprise locale : `node scripts/check-pedagogy-owner-proposals.mjs`, puis lire
+OWNER_CURRICULUM_PROPOSALS.md et les décisions effectivement reçues. Ne pas
+rejouer le crawl ni les anciennes commandes de déploiement sans nécessité.
+
+## État final faisant foi — 9 septembre 2026
+
+SHA déployé et testé : `99c2daacd8ead63c9337456ea72c81bfe4f822b5`.
+Déploiement 34316453874 SUCCESS ; gate consolidé exact 34316962304 SUCCESS,
+y compris navigateur live, cinq contextes et nettoyages ciblés.
+URL : https://ecoscolaire-o2n01ucdn-linda-lemofouet-s-projects.vercel.app
+PR 238 fusionnée ; correctifs Settings des PR 237/240 préservés.
+Rapport faisant foi : [FINAL_REPORT.md](FINAL_REPORT.md).
+Les sections suivantes sont un journal historique, pas des commandes à rejouer.
+Contenu PARTIEL prêt pour revue humaine ; produit pédagogiquement complet : NON.
+OpenAI : zéro appel pendant cette reprise. Production : aucune action.
+Branche locale : codex/pedagogy-content-completion ; worktree :
+ecoscolaire-pedagogy-content-completion. Le checkpoint documentaire final est local
+uniquement et ne remplace pas le SHA déployé ci-dessus. Aucune fixture de cette
+recette conservée. Prochaine étape : revue humaine selon SECRETARY_REVIEW_GUIDE.md,
+pas de nouveau déploiement ni passage Production automatique.
+
+## SHA courant après fusion concurrente PR 240
+
+Le déploiement 34315982579 de 5d63299 a réussi. Avant le dispatch, la garde SHA a
+détecté la PR Settings 240 ; aucun test live sur 5d63299 n'a été lancé. Son correctif
+de préservation du calendrier est conservé par fast-forward, sans conflit.
+SHA courant : `99c2daacd8ead63c9337456ea72c81bfe4f822b5`.
+Déploiement 34316453874 en cours ; Preview 6343458146 success :
+https://ecoscolaire-o2n01ucdn-linda-lemofouet-s-projects.vercel.app.
+Gate consolidé exact lancé : 34316962304, confirmation RUN_PEDAGOGY_STAGING_SYNTHETIC.
+Ses contrôles live exigent le succès du déploiement exact. Aucun appel OpenAI.
+Les mentions 5d63299 ci-dessous décrivent la livraison Pédagogie avant la PR 240.
+
+## Livraison fusionnée — recette exacte encore en attente
+
+PR 238 MERGED le 9 septembre 2026. SHA staging :
+`5d632993f8631dae94a0c8636f43101b84ef399b`.
+Le travail Settings PR 237 est préservé (base 9bac813, fusion dans 73625d7).
+Gate combiné 34315530071 PASS : 133 fichiers / 820 tests unitaires, Functions,
+Rules, Storage, A4, A/B/C et cinq contextes navigateur ; nettoyages exacts vérifiés.
+CI 34315532376 et sécurité financière 34315532420 PASS.
+
+Déploiement Firebase du SHA fusionné : run 34315982579 en cours après les trois
+CI obligatoires PASS. Preview Vercel du même SHA : déploiement 6343377824 success,
+URL protégée https://ecoscolaire-8je360dxq-linda-lemofouet-s-projects.vercel.app.
+NE PAS considérer la recette Staging exacte comme PASS avant sa propre exécution.
+
+Reprise exacte après succès du déploiement :
+`gh workflow run pedagogy-release-gate.yml --ref staging -f expected_sha=5d632993f8631dae94a0c8636f43101b84ef399b -f app_url=https://ecoscolaire-8je360dxq-linda-lemofouet-s-projects.vercel.app -f confirmation=RUN_PEDAGOGY_STAGING_SYNTHETIC`
+Cette confirmation n'exécute aucun appel OpenAI. Pas de cleanup global, pas de main.
+
+Compteurs ITALO relus : 34 classes, 97 entrées subjects (dont 25 ajouts de références),
+38 classSubjects, 13 classPrograms, 0 adoption, 0 planning, 0 préparation locale.
+Catalogue global : 9 programmes (8 références partielles + 1 démonstration),
+17 unités (12 extraits primaires sourcés + 5 de démonstration). Tous les 34 niveaux
+techniques sont rattachés ; aucune décision pédagogique réelle créée.
 
 ## Diagnostic de la première recette cinq contextes
 

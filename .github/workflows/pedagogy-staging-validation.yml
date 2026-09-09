@@ -89,6 +89,10 @@ jobs:
       - name: Install Chromium browser
         run: npx playwright install --with-deps chromium
       - name: Synthetic canonical results and teacher-declared support
+        run: npx playwright test tests/pedagogy-curriculum-review-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
+      - name: Existing canonical results regression
+        run: node scripts/verify-curriculum-review-staging.mjs
+      - name: Existing canonical results browser regression
         run: npx playwright test tests/pedagogy-results-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1
       - name: Synthetic local file integrity, manual review and exact cleanup
         run: npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --config=playwright.pedagogy-staging.config.ts --workers=1

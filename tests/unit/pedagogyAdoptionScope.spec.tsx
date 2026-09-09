@@ -2,6 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+vi.mock('../../src/features/pedagogy/components/CurriculumProposalReview', () => ({ CurriculumProposalReview: () => null }));
 const state = vi.hoisted(() => ({ schoolId: 'a', role: 'secretary', adopt: vi.fn(), refresh: vi.fn() }));
 vi.mock('../../src/context/AppContext', () => ({ useAppContext: () => ({
   currentSchool: { id: state.schoolId, activeAcademicYearId: state.schoolId + '-year' }, currentUser: { role: state.role },
