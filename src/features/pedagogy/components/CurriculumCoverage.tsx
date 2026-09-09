@@ -3,6 +3,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { configuredCurriculumCoverage } from '../services/curriculumCoverage';
 import { classCoverageSummary } from '../services/classCoverageSummary';
 import type { CurriculumProgram, SchoolCurriculumAdoption } from '../types';
+import { getDisplayClassName } from '../../../utils/classCatalog';
 export function CurriculumCoverage({ yearId, programs, adoptions, unavailable }: { yearId?: string; programs: CurriculumProgram[]; adoptions: SchoolCurriculumAdoption[]; unavailable: boolean }) {
   const { db, currentSchool } = useAppContext();
   const [page, setPage] = useState(0);
@@ -16,7 +17,7 @@ export function CurriculumCoverage({ yearId, programs, adoptions, unavailable }:
   };
   return <section className="pedagogy-card"><h2>Programmes de vos classes</h2>
     <p>Commencez par les classes dont le niveau ou les matières restent à configurer. Une adoption enregistrée ne prouve pas la couverture officielle.</p>
-    {classCoverageSummary(rows).map(item => <article className="pedagogy-list-row" key={item.classId}><div><strong>{item.name}</strong><small>{!item.levelMapped ? 'À faire : rattacher le niveau.' : !item.subjects ? 'À faire : configurer les matières/domaines.' : !item.adopted ? 'À faire : examiner le programme avant adoption.' : 'Décision d’adoption reçue.'}</small><small>Matières/domaines configurés : {item.subjects}. Total attendu : à vérifier dans le référentiel.</small></div></article>)}
+    {classCoverageSummary(rows).map(item => <article className="pedagogy-list-row" key={item.classId}><div><strong>{getDisplayClassName(item.name)}</strong><small>{!item.levelMapped ? 'À faire : rattacher le niveau.' : !item.subjects ? 'À faire : configurer les matières/domaines.' : !item.adopted ? 'À faire : examiner le programme avant adoption.' : 'Décision d’adoption reçue.'}</small><small>Matières/domaines configurés : {item.subjects}. Total attendu : à vérifier dans le référentiel.</small></div></article>)}
     <details><summary>Détails / Administration / Couverture</summary>
     <p>{totalClasses} classe(s) active(s) configurée(s), {rows.length} ligne(s) classe/matière ou domaine. Les niveaux et matières manquants restent visibles. L’ouverture réelle et les décisions pédagogiques sont à confirmer.</p>
     <p>Huit programmes MINEDUB 2018 authentifiés et deux variantes sont référencés dans les ressources. Cela ne prouve pas une correspondance classe/matière ni leur applicabilité actuelle. Aucun rattachement officiel acquis. Pour une classe antérieure au périmètre officiel retrouvé : ITALO_EARLY_YEARS_PROGRAM, validation humaine requise, jamais MINEDUB par défaut.</p>

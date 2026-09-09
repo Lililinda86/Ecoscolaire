@@ -17,6 +17,7 @@ export function CurriculumUnitDetails({ schoolId, programId, levelId }: { school
     {resource.data.map(unit => <details key={unit.id}><summary>{unit.subjectName || unit.subjectId} — {unit.title}</summary>
       <p>Domaine : {unit.domain || 'non renseigné'}. Thème : {unit.theme || 'non renseigné'}.</p>
       <p>Objectif : {unit.objective || 'non renseigné'}</p><p>Compétence : {unit.competency || 'non renseignée'}</p>
+      <p>Leçon détaillée dans cet extrait : {unit.officialLesson || 'non renseignée'}. Statut de vérification : {unit.verificationStatus || 'non établi'}.</p>
       <p>Volume indicatif sourcé : {Number.isFinite(unit.indicativeHours) && (unit.indicativeHours || 0) > 0 && unit.sourceLocator && curriculumProvenanceLink(unit.sourceUrl) ? `${unit.indicativeHours} h (déclaré, à vérifier)` : 'non établi'}.</p>
       <p>Localisation dans la source : {unit.sourceLocator || 'non renseignée'}</p>
       {curriculumProvenanceLink(unit.sourceUrl) && <a href={curriculumProvenanceLink(unit.sourceUrl)!} target="_blank" rel="noopener noreferrer">Source déclarée de cette unité</a>}

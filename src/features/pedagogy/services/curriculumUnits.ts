@@ -13,6 +13,8 @@ export interface CurriculumUnitDetail {
   title: string; objective: string; sequence: number; status: string;
   subjectName?: string; domain?: string; theme?: string; competency?: string;
   sourceUrl?: string; sourceLocator?: string; indicativeHours?: number;
+  verificationStatus?: string;
+  officialLesson?: string | null;
 }
 
 export async function loadPublishedCurriculumUnits(programId: string, levelId: string): Promise<CurriculumUnitDetail[]> {

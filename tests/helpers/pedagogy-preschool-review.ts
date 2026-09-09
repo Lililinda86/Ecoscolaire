@@ -33,7 +33,7 @@ export async function verifyPreschoolReview(page: Page, db: Firestore, f: { scho
   const support = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Synthetic preschool sorting support', exact: true }) });
   await expect(support).toBeVisible();
   for (const button of ['Consigner l’accord enseignant', 'Consigner la réalisation']) {
-    await support.getByLabel('Compte rendu reçu de l’enseignant', { exact: true }).fill('Synthetic review fixture declaration only.');
+    await support.getByRole('textbox', { name: 'Compte rendu reçu de l’enseignant', exact: true }).fill('Synthetic review fixture declaration only.');
     await support.getByRole('combobox', { name: 'Enseignant déclarant', exact: true }).selectOption(f.teacherId);
     await support.getByRole('checkbox', { name: 'J’ai reçu cette déclaration de l’enseignant ; je ne la déduis pas des notes.' }).check();
     await support.getByRole('button', { name: button, exact: true }).click();
