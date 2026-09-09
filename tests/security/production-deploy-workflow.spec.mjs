@@ -51,6 +51,7 @@ const requiredFunctions = new Set([
   'linkStaffToUser',
   'unlinkStaffFromUser',
   'manageAcademicPeriod',
+  'updateAcademicYearBounds',
   'ensureClassProgramDraft',
   'updateClassProgramDraft',
   'publishClassProgramDraft',

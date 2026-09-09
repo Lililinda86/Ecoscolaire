@@ -13,6 +13,7 @@ test('limited release retains every Production workflow and guard',()=>{
  for(const file of files.filter(f=>f.startsWith('.github/workflows/') || /production|secret-guard|backup-gate|main-payment-lots/.test(f))){
   assert.ok(fs.existsSync(file),`${file} retained`);
   if(file==='.github/workflows/firebase-deploy.yml') assert.equal(read(file).replaceAll('functions:manageAcademicPeriod,functions:updateAcademicYearBounds,','functions:manageAcademicPeriod,'),original(file));
+  else if(file==='tests/security/production-deploy-workflow.spec.mjs') assert.equal(read(file).replace("  'manageAcademicPeriod',\n  'updateAcademicYearBounds',","  'manageAcademicPeriod',"),original(file));
   else assert.equal(read(file),original(file),`${file} not weakened`);
  }
 });
