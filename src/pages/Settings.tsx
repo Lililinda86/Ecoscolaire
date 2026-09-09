@@ -953,8 +953,13 @@ const FullSettings: React.FC = () => {
         <h2 id="school-policies">Politiques d'établissement</h2>
         <h3 id="roles-validations">Rôles &amp; validations</h3>
         <p>La secrétaire consulte les tarifs, encaisse et soumet les demandes d’avantages. La direction et le propriétaire approuvent ou refusent selon leurs droits. Les tarifs officiels ne sont pas modifiables pendant l’encaissement.</p>
+        <div className="fee-actions">
+          <button type="button" onClick={() => navigate('/users')}>Gérer les utilisateurs et leurs rôles</button>
+          <button type="button" onClick={() => navigate('/validations')}>Ouvrir les demandes de validation</button>
+        </div>
         <h3 id="documents-receipts">Documents &amp; reçus</h3>
         <p>Chaque encaissement génère un reçu global ventilé, imprimable et téléchargeable en PDF. Les anciens paiements et reçus restent consultables depuis Encaissement.</p>
+        <button type="button" onClick={() => navigate('/payments')}>Consulter les encaissements et reçus</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
           <input
             type="checkbox"
