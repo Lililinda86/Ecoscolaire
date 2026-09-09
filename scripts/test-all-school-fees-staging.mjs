@@ -331,6 +331,20 @@ try {
   await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
   await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Finances & tarifs', exact: true }).click();
+  // Read stored dates before touching any control. Never repair dates from an empty UI.
+  const storedDates = (await db.collection('academicYears').doc(yearId).get()).data().tuitionPaymentDeadlines;
+  assert.deepEqual(storedDates, { T1: '2026-09-05', T2: '2027-01-10', T3: '2027-04-10' });
+  for (const [key, label] of [['T1', '1re'], ['T2', '2e'], ['T3', '3e']]) {
+    await expect(settingsPage.getByLabel(`Échéance ${label} tranche`, { exact: true })).toHaveValue(storedDates[key]);
+  }
+  await settingsPage.reload({ waitUntil: 'domcontentloaded' });
+  await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
+  await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Finances & tarifs', exact: true }).click();
+  for (const [key, label] of [['T1', '1re'], ['T2', '2e'], ['T3', '3e']]) {
+    await expect(settingsPage.getByLabel(`Échéance ${label} tranche`, { exact: true })).toHaveValue(storedDates[key]);
+  }
+  assert.deepEqual((await db.collection('academicYears').doc(yearId).get()).data().tuitionPaymentDeadlines, storedDates);
+  pass('TUITION DATES DATABASE / UI / RELOAD MATCH / NO DEADLINE WRITE');
   // Exercise the exact nursery workflow, including implicit scope and actual deselection.
   await settingsPage.getByText('Créer un nouveau frais', { exact: true }).click();
   const nurseryCycles = settingsPage.getByRole('group', { name: 'Cycles concernés', exact: true });
@@ -338,6 +352,32 @@ try {
   const nurseryStudents = settingsPage.getByRole('group', { name: 'Élèves concernés', exact: true });
   await expect(nurseryClasses.getByRole('checkbox')).toHaveCount(7);
   await expect(nurseryStudents.getByRole('checkbox')).toHaveCount(9);
+  for (const [cycle, classes, pupils] of [['Maternelle', ['Maternelle Petite Section', 'Maternelle Moyenne Section', 'Maternelle Grande Section', 'Nursery 2'], 3], ['Primaire', ['CP'], 3], ['Secondaire', ['Form 1'], 2]]) {
+    await nurseryCycles.getByRole('checkbox', { name: cycle, exact: true }).check();
+    await expect(nurseryClasses.getByRole('checkbox')).toHaveCount(classes.length + 1);
+    for (const name of classes) await expect(nurseryClasses.getByRole('checkbox', { name, exact: true })).toBeVisible();
+    await expect(nurseryStudents.getByRole('checkbox')).toHaveCount(pupils + 1);
+    await nurseryClasses.getByRole('checkbox', { name: 'Tout sélectionner — classes', exact: true }).check();
+    for (const name of classes) await expect(nurseryClasses.getByRole('checkbox', { name, exact: true })).toBeChecked();
+    await nurseryStudents.getByRole('checkbox', { name: 'Tout sélectionner — élèves', exact: true }).check();
+    await expect(nurseryStudents.getByRole('status')).toHaveText(`${pupils} élèves sélectionnés`);
+    await nurseryStudents.getByRole('button', { name: 'Tout désélectionner — élèves', exact: true }).click();
+    await expect(nurseryStudents.getByRole('status')).toHaveText('0 élèves sélectionnés');
+    await nurseryClasses.getByRole('button', { name: 'Tout désélectionner — classes', exact: true }).click();
+    await nurseryCycles.getByRole('checkbox', { name: cycle, exact: true }).uncheck();
+  }
+  pass('EACH CYCLE ALONE / EXACT CLASS AND STUDENT COUNTS / SELECT ALL CLASSES / STUDENT COUNTERS');
+  for (const type of ['uniform', 'sports_uniform', 'ceremony_uniform', 'other_uniform', 'activity_kit', 'event', 'excursion', 'school_trip', 'cultural_activity', 'activity', 'photo', 'supplies', 'books', 'canteen', 'childcare', 'contribution', 'other', 'exam', 'exceptional']) {
+    await settingsPage.getByLabel('Type de frais').selectOption(type);
+    await expect(settingsPage.getByLabel('Type de frais')).toHaveValue(type);
+    const label = settingsPage.getByRole('textbox', { name: /^(Libellé précis du frais|Précisez le libellé du frais)$/ });
+    await label.fill(`Libellé précis ${type} TEST`);
+    await expect(label).toHaveValue(`Libellé précis ${type} TEST`);
+  }
+  await settingsPage.getByRole('combobox', { name: 'Périodicité', exact: true }).selectOption('recurring');
+  await expect(settingsPage.getByText('Chaque nouvelle échéance doit être publiée explicitement', { exact: false })).toBeVisible();
+  await settingsPage.getByRole('combobox', { name: 'Périodicité', exact: true }).selectOption('one_off');
+  pass('ALL 19 FEE TYPE CHOICES ACTIONABLE / PRECISE LABELS / RECURRENCE');
   await settingsPage.getByLabel('Type de frais').selectOption('exam');
   await settingsPage.getByLabel('Libellé précis du frais', { exact: true }).fill('Examen maternelle TEST');
   await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill('10000');
@@ -543,6 +583,24 @@ try {
     await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: label, exact: true }).click();
   }
   pass('EXISTING PARAMETERS SECTIONS ACCESSIBLE');
+  for (const [section, button, path, heading] of [
+    ['Rôles & validations', 'Gérer les utilisateurs et leurs rôles', '/users', 'Gestion des Accès & Rôles'],
+    ['Rôles & validations', 'Ouvrir les demandes de validation', '/validations', 'Centre de Validation'],
+    ['Documents & reçus', 'Consulter les encaissements et reçus', '/payments', null]
+  ]) {
+    await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: section, exact: true }).click();
+    await settingsPage.getByRole('button', { name: button, exact: true }).click();
+    await expect(settingsPage).toHaveURL(`${origin}/#${path}`);
+    if (heading) await expect(settingsPage.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    else await expect(settingsPage.getByTestId('open-cash-payment')).toBeVisible();
+    await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
+    await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
+  }
+  await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Finances & tarifs', exact: true }).click();
+  await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Transport', exact: true }).click();
+  assert.deepEqual((await db.collection('academicYears').doc(yearId).get()).data().tuitionPaymentDeadlines, storedDates);
+  pass('DOCUMENTS RECEIPTS / USERS ROLES / VALIDATIONS REAL NAVIGATION');
+
   await settingsPage.getByLabel('PK14 à PK33 — FCFA / mois').fill('4600');
   await settingsPage.getByLabel('Motif de la modification tarifaire').fill('Validation UI de la publication prospective');
   settingsPage.once('dialog', dialog => dialog.accept());
