@@ -1,5 +1,20 @@
 # Remplissage pédagogique — exécution en cours
 
+## Rattachement technique final des niveaux
+
+Les six classes maternelles historiques ont désormais leur catalogLevelId issu
+des alias existants de classCatalog/defaultClasses : 34/34 classes avec niveau
+technique. Noms et IDs inchangés ; aucune équivalence aux années MINEDUB décidée.
+Écriture des six seuls champs sous préconditions updateTime ; readback PASS,
+dry-run suivant zéro changement. Total du mandat : 18 champs de configuration
+catalogLevelId ajoutés (12 primaire + 6 maternel), aucune donnée élève modifiée.
+Les mentions « six niveaux manquants » plus bas sont historiques.
+
+Les affectations locales de disciplines ne sont pas forcées : le workflow canonique
+de publication exige des coefficients et horaires valides pour les matières actives.
+Ils ne sont pas renseignés à partir de valeurs inventées ou de sommaires seuls.
+Le catalogue de références est prêt à servir à cette décision locale.
+
 ## État complémentaire après 25efadd
 
 Gate Linux 34313816879 : PASS intégral (statique, Functions, Rules Firestore,
