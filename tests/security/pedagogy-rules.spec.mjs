@@ -29,6 +29,14 @@ beforeEach(async () => {
 });
 
 describe('Pedagogy Lot A read matrix and backend-only writes', () => {
+  test('curriculum review decisions are scoped and backend-only', async () => {
+    const path = 'schoolCurriculumAdoptions/adoption-a/reviewDecisions/decision-a';
+    await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), path), { schoolId: 'school-a', reviewOutcome: 'not_applicable' }));
+    await assertSucceeds(getDoc(doc(env.authenticatedContext('pedagogy-owner').firestore(), path)));
+    await assertFails(getDoc(doc(env.authenticatedContext('pedagogy-owner-b').firestore(), path)));
+    await assertFails(updateDoc(doc(env.authenticatedContext('pedagogy-owner').firestore(), path), { reviewOutcome: 'approve' }));
+    await assertFails(deleteDoc(doc(env.authenticatedContext('pedagogy-owner').firestore(), path)));
+  });
   test('source-watch records are school-scoped and never client-writable', async () => {
     const paths = ['pedagogySourceWatches/watch-a', 'pedagogySourceWatches/watch-a/versions/1', 'pedagogySourceWatches/watch-a/reviews/2', 'pedagogySourceWatchAttempts/attempt-a'];
     await env.withSecurityRulesDisabled(async context => {

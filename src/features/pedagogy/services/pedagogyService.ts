@@ -87,7 +87,7 @@ export const uploadLessonPreparation = async (schoolId: string, file: File, prep
 };
 
 export const ensureTeachingWeeks = (schoolId: string, academicYearId: string) => call('ensureTeachingWeeks', { schoolId, academicYearId });
-export const adoptCurriculumProgram = (input: { schoolId: string; academicYearId: string; catalogLevelId: string; curriculumProgramId: string; expectedRevision: number; expectedProgramVersion: string; declarationReceived: boolean; decisionBy: string; decisionDate: string; decisionReference: string }) => call('adoptCurriculumProgram', input);
+export const adoptCurriculumProgram = (input: { schoolId: string; academicYearId: string; catalogLevelId: string; curriculumProgramId: string; expectedRevision: number; expectedProgramVersion: string; declarationReceived: boolean; decisionBy: string; decisionDate: string; decisionReference: string; reviewOutcome?: 'approve' | 'request_correction' | 'not_applicable' }) => call('adoptCurriculumProgram', input);
 export const ensureTeachingPlanDraft = (input: { schoolId: string; academicYearId: string; classId: string; weekStartDate: string }) => call<{ schoolId: string; academicYearId: string; classId: string; weekStartDate: string }, { planId: string }>('ensureTeachingPlanDraft', input);
 export const generateTeachingPlanProposal = (schoolId: string, planId: string) => call('generateTeachingPlanProposal', { schoolId, planId });
 export const saveTeachingPlanAdjustments = (schoolId: string, planId: string, adjustments: Array<Pick<TeachingPlanItem, 'id' | 'lessonTitle' | 'objective' | 'note'>>) => call('saveTeachingPlanAdjustments', { schoolId, planId, adjustments });

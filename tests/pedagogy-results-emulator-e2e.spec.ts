@@ -6,24 +6,70 @@ import { getAuth } from 'firebase-admin/auth';
 import fixture from './helpers/pedagogy-results-fixture.cjs';
 import { loginAs } from './helpers/auth';
 import { verifyStoredTaughtReview } from './helpers/pedagogy-taught-review';
+import { verifyPreschoolReview } from './helpers/pedagogy-preschool-review';
 
 const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire';
 const staging = process.env.PEDAGOGY_STAGING_E2E === 'true';
 if (!['demo-ecoscolaire', 'ecoscolaire-staging'].includes(projectId) || staging && projectId !== 'ecoscolaire-staging') throw new Error('Production forbidden.');
-test('Lot D: secretary transfers subject assessments and records received canonical results', async ({ page }) => {
+for (const reviewCase of [
+  { name: 'CE1', section: 'francophone', stage: 'primary', label: 'primary FR' },
+  { name: 'Class 3', section: 'anglophone', stage: 'primary', label: 'primary EN' },
+  { name: '6e', section: 'francophone', stage: 'secondary', label: 'secondary FR' },
+  { name: 'Form 1', section: 'anglophone', stage: 'secondary', label: 'secondary EN' },
+  { name: 'Maternelle 1', section: 'francophone', stage: 'preschool', label: 'preschool' },
+]) test(`Review ${reviewCase.label}: isolated stored chain and live secretary results/support`, async ({ page }) => {
   const emulator = projectId === 'demo-ecoscolaire' && Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
   if (process.env.CI && !staging && !emulator) throw new Error('CI emulator configuration missing; refusing a skipped success.');
   test.skip(!staging && !emulator, 'Full emulators or explicit Staging required.');
-  test.setTimeout(180_000);
+  test.setTimeout(staging ? 300_000 : 180_000);
   const prefix = `pedagogy-results-${randomBytes(8).toString('hex')}`;
   const app = initializeApp({ projectId }, prefix), db = initializeFirestore(app, { preferRest: staging }), auth = getAuth(app);
-  const f = await fixture.seedResultsFixture(db, prefix);
+  const f = await fixture.seedResultsFixture(db, prefix, reviewCase);
   let createdAuth = false;
   try {
     const email = `${prefix}@example.invalid`, password = randomBytes(24).toString('base64url');
     await auth.createUser({ uid: f.secretaryId, email, password }); createdAuth = true;
     await auth.setCustomUserClaims(f.secretaryId, { role: 'secretary', schoolId: f.schoolId });
     await loginAs(page, email, password);
+    await test.step('Stored synthetic curriculum, plan, template and taught receipt are linked', async () => {
+      const preparation = (await db.doc(`lessonPreparations/${prefix}-prep-math`).get()).data()!;
+      expect(preparation.isTestFixture).toBe(true);
+      expect((await db.doc(`curriculumUnits/${preparation.curriculumUnitId}`).get()).data()?.sourceType).toBe('mock');
+      expect((await db.doc(`teachingPlans/${preparation.planId}`).get()).data()?.isTestFixture).toBe(true);
+      expect((await db.doc(`teachingPlanItems/${preparation.planItemId}`).get()).data()?.curriculumUnitId).toBe(preparation.curriculumUnitId);
+      expect((await db.doc(`lessonPreparationTemplates/${preparation.templateId}`).get()).exists).toBe(true);
+      expect(preparation.teachingConfirmation.status).toBe('taught');
+      await page.goto('/#/pedagogy/preparations');
+      await expect(page.getByRole('heading', { name: 'Préparations de cours' })).toBeVisible();
+      console.log(`REVIEW_CHAIN ${reviewCase.label}: linked synthetic stored states; no real teaching declaration and no AI generation`);
+    });
+    if (reviewCase.stage === 'preschool') {
+      await verifyPreschoolReview(page, db, f);
+      return;
+    }
+    await test.step('Five isolated review examples and responsive resources', async () => {
+      await page.goto('/#/pedagogy/resources');
+      await expect(page.getByRole('heading', { name: 'Cinq parcours de revue synthétiques' })).toBeVisible();
+      const review = page.getByRole('region', { name: 'Laboratoire synthétique de revue' });
+      for (const id of ['original-nursery-fr-v1', 'original-primary-fr-v1', 'original-primary-en-v1', 'original-secondary-fr-v1', 'original-secondary-en-v1']) {
+        await review.getByLabel('Parcours synthétique').selectOption(id);
+        await expect(review.getByText('Étape 1 / 9', { exact: true })).toBeVisible();
+        for (let step = 1; step < 9; step++) await review.getByRole('button', { name: 'Étape suivante (simulation)' }).click();
+        await expect(review.getByRole('heading', { name: 'Remédiation — simulation' })).toBeVisible();
+        await review.getByRole('button', { name: 'Réinitialiser la simulation' }).click();
+      }
+      for (const width of [360, 768, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+      }
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.goto('/#/pedagogy/program');
+      await page.getByLabel('Classe à consulter').selectOption(f.classId);
+      if (reviewCase.stage === 'primary') {
+        await expect(page.getByRole('heading', { name: 'Matières documentées' })).toBeVisible();
+        await expect(page.getByText(reviewCase.section === 'francophone' ? 'Mathématiques' : 'Mathematics', { exact: true })).toBeVisible();
+      } else await expect(page.getByText('MISSING_OFFICIAL_SOURCE', { exact: true })).toBeVisible();
+    }, { timeout: 60000 });
     await page.goto('/#/pedagogy/results');
     await expect(page.getByRole('heading', { name: 'Résultats et suivi' })).toBeVisible();
     await expect(page.getByText('Synthetic weekly assessment · version 1, correction 0')).toBeVisible();
@@ -115,7 +161,7 @@ test('Lot D: secretary transfers subject assessments and records received canoni
       await expect(paper).not.toContainText('Synthetic answer');
       await page.getByLabel('Exemplaire de la banque').selectOption('correction');
       await expect(paper).toContainText('Synthetic answer');
-      await expect(paper).toContainText('BROUILLON — À VALIDER PAR L’ENSEIGNANT');
+      await expect(paper).toContainText(reviewCase.section === 'anglophone' ? 'DRAFT - TEACHER APPROVAL REQUIRED' : 'BROUILLON — À VALIDER PAR L’ENSEIGNANT');
       for (const width of [390, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth), 'Bank must not overflow the viewport').toBeLessThanOrEqual(width + 1);

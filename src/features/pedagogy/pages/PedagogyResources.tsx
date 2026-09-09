@@ -7,6 +7,7 @@ import { provenanceRegistry, provenanceBadge } from '../resources/provenanceRegi
 import { pedagogicalReviewPackText } from '../resources/pedagogicalReviewPack';
 import { structuredReviewExcerpts } from '../resources/minedubVerified';
 import { resourceTaxonomy } from '../resources/resourceTaxonomy';
+import { SyntheticReviewLab } from '../components/SyntheticReviewLab';
 import type { OriginalTemplate, ResourceCycle } from '../resources/originalTemplates';
 
 const cycleLabels: Record<ResourceCycle, string> = { pre_nursery: 'Prématernelle / Pre-nursery', nursery: 'Maternelle / Nursery', primary: 'Primaire / Primary', secondary: 'Collège / Secondary' };
@@ -32,6 +33,7 @@ export default function PedagogyResources() {
   return <div className="pedagogy-page">
     <PedagogyHeader title="Ressources pédagogiques" description="Modèles intégrés consultables et exportables. Aucun téléchargement ne vaut adoption, cours enseigné ou validation par un enseignant." /><PedagogyNav />
     <button onClick={downloadRegistry}>Exporter le registre complet de provenance (JSON)</button>
+    <SyntheticReviewLab />
     <section className="pedagogy-card"><h2>Dossier de revue pédagogique humaine</h2><p>Cinq exemples : maternelle FR, primaire FR/EN, secondaire FR/EN. Références MINEDUB localisées lorsqu’elles sont disponibles, exemples internes originaux, progression proposée, préparation, bilan/évaluation, corrigé, preuves d’objectifs et remédiation. Correspondances ITALO et décisions humaines en attente ; sources secondaires manquantes.</p><button onClick={downloadReviewPack}>Télécharger PEDAGOGICAL_REVIEW_PACK</button></section>
     <section className="pedagogy-card"><h2>Classement des ressources et épreuves</h2><p>Ces catégories ne sont pas un inventaire de documents disponibles. La banque actuelle contient uniquement les évaluations internes effectivement validées dans le périmètre sélectionné.</p>{resourceTaxonomy.map(category => <details key={category.kind}><summary>{category.label}</summary><p>{category.requirement}</p></details>)}</section>
     <div className="pedagogy-alert"><strong>Fonds original à relire : 8 modèles, 4 cycles, français et anglais.</strong><p>Ces textes ont été rédigés avec un assistant pour le projet. Ils ne sont ni des programmes officiels, ni des extraits de CEDUC, ni des contenus validés par les enseignants. Les rattachements au programme et l’adaptation à la classe restent à confirmer.</p></div>

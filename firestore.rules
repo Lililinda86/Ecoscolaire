@@ -1275,6 +1275,10 @@ service cloud.firestore {
     }
 
     match /schoolCurriculumAdoptions/{adoptionId} {
+      match /reviewDecisions/{decisionId} {
+        allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
+        allow write: if false;
+      }
       allow read: if isAuthenticated() && isActive() && hasSchoolAccess(resource.data.schoolId) && (isSuperAdmin() || isOwner() || isDirector() || isSecretary() || isBoardViewer());
       allow create, update, delete: if false;
     }
