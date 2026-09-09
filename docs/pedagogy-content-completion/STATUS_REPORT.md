@@ -1,5 +1,36 @@
 # Remplissage pédagogique — exécution en cours
 
+## Reprise active après 243d2e9
+
+PR 238 vers staging, branche codex/pedagogy-content-completion, code publié.
+Les anciens « aucun push » ci-dessous décrivent le premier checkpoint seulement.
+Gate Linux 34313264513 : statique PASS, Functions/règles Firestore/Storage/A4 PASS ;
+échec Lot A sur ancien texte « Progression planifiée uniquement », diagnostic établi,
+sélecteur corrigé pour le nouveau libellé. Nouvelle exécution après push du correctif.
+
+Configuration Staging appliquée : uniquement catalogLevelId ajouté à 12 classes
+primaires historiques (noms/IDs inchangés), commit Firestore atomique avec updateTime.
+Lecture après écriture PASS ; deuxième dry-run : zéro changement. Aucun élève,
+résultat, matière, horaire, affectation ou adoption modifié. Ne pas déclarer qu'aucune
+configuration Staging n'a changé. Six classes préscolaires historiques restent sans
+niveau canonique renseigné ; correspondance aux années MINEDUB à décision humaine.
+
+Contenu intégré : index de 10 disciplines pour chacun des six référentiels primaires
+et 5 domaines pour chacun des deux référentiels préscolaires. Ce sont des références
+documentées consultables, PAS 70 matières locales configurées. Cinq simulations en
+mémoire accessibles dans Ressources, distinctes d'une recette backend complète par
+cycle. Les collections ITALO ne reçoivent aucune fixture.
+
+MINESEC : PDF Seconde anglais pour francophones, 2018, 33 pages consultables par
+chemin direct. Arrêté non numéroté/date non renseignée et téléchargement local expiré :
+OFFICIAL_PENDING_VERIFICATION, aucune empreinte inventée. Courte reformulation du
+module 1 p.11 consultable ; série A/C/D et applicabilité à confirmer.
+GCE Board : règlements/syllabus et annales via bureaux, aucun achat. CEDUC : candidat
+Communauté Éducative Camerounaise identifié par sa présentation publique ; identité
+juridique, URL canonique active et licence restent inconnues, LINK_ONLY.
+
+OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
+
 Base vérifiée : origin/staging 9eb7fbdec84386f7f0d58433a9463d29d25b8f38.
 Branche : codex/pedagogy-content-completion. Worktree : ecoscolaire-pedagogy-content-completion.
 Les anciens worktrees et leurs modifications sont préservés.
