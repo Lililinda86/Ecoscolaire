@@ -1,3 +1,4 @@
+import { saveTransportSettings, transportSettingsPolicy } from '../services/transportSettings';
 import { activeFeeClass } from '../../functions/src/feeTargeting';
 import { financialSettingsPayload, stableConfiguration } from '../utils/financialSettingsPayload';
 import { httpsCallable } from 'firebase/functions';
@@ -7,7 +8,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SchoolFeeCatalog } from '../components/Settings/SchoolFeeCatalog';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDocFromServer, setDoc, updateDoc } from 'firebase/firestore';
 import { db as firestoreDb } from '../db/firebase';
 import { sortClasses } from '../utils/sortClasses';
 import { getClassOptionLabel } from '../utils/classCatalog';
@@ -104,6 +105,8 @@ const FullSettings: React.FC = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [transportSaveError, setTransportSaveError] = useState('');
+  const [transportSaveMessage, setTransportSaveMessage] = useState('');
   const [draftTransportPolicy, setDraftTransportPolicy] = useState(false);
   const [draftItaloTransportEnabled, setDraftItaloTransportEnabled] = useState(false);
   const [draftTransportBillingPeriods, setDraftTransportBillingPeriods] = useState('');
@@ -226,6 +229,38 @@ const FullSettings: React.FC = () => {
     return amount;
   };
 
+  const transportDirty = (() => {
+    if (!db.school) return false;
+    try {
+      return stableConfiguration(transportSettingsPolicy(db.school.academicYear, {
+        enabled: draftItaloTransportEnabled, periods: draftTransportBillingPeriods,
+        pk14To33: draftPkRates.pk14To33, pk34To42: draftPkRates.pk34To42
+      })) !== stableConfiguration(financialSettingsPayload(db.school).transportPolicy);
+    } catch { return true; }
+  })();
+
+  const handleSaveTransport = async () => {
+    if (!db.school || isSaving || !canEditFees) return;
+    setTransportSaveError('');
+    setTransportSaveMessage('');
+    setIsSaving(true);
+    try {
+      const savedSchool = await saveTransportSettings(db.school, {
+        enabled: draftItaloTransportEnabled, periods: draftTransportBillingPeriods,
+        pk14To33: draftPkRates.pk14To33, pk34To42: draftPkRates.pk34To42
+      }, tariffReason);
+      updateLocalState({ school: savedSchool });
+      setDraftItaloTransportEnabled(savedSchool.transportPolicy?.feePolicyId === 'ITALO_PK_2026');
+      setDraftTransportBillingPeriods((savedSchool.transportPolicy?.billingPeriods || []).join(', '));
+      setDraftPkRates({ pk14To33: String(savedSchool.transportPolicy?.pkRates?.pk14To33 ?? 4000), pk34To42: String(savedSchool.transportPolicy?.pkRates?.pk34To42 ?? 5000) });
+      setTransportSaveMessage('Transport enregistré et confirmé par le serveur.');
+    } catch (error) {
+      setTransportSaveError(error instanceof Error ? error.message : 'Enregistrement non confirmé. Réessayez.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveChanges = async (financialOnly = false) => {
     if (!db.school || isSaving) return;
 
@@ -278,23 +313,19 @@ const FullSettings: React.FC = () => {
       alert(errorMsg);
       return;
     }
-    const normalizedTransportPeriods = [...new Set(draftTransportBillingPeriods
-      .split(/[\s,;]+/)
-      .map(value => value.trim())
-      .filter(Boolean))].sort();
-    if (draftItaloTransportEnabled) {
-      if (normalizedTransportPeriods.length === 0) {
-        alert('Configurez au moins un mois facturable pour le transport ITALO.');
-        return;
-      }
-      const allowedYears = new Set([String(yearStart), String(yearEnd)]);
-      if (normalizedTransportPeriods.some(period =>
-        !/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || !allowedYears.has(period.slice(0, 4)))) {
-        alert('Chaque mois transport doit utiliser YYYY-MM et appartenir à l’année scolaire affichée.');
-        return;
-      }
+    let normalizedTransport;
+    try {
+      normalizedTransport = transportSettingsPolicy(db.school.academicYear, {
+        enabled: draftItaloTransportEnabled, periods: draftTransportBillingPeriods,
+        pk14To33: draftPkRates.pk14To33, pk34To42: draftPkRates.pk34To42
+      });
+      setTransportSaveError('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Transport non enregistré.';
+      setTransportSaveError(message);
+      alert(message);
+      return;
     }
-
 
     // 6. PIN Conditional Inclusion
     const normPin = draftAdminPin.trim();
@@ -340,9 +371,7 @@ const FullSettings: React.FC = () => {
         transportPolicy: {
           ...(db.school.transportPolicy || {}),
           secretaryManageAll: draftTransportPolicy,
-          feePolicyId: draftItaloTransportEnabled ? ('ITALO_PK_2026' as const) : null,
-          billingPeriods: draftItaloTransportEnabled ? normalizedTransportPeriods : [],
-          pkRates: { pk14To33: normalizeFee('PK14–PK33', draftPkRates.pk14To33), pk34To42: normalizeFee('PK34–PK42', draftPkRates.pk34To42) }
+          ...normalizedTransport
         }
       };
 
@@ -382,8 +411,11 @@ const FullSettings: React.FC = () => {
       if (!financialOnly && canEditInstitution && draftTransportPolicy !== (db.school.transportPolicy?.secretaryManageAll === true)) {
         await updateDoc(doc(firestoreDb, 'schools', db.school.id), { 'transportPolicy.secretaryManageAll': draftTransportPolicy });
       }
-      const saved = await getDoc(doc(firestoreDb, 'schools', db.school.id));
+      const saved = await getDocFromServer(doc(firestoreDb, 'schools', db.school.id));
       const savedSchool = { ...saved.data(), id: db.school.id } as School;
+      if (!saved.exists() || stableConfiguration(financialSettingsPayload(savedSchool)) !== stableConfiguration(tariffConfiguration)) {
+        throw new Error('Enregistrement non confirmé par le serveur. Rechargez les paramètres.');
+      }
       updateLocalState({ school: savedSchool });
       alert("Paramètres enregistrés avec succès.");
       initDraftsFromSchool(savedSchool);
@@ -978,6 +1010,10 @@ const FullSettings: React.FC = () => {
             Maternelle et primaire : transport payant selon le point PK. Secondaire : gratuit. Les mensualités déjà établies restent inchangées.
           </p>
           <h3 id="transport-configuration">Transport — tarifs des nouvelles mensualités</h3>
+          <p role="status" data-testid="transport-save-status">{transportDirty ? 'Modifications Transport non enregistrées.' : transportSaveMessage || 'Transport chargé depuis les paramètres enregistrés.'}</p>
+          {transportSaveError && <p role="alert">{transportSaveError}</p>}
+          <label>Motif de la modification Transport<textarea data-testid="transport-save-reason" value={tariffReason} maxLength={500} disabled={!canEditFees || isSaving} onChange={event => setTariffReason(event.target.value)} /></label>
+          <button type="button" data-testid="save-transport-settings" disabled={!canEditFees || isSaving} onClick={() => void handleSaveTransport()}>Enregistrer le transport</button>
           <div className="school-fee-grid">
             <label>PK14 à PK33 — FCFA / mois<input type="number" min="1" step="1" value={draftPkRates.pk14To33} disabled={!canEditFees} onChange={e => setDraftPkRates(p => ({ ...p, pk14To33: e.target.value }))} /></label>
             <label>PK34 à PK42 — FCFA / mois<input type="number" min="1" step="1" value={draftPkRates.pk34To42} disabled={!canEditFees} onChange={e => setDraftPkRates(p => ({ ...p, pk34To42: e.target.value }))} /></label>
@@ -989,7 +1025,7 @@ const FullSettings: React.FC = () => {
               rows={2}
               value={draftTransportBillingPeriods}
               onChange={event => setDraftTransportBillingPeriods(event.target.value)}
-              disabled={!canEditFees || !draftItaloTransportEnabled}
+              disabled={!canEditFees || isSaving}
               placeholder="Exemple de format : 2026-09, 2026-10 (saisir uniquement les mois décidés par ITALO)"
               style={{ width: '100%', marginTop: '.35rem' }}
             />
