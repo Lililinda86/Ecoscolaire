@@ -50,6 +50,8 @@ it('missing sources cannot be approved; old source versions are not current deci
   renderAll(); await waitFor(() => expect(screen.queryByText('Chargement des décisions…')).toBeNull());
   const select = screen.getByLabelText('Choix — D27') as HTMLSelectElement;
   expect(select.options[1].disabled).toBe(true); expect(screen.getByText('0 approuvées')).toBeTruthy();
+  expect((screen.getByLabelText('Choix — D13') as HTMLSelectElement).options[1].disabled).toBe(false);
+  expect(screen.queryByLabelText('Sélectionner D13')).toBeNull();
   expect(screen.queryByLabelText('Sélectionner D27')).toBeNull();
 });
 it('tenant changes clear selection and secretary is consultation only', async () => {

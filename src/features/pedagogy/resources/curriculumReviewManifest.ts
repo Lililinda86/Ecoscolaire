@@ -382,13 +382,13 @@ export const curriculumReviewProposals = [
     "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
     "certain": "Aucune correspondance matière locale/source confirmée.",
     "uncertain": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
-    "recommendation": "ATTENDRE SOURCE OFFICIELLE",
+    "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
     "rationale": "PROBABLE — organisation locale à confirmer. Les pièces et lacunes ci-dessus bornent précisément ce qui peut être retenu ; ne pas étendre une source à un autre niveau ou sous-système.",
     "highConfidence": false,
     "missingSource": false,
     "sourceVersion": "163fac899a8a8558bb088349c95d44d98a495ff5ad0d67ae50ddd83de71f942b",
     "sourceDate": "2026-09-09",
-    "mappingVersion": "68f3c82b3536c2e02a8571731cdfc2a84426eec0800f68101a5d81a30ddecd72"
+    "mappingVersion": "3bc1a92ba3c5d78b3c6121f3fc193d74f96f735730be6d3579004330f498c4de"
   },
   {
     "id": "D14",
@@ -412,13 +412,13 @@ export const curriculumReviewProposals = [
     "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
     "certain": "Aucune correspondance matière locale/source confirmée.",
     "uncertain": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
-    "recommendation": "ATTENDRE SOURCE OFFICIELLE",
+    "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
     "rationale": "PROBABLE — organisation locale à confirmer. Les pièces et lacunes ci-dessus bornent précisément ce qui peut être retenu ; ne pas étendre une source à un autre niveau ou sous-système.",
     "highConfidence": false,
     "missingSource": false,
     "sourceVersion": "163fac899a8a8558bb088349c95d44d98a495ff5ad0d67ae50ddd83de71f942b",
     "sourceDate": "2026-09-09",
-    "mappingVersion": "c97d9660b8f0700638515f5f5407010097a9db18c884d3f49aa79412d6c3bd89"
+    "mappingVersion": "09a1a93c34c43f518c7299a42253f1b8b7f2e7551dd9504be5fe07a96d961bbe"
   },
   {
     "id": "D15",
@@ -496,13 +496,13 @@ export const curriculumReviewProposals = [
     "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
     "certain": "Aucune correspondance matière locale/source confirmée.",
     "uncertain": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
-    "recommendation": "ATTENDRE SOURCE OFFICIELLE",
+    "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
     "rationale": "PROBABLE — organisation locale à confirmer. Les pièces et lacunes ci-dessus bornent précisément ce qui peut être retenu ; ne pas étendre une source à un autre niveau ou sous-système.",
     "highConfidence": false,
     "missingSource": false,
     "sourceVersion": "7abff1984aeb1aa97fc86dc12af5a28587539997769f54880516cd7a79fd9b62",
     "sourceDate": "2026-09-09",
-    "mappingVersion": "ef9466cd7da5c6ae982815182368d0963c5d560e6960df0060963fedabb14158"
+    "mappingVersion": "90e4d6f6deed85f26bc920c9207bd5cc61c8d5b5a52e5837166060d6b1211839"
   },
   {
     "id": "D18",
@@ -526,13 +526,13 @@ export const curriculumReviewProposals = [
     "missing": "Confirmer que cette classe est bien l’une des deux dernières années avant le primaire ; appellation seule insuffisante. Pas de collecte de dates de naissance nécessaire.",
     "certain": "Aucune correspondance matière locale/source confirmée.",
     "uncertain": "Le rapport MINEDUB décrit trois sections dans le privé, contre deux années publiques ; proposition fondée sur la position dans le parcours, pas sur une identité réglementaire des libellés.",
-    "recommendation": "ATTENDRE SOURCE OFFICIELLE",
+    "recommendation": "PROGRAMME ITALO LOCAL À VALIDER",
     "rationale": "PROBABLE — organisation locale à confirmer. Les pièces et lacunes ci-dessus bornent précisément ce qui peut être retenu ; ne pas étendre une source à un autre niveau ou sous-système.",
     "highConfidence": false,
     "missingSource": false,
     "sourceVersion": "7abff1984aeb1aa97fc86dc12af5a28587539997769f54880516cd7a79fd9b62",
     "sourceDate": "2026-09-09",
-    "mappingVersion": "a3b82ec051aea57e6b495696dee65467d178bc6b559a3438d6b0e06b41491234"
+    "mappingVersion": "28d39568477f88e6b60dc1af36d70fdbb71c8620113e2143255e1e7bf151634e"
   },
   {
     "id": "D19",

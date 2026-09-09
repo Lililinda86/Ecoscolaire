@@ -76,7 +76,7 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
         const p = row.proposal, existing = currentProposalDecision(resource.data, row);
         return <article key={row.classId} data-testid={'proposal-' + p.id} className="curriculum-review-proposal">
           <h4>{p.id} — {p.name}</h4><p>RECOMMANDATION : <strong>{p.recommendation}</strong></p>
-          <p>{p.highConfidence ? 'Forte confiance — correspondance classe/niveau uniquement.' : 'À examiner — approbation indisponible tant que le dossier est insuffisant.'}</p>
+          <p>{p.highConfidence ? 'Forte confiance — correspondance classe/niveau uniquement.' : p.missingSource ? 'À examiner — approbation indisponible tant que la source est insuffisante.' : 'À examiner individuellement — document présent, équivalence locale conditionnelle à confirmer par la propriétaire.'}</p>
           {owner && p.highConfidence && <label><input type="checkbox" aria-label={'Sélectionner ' + p.id} checked={selected.includes(row.classId)} disabled={locked || Boolean(confirmation)} onChange={e => setSelected(v => e.target.checked ? [...v, row.classId] : v.filter(id => id !== row.classId))} />Sélectionner pour approbation groupée</label>}
           <dl><dt>CLASSE ITALO</dt><dd>{row.className}</dd><dt>SECTION</dt><dd>{p.section}</dd><dt>SOUS-SYSTÈME</dt><dd>{p.subsystem}</dd><dt>NIVEAU LOCAL</dt><dd>{p.localLevel}</dd><dt>PROGRAMME PROPOSÉ</dt><dd>{p.program}</dd><dt>AUTORITÉ</dt><dd>{p.authority}</dd><dt>STATUT D’AUTHENTIFICATION</dt><dd>{p.sources.length ? p.authentication : 'Aucune source officielle suffisante pour ce rattachement local.'}</dd></dl>
           <details><summary>Documents, couverture et justification — {p.id}</summary>
@@ -87,8 +87,8 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
           {existing && <p>Par {existing.decidedBy} — {existing.decidedAt ? new Date(existing.decidedAt.seconds * 1000).toLocaleString() : 'date serveur en cours'} — {existing.decisionNote} (révision {existing.revision})</p>}
           {resource.data.some(d => d.classId === row.classId && d.mappingVersion !== p.mappingVersion) && <p>Une décision existe sur une ancienne version ; elle ne vaut pas validation de cette proposition.</p>}
           {owner && <fieldset disabled={locked || Boolean(confirmation)}><legend>Décision humaine — {p.id}</legend>
-            <label>Choix — {p.id}<select value={drafts[row.classId] || ''} onChange={e => setDrafts(v => ({ ...v, [row.classId]: e.target.value as Decision | '' }))}><option value="">Choisir une décision…</option><option value="APPROVED" disabled={!p.highConfidence}>APPROUVER</option><option value="REQUEST_CHANGE">DEMANDER CORRECTION</option><option value="NOT_APPLICABLE">NON APPLICABLE</option></select></label>
-            <label>Note — {p.id}<textarea maxLength={2000} value={notes[row.classId] || ''} onChange={e => setNotes(v => ({ ...v, [row.classId]: e.target.value }))} /></label>
+            <label>Choix — {p.id}<select aria-label={'Choix — ' + p.id} value={drafts[row.classId] || ''} onChange={e => setDrafts(v => ({ ...v, [row.classId]: e.target.value as Decision | '' }))}><option value="">Choisir une décision…</option><option value="APPROVED" disabled={p.missingSource || !p.sources.length}>APPROUVER</option><option value="REQUEST_CHANGE">DEMANDER CORRECTION</option><option value="NOT_APPLICABLE">NON APPLICABLE</option></select></label>
+            <label>Note — {p.id}<textarea aria-label={'Note — ' + p.id} maxLength={2000} value={notes[row.classId] || ''} onChange={e => setNotes(v => ({ ...v, [row.classId]: e.target.value }))} /></label>
             <button type="button" disabled={!drafts[row.classId] || !notes[row.classId]?.trim()} onClick={() => setConfirmation([{ row, decision: drafts[row.classId] as Decision, note: notes[row.classId].trim() }])}>Enregistrer la décision — {p.id}</button>
           </fieldset>}
         </article>;

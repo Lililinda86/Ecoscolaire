@@ -10,6 +10,8 @@ Contrôles locaux exécutés : typecheck frontend/Functions PASS ; compilation F
 
 Mise à jour : régression locale complète PASS (134 fichiers / 825 tests). PR #242 ouverte. Premier build CI bloqué par la taille du bundle principal (2,21 MB, limite PWA 2 MiB). Correction ciblée : chargement différé de la page Programme, selon le mécanisme existant des Ressources ; limite de cache inchangée. Ajout d’une vérification ITALO Staging en lecture seule après recette synthétique.
 
+Passage CI 4038282 : static gates, frontend, Vercel et contrôles serveur/règles PASS. Recette navigateur : affichage 34/six groupes et responsive exécutés ; échec du sélecteur exact « Choix — D27 » (libellé implicite du select), avant décision. Nettoyage de la fixture confirmé. Correction : aria-label explicite sur les champs ; pas de modification des permissions pour résoudre le test. Approbation individuelle distinguée de la groupée : 4 rattachements préscolaires documentés mais conditionnels soumis à décision owner individuelle ; 18 dossiers sans source suffisante non approuvables ; groupée limitée aux 12 fortes.
+
 Plan et reprise : CURRICULUM_REVIEW_EXECUTION.md. Prochaine étape : PR vers staging, CI Linux puis recette exacte. OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
 
 La compilation a régénéré des fichiers suivis sous functions/lib ; ces sorties ne sont pas incluses dans la PR et restent préservées localement. Les sources sont compilées à neuf par la CI.

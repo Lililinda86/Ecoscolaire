@@ -32,7 +32,7 @@ const proposals = audit.classes.map((item, i) => {
     authentication: 'Provenance ministérielle documentée pour les liens présents ; promulgation et applicabilité actuelle non certifiées. Voir les réserves de chaque document.',
     covered: field('MATIÈRES/DOMAINES OFFICIELS RETROUVÉS'), missing: item.missing,
     certain: field('CORRESPONDANCES CERTAINES'), uncertain: field('CORRESPONDANCES PROBABLES'),
-    recommendation: highConfidence ? 'APPROUVER' : local ? 'PROGRAMME ITALO LOCAL À VALIDER' : 'ATTENDRE SOURCE OFFICIELLE',
+    recommendation: highConfidence ? 'APPROUVER' : local || ['D13','D14','D17','D18'].includes(item.id) ? 'PROGRAMME ITALO LOCAL À VALIDER' : 'ATTENDRE SOURCE OFFICIELLE',
     rationale: field('JUSTIFICATION'), highConfidence,
     // Conditional preschool mappings have a document, but no established local equivalence.
     missingSource: !highConfidence && !['D13','D14','D17','D18'].includes(item.id),

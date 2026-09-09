@@ -20,7 +20,7 @@ export const recordCurriculumProposalDecisions = functions.https.onCall(async (d
     const proposal = curriculumReviewProposals.find(p => p.id === raw?.proposalId);
     if (!proposal || raw.sourceVersion !== proposal.sourceVersion || raw.mappingVersion !== proposal.mappingVersion) throw new functions.https.HttpsError('aborted', 'Version documentaire modifiée : rechargez.');
     if (!['APPROVED', 'REQUEST_CHANGE', 'NOT_APPLICABLE'].includes(String(raw.decision)) || !Number.isInteger(raw.expectedRevision) || Number(raw.expectedRevision) < 0 || typeof raw.decisionNote !== 'string' || !raw.decisionNote.trim() || raw.decisionNote.length > 2000) throw new functions.https.HttpsError('invalid-argument', 'Décision, note et révision attendue requises.');
-    if (raw.decision === 'APPROVED' && !proposal.highConfidence) throw new functions.https.HttpsError('failed-precondition', 'Source ou correspondance insuffisante : correction documentaire nécessaire avant approbation.');
+    if (raw.decision === 'APPROVED' && (proposal.missingSource || !proposal.sources.length)) throw new functions.https.HttpsError('failed-precondition', 'Source insuffisante : correction documentaire nécessaire avant approbation.');
     if (data.items.length > 1 && (raw.decision !== 'APPROVED' || !proposal.highConfidence)) throw new functions.https.HttpsError('invalid-argument', 'Action groupée réservée aux correspondances à forte confiance.');
     return { classId, proposal, decision: String(raw.decision), decisionNote: raw.decisionNote.trim(), expectedRevision: Number(raw.expectedRevision) };
   });

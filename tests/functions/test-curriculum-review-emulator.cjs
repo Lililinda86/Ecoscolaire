@@ -17,7 +17,7 @@ const call = (items, role = 'owner', extra = {}) => fn.run({ schoolId, academicY
     for (const role of ['secretary', 'director', 'superAdmin', 'foreign']) await assert.rejects(call([item(0)], role), e => e.code === 'permission-denied');
     await assert.rejects(call([item(0)], 'owner', { confirmed: false }), e => e.code === 'invalid-argument');
     for (const field of ['sourceVersion', 'mappingVersion']) await assert.rejects(call([{ ...item(0), [field]: 'stale' }]), e => e.code === 'aborted');
-    for (let i = 12; i < 34; i++) await assert.rejects(call([item(i)]), e => e.code === 'failed-precondition');
+    for (let i = 12; i < 34; i++) if (proposals[i].missingSource) await assert.rejects(call([item(i)]), e => e.code === 'failed-precondition');
     await assert.rejects(call([item(0), item(0)]), e => e.code === 'invalid-argument');
     await assert.rejects(call([item(0), item(1, 'REQUEST_CHANGE')]), e => e.code === 'invalid-argument');
     await db.doc('classes/' + schoolId + '-D02').update({ schoolId: 'foreign' });
@@ -41,6 +41,8 @@ const call = (items, role = 'owner', extra = {}) => fn.run({ schoolId, academicY
       if (d.proposalId === 'D27') assert.equal((await doc.ref.collection('history').doc('1').get()).data().decision, 'REQUEST_CHANGE');
     }
     assert.equal((await db.collection('audit_logs').where('schoolId', '==', schoolId).get()).size, 14);
+    await call([item(12)]); // Conditional, documented preschool mapping: owner individual review only.
+    await assert.rejects(call([item(13), item(16)]), e => e.code === 'invalid-argument');
     console.log('CURRICULUM_REVIEW_BACKEND PASS: owner, tenant, 34 mappings, source guards, atomic batch, idempotency, immutable history and audit');
   } finally {
     for (const collection of ['curriculumProposalReviews', 'curriculumReviewRequests', 'audit_logs', 'classes', 'academicYears', 'users']) {
