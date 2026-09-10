@@ -111,6 +111,7 @@ const students = {};
   assert.equal(oldLine.label, initialLine.label); assert.equal(oldLine.grossExpectedAmount, 7500); assert.equal(oldLine.originalDueDate, null);
   const newLine = (await call('getStudentFinancialAccount', { studentId: students.primary36, academicYear, monthlyTransport: true }, secretaryId)).lines.find(l => l.feeId === editId);
   assert.equal(newLine.label, 'Revised label'); assert.equal(newLine.grossExpectedAmount, 9000); assert.equal(newLine.originalDueDate, '2027-06-20');
+    assert.equal(newLine.tariffVersion, (await call('getSchoolFeeCatalog', {})).fees.find(f => f.id === editId).versionId, 'new obligations retain the published revision identity');
   assert.equal((await db.collection('payments').where('schoolId', '==', schoolId).get()).size, paymentsBefore);
   await call('manageSchoolFee', { action: 'archive', feeId: editId });
   // Remove only this test catalogue/assignment/snapshot to preserve pre-existing exact line-count assertions below.
