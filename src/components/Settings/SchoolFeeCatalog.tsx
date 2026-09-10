@@ -46,6 +46,7 @@ export function SchoolFeeCatalog() {
   const { db, currentUser } = useAppContext();
   const school = db.school;
   const editor = useRef<HTMLDetailsElement>(null);
+  const catalogRead = useRef(0);
   const [editing, setEditing] = useState<Fee | null>(null);
   const [editReason, setEditReason] = useState('');
   const [loading, setLoading] = useState(true);
@@ -66,9 +67,10 @@ export function SchoolFeeCatalog() {
   const canManage = ['owner', 'director', 'superAdmin'].includes(currentUser?.role || '');
   const load = useCallback(async () => {
     if (!school?.id) return;
+    const request = ++catalogRead.current;
     const result = await httpsCallable<{ schoolId: string }, { fees: Fee[] }>(functions, 'getSchoolFeeCatalog')({ schoolId: school.id });
     if (!Array.isArray(result.data.fees)) throw new Error('Réponse du catalogue invalide. Rechargez la page.');
-    setFees(result.data.fees); setLoading(false);
+    if (request === catalogRead.current) { setFees(result.data.fees); setLoading(false); }
     return result.data.fees;
   }, [school?.id]);
   useEffect(() => { void load().catch(e => { setLoading(false); setError(e instanceof Error ? e.message : 'Catalogue indisponible.'); }); }, [load]);

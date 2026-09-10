@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { SchoolFeeCatalog } from '../../src/components/Settings/SchoolFeeCatalog';
-const state = vi.hoisted(() => ({ fees: [] as Record<string, unknown>[], failure: '', omit: false, saves: 0 }));
+const state = vi.hoisted(() => ({ fees: [] as Record<string, unknown>[], failure: '', omit: false, saves: 0, delayRead: false, finishRead: null as null | ((value: { data: { fees: Record<string, unknown>[] } }) => void) }));
 vi.mock('../../src/db/firebase', () => ({ functions: {} }));
 vi.mock('../../src/context/AppContext', () => ({ useAppContext: () => ({ currentUser: { role: 'director' }, db: {
   school: { id: 'school', academicYear: '2026-2027', activeAcademicYearId: 'year' },
@@ -10,13 +10,14 @@ vi.mock('../../src/context/AppContext', () => ({ useAppContext: () => ({ current
   students: [{ id: 's', schoolId: 'school', name: 'Élève test', classId: 'cp', academicYearId: 'year' }]
 } }) }));
 vi.mock('firebase/functions', () => ({ httpsCallable: (_: unknown, name: string) => async (payload: {feeId: string; fee: Record<string, unknown>}) => {
+  if (name === 'getSchoolFeeCatalog' && state.delayRead) { state.delayRead = false; return new Promise(resolve => { state.finishRead = resolve; }); }
   if (name === 'getSchoolFeeCatalog') return { data: { fees: state.fees } };
   state.saves++;
   if (state.failure) throw new Error(state.failure);
   if (!state.omit) state.fees = [{ ...payload.fee, id: payload.feeId, schemaVersion: 2, active: true }];
   return { data: { feeId: payload.feeId } };
 } }));
-afterEach(() => { cleanup(); state.fees = []; state.failure = ''; state.omit = false; state.saves = 0; });
+afterEach(() => { cleanup(); state.fees = []; state.failure = ''; state.omit = false; state.saves = 0; state.delayRead = false; state.finishRead = null; });
 async function submit() {
   fireEvent.click(screen.getByRole('button', { name: 'Ajouter un frais', exact: true }));
   fireEvent.change(screen.getByLabelText('Libellé précis du frais'), { target: { value: 'Test tenue' } });
@@ -45,4 +46,11 @@ it('never claims success when the readback does not contain the submitted fee', 
   await vi.waitFor(() => expect(screen.getAllByRole('alert')[0].textContent).toContain('Publication non confirmée'));
   expect(screen.queryByText('Frais publié avec succès')).toBeNull();
   expect((screen.getByLabelText('Montant (FCFA)') as HTMLInputElement).value).toBe('5000');
+});
+
+it('ignores an older empty read completing after confirmed publication', async () => {
+  state.delayRead = true; render(<SchoolFeeCatalog />); await submit();
+  await screen.findByText('Frais publié avec succès');
+  state.finishRead!({ data: { fees: [] } });
+  await vi.waitFor(() => expect(screen.getByRole('heading', { name: 'Tenues', exact: true }).closest('section')!.textContent).toContain('Test tenue'));
 });
