@@ -58,6 +58,14 @@ const students = {};
     const fee = { label: category, category, amount: 15000, description: 'Test', academicYear, mandatory: category !== 'excursion', dueDate: '2027-06-15', classIds: [], cycles: ['primary'], studentIds: [] };
     await assert.rejects(call('manageSchoolFee', { action: 'create', feeId, fee }, secretaryId), e => e.code === 'permission-denied');
     await call('manageSchoolFee', { action: 'create', feeId, fee });
+    // Publication persists the debt before any account read, with no out-of-scope debt.
+    const immediately = await db.collection('studentFinancialObligations').where('feeId', '==', feeId).get();
+    assert.equal(immediately.size, fee.mandatory ? 2 : 0);
+    assert.ok(immediately.docs.every(d => [students.primary18, students.primary36].includes(d.data().studentId)));
+    const replay = await call('manageSchoolFee', { action: 'create', feeId, fee });
+    assert.equal(replay.replay, true, 'idempotent retry ignores Firestore object key order');
+    assert.equal((await db.collection('studentFinancialObligations').where('feeId', '==', feeId).get()).size, immediately.size);
+
     await call('manageSchoolFee', { action: 'create', feeId, fee });
     await assert.rejects(call('manageSchoolFee', { action: 'create', feeId, fee: { ...fee, amount: 1 } }), e => e.code === 'already-exists');
   }
