@@ -1,5 +1,6 @@
+import { isDeepStrictEqual } from 'node:util';
 import { recoverHistoricalTariffs } from './legacyObligationTariffs';
-import { readObligations, freezeObligations } from './financialObligationSnapshots';
+import { readObligations, freezeObligations, obligationId } from './financialObligationSnapshots';
 import { activeFeeClass, activeFeeStudent, feeClassCycle } from './feeTargeting';
 import { publishFinancialTariffs } from './financialTariffConfiguration';
 import * as admin from 'firebase-admin';
@@ -93,6 +94,43 @@ async function preserveLegacyFee(tx: admin.firestore.Transaction, db: admin.fire
   return writes;
 }
 
+// Prepare all reads before committing catalogue and mandatory obligations atomically.
+// Existing assignments and obligation snapshots are never updated by a publication.
+async function prepareMandatoryPublication(tx: admin.firestore.Transaction, db: admin.firestore.Firestore,
+  schoolId: string, school: Data, candidates: SchoolFee[], freeze = true) {
+  const policies = candidates.filter(f => f.schemaVersion === 2 && f.mandatory && f.active && f.academicYear === school.academicYear);
+  if (!policies.length) return () => {};
+  const selected = [...new Set(policies.flatMap(f => f.studentIds))];
+  const roster = policies.every(f => f.studentIds.length) ? await Promise.all(selected.map(s => tx.get(db.collection('students').doc(s))))
+    : (await tx.get(db.collection('students').where('schoolId', '==', schoolId))).docs;
+  const writes: Array<() => void> = [];
+  const classes = new Map<string, admin.firestore.DocumentSnapshot>();
+  for (const student of roster) {
+    const data = { ...student.data(), id: student.id };
+    if (!student.exists || !activeFeeStudent(data, schoolId, school.activeAcademicYearId as string | undefined) || !student.data()?.classId) continue;
+    const classId = id(student.data()?.classId);
+    if (!classes.has(classId)) classes.set(classId, await tx.get(db.collection('classes').doc(classId)));
+    const cls = classes.get(classId)!;
+    const classData = { ...cls.data(), id: cls.id, name: String(cls.data()?.name || '') };
+    if (!cls.exists || !activeFeeClass(classData, schoolId, school.activeAcademicYearId as string | undefined)) continue;
+    // Previous policy first freezes debts already due before a revision, including unopened accounts.
+    const fee = policies.find(f => appliesToStudent(f, data, classData, String(school.academicYear)));
+    if (!fee) continue;
+    const assignment = db.collection('studentFeeAssignments').doc(feeAssignmentId(schoolId, student.id, fee.academicYear, fee.id));
+    const key = 'other:' + fee.id;
+    const obligation = db.collection('studentFinancialObligations').doc(obligationId(schoolId, student.id, fee.academicYear, key));
+    const [assigned, frozen] = await Promise.all([tx.get(assignment), tx.get(obligation)]);
+    const snapshot = assigned.exists ? assigned.data()!.fee as SchoolFee : fee;
+    if (!assigned.exists) writes.push(() => tx.create(assignment, { schoolId, studentId: student.id, academicYear: fee.academicYear,
+      feeId: fee.id, fee: snapshot, assignedBy: 'mandatory-policy', assignedAt: admin.firestore.FieldValue.serverTimestamp() }));
+    if (freeze && !frozen.exists) writes.push(() => freezeObligations(tx, db, {}, { schoolId, studentId: student.id, academicYear: fee.academicYear,
+      classId, cycle: feeClassCycle(classData), tariffVersion: String(snapshot.versionId || snapshot.id) },
+    [{ key, type: 'other', category: snapshot.category, label: snapshot.label, grossExpectedAmount: snapshot.amount,
+      netExpectedAmount: snapshot.amount, originalDueDate: snapshot.dueDate, period: null, feeId: fee.id }]));
+  }
+  return () => { for (const write of writes) write(); };
+}
+
 export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentification requise.');
   const schoolId = id(raw?.schoolId); const feeId = raw?.action === 'configure' ? 'configuration' : id(raw?.feeId); const db = admin.firestore();
@@ -138,6 +176,8 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       const fee: SchoolFee = { id: feeId, schemaVersion: 2, label: source.label.trim(), description: source.description.trim(), category: source.category,
         amount: source.amount, academicYear: year, mandatory: source.mandatory, active: true, dueDate, classIds, cycles, studentIds, ...(source.recurrence ? { recurrence: source.recurrence } : {}) };
       if (editing) {
+        const publish = await prepareMandatoryPublication(tx, db, schoolId, school.data() || {}, [existing as SchoolFee, fee], existing!.schemaVersion === 2);
+        publish();
         for (const write of legacyWrites) write();
         const versionId = createHash('sha256').update(JSON.stringify([schoolId, feeId, existing!.versionId || 'initial', fee])).digest('hex');
         const next = { ...existing, ...fee, versionId };
@@ -148,10 +188,12 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
         tx.update(school.ref, { feeCatalog: entries.map(f => f.id === feeId ? next : f) });
       } else {
       if (existing) {
-        if (JSON.stringify(existing) === JSON.stringify(fee)) return { feeId, replay: true };
+        if (isDeepStrictEqual(existing, fee)) return { feeId, replay: true };
         throw new functions.https.HttpsError('already-exists', 'Identifiant déjà utilisé : créer une nouvelle version.');
       }
       if (entries.length >= 200) throw fail('Catalogue limité à 200 versions.');
+      const publish = await prepareMandatoryPublication(tx, db, schoolId, school.data() || {}, [fee]);
+      publish();
       tx.update(school.ref, { feeCatalog: [...entries, fee] });
       }
     } else if (raw.action === 'revise') {
@@ -162,6 +204,8 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       if (raw.amount === existing.amount) return { feeId, replay: true };
       const versionId = createHash('sha256').update(JSON.stringify([schoolId, feeId, existing.versionId || 'initial', raw.amount])).digest('hex');
       const next = { ...existing, amount: raw.amount, versionId };
+      const publish = await prepareMandatoryPublication(tx, db, schoolId, school.data() || {}, [existing as SchoolFee, next as unknown as SchoolFee]);
+      publish();
       // Stable fee identity: existing student assignments retain their old full snapshot.
       // A revision is never a second compulsory charge on already-assigned students.
       tx.create(school.ref.collection('financialTariffVersions').doc(versionId), {

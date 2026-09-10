@@ -67,7 +67,9 @@ export function SchoolFeeCatalog() {
   const load = useCallback(async () => {
     if (!school?.id) return;
     const result = await httpsCallable<{ schoolId: string }, { fees: Fee[] }>(functions, 'getSchoolFeeCatalog')({ schoolId: school.id });
+    if (!Array.isArray(result.data.fees)) throw new Error('Réponse du catalogue invalide. Rechargez la page.');
     setFees(result.data.fees); setLoading(false);
+    return result.data.fees;
   }, [school?.id]);
   useEffect(() => { void load().catch(e => { setLoading(false); setError(e instanceof Error ? e.message : 'Catalogue indisponible.'); }); }, [load]);
   const run = async (payload: Record<string, unknown>) => {
@@ -75,7 +77,18 @@ export function SchoolFeeCatalog() {
     setBusy(true); setError(''); setMessage('');
     try {
       await httpsCallable(functions, 'manageSchoolFee')({ schoolId: school.id, ...payload });
-      await load(); setMessage('Opération enregistrée. Le compte élève utilisera les montants validés par le serveur.'); return true;
+      const persisted = await load();
+      if (payload.action === 'create' || (payload.action === 'revise' && payload.fee)) {
+        const expected = payload.fee as Record<string, unknown>;
+        const saved = persisted?.find(f => f.id === payload.feeId);
+        const matches = saved && Object.entries(expected).every(([key, value]) => {
+          const actual = (saved as unknown as Record<string, unknown>)[key];
+          if (Array.isArray(value)) return Array.isArray(actual) && [...actual].sort().join('\0') === [...value].sort().join('\0');
+          return actual === (typeof value === 'string' ? value.trim() : value);
+        });
+        if (!matches) throw new Error('Publication non confirmée par le serveur. Le formulaire est conservé ; réessayez sans créer un nouveau frais.');
+      }
+      setMessage(payload.action === 'create' || payload.action === 'revise' ? 'Frais publié avec succès' : 'Opération enregistrée. Le compte élève utilisera les montants validés par le serveur.'); return true;
     } catch (e) { setError(e instanceof Error ? e.message : 'Opération refusée.'); return false; }
     finally { setBusy(false); }
   };
@@ -138,7 +151,7 @@ export function SchoolFeeCatalog() {
       <form onChange={() => setReview(false)} onSubmit={async e => {
         e.preventDefault();
         if (!availableClasses.length || selectedClasses.length !== classIds.length || selectedStudents.length !== studentIds.length) { setError('Le périmètre a changé ou ne contient aucune classe éligible. Vérifiez les classes et élèves avant publication.'); return; }
-        if (!review) { setReview(true); return; }
+        if (!review) { setError(''); setMessage(''); setReview(true); return; }
         const category = feeTypes.find(type => type.key === feeType)?.category || 'other';
         if (await run({ action: editing ? 'revise' : 'create', feeId, ...(editing ? { expectedAmount: editing.amount, expectedVersion: editing.versionId || null, reason: editReason } : {}), fee: { label, category, amount: Number(amount), description, mandatory, recurrence, dueDate: dueDate || null, academicYear: school.academicYear, classIds: selectedClasses, cycles, studentIds: selectedStudents } })) {
           setFeeId(crypto.randomUUID()); setLabel(''); setAmount(''); setReview(false); setEditing(null); if (editor.current) editor.current.open = false;
@@ -176,7 +189,7 @@ export function SchoolFeeCatalog() {
           <div className="fee-target-list">{visibleStudents.map(s => <label key={s.id}><input type="checkbox" checked={selectedStudents.includes(s.id)} onChange={e => setStudentIds(e.target.checked ? [...selectedStudents, s.id] : selectedStudents.filter(id => id !== s.id))} />{s.name} — {s.matricule}</label>)}</div>
         </fieldset>
         {review && <section aria-label="Résumé avant publication" className="fee-publication-review">
-          <h3>Vérifier avant publication</h3><p><strong>{label}</strong> — {formatCurrency(Number(amount))}</p>
+          <p role="status">Brouillon non enregistré. Cliquez sur « Publier le frais » pour enregistrer ce tarif sur le serveur.</p><h3>Vérifier avant publication</h3><p><strong>{label}</strong> — {formatCurrency(Number(amount))}</p>
           <p>{mandatory ? 'Obligatoire' : 'Facultatif'} · {recurrence === 'one_off' ? 'Ponctuel' : 'Récurrent'} · {school.academicYear}</p>
           <p>Cycles : {cycles.map(c => ({ nursery: 'Maternelle', primary: 'Primaire', secondary: 'Secondaire' })[c]).join(', ') || 'Tous les cycles éligibles'}</p>
           <p>Classes : {availableClasses.filter(c => effectiveClasses.includes(c.id)).map(c => getClassOptionLabel(c, availableClasses)).join(', ')}</p>
@@ -185,6 +198,8 @@ export function SchoolFeeCatalog() {
         </section>}
         <p>Après publication, le tarif est figé. Un nouveau frais crée une obligation supplémentaire ; il ne remplace ni n’annule une dette existante. Désactiver arrête uniquement les nouvelles affectations.</p>
         {editing && <label>Motif de la modification du frais<textarea required maxLength={500} value={editReason} onChange={e => setEditReason(e.target.value)} /></label>}
+        {error && <p role="alert">{error}</p>}
+        {!availableClasses.length && <p role="alert">Aucune classe éligible pour l’année active. La publication est impossible.</p>}
         <button disabled={busy || !availableClasses.length} type="submit">{review ? (editing ? 'Publier les modifications' : 'Publier le frais') : 'Vérifier avant publication'}</button>
       </form>
     </details>}
