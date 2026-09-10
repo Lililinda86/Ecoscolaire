@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { SchoolFeeCatalog } from '../../src/components/Settings/SchoolFeeCatalog';
 const state = vi.hoisted(() => ({ fees: [] as Record<string, unknown>[], failure: '', omit: false, saves: 0, delayRead: false, finishRead: null as null | ((value: { data: { fees: Record<string, unknown>[] } }) => void) }));
 vi.mock('../../src/db/firebase', () => ({ functions: {} }));
@@ -51,6 +51,6 @@ it('never claims success when the readback does not contain the submitted fee', 
 it('ignores an older empty read completing after confirmed publication', async () => {
   state.delayRead = true; render(<SchoolFeeCatalog />); await submit();
   await screen.findByText('Frais publié avec succès');
-  state.finishRead!({ data: { fees: [] } });
+  await act(async () => { state.finishRead!({ data: { fees: [] } }); });
   await vi.waitFor(() => expect(screen.getByRole('heading', { name: 'Tenues', exact: true }).closest('section')!.textContent).toContain('Test tenue'));
 });

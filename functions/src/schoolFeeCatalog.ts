@@ -113,7 +113,7 @@ async function prepareMandatoryPublication(tx: admin.firestore.Transaction, db: 
     const cls = classes.get(classId)!;
     const classData = { ...cls.data(), id: cls.id, name: String(cls.data()?.name || '') };
     if (!cls.exists || !activeFeeClass(classData, schoolId, school.activeAcademicYearId as string | undefined)) continue;
-    // Previous policy first freezes debts already due before a revision, including unopened accounts.
+    // Already-published debts retain their assignment; only new obligations use this policy.
     const fee = policies.find(f => appliesToStudent(f, data, classData, String(school.academicYear)));
     if (!fee) continue;
     const assignment = db.collection('studentFeeAssignments').doc(feeAssignmentId(schoolId, student.id, fee.academicYear, fee.id));
@@ -176,11 +176,11 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       const fee: SchoolFee = { id: feeId, schemaVersion: 2, label: source.label.trim(), description: source.description.trim(), category: source.category,
         amount: source.amount, academicYear: year, mandatory: source.mandatory, active: true, dueDate, classIds, cycles, studentIds, ...(source.recurrence ? { recurrence: source.recurrence } : {}) };
       if (editing) {
-        const publish = await prepareMandatoryPublication(tx, db, schoolId, school.data() || {}, [existing as SchoolFee, fee], existing!.schemaVersion === 2);
-        publish();
-        for (const write of legacyWrites) write();
         const versionId = createHash('sha256').update(JSON.stringify([schoolId, feeId, existing!.versionId || 'initial', fee])).digest('hex');
         const next = { ...existing, ...fee, versionId };
+        const publish = await prepareMandatoryPublication(tx, db, schoolId, school.data() || {}, [next], existing!.schemaVersion === 2);
+        publish();
+        for (const write of legacyWrites) write();
         tx.create(school.ref.collection('financialTariffVersions').doc(versionId), {
           feeId, academicYear: year, previous: existing, next, reason: raw.reason.trim(),
           actorId: context.auth!.uid, effectiveAt: admin.firestore.FieldValue.serverTimestamp()
@@ -204,7 +204,7 @@ export const manageSchoolFee = functions.https.onCall(async (raw, context) => {
       if (raw.amount === existing.amount) return { feeId, replay: true };
       const versionId = createHash('sha256').update(JSON.stringify([schoolId, feeId, existing.versionId || 'initial', raw.amount])).digest('hex');
       const next = { ...existing, amount: raw.amount, versionId };
-      const publish = await prepareMandatoryPublication(tx, db, schoolId, school.data() || {}, [existing as SchoolFee, next as unknown as SchoolFee]);
+      const publish = await prepareMandatoryPublication(tx, db, schoolId, school.data() || {}, [next as unknown as SchoolFee]);
       publish();
       // Stable fee identity: existing student assignments retain their old full snapshot.
       // A revision is never a second compulsory charge on already-assigned students.
