@@ -657,6 +657,7 @@ try {
     await settingsPage.reload({ waitUntil: 'domcontentloaded' }); await openCatalog();
     const row = settingsPage.locator('.school-fee-group').filter({ has: settingsPage.getByRole('heading', { name: group, exact: true }) }).locator('li').filter({ has: settingsPage.getByText(label, { exact: true }) });
     await expect(row).toHaveCount(1); await expect(row).toContainText('Obligatoire');
+    settingsPage.once('dialog', dialog => { assert.equal(dialog.message(), 'Voulez-vous vraiment vous déconnecter ?'); return dialog.accept(); });
     await settingsPage.getByTestId('logout-button').click(); await settingsPage.getByTestId('login-email').waitFor();
     await settingsPage.getByTestId('login-email').fill(users.director.email); await settingsPage.getByTestId('login-password').fill(users.director.password);
     await settingsPage.getByTestId('login-submit').click(); await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
