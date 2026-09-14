@@ -1,5 +1,25 @@
 # Remplissage pédagogique — livraison technique Staging validée
 
+## Livraison courante — revue primaire owner en trois étapes
+
+PR #246 fusionnée. SHA Staging ce419539999a569399be9c1ecd016d32a9fda5ae.
+URL : https://ecoscolaire-kojvhw4u1-linda-lemofouet-s-projects.vercel.app/#/pedagogy/program.
+Déploiement 34381513388 tentative 2 PASS après incident de liste Functions ;
+aucun changement IAM/code pour la relance. Gate exact 34899381349 PASS le
+14 septembre 2026 : 844 tests unitaires, règles, backend, A/B/C/D, revue primaire,
+responsive 360/768/1440, nettoyage de toutes les fixtures live vérifié.
+Compteurs ITALO lus à 21:40 UTC : niveaux 0/12 approuvés, mappings sûrs 0/76
+approuvés, ambiguïtés 0/44 résolues. Préscolaire et secondaire inchangés.
+Branche codex/pedagogy-primary-owner-review, worktree dédié
+ecoscolaire-pedagogy-content-completion ; changements functions/lib et
+playwright-report préservés, exclus du checkpoint documentaire.
+Rapport : PRIMARY_OWNER_REVIEW_DELIVERY.md ; guide : OWNER_PRIMARY_REVIEW_GUIDE.md.
+Reprise : revue owner dans la nouvelle Preview ; aucun déploiement supplémentaire.
+AUTOMATIC HUMAN DECISIONS: 0. OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
+READY FOR OWNER PRIMARY REVIEW: YES. READY FOR PRODUCTION AUTHORIZATION: NO.
+
+Les sections suivantes décrivent les livraisons antérieures.
+
 ## Mission matières — livraison Staging validée
 
 PR #245 MERGED le 9 septembre 2026 à 16:11 UTC. SHA Staging :

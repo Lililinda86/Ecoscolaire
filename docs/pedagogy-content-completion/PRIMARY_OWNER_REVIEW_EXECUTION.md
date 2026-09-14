@@ -23,4 +23,22 @@ Mapping validé = niveau approuvé courant ET décision de mapping explicite cou
 Aucune adoption, matière enseignée, affectation, horaire ou coefficient créé.
 OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
 
-État : implémentation en cours. Aucun test nouveau déclaré PASS.
+État : PR #246 fusionnée, SHA Staging ce419539999a569399be9c1ecd016d32a9fda5ae.
+Gate candidat 34380833094 PASS : 137 fichiers / 844 tests unitaires ; transactions,
+règles, A/B/C/D et nouvelle revue navigateur 12/76/44, responsive 360/768/1440.
+Gate initial 34380352967 FAIL avant scénario : import named/CommonJS du catalogue
+dans Playwright. Corrigé par chargement du catalogue compilé avec createRequire ;
+aucune assertion assouplie. Tests chargés localement, gate complet ensuite PASS.
+Fixture Linux curriculum-review-40d848e54d4ada91 nettoyée et vérifiée.
+Déploiement 34381513388 tentative 2 PASS. Première tentative : échec de liste
+Functions avant le dernier service de veille. Services ACTIVE vérifiés, liste
+relue avec succès ; relance du seul job sans modification du code ou IAM.
+Reprise du 14 septembre : recette exacte 34899381349 PASS, confirmation
+RUN_PEDAGOGY_STAGING_SYNTHETIC seulement, SHA ce419539999a569399be9c1ecd016d32a9fda5ae.
+Preview : https://ecoscolaire-kojvhw4u1-linda-lemofouet-s-projects.vercel.app.
+137 fichiers / 844 tests unitaires PASS ; nouvelle revue 12/76/44 et régressions
+A/B/C/D PASS ; nettoyages live tous vérifiés. Lecture ITALO réelle : 0/12 niveaux,
+0/76 correspondances sûres et 0/44 ambiguïtés décidés/résolus.
+Prochaine action : revue humaine owner dans la nouvelle Preview. Aucun travail
+technique restant pour cette livraison ; aucune autorisation Production.
+Rapport final : PRIMARY_OWNER_REVIEW_DELIVERY.md.
