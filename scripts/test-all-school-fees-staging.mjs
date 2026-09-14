@@ -663,7 +663,9 @@ try {
     await settingsPage.getByTestId('login-submit').click(); await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
     await openCatalog(); await expect(row).toHaveCount(1);
     assert.equal((await account(students.nurseryMS)).lines.find(l => l.feeId === fee.id).remainingBalance, amount);
-    await page.goto(`${origin}/#/payments`); await page.getByTestId('open-cash-payment').click();
+    await page.goto(`${origin}/#/payments`);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByTestId('open-cash-payment').click();
     await page.getByTestId('cash-payment-student').selectOption(students.nurseryMS);
     await page.getByLabel(`Montant reçu pour ${label}`, { exact: true }).waitFor({ state: 'attached', timeout: 30000 });
     assert.equal((await db.collection('studentFinancialObligations').where('schoolId', '==', schoolId).get()).docs.filter(d => d.data().feeId === fee.id).length, 1);
