@@ -3,7 +3,7 @@ import * as functions from 'firebase-functions';
 import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requirePedagogyActor, requireId, audit } from './authorization';
-import { matchOfficialSubjects, primaryDocumentByLevel, MappingSubject, proposeDocumentaryProgression, DocumentaryWeek } from './subjectMappingEngine';
+import { matchOfficialSubjects, primaryDocumentByLevel, MappingSubject, proposeDocumentaryProgression, DocumentaryWeek, documentaryRelationsFor } from './subjectMappingEngine';
 import { subjectMappingSources } from './subjectMappingSources';
 import { secondarySubjectSources } from './secondarySubjectSources';
 
@@ -26,16 +26,18 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
   if (deciding && (data.confirmed !== true || !Array.isArray(data.items) || !data.items.length || data.items.length > 120)) throw new functions.https.HttpsError('invalid-argument', 'Sélection explicite et confirmation requises (1 à 120 matières).');
   const db = admin.firestore();
   return db.runTransaction(async tx => {
-    const [user, year, catalogSnap, classesSnap, previousSnap, weeksSnap] = await Promise.all([
+    const [user, year, catalogSnap, classesSnap, previousSnap, weeksSnap, school] = await Promise.all([
       tx.get(db.doc('users/' + actor.uid)), tx.get(db.doc('academicYears/' + academicYearId)),
       tx.get(db.collection('subjects').where('schoolId', '==', schoolId).limit(1001)),
       tx.get(db.collection('classes').where('schoolId', '==', schoolId).limit(501)),
       tx.get(db.collection('curriculumSubjectMappings').where('schoolId', '==', schoolId).limit(2001)),
       tx.get(db.collection('teachingWeeks').where('schoolId', '==', schoolId).limit(1001)),
+      tx.get(db.doc('schools/' + schoolId)),
     ]);
     const u = user.data();
     if (!u || u.isActive !== true || !(writing ? ['owner'] : readers).includes(u.role) || (u.role !== 'superAdmin' && u.schoolId !== schoolId)) throw new functions.https.HttpsError('permission-denied', 'Droits modifiés.');
     if (year.data()?.schoolId !== schoolId || year.data()?.status !== 'active' || !active(year.data()!)) throw new functions.https.HttpsError('failed-precondition', 'Année active requise.');
+    if (deciding && school.data()?.activeAcademicYearId !== academicYearId) throw new functions.https.HttpsError('failed-precondition', 'L’année de revue doit être l’année courante de cet établissement. Rechargez.');
     if (catalogSnap.size > 1000 || classesSnap.size > 500 || previousSnap.size > 2000 || weeksSnap.size > 1000) throw new functions.https.HttpsError('resource-exhausted', 'Limite de lecture atteinte.');
     const catalog = catalogSnap.docs.map(doc => {
       const d = doc.data();
@@ -47,7 +49,7 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
       const source = subjectMappingSources.find(s => s.documentId === primaryDocumentByLevel[cls.catalogLevelId]);
       const section = cls.section || cls.type;
       if (!source || !['francophone', 'anglophone'].includes(source.section) || (section && section !== source.section) || (cls.cycle && cls.cycle !== 'primary') || cls.educationType === 'technical') return [];
-      const mappings = matchOfficialSubjects(source.names, catalog, schoolId, source.section as 'francophone' | 'anglophone');
+      const mappings = matchOfficialSubjects(source.names, catalog, schoolId, source.section as 'francophone' | 'anglophone').map(mapping => ({ ...mapping, documentaryRelations: documentaryRelationsFor(cls.catalogLevelId, mapping) }));
       const safe = mappings.filter(m => m.localMatch !== null);
       const sourceVersion = source.sourceVersion;
       const mappingVersion = digest([version, sourceVersion, doc.id, cls.catalogLevelId, mappings]);
@@ -81,6 +83,7 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
         if (p.skip) continue;
         const record = { schoolId, academicYearId, classId: p.row.classId, catalogLevelId: p.row.catalogLevelId,
           officialSubject: p.mapping.officialSubject, subjectId: p.subjectId, matchStatus: p.mapping.status,
+          documentaryRelation: p.subjectId ? p.mapping.documentaryRelations.find((relation: { subjectId: string }) => relation.subjectId === p.subjectId) || null : null,
           decision: p.item.decision, decisionNote: p.item.decisionNote.trim(), revision: Number(p.item.expectedRevision) + 1,
           sourceVersion: p.row.sourceVersion, mappingVersion: p.row.mappingVersion, sourceDocumentId: p.row.source.documentId,
           decidedBy: actor.uid, decidedAt: FieldValue.serverTimestamp(), scope: 'OWNER_DOCUMENTARY_SUBJECT_DECISION',

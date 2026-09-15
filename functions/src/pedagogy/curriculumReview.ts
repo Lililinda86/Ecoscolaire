@@ -28,9 +28,10 @@ export const recordCurriculumProposalDecisions = functions.https.onCall(async (d
   const db = admin.firestore(), requestRef = db.collection('curriculumReviewRequests').doc(digest([schoolId, actor.uid, requestId]));
   const fingerprint = digest([academicYearId, items]);
   return db.runTransaction(async transaction => {
-    const [user, year, request] = await Promise.all([transaction.get(db.doc('users/' + actor.uid)), transaction.get(db.doc('academicYears/' + academicYearId)), transaction.get(requestRef)]);
+    const [user, year, request, school] = await Promise.all([transaction.get(db.doc('users/' + actor.uid)), transaction.get(db.doc('academicYears/' + academicYearId)), transaction.get(requestRef), transaction.get(db.doc('schools/' + schoolId))]);
     if (user.data()?.role !== 'owner' || user.data()?.isActive !== true || user.data()?.schoolId !== schoolId) throw new functions.https.HttpsError('permission-denied', 'Droits propriétaire modifiés.');
     if (year.data()?.schoolId !== schoolId || year.data()?.status !== 'active' || year.data()?.isActive === false) throw new functions.https.HttpsError('failed-precondition', 'Année active de cet établissement requise.');
+    if (school.data()?.activeAcademicYearId !== academicYearId) throw new functions.https.HttpsError('failed-precondition', 'L’année de revue doit être l’année courante de cet établissement. Rechargez.');
     if (request.exists) {
       if (request.data()?.fingerprint !== fingerprint) throw new functions.https.HttpsError('already-exists', 'Identifiant de requête déjà utilisé.');
       return { recordedCount: items.length, idempotent: true };

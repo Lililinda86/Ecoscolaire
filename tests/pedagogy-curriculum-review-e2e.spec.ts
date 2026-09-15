@@ -41,6 +41,9 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await expect(review.getByText('0 approuvées', { exact: true })).toBeVisible();
     await expect(review.getByTestId('primary-level-review')).toHaveCount(12);
     await expect(review.getByTestId('primary-safe-mapping')).toHaveCount(76);
+    await expect(review.getByRole('region', { name: 'Niveaux primaire FR', exact: true }).getByTestId('primary-level-review')).toHaveCount(6);
+    await expect(review.getByRole('region', { name: 'Niveaux primaire EN', exact: true }).getByTestId('primary-level-review')).toHaveCount(6);
+    for (const mapping of await review.getByTestId('primary-safe-mapping').all()) await expect(mapping).not.toBeVisible();
     await expect(review.getByTestId('primary-ambiguous-mapping')).toHaveCount(44);
     await expect(review.getByText('MAPPINGS SÛRS : 0/76 validés', { exact: true })).toBeVisible();
     for (const box of await review.getByRole('checkbox').all()) await expect(box).not.toBeChecked();
@@ -125,6 +128,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await review.getByRole('button', { name: 'APPLIQUER LES CORRESPONDANCES SÛRES SÉLECTIONNÉES', exact: true }).click();
     const mappingDialog = page.getByRole('dialog', { name: 'Confirmer les correspondances sélectionnées', exact: true });
     await expect(mappingDialog.getByText('12 classe(s) · 76 correspondance(s)', { exact: true })).toBeVisible();
+    await expect(mappingDialog.getByText('0 ambiguïté incluse · 0 horaire · 0 coefficient · 0 adoption automatique.', { exact: true })).toBeVisible();
     for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true); }
     await mappingDialog.getByRole('button', { name: 'Annuler', exact: true }).click();
     await expect(review.getByText('MAPPINGS SÛRS : 0/76 validés', { exact: true })).toBeVisible();
@@ -148,6 +152,7 @@ test('34 curriculum proposals: owner decisions, batch, audit, tenant isolation a
     await expect(review.getByText('AMBIGUÏTÉS : 1/44 résolues', { exact: true })).toBeVisible();
     const subjectDecisions = (await db.collection('curriculumSubjectMappings').where('schoolId', '==', prefix).get()).docs.filter(d => d.data().scope === 'OWNER_DOCUMENTARY_SUBJECT_DECISION');
     expect(subjectDecisions).toHaveLength(77);
+    for (const d of subjectDecisions) expect(d.data().documentaryRelation?.evidenceVersion).toBe('primary-documentary-relations-v1');
     for (const d of subjectDecisions) { expect(d.data().decidedBy).toBe(ownerId); expect(d.data().decidedAt.toMillis()).toBeGreaterThan(0); expect((await d.ref.collection('history').get()).size).toBe(d.data().revision); }
     for (const name of ['teacherAssignments', 'classSubjects', 'classPrograms', 'schoolCurriculumAdoptions', 'teachingPlans', 'timetableEntries']) expect((await db.collection(name).where('schoolId', '==', prefix).get()).empty).toBe(true);
     expect((await db.collection('audit_logs').where('schoolId', '==', prefix).get()).docs.filter(d => d.data().action === 'CURRICULUM_SUBJECT_MAPPING_DECIDED')).toHaveLength(78);

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 const state = vi.hoisted(() => ({ call: vi.fn(), load: vi.fn().mockResolvedValue([]), school: 'a', role: 'owner' }));
 vi.mock('../../src/db/firebase', () => ({ db: {}, functions: {} }));
 vi.mock('firebase/firestore', () => ({ collection: vi.fn(), query: vi.fn(), where: vi.fn() }));
@@ -22,6 +22,15 @@ it('renders all 34 proposals and six groups with 12 recommendations and no prese
   for (const select of screen.getAllByRole('combobox')) expect((select as HTMLSelectElement).value).toBe('');
   expect(screen.getByText('12 propositions forte confiance')).toBeTruthy();
   expect(screen.getByText('22 à examiner')).toBeTruthy();
+  expect(state.call).not.toHaveBeenCalled();
+});
+it('selects the twelve levels only after explicit select-all, without deciding', async () => {
+  renderAll(); await waitFor(() => expect(screen.queryByText('Chargement des décisions…')).toBeNull());
+  const step = screen.getByRole('region', { name: 'Étape 1 — Valider les niveaux' });
+  expect(within(step).getAllByRole('checkbox').every(box => !(box as HTMLInputElement).checked)).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'TOUT SÉLECTIONNER — LES 12 NIVEAUX' }));
+  expect(within(step).getAllByRole('checkbox')).toHaveLength(12);
+  expect(within(step).getAllByRole('checkbox').every(box => (box as HTMLInputElement).checked)).toBe(true);
   expect(state.call).not.toHaveBeenCalled();
 });
 it('requires explicit individual choice, note and confirmation, then refreshes the counter', async () => {

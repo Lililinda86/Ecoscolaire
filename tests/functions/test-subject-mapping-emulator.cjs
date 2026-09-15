@@ -9,6 +9,7 @@ const ctx = role => ({ auth: { uid: schoolId + '-' + role, token: {} } });
 const call = (action, role = 'owner', extra = {}) => fn.run({ schoolId, academicYearId: year, action, ...extra }, ctx(role));
 (async () => {
   try {
+    await db.doc('schools/' + schoolId).create({ activeAcademicYearId: year });
     await db.doc('academicYears/' + year).create({ schoolId, status: 'active' });
     for (const role of ['owner', 'secretary', 'foreign']) await db.doc('users/' + schoolId + '-' + role).create({ schoolId: role === 'foreign' ? schoolId + '-foreign' : schoolId, role: role === 'foreign' ? 'owner' : role, isActive: true });
     for (const level of ['fr-primary-sil', 'fr-primary-cp', 'fr-primary-ce1', 'fr-primary-ce2', 'fr-primary-cm1', 'fr-primary-cm2', ...Array.from({length: 6}, (_, i) => 'en-primary-' + (i + 1))]) await db.doc('classes/' + schoolId + '-' + level).create({ schoolId, name: level, catalogLevelId: level, isActive: true });
@@ -39,6 +40,9 @@ const call = (action, role = 'owner', extra = {}) => fn.run({ schoolId, academic
     const safe = row.mappings.filter(m => m.localMatch);
     const item = (r, m, decision = 'APPROVED') => ({ classId: r.classId, officialSubject: m.officialSubject, sourceVersion: r.sourceVersion, mappingVersion: r.mappingVersion, expectedRevision: 0, decision, decisionNote: '' });
     const items = safe.map(m => item(row, m));
+    await db.doc('schools/' + schoolId).update({ activeAcademicYearId: year + '-other' });
+    await assert.rejects(call('decide', 'owner', { confirmed: true, items }), e => e.code === 'failed-precondition');
+    await db.doc('schools/' + schoolId).update({ activeAcademicYearId: year });
     assert.equal((await call('preview')).decisions.length, 0, 'old proposals never counted as approval');
     await assert.rejects(call('decide', 'secretary', { confirmed: true, items }), e => e.code === 'permission-denied');
     await assert.rejects(call('decide', 'foreign', { confirmed: true, items }), e => e.code === 'permission-denied');
@@ -60,6 +64,9 @@ const call = (action, role = 'owner', extra = {}) => fn.run({ schoolId, academic
     assert.equal(reviewed.length, 3);
     const linked = reviewed.find(d => d.decision === 'LINK');
     assert.equal(linked.revision, 2); assert.equal(linked.decidedBy, schoolId + '-owner'); assert(linked.decidedAt.toMillis());
+    assert.equal(linked.documentaryRelation.evidenceVersion, 'primary-documentary-relations-v1');
+    assert.equal(linked.documentaryRelation.subjectId, link.subjectId);
+    assert.equal(linked.documentaryRelation.type, 'UNRESOLVED', 'SIL History must not inherit higher-level components');
     assert.equal((await db.doc('curriculumSubjectMappings/' + linked.id).collection('history').get()).size, 2);
     assert.equal((await db.collection('audit_logs').where('schoolId', '==', schoolId).get()).size, 5);
     for (const collection of ['classSubjects', 'classPrograms', 'teacherAssignments', 'schoolCurriculumAdoptions', 'curriculumProposalReviews', 'timetableEntries', 'teachingPlans']) assert.equal((await db.collection(collection).where('schoolId', '==', schoolId).get()).size, 0);
@@ -70,7 +77,7 @@ const call = (action, role = 'owner', extra = {}) => fn.run({ schoolId, academic
     assert.equal((await db.doc('curriculumSubjectMappings/' + applied.id).get()).data().links.length, 2);
     console.log('SUBJECT_MAPPING_BACKEND PASS: twelve primary classes, owner, tenant, safe only, confirmation, idempotence, version guards, immutable old proposal, audit, no adoption');
   } finally {
-    for (const collection of ['curriculumSubjectMappings', 'audit_logs', 'classes', 'academicYears', 'subjects', 'users']) {
+    for (const collection of ['curriculumSubjectMappings', 'audit_logs', 'classes', 'academicYears', 'subjects', 'users', 'schools']) {
       const docs = await db.collection(collection).get();
       for (const d of docs.docs) if (d.id.startsWith(schoolId) || d.data().schoolId === schoolId) await db.recursiveDelete(d.ref);
     }

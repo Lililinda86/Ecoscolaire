@@ -11,10 +11,14 @@ const item = (i, decision = 'APPROVED') => ({ classId: schoolId + '-' + proposal
 const call = (items, role = 'owner', extra = {}) => fn.run({ schoolId, academicYearId: year, requestId: randomBytes(12).toString('hex'), confirmed: true, items, ...extra }, context(role));
 (async () => {
   try {
+    await db.doc('schools/' + schoolId).create({ activeAcademicYearId: year });
     await db.doc('academicYears/' + year).create({ schoolId, status: 'active' });
     for (const role of ['owner', 'secretary', 'director', 'superAdmin', 'foreign']) await db.doc('users/' + schoolId + '-' + role).create({ schoolId: role === 'foreign' ? schoolId + '-foreign' : schoolId, role: role === 'foreign' ? 'owner' : role, isActive: true });
     for (const p of proposals) await db.doc('classes/' + schoolId + '-' + p.id).create({ schoolId, isActive: true, catalogLevelId: p.catalogLevelId });
     for (const role of ['secretary', 'director', 'superAdmin', 'foreign']) await assert.rejects(call([item(0)], role), e => e.code === 'permission-denied');
+    await db.doc('schools/' + schoolId).update({ activeAcademicYearId: year + '-other' });
+    await assert.rejects(call([item(0)]), e => e.code === 'failed-precondition');
+    await db.doc('schools/' + schoolId).update({ activeAcademicYearId: year });
     await assert.rejects(call([item(0)], 'owner', { confirmed: false }), e => e.code === 'invalid-argument');
     for (const field of ['sourceVersion', 'mappingVersion']) await assert.rejects(call([{ ...item(0), [field]: 'stale' }]), e => e.code === 'aborted');
     for (let i = 12; i < 34; i++) if (proposals[i].missingSource) await assert.rejects(call([item(i)]), e => e.code === 'failed-precondition');
@@ -45,7 +49,7 @@ const call = (items, role = 'owner', extra = {}) => fn.run({ schoolId, academicY
     await assert.rejects(call([item(13), item(16)]), e => e.code === 'invalid-argument');
     console.log('CURRICULUM_REVIEW_BACKEND PASS: owner, tenant, 34 mappings, source guards, atomic batch, idempotency, immutable history and audit');
   } finally {
-    for (const collection of ['curriculumProposalReviews', 'curriculumReviewRequests', 'audit_logs', 'classes', 'academicYears', 'users']) {
+    for (const collection of ['curriculumProposalReviews', 'curriculumReviewRequests', 'audit_logs', 'classes', 'academicYears', 'users', 'schools']) {
       const docs = await db.collection(collection).get();
       for (const d of docs.docs) if (d.id.startsWith(schoolId) || d.data().schoolId === schoolId) await db.recursiveDelete(d.ref);
     }

@@ -5,10 +5,64 @@ export interface MappingSubject {
   isActive?: boolean; localConfigurationStatus?: string;
 }
 export type MatchStatus = 'EXACT' | 'SAFE_ALIAS' | 'AMBIGUOUS' | 'MISSING_LOCAL_SUBJECT';
+export type DocumentaryRelationType = 'EXACT' | 'SAFE_ALIAS' | 'COMPONENT_OF_OFFICIAL_DOMAIN' | 'LOCAL_SUBJECT_COVERS_MULTIPLE_DOMAINS' | 'ITALO_LOCAL_SUBJECT' | 'NOT_APPLICABLE' | 'UNRESOLVED';
+export interface DocumentaryRelation {
+  subjectId: string; subjectName: string; type: DocumentaryRelationType;
+  explanation: string; pdfPages: number[]; evidenceVersion: string;
+}
 export interface SubjectMatch {
   officialSubject: string; localMatch: MappingSubject | null; candidates: MappingSubject[];
   referenceCandidates: MappingSubject[]; status: MatchStatus;
   action: 'REUSE_EXISTING' | 'PROPOSE_CREATE' | 'NEEDS_HUMAN_MAPPING'; reason: string;
+  documentaryRelations?: DocumentaryRelation[];
+}
+
+/** Source structure, not an owner decision or a claim about ITALO's taught content.
+ * Page numbers refer to the existing authenticated PDFs (not printed pagination).
+ * Unknown local scope must remain unresolved, even when labels look similar. */
+export function documentaryRelationsFor(level: string, mapping: SubjectMatch): DocumentaryRelation[] {
+  if (!primaryDocumentByLevel[level]) return [];
+  const fr = level.startsWith('fr-');
+  const first = ['fr-primary-sil', 'fr-primary-cp', 'en-primary-1', 'en-primary-2'].includes(level);
+  return mapping.candidates.map(candidate => {
+    let type: DocumentaryRelationType = mapping.status === 'EXACT' || mapping.status === 'SAFE_ALIAS' ? mapping.status : 'UNRESOLVED';
+    let explanation = mapping.reason;
+    let pdfPages: number[] = [];
+    if (mapping.status === 'AMBIGUOUS') {
+      const official = mapping.officialSubject, local = candidate.name;
+      if (fr && official === 'Sciences humaines et sociales') {
+        pdfPages = [6];
+        if (local === 'Éducation à la citoyenneté et morale' || !first && ['Histoire', 'Géographie'].includes(local)) {
+          type = 'COMPONENT_OF_OFFICIAL_DOMAIN';
+          explanation = 'Le sommaire place cette composante dans les sciences humaines et sociales ; elle ne couvre pas à elle seule le domaine entier.';
+        } else {
+          explanation = 'Le sommaire SIL/CP ne nomme pas Histoire/Géographie dans ce domaine : conserver le périmètre local à examiner, sans extrapoler les niveaux supérieurs.';
+        }
+      } else if (!fr && !first && official === 'English Language and Literature' && ['English Language', 'Literature in English'].includes(local)) {
+        type = 'COMPONENT_OF_OFFICIAL_DOMAIN'; pdfPages = [24];
+        explanation = 'Le texte distingue explicitement langue et littérature aux niveaux II/III ; cette matière est une composante, pas une équivalence du domaine entier.';
+      } else if (fr && official === 'Français et littérature') {
+        pdfPages = [5];
+        explanation = 'Le domaine comporte langue et littérature ; le libellé local Français ne prouve pas si la littérature est incluse. Confirmer le périmètre ITALO.';
+      } else if (fr && official === 'Éducation artistique') {
+        pdfPages = [6];
+        explanation = 'Le domaine réunit arts visuels, musique, arts dramatiques et danse ; préciser quelles composantes couvre cette matière ITALO.';
+      } else if (fr && official === 'Développement personnel') {
+        pdfPages = [6];
+        explanation = 'Le domaine réunit artisanat, activités agropastorales et activités domestiques ; le périmètre de la matière ITALO doit être confirmé, sans y assimiler automatiquement morale ou santé.';
+      } else if (!fr && official === 'Vocational Studies') {
+        pdfPages = [first ? 32 : 31];
+        explanation = 'Le domaine distingue arts et métiers, activités agropastorales et économie domestique, avec restriction au niveau I ; Practical Skills ne décrit pas à lui seul son périmètre local.';
+      } else if (!fr && official === 'Arts') {
+        pdfPages = [first ? 33 : 32];
+        explanation = 'Le domaine distingue arts visuels et arts du spectacle ; Creative Arts ne prouve pas que les deux sont couverts à ITALO.';
+      } else if (!fr && official === 'Physical Education and Sports') {
+        pdfPages = [first ? 35 : 34];
+        explanation = 'La discipline officielle associe éducation physique et sports ; vérifier si Physical Education couvre cet ensemble ou seulement une partie à ITALO.';
+      }
+    }
+    return { subjectId: candidate.id, subjectName: candidate.name, type, explanation, pdfPages, evidenceVersion: 'primary-documentary-relations-v1' };
+  });
 }
 const normalize = (value: string) => value.normalize('NFC').trim().toLocaleLowerCase('fr').replace(/\s+/g, ' ').replace(/[’‘]/g, "'");
 // Explicit scoped aliases, not fuzzy search, translation or curriculum equivalence.
