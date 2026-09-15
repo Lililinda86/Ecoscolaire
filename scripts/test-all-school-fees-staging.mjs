@@ -3,7 +3,10 @@ import { randomBytes } from 'node:crypto';
 import { initializeApp, applicationDefault, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { chromium, expect } from '@playwright/test';
+import { chromium, expect as baseExpect } from '@playwright/test';
+
+// Live callable transactions and server hydration can exceed Playwright's 5 s default.
+const expect = baseExpect.configure({ timeout: 30000 });
 
 const project = 'ecoscolaire-staging';
 assert.equal(process.env.VITE_FIREBASE_PROJECT_ID, project);
@@ -20,7 +23,7 @@ const app = initializeApp({ projectId: project, credential: applicationDefault()
 const db = getFirestore(app), auth = getAuth(app);
 const tagged = { testFixture: true, testRunId: runId };
 const users = {}, refs = [], students = {};
-let browser;
+let browser, diagnosticPage;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const pass = label => console.log(`${label}: PASS`);
 async function seed(collection, id, data) {
@@ -96,9 +99,9 @@ try {
     await seed('classes', `${schoolId}-${key}`, { schoolId, name, cycle: 'nursery', academicYearId: yearId, isActive: active });
   }
   students.nurseryMS = `${schoolId}-ms-student`;
-  await seed('students', students.nurseryMS, { schoolId, classId: `${schoolId}-ms`, academicYearId: yearId, academicYear: year, usesTransport: false, name: 'ALLFEES Maternelle MS', matricule: 'AF-MS', schoolingStatus: 'active', gender: 'F', section: 'francophone' });
-  await seed('studentPrivate', students.nurseryMS, { schoolId, studentId: students.nurseryMS, transportZonePk: null });
-  await seed('studentFinance', students.nurseryMS, { schoolId, studentId: students.nurseryMS, registrationFeeExpected: 15000 });
+  await seed('students', students.nurseryMS, { id: students.nurseryMS, schoolId, classId: `${schoolId}-ms`, academicYearId: yearId, academicYear: year, usesTransport: false, name: 'ALLFEES Maternelle MS', matricule: 'AF-MS', schoolingStatus: 'active', gender: 'F', section: 'francophone' });
+  await seed('studentPrivate', students.nurseryMS, { id: students.nurseryMS, schoolId, studentId: students.nurseryMS, transportZonePk: null });
+  await seed('studentFinance', students.nurseryMS, { id: students.nurseryMS, schoolId, studentId: students.nurseryMS, registrationFeeExpected: 15000 });
   assert.equal((await account(students.nurseryMS)).lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 60000);
   const studentId = students.primary18;
   await denied(call('getStudentFinancialAccount', { studentId, academicYear: year }, 'foreign'));
@@ -320,6 +323,7 @@ try {
   pass('SECRETARY FINANCIAL SETTINGS READ-ONLY / 360 / 768 / 1440');
   const directorContext = await browser.newContext();
   const settingsPage = await directorContext.newPage();
+  diagnosticPage = settingsPage;
   settingsPage.on('pageerror', error => errors.push(error.message));
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) await settingsPage.route(`${origin}/**`, route => route.continue({ headers: { ...route.request().headers(),
     'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
@@ -621,6 +625,77 @@ try {
     await settingsPage.screenshot({ path: `all-fees-settings-${width}.png`, fullPage: true });
     pass(`PARAMETERS ${width}`);
   }
+  // Human incident matrix: actual publication, database, F5, logout/login and Encaissement.
+  const matrix = [['uniform', 'Test tenue', 5000, 'Tenues'], ['excursion', 'Test excursion', 3000, 'Activités / événements'],
+    ['supplies', 'Test fournitures', 2000, 'Autres frais'], ['exam', 'Test examen', 1000, 'Frais ponctuels']];
+  const matrixFees = [];
+  const openCatalog = async () => {
+    await settingsPage.goto(`${origin}/#/settings`, { waitUntil: 'domcontentloaded' });
+    await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).waitFor({ timeout: 30000 });
+    await settingsPage.getByRole('navigation', { name: 'Sections des paramètres' }).getByRole('button', { name: 'Finances & tarifs', exact: true }).click();
+  };
+  await settingsPage.setViewportSize({ width: 1440, height: 1000 });
+  for (const [type, label, amount, group] of matrix) {
+    await openCatalog();
+    await settingsPage.getByRole('button', { name: 'Ajouter un frais', exact: true }).click();
+    await settingsPage.getByLabel('Type de frais').selectOption(type);
+    await settingsPage.getByLabel('Libellé précis du frais', { exact: true }).fill(label);
+    await settingsPage.getByLabel('Montant (FCFA)', { exact: true }).fill(String(amount));
+    await settingsPage.getByLabel('Échéance éventuelle', { exact: true }).fill('2027-06-15');
+    await settingsPage.getByRole('group', { name: 'Cycles concernés' }).getByLabel('Maternelle', { exact: true }).check();
+    await settingsPage.getByRole('group', { name: 'Classes concernées' }).getByLabel('Maternelle Moyenne Section', { exact: true }).check();
+    await settingsPage.getByRole('group', { name: 'Élèves concernés' }).getByRole('checkbox', { name: 'ALLFEES Maternelle MS — AF-MS', exact: true }).check();
+    await settingsPage.getByRole('button', { name: 'Vérifier avant publication', exact: true }).click();
+    await expect(settingsPage.getByText(/Brouillon non enregistré/)).toBeVisible();
+    await settingsPage.getByRole('button', { name: 'Publier le frais', exact: true }).click();
+    await expect(settingsPage.getByText('Frais publié avec succès', { exact: true })).toBeVisible();
+    const stored = (await db.collection('schools').doc(schoolId).get()).data().feeCatalog.filter(f => f.label === label);
+    assert.equal(stored.length, 1); const fee = stored[0]; matrixFees.push(fee);
+    assert.equal(fee.amount, amount); assert.equal(fee.category, type); assert.equal(fee.mandatory, true);
+    assert.equal(fee.academicYear, year); assert.equal(fee.dueDate, '2027-06-15');
+    assert.deepEqual(fee.cycles, ['nursery']); assert.deepEqual(fee.classIds, [`${schoolId}-ms`]); assert.deepEqual(fee.studentIds, [students.nurseryMS]);
+    // Verify persistence before an account call can lazily create anything.
+    const obligations = await db.collection('studentFinancialObligations').where('schoolId', '==', schoolId).get();
+    const immediate = obligations.docs.filter(d => d.data().feeId === fee.id);
+    assert.equal(immediate.length, 1); assert.equal(immediate[0].data().studentId, students.nurseryMS);
+    await settingsPage.reload({ waitUntil: 'domcontentloaded' }); await openCatalog();
+    const row = settingsPage.locator('.school-fee-group').filter({ has: settingsPage.getByRole('heading', { name: group, exact: true }) }).locator('li').filter({ has: settingsPage.getByText(label, { exact: true }) });
+    await expect(row).toHaveCount(1, { timeout: 30000 }); await expect(row).toContainText('Obligatoire');
+    settingsPage.once('dialog', dialog => { assert.equal(dialog.message(), 'Voulez-vous vraiment vous déconnecter ?'); return dialog.accept(); });
+    await settingsPage.getByTestId('logout-button').click(); await settingsPage.getByTestId('login-email').waitFor();
+    await settingsPage.getByTestId('login-email').fill(users.director.email); await settingsPage.getByTestId('login-password').fill(users.director.password);
+    await settingsPage.getByTestId('login-submit').click(); await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
+    await openCatalog(); await expect(row).toHaveCount(1, { timeout: 30000 });
+    assert.equal((await account(students.nurseryMS)).lines.find(l => l.feeId === fee.id).remainingBalance, amount);
+    await page.goto(`${origin}/#/payments`);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByTestId('open-cash-payment').click();
+    await page.getByTestId('cash-payment-student').selectOption(students.nurseryMS);
+    await page.getByLabel(`Montant reçu pour ${label}`, { exact: true }).waitFor({ state: 'attached', timeout: 30000 });
+    assert.equal((await db.collection('studentFinancialObligations').where('schoolId', '==', schoolId).get()).docs.filter(d => d.data().feeId === fee.id).length, 1);
+    pass(`${label}: WRITE / CATEGORY / EXACT FIELDS / IMMEDIATE OBLIGATION / F5 / LOGOUT LOGIN / ENCAISSEMENT / NO DUPLICATE`);
+  }
+  // Partial payment of two new fees together, using only the isolated test pupil.
+  for (const [label, paid] of [['Test tenue', 1000], ['Test excursion', 1000]]) {
+    const input = page.getByLabel(`Montant reçu pour ${label}`, { exact: true });
+    const group = input.locator('xpath=ancestor::details[contains(@class,"account-fee-group")]');
+    if (await group.getAttribute('open') === null) await group.locator('summary').first().click();
+    await input.fill(String(paid));
+  }
+  const [collectionResponse] = await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/recordCashCollection') && response.request().method() === 'POST'),
+    page.getByTestId('cash-payment-submit').click()
+  ]);
+  const collectionBody = await collectionResponse.json();
+  assert.equal(collectionBody.error, undefined, JSON.stringify(collectionBody.error));
+  assert.equal(collectionResponse.status(), 200);
+  await page.getByRole('heading', { name: 'Encaissement enregistré ✓', exact: true }).waitFor({ timeout: 30000 });
+  for (const [label, remaining] of [['Test tenue', 4000], ['Test excursion', 2000]]) {
+    await expect(page.locator('.student-account-receipt')).toContainText(label);
+    const fee = matrixFees.find(f => f.label === label), line = (await account(students.nurseryMS)).lines.find(l => l.feeId === fee.id);
+    assert.equal(line.previousPaid, 1000); assert.equal(line.remainingBalance, remaining);
+  }
+  pass('CATALOGUE INCIDENT MATRIX / PARTIAL MULTI-FEE PAYMENT / RECEIPT / REMAINDERS');
   assert.deepEqual(errors, []);
   await browser.close(); browser = undefined;
   await call('manageSchoolFee', { action: 'archive', feeId }, 'director');
@@ -632,6 +707,12 @@ try {
     'another V3 payment remains reflected after an atomic reversal');
   pass('ARCHIVE / REVERSAL');
   console.log('STAGING FUNCTIONAL: PASS');
+} catch (error) {
+  if (diagnosticPage && !diagnosticPage.isClosed()) {
+    await diagnosticPage.screenshot({ path: 'all-fees-catalog-failure.png', fullPage: true }).catch(() => {});
+    console.error('CATALOGUE UI AT FAILURE:', await diagnosticPage.locator('.school-fee-catalog').innerText({ timeout: 3000 }).catch(() => 'Catalogue not mounted'));
+  }
+  throw error;
 } finally {
   if (browser) await browser.close();
   const collections = ['studentFinancialObligations', 'studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
@@ -660,5 +741,6 @@ try {
   console.log('CLEANUP: PASS\nRESIDUALS: 0 (isolated test school)\nORPHANS: 0 (isolated test school)\nPRODUCTION TOUCHED: NO');
   await deleteApp(app);
 }
+
 
 
