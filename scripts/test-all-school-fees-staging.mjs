@@ -20,7 +20,7 @@ const app = initializeApp({ projectId: project, credential: applicationDefault()
 const db = getFirestore(app), auth = getAuth(app);
 const tagged = { testFixture: true, testRunId: runId };
 const users = {}, refs = [], students = {};
-let browser;
+let browser, diagnosticPage;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const pass = label => console.log(`${label}: PASS`);
 async function seed(collection, id, data) {
@@ -320,6 +320,7 @@ try {
   pass('SECRETARY FINANCIAL SETTINGS READ-ONLY / 360 / 768 / 1440');
   const directorContext = await browser.newContext();
   const settingsPage = await directorContext.newPage();
+  diagnosticPage = settingsPage;
   settingsPage.on('pageerror', error => errors.push(error.message));
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) await settingsPage.route(`${origin}/**`, route => route.continue({ headers: { ...route.request().headers(),
     'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 'x-vercel-set-bypass-cookie': 'true' } }));
@@ -656,12 +657,12 @@ try {
     assert.equal(immediate.length, 1); assert.equal(immediate[0].data().studentId, students.nurseryMS);
     await settingsPage.reload({ waitUntil: 'domcontentloaded' }); await openCatalog();
     const row = settingsPage.locator('.school-fee-group').filter({ has: settingsPage.getByRole('heading', { name: group, exact: true }) }).locator('li').filter({ has: settingsPage.getByText(label, { exact: true }) });
-    await expect(row).toHaveCount(1); await expect(row).toContainText('Obligatoire');
+    await expect(row).toHaveCount(1, { timeout: 30000 }); await expect(row).toContainText('Obligatoire');
     settingsPage.once('dialog', dialog => { assert.equal(dialog.message(), 'Voulez-vous vraiment vous déconnecter ?'); return dialog.accept(); });
     await settingsPage.getByTestId('logout-button').click(); await settingsPage.getByTestId('login-email').waitFor();
     await settingsPage.getByTestId('login-email').fill(users.director.email); await settingsPage.getByTestId('login-password').fill(users.director.password);
     await settingsPage.getByTestId('login-submit').click(); await settingsPage.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 45000 });
-    await openCatalog(); await expect(row).toHaveCount(1);
+    await openCatalog(); await expect(row).toHaveCount(1, { timeout: 30000 });
     assert.equal((await account(students.nurseryMS)).lines.find(l => l.feeId === fee.id).remainingBalance, amount);
     await page.goto(`${origin}/#/payments`);
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -703,6 +704,12 @@ try {
     'another V3 payment remains reflected after an atomic reversal');
   pass('ARCHIVE / REVERSAL');
   console.log('STAGING FUNCTIONAL: PASS');
+} catch (error) {
+  if (diagnosticPage && !diagnosticPage.isClosed()) {
+    await diagnosticPage.screenshot({ path: 'all-fees-catalog-failure.png', fullPage: true }).catch(() => {});
+    console.error('CATALOGUE UI AT FAILURE:', await diagnosticPage.locator('.school-fee-catalog').innerText({ timeout: 3000 }).catch(() => 'Catalogue not mounted'));
+  }
+  throw error;
 } finally {
   if (browser) await browser.close();
   const collections = ['studentFinancialObligations', 'studentFeeAssignments', 'studentTransportPlans', 'financialBenefits', 'paymentMoratoriums', 'payments', 'receipts',
