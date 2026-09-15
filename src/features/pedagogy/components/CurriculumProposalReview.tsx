@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { collection, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db as firestore, functions } from '../../../db/firebase';
@@ -35,6 +35,7 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [confirmation, setConfirmation] = useState<Array<{ row: Row; decision: Decision; note: string }> | null>(null);
   const [groupNote, setGroupNote] = useState('');
+  const submitting = useRef(false);
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState('');
@@ -43,7 +44,8 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
   const approvedLevels = resource.error || resource.loading ? [] : primary.filter(row => currentProposalDecision(resource.data, row)?.decision === 'APPROVED').map(row => row.classId);
   const locked = !owner || busy || resource.loading || Boolean(resource.error) || uncertain || !yearId || !schoolId;
   const submit = async () => {
-    if (locked || !confirmation?.length) return;
+    if (locked || submitting.current || !confirmation?.length) return;
+    submitting.current = true;
     setBusy(true);
     try {
       await httpsCallable(functions, 'recordCurriculumProposalDecisions')({ schoolId, academicYearId: yearId, requestId: crypto.randomUUID(), confirmed: true,
@@ -51,7 +53,7 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
       setConfirmation(null); setSelected([]); setDrafts({}); setNotes({}); setGroupNote('');
       await resource.refresh(); setMessage('Décision enregistrée. Correspondance uniquement : aucune adoption ni authentification modifiée.');
     } catch (error) { setUncertain(true); setMessage((error instanceof Error ? error.message : 'Échec de la décision.') + ' Rechargez cette page et vérifiez les décisions avant toute nouvelle saisie.'); }
-    finally { setBusy(false); }
+    finally { submitting.current = false; setBusy(false); }
   };
   return <section aria-label="Validation du référentiel" className="curriculum-review pedagogy-card">
     <h2>Validation du référentiel</h2>
@@ -65,14 +67,15 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
     {resource.loading && <p role="status">Chargement des décisions…</p>}
     {(resource.error || message) && <p role="status">{resource.error || message}</p>}
     {!owner && <p>Consultation seule : les décisions sont réservées à la propriétaire (owner).</p>}
-    <section aria-label="Étape 1 — Valider les niveaux"><h3>Étape 1 — Valider les niveaux</h3>
+    <section aria-label="Étape 1 — Valider les niveaux"><h3>Étape 1 — CONFIRMER LES NIVEAUX</h3>
       <p>{primary.length} rattachements primaires à forte confiance. Sélectionnez uniquement les niveaux que vous souhaitez approuver.</p>
-      {primary.map(row => <article key={row.classId} data-testid="primary-level-review"><h4>{row.className} → {row.proposal.program}</h4><p>Forte confiance — {row.proposal.rationale}</p>
+      {owner && <button type="button" disabled={locked || Boolean(confirmation)} onClick={() => setSelected(primary.map(row => row.classId))}>TOUT SÉLECTIONNER — LES 12 NIVEAUX</button>}
+      {['fr-', 'en-'].map(prefix => <section key={prefix} aria-label={prefix === 'fr-' ? 'Niveaux primaire FR' : 'Niveaux primaire EN'}><h4>{prefix === 'fr-' ? 'Primaire FR' : 'Primaire EN'}</h4>{primary.filter(row => row.proposal.catalogLevelId.startsWith(prefix)).map(row => <article key={row.classId} data-testid="primary-level-review"><h4>{row.className} → {row.proposal.program}</h4><p>Forte confiance — {row.proposal.rationale}</p>
         <p>{row.proposal.sources.map(s => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">{s.title} </a>)}</p>
         <p>État : {resource.loading || resource.error ? 'Lecture non confirmée' : currentProposalDecision(resource.data, row)?.decision === 'APPROVED' ? 'NIVEAU VALIDÉ' : 'À valider'}</p>
         {owner && <label><input type="checkbox" aria-label={'Sélectionner niveau — ' + row.className} checked={selected.includes(row.classId)} disabled={locked || Boolean(confirmation)} onChange={e => setSelected(v => e.target.checked ? [...new Set([...v, row.classId])] : v.filter(id => id !== row.classId))} />Sélectionner ce niveau</label>}
         <details><summary>Voir les détails</summary><p>{row.proposal.sources.map(s => s.detail).join(' ; ')}</p><p>sourceVersion : {row.proposal.sourceVersion}</p><p>mappingVersion : {row.proposal.mappingVersion}</p></details>
-      </article>)}
+      </article>)}</section>)}
     {owner && <fieldset disabled={locked}><legend>Approbation des niveaux sélectionnés</legend>
       <p>{selected.length} sélectionnée(s). Aucune sélection automatique.</p>
       <label>Note de décision groupée<textarea maxLength={2000} value={groupNote} onChange={e => setGroupNote(e.target.value)} /></label>
@@ -82,7 +85,7 @@ export function ReviewScope({ schoolId, yearId, owner, rows }: { schoolId?: stri
     <PrimarySubjectSteps approvedLevels={approvedLevels} levelsAvailable={primary.length} levelsLoading={resource.loading || Boolean(resource.error)} />
     <p>Préscolaire : {rows.filter(r => /preschool|nursery/.test(r.proposal.catalogLevelId)).length} niveaux, prochaine revue séparée avec les réserves existantes. Secondaire : correspondances partielles conservées, aucune application groupée.</p>
     {confirmation && <div role="dialog" aria-modal="true" aria-label="Confirmer les décisions" className="curriculum-review-confirm">
-      <h3>Confirmer les décisions</h3><p>Vérifiez chaque classe et la version avant enregistrement. Les anciennes décisions restent dans l’historique.</p>
+      <h3>Confirmer les décisions</h3><p>Vérifiez chaque classe et la version avant enregistrement. Les anciennes décisions restent dans l’historique.</p><p>Cette décision confirme uniquement le rattachement classe → niveau documentaire : ni validation de toutes les matières, ni horaires, coefficients, progression, adoption complète ou enseignement effectif.</p>
       <p>{confirmation.length} niveau(x) sélectionné(s).</p><ul>{confirmation.map(({ row, decision, note }) => <li key={row.classId}>{row.proposal.name} — {labels[decision]} — {note}<details><summary>Voir les détails</summary>Source : {row.proposal.sourceVersion}<br />Correspondance : {row.proposal.mappingVersion}</details></li>)}</ul>
       <button type="button" disabled={locked} onClick={() => void submit()}>CONFIRMER L’ENREGISTREMENT</button><button type="button" disabled={busy} onClick={() => setConfirmation(null)}>Annuler</button>
     </div>}

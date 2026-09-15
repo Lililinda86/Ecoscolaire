@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DEFAULT_SUBJECT_CATALOG } from '../../functions/src/academic/defaultSubjectCatalog';
 import { minedubSubjectIndex } from '../../src/features/pedagogy/resources/minedubSubjectIndex';
-import { matchOfficialSubjects, primaryDocumentByLevel } from '../../src/features/pedagogy/services/subjectMapping';
+import { matchOfficialSubjects, primaryDocumentByLevel, documentaryRelationsFor } from '../../src/features/pedagogy/services/subjectMapping';
 import { SubjectMappingProvider, type SubjectDecision, type SubjectReviewRow } from '../../src/features/pedagogy/components/SubjectMappingReview';
 import { PrimarySubjectSteps } from '../../src/features/pedagogy/components/PrimarySubjectSteps';
 const state = vi.hoisted(() => ({ call: vi.fn(), decisions: [] as unknown[] }));
@@ -12,7 +12,7 @@ vi.mock('firebase/functions', () => ({ httpsCallable: () => state.call }));
 const catalog = DEFAULT_SUBJECT_CATALOG.map(s => ({ ...s, id: s.internalCode, schoolId: 'school', isActive: true }));
 const rows: SubjectReviewRow[] = Object.entries(primaryDocumentByLevel).map(([level, documentId]) => {
   const source = minedubSubjectIndex.find(s => s.documentId === documentId)!;
-  const mappings = matchOfficialSubjects(source.names, catalog, 'school', level.startsWith('fr') ? 'francophone' : 'anglophone');
+  const mappings = matchOfficialSubjects(source.names, catalog, 'school', level.startsWith('fr') ? 'francophone' : 'anglophone').map(mapping => ({ ...mapping, documentaryRelations: documentaryRelationsFor(level, mapping) }));
   return { classId: level, className: level, catalogLevelId: level, mappings, safeCount: mappings.filter(m => m.localMatch).length, ambiguousCount: mappings.filter(m => m.status === 'AMBIGUOUS').length, missingCount: 0, mappingVersion: 'mapping-' + level, status: 'not_applied', progressionSuggestions: [], source: { title: documentId, sourceUrl: 'https://www.minedub.cm', sourceVersion: 'source-' + documentId, edition: '2018', pdfPages: [5], units: [] } };
 });
 function mount(owner = true, approvedLevels: string[] = []) {
@@ -27,6 +27,9 @@ it('shows exactly 76 safe and 44 ambiguous mappings, none selected, no source ha
   mount(); await screen.findByText('MAPPINGS SÛRS : 0/76 validés');
   expect(screen.getAllByTestId('primary-safe-mapping')).toHaveLength(76);
   expect(screen.getAllByTestId('primary-ambiguous-mapping')).toHaveLength(44);
+  expect(within(screen.getByRole('region', { name: 'Matières sûres primaire FR' })).getAllByRole('article')).toHaveLength(6);
+  expect(within(screen.getByRole('region', { name: 'Matières sûres primaire EN' })).getAllByRole('article')).toHaveLength(6);
+  expect(screen.getAllByTestId('primary-safe-mapping').every(item => !item.closest('details')?.open)).toBe(true);
   for (const box of screen.getAllByRole('checkbox')) expect((box as HTMLInputElement).checked).toBe(false);
   for (const select of screen.getAllByRole('combobox')) expect((select as HTMLSelectElement).value).toBe('');
   expect(state.call.mock.calls.every(([d]) => d.action === 'preview')).toBe(true);
