@@ -96,9 +96,9 @@ try {
     await seed('classes', `${schoolId}-${key}`, { schoolId, name, cycle: 'nursery', academicYearId: yearId, isActive: active });
   }
   students.nurseryMS = `${schoolId}-ms-student`;
-  await seed('students', students.nurseryMS, { schoolId, classId: `${schoolId}-ms`, academicYearId: yearId, academicYear: year, usesTransport: false, name: 'ALLFEES Maternelle MS', matricule: 'AF-MS', schoolingStatus: 'active', gender: 'F', section: 'francophone' });
-  await seed('studentPrivate', students.nurseryMS, { schoolId, studentId: students.nurseryMS, transportZonePk: null });
-  await seed('studentFinance', students.nurseryMS, { schoolId, studentId: students.nurseryMS, registrationFeeExpected: 15000 });
+  await seed('students', students.nurseryMS, { id: students.nurseryMS, schoolId, classId: `${schoolId}-ms`, academicYearId: yearId, academicYear: year, usesTransport: false, name: 'ALLFEES Maternelle MS', matricule: 'AF-MS', schoolingStatus: 'active', gender: 'F', section: 'francophone' });
+  await seed('studentPrivate', students.nurseryMS, { id: students.nurseryMS, schoolId, studentId: students.nurseryMS, transportZonePk: null });
+  await seed('studentFinance', students.nurseryMS, { id: students.nurseryMS, schoolId, studentId: students.nurseryMS, registrationFeeExpected: 15000 });
   assert.equal((await account(students.nurseryMS)).lines.find(l => l.key === 'tuition:T1').grossExpectedAmount, 60000);
   const studentId = students.primary18;
   await denied(call('getStudentFinancialAccount', { studentId, academicYear: year }, 'foreign'));
@@ -678,7 +678,13 @@ try {
     if (await group.getAttribute('open') === null) await group.locator('summary').first().click();
     await input.fill(String(paid));
   }
-  await page.getByTestId('cash-payment-submit').click();
+  const [collectionResponse] = await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/recordCashCollection') && response.request().method() === 'POST'),
+    page.getByTestId('cash-payment-submit').click()
+  ]);
+  const collectionBody = await collectionResponse.json();
+  assert.equal(collectionBody.error, undefined, JSON.stringify(collectionBody.error));
+  assert.equal(collectionResponse.status(), 200);
   await page.getByRole('heading', { name: 'Encaissement enregistré ✓', exact: true }).waitFor({ timeout: 30000 });
   for (const [label, remaining] of [['Test tenue', 4000], ['Test excursion', 2000]]) {
     await expect(page.locator('.student-account-receipt')).toContainText(label);
