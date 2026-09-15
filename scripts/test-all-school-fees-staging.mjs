@@ -3,7 +3,10 @@ import { randomBytes } from 'node:crypto';
 import { initializeApp, applicationDefault, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { chromium, expect } from '@playwright/test';
+import { chromium, expect as baseExpect } from '@playwright/test';
+
+// Live callable transactions and server hydration can exceed Playwright's 5 s default.
+const expect = baseExpect.configure({ timeout: 30000 });
 
 const project = 'ecoscolaire-staging';
 assert.equal(process.env.VITE_FIREBASE_PROJECT_ID, project);
@@ -738,5 +741,6 @@ try {
   console.log('CLEANUP: PASS\nRESIDUALS: 0 (isolated test school)\nORPHANS: 0 (isolated test school)\nPRODUCTION TOUCHED: NO');
   await deleteApp(app);
 }
+
 
 
