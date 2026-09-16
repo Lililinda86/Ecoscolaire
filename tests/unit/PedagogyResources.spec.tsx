@@ -9,10 +9,10 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.use
 const open = () => render(<MemoryRouter><PedagogyResources /></MemoryRouter>);
 it('filters actual bilingual resources and keeps missing integrations explicit', () => {
   open();
-  expect(screen.getByRole('status').textContent).toContain('8 modèle');
+  expect(screen.getByRole('status', { name: 'Nombre de modèles originaux' }).textContent).toContain('8 modèle');
   fireEvent.change(screen.getByLabelText('Langue'), { target: { value: 'en' } });
   fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'pre_nursery' } });
-  expect(screen.getByRole('status').textContent).toContain('1 modèle');
+  expect(screen.getByRole('status', { name: 'Nombre de modèles originaux' }).textContent).toContain('1 modèle');
   expect(screen.getByText('Explore and name familiar objects')).toBeTruthy();
   expect(screen.getByText(/CEDUC : connexion et droits de réutilisation non vérifiés/)).toBeTruthy();
   fireEvent.change(screen.getByLabelText('Recherche'), { target: { value: 'no matching resource' } });

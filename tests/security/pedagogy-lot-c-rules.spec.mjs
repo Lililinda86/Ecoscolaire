@@ -32,6 +32,22 @@ beforeEach(async () => {
   });
 });
 describe('Pedagogy Lot C protected weekly assessments', () => {
+  test('preschool guides, revisions and teacher declarations retain private server-only permissions', async () => {
+    const paths = ['preschoolWeeklyReviews/review-a', 'preschoolWeeklyReviews/review-a/revisions/1', 'preschoolWeeklyReviews/review-a/teacherDecisions/domain-a'];
+    await env.withSecurityRulesDisabled(async context => {
+      for (const path of paths) await setDoc(doc(context.firestore(), path), { schoolId: 'school-a', status: 'needs_review', teacherValidated: false });
+    });
+    for (const uid of ['secretary-a', 'director-a', 'owner-a', 'super', 'teacher-a', 'board-a', 'secretary-b']) {
+      const db = env.authenticatedContext(uid).firestore();
+      for (const path of paths) {
+        if (['secretary-a', 'director-a', 'owner-a', 'super'].includes(uid)) await assertSucceeds(getDoc(doc(db, path)));
+        else await assertFails(getDoc(doc(db, path)));
+        await assertFails(setDoc(doc(db, path), { schoolId: 'school-a', teacherValidated: true }));
+        await assertFails(deleteDoc(doc(db, path)));
+      }
+    }
+    for (const path of paths) await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), path)));
+  });
   test('individual support and its history are private, server-written only', async () => {
     const paths = ['pedagogyRemediations/support-a', 'pedagogyRemediations/support-a/history/1'];
     await env.withSecurityRulesDisabled(async context => {

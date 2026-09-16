@@ -8,6 +8,7 @@ export { recordTeachingConfirmations } from './teachingConfirmations';
 export { reviewCurriculumSubjectMappings } from './subjectMapping';
 export { savePedagogyClassPolicy } from './classPolicies';
 export { recordPedagogyObservations } from './observations';
+export { managePreschoolWeeklyReview } from './preschoolWeeklyReviews';
 export { savePedagogyFridayConfiguration, pedagogyFridayScheduler } from './fridayAutomation';
 export { publishPedagogyAssessmentToGrades, recordPedagogyResults } from './canonicalResults';
 export { managePedagogyRemediation } from './remediations';

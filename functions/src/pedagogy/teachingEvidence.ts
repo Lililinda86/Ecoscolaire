@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const TEACHING_STATES = ['unconfirmed', 'taught', 'partially_taught', 'postponed', 'not_taught'] as const;
+export const TEACHING_STATES = ['unconfirmed', 'taught', 'partially_taught', 'postponed', 'not_taught', 'cancelled', 'replaced'] as const;
 export type TeachingState = typeof TEACHING_STATES[number];
 export interface TeachingConfirmation {
   id: string;

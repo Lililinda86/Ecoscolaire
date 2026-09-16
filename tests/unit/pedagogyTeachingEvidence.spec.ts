@@ -11,7 +11,7 @@ function confirmed(status: TeachingState = 'taught') {
 }
 describe('Enseignements confirmés, distincts de la réception', () => {
   it('excludes old validated preparations without inventing a declaration', () => expect(admissibleTeachingContent(preparation()).exclusion).toBe('teaching_not_confirmed'));
-  it.each(['unconfirmed', 'postponed', 'not_taught'] as const)('excludes %s', status => expect(admissibleTeachingContent(confirmed(status)).content).toBe(''));
+  it.each(['unconfirmed', 'postponed', 'not_taught', 'cancelled', 'replaced'] as const)('excludes %s', status => expect(admissibleTeachingContent(confirmed(status)).content).toBe(''));
   it('limits partial teaching to exact confirmed passages, excluding the general title/objective', () => {
     expect(admissibleTeachingContent(confirmed('partially_taught'))).toEqual({ content: 'Partager en deux parts égales.', exclusion: null });
     expect(admissibleTeachingContent(confirmed('partially_taught')).content).not.toContain('Comparer');

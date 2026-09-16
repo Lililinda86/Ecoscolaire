@@ -1,5 +1,7 @@
 .pedagogy-page{--ink:#17211b;--muted:#647168;--green:#176b45;--line:#dce5df;max-width:1320px;margin:0 auto;padding:2rem;color:var(--ink)}
 .pedagogy-exam-bank{min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+.pedagogy-material-library,.pedagogy-material-library label{min-width:0;overflow-wrap:anywhere}
+.pedagogy-material-library select,.pedagogy-material-library input{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
 .pedagogy-exam-bank label,.pedagogy-exam-bank .pedagogy-card{min-width:0}
 .pedagogy-exam-bank select,.pedagogy-exam-bank input{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .pedagogy-exam-bank .pedagogy-list-row,.pedagogy-exam-bank .pedagogy-row-actions{flex-wrap:wrap}

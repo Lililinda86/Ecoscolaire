@@ -1,0 +1,149 @@
+import { expect, test } from '@playwright/test';
+import { randomBytes } from 'node:crypto';
+import { initializeApp, deleteApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
+import { loginAs } from './helpers/auth';
+import { earlyYearsActivities } from '../src/features/pedagogy/resources/earlyYearsProgram';
+
+const staging = process.env.PEDAGOGY_STAGING_E2E === 'true';
+const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire';
+if (!['demo-ecoscolaire', 'ecoscolaire-staging'].includes(projectId) || staging && projectId !== 'ecoscolaire-staging') throw Error('PRODUCTION_GUARD');
+test.skip(!staging && !process.env.FIRESTORE_EMULATOR_HOST, 'Explicit isolated environment required');
+test.describe.configure({ mode: 'serial' });
+for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 'en-nursery-1']) {
+  test('complete secretary preschool pathway — ' + levelId, async ({ page }) => {
+    test.setTimeout(240_000); page.setDefaultTimeout(25_000);
+    const prefix = 'ey-' + randomBytes(7).toString('hex'), schoolId = prefix + '-school', yearId = prefix + '-year', classId = prefix + '-class';
+    const uid = prefix + '-secretary', email = prefix + '@example.invalid', password = randomBytes(24).toString('base64url');
+    const staffId = prefix + '-staff', subjectId = prefix + '-domain', programId = prefix + '-program', unitId = prefix + '-unit', revisionId = prefix + '-revision', pupilId = prefix + '-pupil';
+    const app = initializeApp({ projectId, storageBucket: staging ? projectId + '.firebasestorage.app' : projectId + '.appspot.com' }, prefix);
+    const db = getFirestore(app), auth = getAuth(app), bucket = getStorage(app).bucket();
+    const activity = earlyYearsActivities(levelId)[0], en = activity.language === 'en';
+    const collections = ['users','schools','academicYears','classes','staff','subjects','students','teacherAssignments','classPrograms','classSubjects','curriculumPrograms','curriculumUnits','schoolCurriculumAdoptions','teachingWeeks','teachingPlans','teachingPlanItems','lessonPreparationTemplates','lessonPreparations','preparationUploads','preparationAnalyses','teachingConfirmations','teachingConfirmationBatches','preschoolWeeklyReviews','pedagogyObservations','pedagogyObservationBatches','pedagogyRemediations','pedagogyRemediationRequests','audit_logs'];
+    let createdAuth = false;
+    const scope = { schoolId, academicYearId: yearId, classId };
+    try {
+      await auth.createUser({ uid, email, password }); createdAuth = true;
+      await auth.setCustomUserClaims(uid, { schoolId, role: 'secretary' });
+      const batch = db.batch();
+      const put = (collection: string, id: string, data: Record<string, unknown>) => batch.create(db.collection(collection).doc(id), { id, schoolId, syntheticFixture: prefix, ...data });
+      put('users', uid, { email, role: 'secretary', isActive: true, name: 'Synthetic secretary' });
+      put('schools', schoolId, { name: 'Synthetic preschool school', activeAcademicYearId: yearId, academicYear: '2026-2027', subscriptionStatus: 'active', isActive: true });
+      put('academicYears', yearId, { name: '2026-2027', status: 'active', startDate: '2026-09-01', endDate: '2027-06-30' });
+      put('classes', classId, { name: 'Synthetic ' + levelId, catalogLevelId: levelId, cycle: 'nursery', type: en ? 'anglophone' : 'francophone', section: en ? 'anglophone' : 'francophone', isActive: true });
+      put('staff', staffId, { name: 'Synthetic teacher', role: 'teacher', status: 'active', isActive: true });
+      put('subjects', subjectId, { name: activity.domain, isActive: true });
+      put('students', pupilId, { ...scope, name: 'Synthetic pupil 1', firstName: 'Synthetic', lastName: 'pupil 1', isActive: true, schoolingStatus: 'active', status: 'active' });
+      put('teacherAssignments', prefix + '-assignment', { ...scope, subjectId, teacherStaffId: staffId, status: 'active', isActive: true });
+      put('classPrograms', prefix + '-class-program', { ...scope, status: 'published', publishedRevisionId: revisionId, publishedRevisionNumber: 1 });
+      put('classSubjects', prefix + '-class-subject', { ...scope, revisionId, subjectId, subjectNameSnapshot: activity.domain, isActive: true, displayOrder: 1 });
+      put('curriculumPrograms', programId, { title: 'Synthetic ITALO local preschool program', countryCode: 'CM', section: en ? 'anglophone' : 'francophone', cycle: 'nursery', version: 'synthetic-v1', status: 'published', sourceType: 'mock', checksum: 'synthetic-only' });
+      put('curriculumUnits', unitId, { programId, catalogLevelId: levelId, subjectId, title: activity.title, objective: activity.objective, sequence: 1, status: 'published', sourceType: 'mock' });
+      // Upstream local program adoption/assignment are fixture prerequisites,
+      // never genuine owner decisions. Planning onward uses real UI/Functions.
+      const adoptionId = [schoolId, yearId, levelId].join('__');
+      put('schoolCurriculumAdoptions', adoptionId, { academicYearId: yearId, catalogLevelId: levelId, curriculumProgramId: programId, status: 'active', revision: 1 });
+      await batch.commit();
+      await loginAs(page, email, password);
+      await page.goto('/#/pedagogy/resources');
+      const library = page.getByTestId('material-library');
+      await expect(library.getByRole('status')).toHaveText('130 ressource(s) correspondant aux filtres.');
+      await library.getByRole('combobox', { name: 'Classe de la bibliothèque' }).selectOption(classId);
+      await library.getByRole('combobox', { name: 'Source documentaire' }).selectOption('ITALO');
+      await expect(library.getByRole('status')).toHaveText('5 ressource(s) correspondant aux filtres.');
+      await expect(library).toContainText(activity.title);
+      for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await library.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true); }
+      await page.goto('/#/pedagogy/program');
+      await page.getByLabel('Niveau préscolaire ITALO').selectOption(levelId);
+      await expect(page.getByTestId('early-years-program')).toContainText(activity.title);
+      await expect(page.getByTestId('early-years-program')).toContainText('ITALO_EARLY_YEARS_PROGRAM');
+      await page.goto('/#/pedagogy/planning');
+      await page.getByRole('button', { name: 'Initialiser les semaines', exact: true }).click(); await expect(page.getByText('Semaines prêtes.')).toBeVisible();
+      await page.getByRole('combobox', { name: 'Classe', exact: true }).selectOption(classId);
+      await page.getByRole('combobox', { name: 'Semaine', exact: true }).selectOption('2026-09-07');
+      await page.getByRole('button', { name: 'Créer la proposition', exact: true }).click(); await expect(page.getByText('Proposition générée.')).toBeVisible();
+      await page.getByLabel('Enseignant ayant validé').selectOption(staffId);
+      await page.getByRole('button', { name: 'Consigner sa validation', exact: true }).click(); await expect(page.getByText('Validation enseignant enregistrée.', { exact: true })).toBeVisible();
+      await page.goto('/#/pedagogy/preparations');
+      await page.getByRole('combobox', { name: 'Semaine', exact: true }).selectOption('2026-09-07');
+      await page.getByRole('button', { name: 'Générer les préparations attendues' }).click(); await expect(page.getByText(/1 préparation\(s\) attendue\(s\), 1 créée\(s\)/)).toBeVisible();
+      const templates = await db.collection('lessonPreparationTemplates').where('schoolId', '==', schoolId).get();
+      expect(templates.docs[0].data().schemaVersion).toBe('preschool-preparation-template-v2');
+      await expect(page.locator('#preparation-template')).toContainText(en ? 'Manipulation and play' : 'Manipulation et jeu');
+      await page.getByRole('link', { name: 'Déposer', exact: true }).click();
+      await page.locator('input[type=file]').setInputFiles(en ? 'tests/fixtures/synthetic-pedagogy-ai/nursery-en.pdf' : 'tests/fixtures/synthetic-pedagogy-ai/pre-fr.pdf');
+      await page.getByRole('button', { name: 'Déposer et analyser' }).click();
+      await expect(page.getByText(staging ? /Analyse échouée/ : /Analyse terminée/).first()).toBeVisible();
+      // No provider permission is installed. On Staging the real controlled
+      // failure/manual-review path is tested; emulator extraction is synthetic.
+      await page.getByLabel('Activité / thème', { exact: true }).fill(activity.title);
+      await page.getByLabel('Objectif et acquis observable', { exact: true }).fill(activity.observable);
+      await page.getByLabel('Expériences familières', { exact: true }).fill('Synthetic familiar classroom context');
+      await page.getByLabel('Matériel', { exact: true }).fill(activity.materials);
+      await page.getByLabel('Accueil, découverte, jeu, guidage et verbalisation', { exact: true }).fill(activity.activity);
+      await page.getByLabel('Observation qualitative, sans note', { exact: true }).fill(activity.observable);
+      await page.getByLabel('Consolidation, adaptation et prolongement', { exact: true }).fill(activity.support);
+      await page.getByRole('button', { name: 'Enregistrer les corrections' }).click(); await expect(page.getByText('Corrections enregistrées.')).toBeVisible();
+      await page.getByRole('button', { name: 'Valider après relecture' }).click(); await expect(page.getByText('Préparation validée après relecture du secrétariat.')).toBeVisible();
+      const preparation = (await db.collection('lessonPreparations').where('schoolId', '==', schoolId).get()).docs[0];
+      await page.goto('/#/pedagogy/preparations'); await page.getByRole('combobox', { name: 'Semaine', exact: true }).selectOption('2026-09-07');
+      const teaching = page.getByRole('heading', { name: 'Enseignements réalisés' }).locator('..');
+      await teaching.getByRole('checkbox').first().check();
+      await teaching.getByRole('combobox', { name: 'Déclaration', exact: true }).selectOption('taught');
+      await teaching.getByLabel('Date effective').fill('2026-09-08');
+      await teaching.getByRole('checkbox', { name: 'Je consigne les déclarations reçues des enseignants sélectionnés.' }).check();
+      await teaching.getByRole('button', { name: 'Enregistrer 1 déclaration(s)', exact: true }).click(); await expect(page.getByText(/Déclarations enregistrées/)).toBeVisible();
+      await page.goto('/#/pedagogy/assessments');
+      await page.getByRole('combobox', { name: 'Semaine', exact: true }).selectOption(preparation.data().weekId);
+      const guide = page.getByTestId('preschool-weekly-review');
+      await guide.getByRole('button', { name: 'Préparer le bilan qualitatif', exact: true }).click();
+      await expect(page.getByTestId('preschool-review-print')).toContainText(activity.observable);
+      await guide.getByRole('combobox', { name: 'Domaine', exact: true }).selectOption(subjectId);
+      await guide.getByLabel('Enseignant responsable').selectOption(staffId); await guide.getByLabel('Note de déclaration').fill('Entirely synthetic teacher agreement, not a real pedagogical decision');
+      await guide.getByRole('checkbox').check(); await guide.getByRole('button', { name: 'Enregistrer l’accord reçu', exact: true }).click();
+      await expect(guide.getByRole('button', { name: 'Imprimer le guide validé' })).toBeVisible();
+      for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true); }
+      await page.emulateMedia({ media: 'print' });
+      const pdf = await page.pdf({ format: 'A4', preferCSSPageSize: true }); expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+      await test.info().attach(levelId + '-qualitative-a4', { body: pdf, contentType: 'application/pdf' }); await page.emulateMedia({ media: 'screen' });
+      const observe = async (date: string) => {
+        await page.goto('/#/pedagogy/observations');
+        await page.getByRole('combobox', { name: 'Activité enseignée', exact: true }).selectOption(preparation.id);
+        await page.getByLabel('Objectif observable, extrait exact du contenu confirmé').fill(activity.observable);
+        await page.getByRole('combobox', { name: 'Enseignant déclarant', exact: true }).selectOption(staffId); await page.getByLabel('Date d’observation').fill(date);
+        await page.getByRole('checkbox', { name: 'Synthetic pupil 1', exact: true }).check();
+        await page.getByRole('combobox', { name: 'Observation pour Synthetic pupil 1', exact: true }).selectOption('developing');
+        await page.getByLabel('Contexte pour Synthetic pupil 1').fill('Synthetic classroom observation, no diagnosis or score');
+        await page.getByRole('checkbox', { name: 'Ces observations m’ont été transmises par l’enseignant sélectionné.' }).check();
+        await page.getByRole('button', { name: 'Enregistrer les observations', exact: true }).click(); await expect(page.getByText('Observations enregistrées avec la provenance de l’enseignant.')).toBeVisible();
+      };
+      await observe('2026-09-09');
+      const initial = (await db.collection('pedagogyObservations').where('schoolId', '==', schoolId).get()).docs[0];
+      await page.goto('/#/pedagogy/follow-up'); await page.getByText('Proposer une activité ciblée', { exact: true }).click();
+      await page.getByRole('combobox', { name: 'Preuve initiale', exact: true }).selectOption('observation:' + initial.id);
+      await page.getByRole('textbox', { name: 'Activité proposée', exact: true }).fill('Synthetic familiar activity with support');
+      await page.getByLabel('Motif contextualisé, sans diagnostic').fill('Synthetic observation context only'); await page.getByLabel('Échéance proposée').fill('2026-09-11');
+      await page.getByRole('button', { name: 'Enregistrer la proposition', exact: true }).click();
+      const support = () => page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Synthetic familiar activity with support', exact: true }) });
+      const declaration = async (label: string) => { const card = support(); await card.getByRole('textbox', { name: 'Compte rendu reçu de l’enseignant', exact: true }).fill('Synthetic received declaration only'); await card.getByLabel('Date de la décision ou réalisation').fill('2026-09-10'); await card.getByRole('combobox', { name: 'Enseignant déclarant', exact: true }).selectOption(staffId); await card.getByRole('checkbox', { name: 'J’ai reçu cette déclaration de l’enseignant ; je ne la déduis pas des notes.' }).check(); await card.getByRole('button', { name: label, exact: true }).click(); await expect(card.getByRole('button', { name: label, exact: true })).toHaveCount(0); };
+      await declaration('Consigner l’accord enseignant'); await declaration('Consigner la réalisation');
+      await observe('2026-09-10');
+      const observations = await db.collection('pedagogyObservations').where('schoolId', '==', schoolId).get(); expect(observations.size).toBe(2); const latest = observations.docs.find(d => d.id !== initial.id)!;
+      expect(observations.docs.every(d => d.data().score === undefined && d.data().policySnapshot.totalPoints === null)).toBe(true);
+      await page.goto('/#/pedagogy/follow-up'); await support().getByLabel('Nouvelle preuve après réalisation').selectOption('observation:' + latest.id); await support().getByLabel('Conclusion enseignante').selectOption('continue_support');
+      await declaration('Consigner la réévaluation');
+      expect((await db.collection('pedagogyRemediations').where('schoolId', '==', schoolId).get()).docs[0].data().status).toBe('reviewed');
+      for (const collection of ['grades','evaluations','weeklyAssessments','assessmentItems','pedagogyAiOperations','payments','expenses','buses']) expect((await db.collection(collection).where('schoolId', '==', schoolId).get()).empty).toBe(true);
+      console.log('PRESCHOOL_COMPLETE_PASS: ' + levelId + '; real synthetic workflow, manual review, no provider claim, responsive and A4');
+    } finally {
+      for (const collection of collections) for (const d of (await db.collection(collection).where('schoolId', '==', schoolId).get()).docs) await db.recursiveDelete(d.ref);
+      await bucket.deleteFiles({ prefix: 'schools/' + schoolId + '/pedagogy/preparations/' });
+      if (createdAuth) await auth.deleteUser(uid);
+      for (const collection of collections) expect((await db.collection(collection).where('schoolId', '==', schoolId).get()).empty).toBe(true);
+      expect((await bucket.getFiles({ prefix: 'schools/' + schoolId + '/pedagogy/preparations/' }))[0]).toHaveLength(0);
+      await deleteApp(app);
+    }
+  });
+}

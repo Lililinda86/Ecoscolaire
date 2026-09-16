@@ -80,7 +80,8 @@ test.describe('Lot B — préparations de cours', () => {
       await page.goto('/#/pedagogy/resources');
       await expect(page.getByRole('heading', { name: 'Ressources pédagogiques', exact: true })).toBeVisible();
       await page.getByText('Curriculum primaire francophone — niveau 1 (SIL / CP) · OFFICIEL — MINEDUB', { exact: true }).click();
-      await expect(page.getByText(/38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81/)).toBeVisible();
+      const provenanceRegister = page.getByRole('heading', { name: 'Registre hiérarchisé de provenance', exact: true }).locator('..');
+      await expect(provenanceRegister.getByText(/38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81/)).toBeVisible();
       for (const width of [360, 768, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

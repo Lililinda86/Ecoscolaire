@@ -7,6 +7,8 @@ import { activePedagogyDocument } from './scopes';
 import { mondayIso } from './ids';
 import { FRIDAY_TIME_ZONE, fridayWindow, fridayTrialClock, parseFridayPolicy } from './fridayPolicy';
 import { generateWeeklyAssessmentForActor } from './weeklyAssessments';
+import { localEducationStage } from './pedagogyPolicy';
+import { managePreschoolReviewForActor } from './preschoolWeeklyReviews';
 
 const configurationCollection = 'pedagogyFridayConfigurations';
 const runCollection = 'pedagogyFridayRuns';
@@ -83,9 +85,16 @@ export async function runPedagogyFriday(now = new Date()) {
         attempts += 1;
         let status = 'retryable', errorCode: string | null = null, assessmentId: string | null = null;
         try {
-          const result = await generateWeeklyAssessmentForActor(scope, schoolId, { uid: 'system:pedagogy-friday', role: 'system', schoolId });
-          assessmentId = result.assessmentId;
-          if (['needs_review', 'teacher_validated', 'ready_to_print'].includes(result.status)) status = 'succeeded';
+          const classroom = await db.collection('classes').doc(classId).get();
+          if (classroom.data()?.schoolId !== schoolId) throw Error('FRIDAY_CLASS_SCOPE_MISMATCH');
+          const actor = { uid: 'system:pedagogy-friday', role: 'system', schoolId };
+          const preschool = ['pre_nursery', 'preschool'].includes(localEducationStage(classroom.data() || {}));
+          const result = preschool
+            ? await managePreschoolReviewForActor({ ...scope, operation: 'generate' }, schoolId, actor)
+            : await generateWeeklyAssessmentForActor(scope, schoolId, actor);
+          assessmentId = 'reviewId' in result ? result.reviewId : result.assessmentId;
+          const resultStatus = result.status || ('review' in result ? result.review?.status : '');
+          if (['needs_review', 'teacher_validated', 'ready_to_print'].includes(resultStatus)) status = 'succeeded';
           else errorCode = 'FRIDAY_GENERATION_NOT_COMPLETED';
         } catch (error) { errorCode = safeError(error); }
         await db.runTransaction(async transaction => {

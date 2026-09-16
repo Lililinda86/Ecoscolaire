@@ -128,6 +128,8 @@ jobs:
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs && node tests/functions/test-pedagogy-source-watch-emulator.cjs && node tests/functions/test-pedagogy-adoption-emulator.cjs && node tests/functions/test-curriculum-review-emulator.cjs"
       - name: Subject mapping transaction and tenant regression
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-subject-mapping-emulator.cjs && node tests/functions/test-delegated-level-batch-emulator.cjs && node tests/functions/test-delegated-subject-batch-emulator.cjs"
+      - name: Preschool qualitative review and four-stage follow-up regression
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-preschool-weekly-review-emulator.cjs"
       - run: npx playwright install --with-deps chromium
       - name: Synthetic bilingual A4 print regression
         env:
@@ -162,7 +164,14 @@ jobs:
         run: >-
           npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire
           --only firestore,auth,functions,storage
-          "npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --workers=1"
+          "npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts tests/pedagogy-preschool-complete-e2e.spec.ts --workers=1"
+      - name: Preserve isolated browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-pedagogy-browser-failure
+          path: test-results/**/error-context.md
+          retention-days: 3
       - name: Pedagogy Lot C browser workflow
         env:
           VITE_USE_FIREBASE_EMULATORS: "true"

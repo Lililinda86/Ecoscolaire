@@ -1373,6 +1373,19 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /preschoolWeeklyReviews/{reviewId} {
+      allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+      allow write: if false;
+      match /revisions/{revisionId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
+      match /teacherDecisions/{decisionId} {
+        allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
+        allow write: if false;
+      }
+    }
+
     match /weeklyAssessments/{assessmentId} {
       allow read: if isAuthenticated() && isActive() && canManagePedagogy(resource.data.schoolId);
       allow create, update, delete: if false;
