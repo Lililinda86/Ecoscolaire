@@ -1,7 +1,15 @@
 export const FRIDAY_TIME_ZONE = 'Africa/Douala';
+export const FRIDAY_SYNTHETIC_TRIAL_SCHOOLS = ['pedagogy-ai-validation-20260906', 'pedagogy-preschool-automation-20260916'] as const;
 /** Controlled clock only for the one approved synthetic Staging trial.
  * Does not grant provider access, alter real-school time, or bypass the ledger. */
 export function fridayTrialClock(now: Date, projectId: string | undefined, schoolId: string, config: Record<string, unknown>) {
+  // Separate, expiring fixture for eight-stage scheduler verification. Never
+  // repurpose the historical fixture or grant provider/authentication access.
+  if (projectId === 'ecoscolaire-staging' && schoolId === 'pedagogy-preschool-automation-20260916' &&
+      config.syntheticTrial === 'preschool-automation-2026-09-16' && config.controlledTrialFriday === '2026-09-04T12:00:00Z' &&
+      now.getTime() >= Date.parse('2026-09-16T00:00:00Z') && now.getTime() < Date.parse('2026-09-24T00:00:00Z')) {
+    return new Date('2026-09-04T12:00:00Z');
+  }
   return projectId === 'ecoscolaire-staging' && schoolId === 'pedagogy-ai-validation-20260906' &&
     config.syntheticTrial === 'synthetic-validation-2026-09-06' && config.controlledTrialFriday === '2026-09-04T12:00:00Z'
     ? new Date('2026-09-04T12:00:00Z') : now;

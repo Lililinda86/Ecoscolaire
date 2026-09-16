@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { fridayWindow, fridayTrialClock, parseFridayPolicy } from '../../functions/src/pedagogy/fridayPolicy';
 describe('Friday schedule policy', () => {
+  it('expires the separate eight-stage fixture and never changes another school or project clock', () => {
+    const now = new Date('2026-09-16T12:00:00Z');
+    const school = 'pedagogy-preschool-automation-20260916';
+    const config = { syntheticTrial: 'preschool-automation-2026-09-16', controlledTrialFriday: '2026-09-04T12:00:00Z' };
+    expect(fridayTrialClock(now, 'ecoscolaire-staging', school, config).toISOString()).toBe('2026-09-04T12:00:00.000Z');
+    for (const date of ['2026-09-15T23:59:59Z', '2026-09-24T00:00:00Z']) {
+      const outside = new Date(date);
+      expect(fridayTrialClock(outside, 'ecoscolaire-staging', school, config)).toBe(outside);
+    }
+    expect(fridayTrialClock(now, 'production', school, config)).toBe(now);
+    expect(fridayTrialClock(now, 'ecoscolaire-staging', 'real-school', config)).toBe(now);
+    expect(fridayTrialClock(now, 'ecoscolaire-staging', school, {})).toBe(now);
+    expect(fridayTrialClock(now, 'ecoscolaire-staging', school, { ...config, controlledTrialFriday: '2026-09-11T12:00:00Z' })).toBe(now);
+  });
   it('scopes the controlled clock to the exact approved Staging fixture', () => {
     const now = new Date('2026-09-08T12:00:00Z');
     const config = { syntheticTrial: 'synthetic-validation-2026-09-06', controlledTrialFriday: '2026-09-04T12:00:00Z' };
