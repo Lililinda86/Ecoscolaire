@@ -92,7 +92,7 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 
       const guide = page.getByTestId('preschool-weekly-review');
       await guide.getByRole('button', { name: 'Préparer le bilan qualitatif', exact: true }).click();
       await expect(page.getByTestId('preschool-review-print')).toContainText(activity.observable);
-      await guide.getByLabel('Domaine', { exact: true }).selectOption(subjectId);
+      await guide.getByRole('combobox', { name: 'Domaine', exact: true }).selectOption(subjectId);
       await guide.getByLabel('Enseignant responsable').selectOption(staffId); await guide.getByLabel('Note de déclaration').fill('Entirely synthetic teacher agreement, not a real pedagogical decision');
       await guide.getByRole('checkbox').check(); await guide.getByRole('button', { name: 'Enregistrer l’accord reçu', exact: true }).click();
       await expect(guide.getByRole('button', { name: 'Imprimer le guide validé' })).toBeVisible();
@@ -102,9 +102,9 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 
       await test.info().attach(levelId + '-qualitative-a4', { body: pdf, contentType: 'application/pdf' }); await page.emulateMedia({ media: 'screen' });
       const observe = async (date: string) => {
         await page.goto('/#/pedagogy/observations');
-        await page.getByLabel('Activité enseignée', { exact: true }).selectOption(preparation.id);
+        await page.getByRole('combobox', { name: 'Activité enseignée', exact: true }).selectOption(preparation.id);
         await page.getByLabel('Objectif observable, extrait exact du contenu confirmé').fill(activity.observable);
-        await page.getByLabel('Enseignant déclarant', { exact: true }).selectOption(staffId); await page.getByLabel('Date d’observation').fill(date);
+        await page.getByRole('combobox', { name: 'Enseignant déclarant', exact: true }).selectOption(staffId); await page.getByLabel('Date d’observation').fill(date);
         await page.getByRole('checkbox', { name: 'Synthetic pupil 1', exact: true }).check();
         await page.getByLabel('Observation pour Synthetic pupil 1', { exact: true }).selectOption('developing');
         await page.getByLabel('Contexte pour Synthetic pupil 1').fill('Synthetic classroom observation, no diagnosis or score');
@@ -114,7 +114,7 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 
       await observe('2026-09-09');
       const initial = (await db.collection('pedagogyObservations').where('schoolId', '==', schoolId).get()).docs[0];
       await page.goto('/#/pedagogy/follow-up'); await page.getByText('Proposer une activité ciblée', { exact: true }).click();
-      await page.getByLabel('Preuve initiale', { exact: true }).selectOption('observation:' + initial.id);
+      await page.getByRole('combobox', { name: 'Preuve initiale', exact: true }).selectOption('observation:' + initial.id);
       await page.getByLabel('Activité proposée', { exact: true }).fill('Synthetic familiar activity with support');
       await page.getByLabel('Motif contextualisé, sans diagnostic').fill('Synthetic observation context only'); await page.getByLabel('Échéance proposée').fill('2026-09-11');
       await page.getByRole('button', { name: 'Enregistrer la proposition', exact: true }).click();
