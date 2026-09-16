@@ -1,0 +1,42 @@
+const assert=require('node:assert/strict'),{randomBytes}=require('node:crypto');
+if(!process.env.FIRESTORE_EMULATOR_HOST)throw Error('Emulator only');
+const admin=require('../../functions/node_modules/firebase-admin');admin.initializeApp({projectId:'demo-ecoscolaire'});
+const {runDelegatedSubjectBatch:run,buildPrimaryDocumentaryTargets:build}=require('../../functions/lib/pedagogy/delegatedSubjectBatch');
+const {batchDigest:hash}=require('../../functions/lib/pedagogy/delegatedLevelBatch');
+const {curriculumReviewProposals:proposals}=require('../../functions/lib/pedagogy/curriculumReviewManifest');
+const {DEFAULT_SUBJECT_CATALOG:catalog}=require('../../functions/lib/academic/defaultSubjectCatalog');
+const db=admin.firestore(),schoolId='subject-delegated-'+randomBytes(7).toString('hex'),academicYearId=schoolId+'-year';
+const classes=proposals.filter(p=>p.highConfidence).map(p=>({id:schoolId+'-'+p.id,schoolId,academicYearId,catalogLevelId:p.catalogLevelId,section:p.catalogLevelId.startsWith('fr-')?'francophone':'anglophone',cycle:'primary',isActive:true}));
+const subjects=catalog.filter(s=>s.cycles.includes('primary')).map(s=>({id:schoolId+'-'+s.internalCode,schoolId,name:s.name,section:s.section,cycles:s.cycles,isActive:true,localConfigurationStatus:''})).sort((a,b)=>a.id.localeCompare(b.id));
+const targets=build(schoolId,academicYearId,classes,subjects);
+const authorizationReference='synthetic-subject-authorization',decisionBatchId=schoolId+'-batch';
+const manifest=targets.map(t=>({decisionBatchId,schoolId,academicYearId,decisionType:t.decisionType,targetId:t.id,decision:t.decision,sourceVersion:t.sourceVersion,mappingVersion:t.mappingVersion,authorizationReference,reason:'Synthetic documentary authorization, no actual teaching'}));
+const policy={projectId:'demo-ecoscolaire',manifestDigest:hash(manifest),authorizationReference};
+const count=async c=>(await db.collection(c).where('schoolId','==',schoolId).get()).size;
+(async()=>{try{
+ assert.equal(targets.length,94);assert.equal(targets.filter(t=>!t.component).length,76);assert.equal(targets.filter(t=>t.component).length,18);
+ await db.doc('schools/'+schoolId).create({activeAcademicYearId:academicYearId});await db.doc('academicYears/'+academicYearId).create({schoolId,status:'active'});
+ for(const c of classes)await db.doc('classes/'+c.id).create(c);
+ for(const s of subjects)await db.doc('subjects/'+s.id).create(s);
+ await assert.rejects(run(db,policy,manifest,'dry-run'),/level approval required/);
+ for(const c of classes){const p=proposals.find(p=>p.catalogLevelId===c.catalogLevelId);await db.doc('curriculumProposalReviews/'+hash([schoolId,academicYearId,c.id,p.sourceVersion,p.mappingVersion])).create({schoolId,academicYearId,classId:c.id,decision:'APPROVED',sourceVersion:p.sourceVersion,mappingVersion:p.mappingVersion});}
+ const dry=await run(db,policy,manifest,'dry-run');assert.equal(dry.matched,94);assert.equal(await count('curriculumSubjectMappings'),0);assert.equal(await count('audit_logs'),0);
+ await assert.rejects(run(db,{...policy,projectId:'forbidden-live-project'},manifest,'dry-run'),/Staging/);
+ await assert.rejects(run(db,policy,manifest.map((m,i)=>i?m:{...m,decision:'EXACT'}),'apply',dry.snapshot),/Unapproved/);
+ const forged=manifest.map(m=>({...m,role:'owner'}));await assert.rejects(run(db,{...policy,manifestDigest:hash(forged)},forged,'dry-run'),/fields/);
+ const foreign=manifest.map(m=>({...m,schoolId:schoolId+'-foreign'}));await assert.rejects(run(db,{...policy,manifestDigest:hash(foreign)},foreign,'dry-run'),/tenant\/year/);
+ const stale=manifest.map((m,i)=>i?m:{...m,mappingVersion:'stale'});await assert.rejects(run(db,{...policy,manifestDigest:hash(stale)},stale,'dry-run'),/conflict/);
+ const subjectRef=db.doc('subjects/'+subjects[0].id);await subjectRef.update({isActive:false});await assert.rejects(run(db,policy,manifest,'apply',dry.snapshot),/cohort changed|conflict/);await subjectRef.update({isActive:true});
+ await assert.rejects(run(db,policy,manifest,'apply',dry.snapshot),/Fresh matching/);
+ await db.doc('curriculumSubjectMappings/'+targets[0].groupId).create({schoolId,decision:'REQUEST_CHANGE'});await assert.rejects(run(db,policy,manifest,'dry-run'),/Concurrent/);assert.equal(await count('curriculumSubjectMappings'),1);await db.doc('curriculumSubjectMappings/'+targets[0].groupId).delete();
+ const fresh=await run(db,policy,manifest,'dry-run');assert.equal((await run(db,policy,manifest,'apply',fresh.snapshot)).applied,94);
+ assert.equal((await run(db,policy,manifest,'dry-run')).persisted,94);assert.equal((await run(db,policy,manifest,'apply',fresh.snapshot)).applied,0);
+ const stored=await db.collection('curriculumSubjectMappings').where('schoolId','==',schoolId).get();assert.equal(stored.size,86);assert.equal(await count('audit_logs'),86);assert.equal(await count('curriculumReviewRequests'),1);
+ const safe=stored.docs.filter(d=>d.data().scope==='OWNER_DOCUMENTARY_SUBJECT_DECISION');assert.equal(safe.length,76);assert(safe.every(d=>d.data().decision==='APPROVED'));
+ const components=stored.docs.filter(d=>d.data().scope==='DOCUMENTARY_COMPONENT_RELATIONS');assert.equal(components.length,10);assert.equal(components.reduce((n,d)=>n+d.data().relations.length,0),18);
+ const shs=components.find(d=>d.data().catalogLevelId==='fr-primary-ce1');assert(shs.data().relations.some(r=>r.subjectName==='Histoire'));assert(shs.data().relations.some(r=>r.subjectName==='Géographie'));assert(shs.data().relations.every(r=>r.type==='COMPONENT_OF_OFFICIAL_DOMAIN'));assert.equal(shs.data().subjectId,undefined);
+ for(const d of stored.docs){assert.equal(d.data().decidedBy,'system/delegated-workflow');assert.equal(d.data().decisionAuthorizedByRole,'owner');assert.equal(d.data().adoptionChanged,false);assert.equal(d.data().classProgramPublished,false);assert.equal((await d.ref.collection('history').get()).size,1);}
+ await shs.ref.update({relations:shs.data().relations.slice(1)});await assert.rejects(run(db,policy,manifest,'apply',fresh.snapshot),/evidence conflict/);
+ for(const c of ['teacherAssignments','classPrograms','schoolCurriculumAdoptions','timetableEntries','teachingPlans','users'])assert.equal(await count(c),0);
+ console.log('DELEGATED_SUBJECT_BATCH PASS: 76 safe + 18 components, 86 immutable records, dry-run, tenant/version, atomic conflict, no unsafe equivalence, Histoire+Géographie, audit, retry, tamper detection, no adoption or teaching');
+}finally{for(const c of ['curriculumSubjectMappings','curriculumProposalReviews','curriculumReviewRequests','audit_logs','classes','subjects','academicYears'])for(const d of(await db.collection(c).where('schoolId','==',schoolId).get()).docs)await db.recursiveDelete(d.ref);await db.doc('schools/'+schoolId).delete();await admin.app().delete();}})().catch(e=>{console.error(e);process.exitCode=1;});

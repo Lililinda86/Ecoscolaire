@@ -6,7 +6,7 @@ import { minedubSubjectIndex } from '../../src/features/pedagogy/resources/mined
 import { matchOfficialSubjects, primaryDocumentByLevel, documentaryRelationsFor } from '../../src/features/pedagogy/services/subjectMapping';
 import { SubjectMappingProvider, type SubjectDecision, type SubjectReviewRow } from '../../src/features/pedagogy/components/SubjectMappingReview';
 import { PrimarySubjectSteps } from '../../src/features/pedagogy/components/PrimarySubjectSteps';
-const state = vi.hoisted(() => ({ call: vi.fn(), decisions: [] as unknown[] }));
+const state = vi.hoisted(() => ({ call: vi.fn(), decisions: [] as unknown[], documentaryDecisions: [] as unknown[] }));
 vi.mock('../../src/db/firebase', () => ({ functions: {} }));
 vi.mock('firebase/functions', () => ({ httpsCallable: () => state.call }));
 const catalog = DEFAULT_SUBJECT_CATALOG.map(s => ({ ...s, id: s.internalCode, schoolId: 'school', isActive: true }));
@@ -17,12 +17,12 @@ const rows: SubjectReviewRow[] = Object.entries(primaryDocumentByLevel).map(([le
 });
 function mount(owner = true, approvedLevels: string[] = []) {
   state.call.mockImplementation(async (data: { action: string; items?: SubjectDecision[] }) => {
-    if (data.action === 'preview') return { data: { rows, secondaryRows: [], decisions: state.decisions } };
+    if (data.action === 'preview') return { data: { rows, secondaryRows: [], decisions: state.decisions, documentaryDecisions: state.documentaryDecisions } };
     state.decisions = data.items!.map(i => ({ ...i, revision: 1 })); return { data: {} };
   });
   return render(<SubjectMappingProvider schoolId="school" yearId="year" owner={owner}><PrimarySubjectSteps approvedLevels={approvedLevels} levelsAvailable={12} levelsLoading={false} /></SubjectMappingProvider>);
 }
-afterEach(() => { cleanup(); state.call.mockReset(); state.decisions = []; });
+afterEach(() => { cleanup(); state.call.mockReset(); state.decisions = []; state.documentaryDecisions = []; });
 it('shows exactly 76 safe and 44 ambiguous mappings, none selected, no source hashes visible by default', async () => {
   mount(); await screen.findByText('MAPPINGS SÛRS : 0/76 validés');
   expect(screen.getAllByTestId('primary-safe-mapping')).toHaveLength(76);
@@ -68,4 +68,23 @@ it('secretary can read but cannot select or decide', async () => {
 it('does not count an old mapping version as a current approval', async () => {
   state.decisions = [{ classId: rows[0].classId, officialSubject: rows[0].mappings[0].officialSubject, sourceVersion: rows[0].source.sourceVersion, mappingVersion: 'old', decision: 'APPROVED' }];
   mount(); await screen.findByText('MAPPINGS SÛRS : 0/76 validés');
+});
+it('separates eight persisted documentary resolutions from 36 genuine local cases without presuming teaching', async () => {
+  state.documentaryDecisions = rows.flatMap(row => row.mappings.filter(m => m.status === 'AMBIGUOUS').flatMap(mapping => {
+    const relations = documentaryRelationsFor(row.catalogLevelId, mapping).filter(r => r.type === 'COMPONENT_OF_OFFICIAL_DOMAIN');
+    return relations.length ? [{ classId: row.classId, officialSubject: mapping.officialSubject, sourceVersion: row.source.sourceVersion, mappingVersion: row.mappingVersion, relations, decision: 'DOCUMENTARILY_VERIFIED' }] : [];
+  }));
+  expect(state.documentaryDecisions).toHaveLength(10);
+  mount(); await screen.findByText('Relations documentaires enregistrées — 8 dossiers');
+  expect(screen.getAllByTestId('primary-ambiguous-mapping')).toHaveLength(36);
+  expect(screen.getByText(/36 situations restent à examiner/)).toBeTruthy();
+  expect(screen.getByText('AMBIGUÏTÉS : 0/44 résolues')).toBeTruthy(); // Human decisions are still separate.
+  expect(state.decisions).toHaveLength(0);
+  for (const select of screen.getAllByRole('combobox')) expect((select as HTMLSelectElement).value).toBe('');
+  expect(state.call.mock.calls.every(([d]) => d.action === 'preview')).toBe(true);
+});
+it('never hides a case because a component record belongs to an old version', async () => {
+  state.documentaryDecisions = rows.flatMap(row => row.mappings.map(mapping => ({ classId: row.classId, officialSubject: mapping.officialSubject, sourceVersion: row.source.sourceVersion, mappingVersion: 'old', relations: documentaryRelationsFor(row.catalogLevelId, mapping), decision: 'DOCUMENTARILY_VERIFIED' })));
+  mount(); await screen.findByText('MAPPINGS SÛRS : 0/76 validés');
+  expect(screen.getAllByTestId('primary-ambiguous-mapping')).toHaveLength(44);
 });
