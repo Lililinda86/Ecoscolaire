@@ -3,7 +3,7 @@ import type { LessonPreparation, TeachingState } from '../types';
 import { recordTeachingConfirmations } from '../services/pedagogyService';
 
 const teachingLabels: Record<TeachingState, string> = {
-  unconfirmed: 'Non confirmé', taught: 'Enseigné', partially_taught: 'Partiellement enseigné', postponed: 'Reporté', not_taught: 'Non enseigné'
+  unconfirmed: 'Non confirmé', taught: 'Enseigné / activité réalisée', partially_taught: 'Partiellement enseigné / réalisé', postponed: 'Reporté', not_taught: 'Non enseigné', cancelled: 'Annulé', replaced: 'Remplacé — confirmer séparément la nouvelle activité'
 };
 type Declaration = { status: TeachingState; effectiveDate: string; teacherStaffId: string; excerpts: string; note: string };
 export function TeachingConfirmationForm({ schoolId, academicYearId, classId, weekId, preparations, teachers, onSaved }: {

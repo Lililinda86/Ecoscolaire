@@ -80,7 +80,7 @@ export interface TeachingPlanItem {
 }
 
 export type LessonPreparationStatus = 'expected' | 'uploaded' | 'needs_review' | 'validated';
-export type TeachingState = 'unconfirmed' | 'taught' | 'partially_taught' | 'postponed' | 'not_taught';
+export type TeachingState = 'unconfirmed' | 'taught' | 'partially_taught' | 'postponed' | 'not_taught' | 'cancelled' | 'replaced';
 export interface TeachingConfirmation {
   id: string; status: TeachingState; effectiveDate: string | null;
   declaredByTeacherStaffId: string; recordedBy: string; recordedAt?: unknown;

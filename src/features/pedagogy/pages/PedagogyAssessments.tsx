@@ -12,6 +12,7 @@ import type { AssessmentItem, WeeklyAssessment } from '../types';
 import { getClassOptionLabel } from '../../../utils/classCatalog';
 import { localEducationStage } from '../../../../functions/src/pedagogy/pedagogyPolicy';
 import { Link } from 'react-router-dom';
+import { PreschoolWeeklyReview } from '../components/PreschoolWeeklyReview';
 
 const labels: Record<WeeklyAssessment['status'], string> = {
   draft: 'Brouillon vide', generating: 'Génération…', needs_review: 'À faire valider', teacher_validated: 'Validée enseignant',
@@ -22,10 +23,10 @@ const sourceSignature = (ids: string[], versions: Record<string, number> = {}) =
 
 export default function PedagogyAssessments() {
   const { db, currentSchool } = useAppContext();
-  const year = db?.academicYears?.find(item => item.id === currentSchool?.activeAcademicYearId) || db?.academicYears?.find(item => item.status === 'active');
+  const year = db?.academicYears?.find(item => item.schoolId === currentSchool?.id && item.id === currentSchool?.activeAcademicYearId) || db?.academicYears?.find(item => item.schoolId === currentSchool?.id && item.status === 'active');
   const workspace = usePedagogyWorkspace(currentSchool?.id, year?.id);
-  const classes = useMemo(() => (db?.classes || []).filter(item => item.isActive !== false), [db?.classes]);
-  const teachers = useMemo(() => (db?.staff || []).filter(item => item.role === 'teacher' && item.active !== false && item.status !== 'inactive'), [db?.staff]);
+  const classes = useMemo(() => (db?.classes || []).filter(item => item.schoolId === currentSchool?.id && item.isActive !== false), [db?.classes, currentSchool?.id]);
+  const teachers = useMemo(() => (db?.staff || []).filter(item => item.schoolId === currentSchool?.id && item.role === 'teacher' && item.active !== false && item.status !== 'inactive'), [db?.staff, currentSchool?.id]);
   const [classId, setClassId] = useState('');
   const [weekId, setWeekId] = useState('');
   const selectedClassId = classId || classes[0]?.id || '';
@@ -104,6 +105,7 @@ export default function PedagogyAssessments() {
       {(assessment?.generationVersion || 0) > 0 && <button className="pedagogy-button pedagogy-button--secondary" disabled={preschool || busy} onClick={() => generate(true)}>Régénérer brouillon</button>}
     </section>
     {preschool && <p className="pedagogy-alert">Cette classe suit un parcours sans note ni classement. <Link to="/pedagogy/observations">Ouvrir les activités et observations</Link>.</p>}
+    {preschool && scope && <PreschoolWeeklyReview key={scopeKey} scope={scope} teachers={teachers} />}
     <section className="pedagogy-card no-print">
       <h2>Couverture des préparations</h2>
       <p><strong>{validated.length}/{expected.length}</strong> cours confirmé(s) exploitable(s) · {expected.length ? Math.round(validated.length * 100 / expected.length) : 0}% des préparations attendues. Un cours partiellement enseigné ne couvre pas toute sa matière.</p>
@@ -113,7 +115,7 @@ export default function PedagogyAssessments() {
       {sourceChanged && <div className="assessment-warning"><strong>Les cours confirmés ont changé.</strong><br />Le brouillon n’a pas été modifié automatiquement. Il peut être actualisé par une régénération explicite.</div>}
       {!validated.length && <p>Aucun cours confirmé exploitable</p>}
     </section>
-    {assessment && <section className="pedagogy-card no-print">
+    {!preschool && assessment && <section className="pedagogy-card no-print">
       <div className="pedagogy-card-title"><div><h2>{assessment.title || 'Évaluation hebdomadaire'}</h2><p>Version {assessment.generationVersion} · <span className={`pedagogy-status pedagogy-status--${assessment.status}`}>{labels[assessment.status]}</span></p></div><strong>{total}/{assessment.totalPoints}</strong></div>
       {assessment.generationError && <div className="pedagogy-alert pedagogy-alert--error">Génération impossible : {assessment.generationError}. Le brouillon et ses sources sont conservés ; vous pouvez réessayer.</div>}
       <div className="assessment-editor">{items.map((item, index) => <article key={item.id}>
@@ -143,6 +145,6 @@ export default function PedagogyAssessments() {
       {assessment.status === 'teacher_validated' && <button className="pedagogy-button" disabled={busy || sourceChanged} onClick={ready}>Passer prête à imprimer</button>}
       <div className="pedagogy-actions"><button className="pedagogy-button pedagogy-button--secondary" onClick={() => print('student')}>{assessment.status === 'ready_to_print' && !sourceChanged ? 'Imprimer version finale' : 'Imprimer brouillon'}</button><button className="pedagogy-button pedagogy-button--secondary" onClick={() => print('correction')}>Corrigé / Guide de correction</button></div>
     </section>}
-    {assessment && items.length > 0 && <AssessmentPrint school={currentSchool} assessment={assessment} items={items} mode={printMode} sourceChanged={Boolean(sourceChanged)} language={classes.find(item => item.id === selectedClassId)?.type === 'anglophone' ? 'en' : 'fr'} academicYearLabel={year?.name || ''} />}
+    {!preschool && assessment && items.length > 0 && <AssessmentPrint school={currentSchool} assessment={assessment} items={items} mode={printMode} sourceChanged={Boolean(sourceChanged)} language={classes.find(item => item.id === selectedClassId)?.type === 'anglophone' ? 'en' : 'fr'} academicYearLabel={year?.name || ''} />}
   </main>;
 }

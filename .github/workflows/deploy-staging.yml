@@ -267,6 +267,12 @@ jobs:
       - name: Deploy source-watch review (Staging only)
         run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:recordPedagogySourceWatchReview --non-interactive
 
+      - name: Deploy preschool qualitative review (Staging only)
+        run: |
+          test "$FIREBASE_PROJECT_ID" = ecoscolaire-staging
+          firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:managePreschoolWeeklyReview --non-interactive
+          test "$(gcloud functions describe managePreschoolWeeklyReview --project "$FIREBASE_PROJECT_ID" --region us-central1 --format='value(status)')" = ACTIVE
+
       - name: Verify advantage workflow Functions are ACTIVE
         shell: bash
         run: |

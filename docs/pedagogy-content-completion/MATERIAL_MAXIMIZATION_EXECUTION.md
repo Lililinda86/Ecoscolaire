@@ -23,5 +23,16 @@ Les 76 mappings (42 EXACT, 34 SAFE_ALIAS), huit dossiers documentaires entièrem
 
 ## Journal et preuves
 
+### Lot documentaire primaire livré
+
+PR #251 fusionnée, SHA `7987b7ce2d8f5f9cdbeead67b9722176cef2a906`.
+Gate candidat 35061765676 PASS ; gate exact 35062377027 PASS ; déploiement 35062376103 PASS.
+Dry-run final : 94/94 relations, zéro conflit. Application : 76 mappings sûrs (42 EXACT, 34 SAFE_ALIAS) et 18 relations de composante dans dix dossiers. Relecture indépendante : 86 dossiers, 86 historiques, 86 audits ; autorisation consommée. Aucun changement dans les douze rattachements de niveau, affectations, horaires, planifications, adoptions ou programmes de classe contrôlés. Huit ambiguïtés entièrement documentaires résolues ; 36 situations d’organisation ITALO regroupées en sept questions restent distinctes.
+
+### Extension préscolaire en cours — non encore livrée
+
+Moteur qualitatif déterministe sans fournisseur ; statuts annulé/remplacé exclus de toute évaluation. Bilan transactionnel avec versions, audit, accord reçu de l’enseignant responsable et impression brouillon/validée. Branchement au vendredi existant, pas d’activation automatique d’une configuration réelle. Quarante activités originales proposées pour huit niveaux, domaines FR/EN MINEDUB séparés, modèles de préparation et progression simulée sur le calendrier disponible ; aucune équivalence ministérielle ni adoption inventée.
+Contrôles locaux déjà exécutés : compilation frontend/Functions, 864 tests unitaires de non-régression, puis sept tests ciblés supplémentaires sur les activités et l’interface. Les nouveaux tests transactionnels quatre niveaux, Rules, parcours navigateur complets et recette Staging restent à exécuter. Aucun succès de provider n’est revendiqué.
+
 Les preuves privées et manifestes restent dans `output/primary-controlled-review/` puis le dossier d'exécution d'enrichissement, jamais publiés avec les identifiants d'environnement. Les sources publiques, données pédagogiques auditées et documentation expurgée peuvent être publiées selon l'autorisation existante.
 Ne pas déclarer le bloc terminé sans tests exécutés et compteurs relus. Documenter chaque lacune, poursuivre les blocs indépendants ; le rapport final couvre matériel réellement disponible, droits et vérifications en attente, décisions ITALO structurantes restantes.

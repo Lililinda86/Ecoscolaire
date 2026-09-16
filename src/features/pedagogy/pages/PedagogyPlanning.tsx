@@ -10,6 +10,7 @@ import {
 import type { TeachingPlanItem } from '../types';
 import { canEditTeachingPlan, canValidateTeachingPlan } from '../validators';
 import { getClassOptionLabel } from '../../../utils/classCatalog';
+import { EarlyYearsProgramPanel } from '../components/EarlyYearsProgramPanel';
 
 export default function PedagogyPlanning() {
   const { db, currentSchool, currentUser } = useAppContext();
@@ -54,6 +55,7 @@ export default function PedagogyPlanning() {
   return <main className="pedagogy-page">
     <PedagogyHeader title="Planification hebdomadaire" description="Générez une proposition déterministe, ajustez les séances puis consignez la validation de l’enseignant." />
     <PedagogyNav />
+    <EarlyYearsProgramPanel weeks={workspace.weeks} />
     {(workspace.error || message) && <div className={`pedagogy-alert${workspace.error ? ' pedagogy-alert--error' : ''}`}>{workspace.error || message}</div>}
     <section className="pedagogy-toolbar">
       <label>Classe<select value={classId} onChange={event => { setClassId(event.target.value); setItems([]); }}><option value="">Choisir…</option>{classes.map(item => <option key={item.id} value={item.id}>{getClassOptionLabel(item, classes)}</option>)}</select></label>
