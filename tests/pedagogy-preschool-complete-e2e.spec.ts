@@ -12,7 +12,7 @@ const projectId = process.env.PEDAGOGY_FIREBASE_PROJECT_ID || 'demo-ecoscolaire'
 if (!['demo-ecoscolaire', 'ecoscolaire-staging'].includes(projectId) || staging && projectId !== 'ecoscolaire-staging') throw Error('PRODUCTION_GUARD');
 test.skip(!staging && !process.env.FIRESTORE_EMULATOR_HOST, 'Explicit isolated environment required');
 test.describe.configure({ mode: 'serial' });
-for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 'en-nursery-1']) {
+for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'fr-preschool-ms', 'fr-preschool-gs', 'en-nursery-pre', 'en-nursery-1', 'en-nursery-2', 'en-nursery-3']) {
   test('complete secretary preschool pathway — ' + levelId, async ({ page }) => {
     test.setTimeout(240_000); page.setDefaultTimeout(25_000);
     const prefix = 'ey-' + randomBytes(7).toString('hex'), schoolId = prefix + '-school', yearId = prefix + '-year', classId = prefix + '-class';
