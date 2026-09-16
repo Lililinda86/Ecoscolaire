@@ -88,6 +88,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Exact human-validated Catalogue source, with bounded release infrastructure only.
+          git fetch --no-tags origin bee33fb89058d7c16735a4496b5ad2d45ee1dbdc
+          if node scripts/catalog-production-routing.mjs; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            echo 'targets=functions:manageSchoolFee,functions:getSchoolFeeCatalog' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Exact approved frontend-only Transport release: verify the existing backend.
           git fetch --no-tags origin 872692c5897c6283ec761d1193aeb0ae5a7790e9 8965b81e2fd49a0c84b7f3c8c0b6fb859ac1f802
           if node scripts/transport-production-routing.mjs; then

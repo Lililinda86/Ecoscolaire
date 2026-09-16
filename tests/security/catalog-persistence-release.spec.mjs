@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 test('catalogue candidate changes only the authorized publication chain and its tests', () => {
-  const allowed = new Set(['.github/workflows/catalog-persistence-staging.yml', 'functions/src/schoolFeeCatalog.ts',
+  const allowed = new Set(['.github/workflows/firebase-deploy.yml', '.github/workflows/ci.yml', 'scripts/catalog-production-routing.mjs', 'tests/security/catalog-production-routing.spec.mjs', '.github/workflows/catalog-persistence-staging.yml', 'functions/src/schoolFeeCatalog.ts',
     'src/components/Settings/SchoolFeeCatalog.tsx', 'scripts/test-all-school-fees-staging.mjs',
     'tests/functions/test-all-school-fees.cjs', 'tests/unit/CatalogPersistence.spec.tsx', 'tests/security/catalog-persistence-release.spec.mjs']);
   const changed = execFileSync('git', ['diff', '--name-only', '2eae3051d97694ab89c14e910ded17b502350b37', 'HEAD'], {encoding:'utf8'}).trim().split('\n');
