@@ -3,12 +3,12 @@ import { filterMaterials, materialCatalog, materialPreparationText, materialProv
 
 describe('documentary material library', () => {
   it('deduplicates canonical documents and keeps the 40 local proposals distinct', () => {
-    expect(materialCatalog).toHaveLength(130);
-    expect(new Set(materialCatalog.map(d => d.id)).size).toBe(130);
+    expect(materialCatalog).toHaveLength(134);
+    expect(new Set(materialCatalog.map(d => d.id)).size).toBe(134);
     expect(filterMaterials({ source: 'MINEDUB' })).toHaveLength(8);
     expect(filterMaterials({ source: 'MINESEC' })).toHaveLength(79);
     expect(filterMaterials({ source: 'ITALO' })).toHaveLength(40);
-    expect(filterMaterials({ source: 'GCE BOARD' })).toHaveLength(3);
+    expect(filterMaterials({ source: 'GCE BOARD' })).toHaveLength(7);
     expect(materialCatalog.filter(d => d.sourceAliases!.length > 1).map(d => d.sourceAliases!.map(a => a.id))).toEqual([['minesec-199', 'minesec-17'], ['minesec-49', 'minesec-50']]);
     expect(materialCatalog.flatMap(d => d.themes)).not.toContain('Italien');
   });

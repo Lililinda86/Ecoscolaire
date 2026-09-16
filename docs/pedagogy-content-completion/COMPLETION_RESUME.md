@@ -28,3 +28,13 @@ OPENAI CALLS: 0. PRODUCTION TOUCHED: NO. Aucun résultat futur anticipé.
 Durées conservées comme valeurs documentaires, aucune écriture d’horaire. Form 4 et Form 5 distinctes. Compétences détaillées, activités et évaluations non encore extraites laissées nulles. Bibliothèque existante et export de provenance enrichis, sans décision/adoption.
 
 Tests ciblés : 2 fichiers / 5 tests PASS. Gate du checkpoint 05d83ff : 35143755109 en cours à la rédaction ; statique PASS. Le contrôle navigateur local a été réessayé puis réinitialisé : même erreur Windows ACL au démarrage, aucune interaction ni contournement. Poursuivre Linux et serveur pendant ce blocage externe.
+
+## Checkpoint 3 — preuves et références d’examen
+
+Gate 35143755109 terminé PASS (05d83ff) : huit niveaux, régressions et sécurité de ce checkpoint. Modules/veille : 31 tests ciblés PASS. Types frontend et lint ciblé PASS avant le checkpoint d9e1bec.
+
+Quatre références supplémentaires provenant de https://camgceb.org/downloads/ : Logic 0590 (mars 2024, première session juin 2025), rapports Ordinary Level 2023, Advanced Level 2023 et 2024. Quatre PDF téléchargés légalement, format et hashes contrôlés, couvertures/sommaires inspectés. Liens/métadonnées uniquement publiés ; ni rapports assimilés à des corrigés, ni listes nominatives de résultats importées. Catalogue 134, dont 7 GCE. Banque externe filtrée séparément de la banque interne ; une année de copyright ne devient pas une session d’examen. Tests banque/bibliothèque : 5 fichiers / 14 tests PASS.
+
+Recherche ciblée : CEDUC.CM se décrit comme Communauté Éducative Camerounaise sur sa page LinkedIn (https://www.linkedin.com/company/ceduc-cm), sans droit de redistribution vérifié ; site direct indisponible via le lecteur web. Piste IFADEM « CM livret 4 » contrôlée : couverture COMORES, donc non importée comme document camerounais. L’IFEF annonce des livrets camerounais mais leur accès exact reste à retrouver ; aucune fausse attribution. Recherche Première officielle ne fournit pas encore de programme suffisamment identifié ; ne pas remplacer par un programme français/technique.
+
+Préflight serveur Staging en lecture seule : zéro configuration vendredi activée, zéro veille activée. Les champs série/option/combinaison des cinq classes du second cycle sont vides. Il reste à vérifier les configurations associées avant de regrouper la question ITALO. L’ancien identifiant strictement synthétique prévu par le garde-fou vendredi n’existe pas actuellement ; un essai isolé reste à préparer et exécuter, pas encore PASS.

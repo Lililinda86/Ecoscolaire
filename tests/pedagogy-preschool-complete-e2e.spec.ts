@@ -49,7 +49,7 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'fr-preschool-ms',
       await loginAs(page, email, password);
       await page.goto('/#/pedagogy/resources');
       const library = page.getByTestId('material-library');
-      await expect(library.getByRole('status')).toHaveText('130 ressource(s) correspondant aux filtres.');
+      await expect(library.getByRole('status')).toHaveText('134 ressource(s) correspondant aux filtres.');
       await library.getByRole('combobox', { name: 'Classe de la bibliothèque' }).selectOption(classId);
       await library.getByRole('combobox', { name: 'Source documentaire' }).selectOption('ITALO');
       await expect(library.getByRole('status')).toHaveText('5 ressource(s) correspondant aux filtres.');

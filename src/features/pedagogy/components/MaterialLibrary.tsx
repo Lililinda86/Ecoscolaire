@@ -26,7 +26,7 @@ export function MaterialLibrary() {
   return <section className="pedagogy-card pedagogy-material-library" data-testid="material-library">
     <h2>Bibliothèque documentaire et activités</h2>
     <button onClick={exportMetadata}>Exporter les notices et réserves documentaires</button>
-    <p>Consultation sans adoption : 8 curricula MINEDUB, 79 documents MINESEC distincts issus de 81 notices, 3 références GCE et 40 propositions originales préscolaires. Les PDF externes restent chez leur éditeur. Un filtre de classe indique une référence candidate, jamais une équivalence approuvée. Les ressources d’examen sans rattachement documenté restent visibles en choisissant « Toutes » les classes.</p>
+    <p>Consultation sans adoption : 8 curricula MINEDUB, 79 documents MINESEC distincts issus de 81 notices, 7 références GCE et 40 propositions originales préscolaires. Les PDF externes restent chez leur éditeur. Un filtre de classe indique une référence candidate, jamais une équivalence approuvée. Les ressources d’examen sans rattachement documenté restent visibles en choisissant « Toutes » les classes.</p>
     <div className="pedagogy-form-grid">
       <label>Classe de la bibliothèque<select aria-label="Classe de la bibliothèque" value={selectedClass ? classId : ''} onChange={e => setClassId(e.target.value)}><option value="">Toutes</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       {select('level', 'Niveau documentaire', materialCatalog.flatMap(d => d.levels))}
