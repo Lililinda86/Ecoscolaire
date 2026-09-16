@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { validDate } from './teachingEvidence';
+import { preparationFormatFor } from './preparationFormat';
 
 const db = () => admin.firestore();
 const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'] as const;
@@ -53,6 +54,8 @@ export const ensureExpectedLessonPreparations = functions.https.onCall(async (da
   const { actor, schoolId } = await requirePedagogyActor(context, data?.schoolId);
   const planId = requireId(data?.planId, 'planId');
   const plan = schoolDocument(await db().collection('teachingPlans').doc(planId).get(), schoolId, 'Planification');
+  const classroom = schoolDocument(await db().collection('classes').doc(plan.classId).get(), schoolId, 'Classe');
+  const format = preparationFormatFor(classroom);
   const itemsSnap = await db().collection('teachingPlanItems').where('schoolId', '==', schoolId).where('planId', '==', planId).limit(200).get();
   if (itemsSnap.empty) throw new functions.https.HttpsError('failed-precondition', 'Aucune séance planifiée.');
   let created = 0;
@@ -62,11 +65,13 @@ export const ensureExpectedLessonPreparations = functions.https.onCall(async (da
     const item = itemSnap.data();
     const preparationId = preparationIdForItem(itemSnap.id);
     const prepRef = db().collection('lessonPreparations').doc(preparationId);
-    const templateRef = db().collection('lessonPreparationTemplates').doc(templateId(schoolId, plan.academicYearId, plan.classId, item.subjectId));
+    const baseId = templateId(schoolId, plan.academicYearId, plan.classId, item.subjectId);
+    const templateRef = db().collection('lessonPreparationTemplates').doc(format.preschool ? baseId.replace(/__v1$/, '__v2') : baseId);
     const [existing, template] = await Promise.all([prepRef.get(), templateRef.get()]);
     if (!template.exists && !templatesCreated.has(templateRef.id)) {
       batch.create(templateRef, {
       ...baseTemplate(templateRef.id, schoolId, plan.academicYearId, plan.classId, item.subjectId, item.subjectName),
+      ...(format.preschool ? { version: 2, schemaVersion: format.schemaVersion, language: format.language, sections: format.titles.map((title, index) => ({ key: 'preschool-' + index, title, fields: [title] })) } : {}),
       createdAt: FieldValue.serverTimestamp(), createdBy: actor.uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.uid
     });
       templatesCreated.add(templateRef.id);

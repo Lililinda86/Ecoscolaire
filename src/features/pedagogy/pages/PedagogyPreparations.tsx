@@ -9,6 +9,7 @@ import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
 import { ensureExpectedLessonPreparations } from '../services/pedagogyService';
 import { getClassOptionLabel } from '../../../utils/classCatalog';
 import { TeachingConfirmationForm } from '../components/TeachingConfirmationForm';
+import { preparationFormatFor } from '../../../../functions/src/pedagogy/preparationFormat';
 
 export default function PedagogyPreparations() {
   const { db, currentSchool } = useAppContext();
@@ -24,6 +25,7 @@ export default function PedagogyPreparations() {
   const state = useLessonPreparations(currentSchool?.id, year?.id, selectedWeekStartDate, selectedClassId);
   const plan = workspace.plans.find(item => item.classId === selectedClassId && item.weekStartDate === selectedWeekStartDate);
   const selectedClass = classes.find(item => item.id === selectedClassId);
+  const format = preparationFormatFor(selectedClass || {});
   const first = state.preparations[0];
   const selectedWeek = workspace.weeks.find(item => item.weekStartDate === selectedWeekStartDate);
   const counters = {
@@ -70,9 +72,9 @@ export default function PedagogyPreparations() {
     />}
     <section className="pedagogy-card pedagogy-a4" id="preparation-template">
       <SchoolDocumentHeader school={currentSchool} documentTitle="Fiche de préparation" />
-      <div className="pedagogy-card-title"><div><h2>{first?.subjectName || 'Matière'} — {first?.lessonTitle || 'Titre de la leçon'}</h2><p>{selectedClass?.name || 'Classe'} · Semaine du {selectedWeekStartDate || '____-__-__'}</p></div><button className="pedagogy-button no-print" onClick={() => window.print()}>Imprimer en A4</button></div>
-      {['Objectif et prérequis', 'Matériel et supports', 'Déroulement de la séance', 'Évaluation', 'Différenciation et remédiation'].map(title => <div className="pedagogy-template-section" key={title}><h3>{title}</h3><div /></div>)}
-      <footer>Modèle structuré v1 · les zones non renseignées restent explicitement vides.</footer>
+      <div className="pedagogy-card-title"><div><h2>{first?.subjectName || (format.preschool ? 'Domaine' : 'Matière')} — {first?.lessonTitle || (format.preschool ? 'Activité' : 'Titre de la leçon')}</h2><p>{selectedClass?.name || 'Classe'} · Semaine du {selectedWeekStartDate || '____-__-__'}</p></div><button className="pedagogy-button no-print" onClick={() => window.print()}>Imprimer en A4</button></div>
+      {format.titles.map(title => <div className="pedagogy-template-section" key={title}><h3>{title}</h3><div /></div>)}
+      <footer>{format.schemaVersion} · les zones non renseignées restent explicitement vides. {format.preschool && 'L’enseignant reste auteur ; pas de notation numérique ni diagnostic.'}</footer>
     </section>
   </main>;
 }

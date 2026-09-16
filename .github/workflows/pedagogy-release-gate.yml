@@ -164,7 +164,7 @@ jobs:
         run: >-
           npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire
           --only firestore,auth,functions,storage
-          "npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts --workers=1"
+          "npx playwright test tests/pedagogy-lot-b-emulator-e2e.spec.ts tests/pedagogy-preschool-complete-e2e.spec.ts --workers=1"
       - name: Pedagogy Lot C browser workflow
         env:
           VITE_USE_FIREBASE_EMULATORS: "true"
