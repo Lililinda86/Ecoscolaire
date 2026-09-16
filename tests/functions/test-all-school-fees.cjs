@@ -58,6 +58,14 @@ const students = {};
     const fee = { label: category, category, amount: 15000, description: 'Test', academicYear, mandatory: category !== 'excursion', dueDate: '2027-06-15', classIds: [], cycles: ['primary'], studentIds: [] };
     await assert.rejects(call('manageSchoolFee', { action: 'create', feeId, fee }, secretaryId), e => e.code === 'permission-denied');
     await call('manageSchoolFee', { action: 'create', feeId, fee });
+    // Publication persists the debt before any account read, with no out-of-scope debt.
+    const immediately = await db.collection('studentFinancialObligations').where('feeId', '==', feeId).get();
+    assert.equal(immediately.size, fee.mandatory ? 2 : 0);
+    assert.ok(immediately.docs.every(d => [students.primary18, students.primary36].includes(d.data().studentId)));
+    const replay = await call('manageSchoolFee', { action: 'create', feeId, fee });
+    assert.equal(replay.replay, true, 'idempotent retry ignores Firestore object key order');
+    assert.equal((await db.collection('studentFinancialObligations').where('feeId', '==', feeId).get()).size, immediately.size);
+
     await call('manageSchoolFee', { action: 'create', feeId, fee });
     await assert.rejects(call('manageSchoolFee', { action: 'create', feeId, fee: { ...fee, amount: 1 } }), e => e.code === 'already-exists');
   }
@@ -103,6 +111,7 @@ const students = {};
   assert.equal(oldLine.label, initialLine.label); assert.equal(oldLine.grossExpectedAmount, 7500); assert.equal(oldLine.originalDueDate, null);
   const newLine = (await call('getStudentFinancialAccount', { studentId: students.primary36, academicYear, monthlyTransport: true }, secretaryId)).lines.find(l => l.feeId === editId);
   assert.equal(newLine.label, 'Revised label'); assert.equal(newLine.grossExpectedAmount, 9000); assert.equal(newLine.originalDueDate, '2027-06-20');
+    assert.equal(newLine.tariffVersion, (await call('getSchoolFeeCatalog', {})).fees.find(f => f.id === editId).versionId, 'new obligations retain the published revision identity');
   assert.equal((await db.collection('payments').where('schoolId', '==', schoolId).get()).size, paymentsBefore);
   await call('manageSchoolFee', { action: 'archive', feeId: editId });
   // Remove only this test catalogue/assignment/snapshot to preserve pre-existing exact line-count assertions below.
