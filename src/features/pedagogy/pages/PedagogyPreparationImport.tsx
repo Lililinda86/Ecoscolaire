@@ -98,7 +98,10 @@ export default function PedagogyPreparationImport() {
     catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Validation impossible.'); }
     finally { setBusy(false); }
   };
-  const field = (key: keyof PreparationReview, label: string) => <label>{format.preschool ? ({ lessonTitle: 'Activité / thème', objective: 'Objectif et acquis observable', prerequisites: 'Expériences familières', materials: 'Matériel', lessonSteps: 'Accueil, découverte, jeu, guidage et verbalisation', assessment: 'Observation qualitative, sans note', differentiation: 'Consolidation, adaptation et prolongement' }[key]) : label}<textarea value={review[key]} onChange={event => setReview(value => ({ ...value, [key]: event.target.value }))} /></label>;
+  const field = (key: keyof PreparationReview, label: string) => {
+    const fieldLabel = format.preschool ? ({ lessonTitle: 'Activité / thème', objective: 'Objectif et acquis observable', prerequisites: 'Expériences familières', materials: 'Matériel', lessonSteps: 'Accueil, découverte, jeu, guidage et verbalisation', assessment: 'Observation qualitative, sans note', differentiation: 'Consolidation, adaptation et prolongement' }[key]) : label;
+    return <label htmlFor={`preparation-review-${key}`}>{fieldLabel}<textarea id={`preparation-review-${key}`} aria-label={fieldLabel} value={review[key]} onChange={event => setReview(value => ({ ...value, [key]: event.target.value }))} /></label>;
+  };
   return <main className="pedagogy-page">
     <PedagogyHeader title="Importer et relire" description="PDF, JPEG ou PNG (10 Mio maximum). L’intégrité du fichier est contrôlée ; l’IA documentaire réelle reste indisponible tant que son autorisation et sa configuration ne sont pas validées." />
     <PedagogyNav />
