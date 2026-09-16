@@ -6,6 +6,7 @@ import { useScopedResource } from '../hooks/useScopedResource';
 import { loadInternalExamBank } from '../services/examBank';
 import { loadAssessmentItems } from '../services/pedagogyService';
 import { localEducationStage } from '../../../../functions/src/pedagogy/pedagogyPolicy';
+import { materialCatalog } from '../resources/materialCatalog';
 import type { AssessmentItem, WeeklyAssessment } from '../types';
 const emptyEntries: WeeklyAssessment[] = [], emptyItems: AssessmentItem[] = [];
 
@@ -60,6 +61,7 @@ export default function PedagogyExamBank() {
   return <main className="pedagogy-page pedagogy-exam-bank">
     <PedagogyHeader title="Banque d’épreuves internes" description="Consulter les évaluations validées de l’établissement, par année, classe et matière. Aucun appel IA, aucune modification ni validation automatique." /><PedagogyNav />
     <p>Cette banque ne contient pas d’annales officielles intégrées. Les droits des sujets externes restent à vérifier. Le préscolaire utilise les activités et observations, sans épreuves numériques imposées.</p>
+    <section className="pedagogy-card"><h2>Références d’examen externes — liens autorisés à consulter</h2><p>Fonds distinct des évaluations internes : deux syllabus GCE et un spécimen. Aucun sujet passé ni corrigé externe authentifié n’est annoncé. Aucune ressource n’est appliquée automatiquement à une classe.</p>{materialCatalog.filter(d => d.authority === 'GCE BOARD').map(d => <details key={d.id}><summary>{d.title}</summary><p>{d.note}</p><p>{d.edition} · {d.rights} · {d.applicability}</p><a href={d.url!} target="_blank" rel="noopener noreferrer">Consulter le document sur le site GCE Board</a></details>)}</section>
     <section className="pedagogy-card pedagogy-filters"><label>Année<select aria-label="Année banque" value={year?.id || ''} onChange={event => setYearId(event.target.value)}>{years.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Classe / section<select aria-label="Classe banque" value={classroom?.id || ''} onChange={event => setClassId(event.target.value)}>{classes.map(item => <option key={item.id} value={item.id}>{item.name} · {item.type}</option>)}</select></label></section>
     {currentSchool && year && classroom ? <BankScope key={JSON.stringify([currentSchool.id, year.id, classroom.id])} schoolId={currentSchool.id} yearId={year.id} classId={classroom.id} language={classroom.type === 'anglophone' ? 'en' : 'fr'} yearLabel={year.name} /> : <p>Sélectionnez un établissement disposant d’une année et d’une classe primaire/collège.</p>}
   </main>;

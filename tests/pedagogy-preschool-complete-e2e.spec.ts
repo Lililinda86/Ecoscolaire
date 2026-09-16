@@ -47,6 +47,14 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 
       put('schoolCurriculumAdoptions', adoptionId, { academicYearId: yearId, catalogLevelId: levelId, curriculumProgramId: programId, status: 'active', revision: 1 });
       await batch.commit();
       await loginAs(page, email, password);
+      await page.goto('/#/pedagogy/resources');
+      const library = page.getByTestId('material-library');
+      await expect(library.getByRole('status')).toHaveText('132 ressource(s) correspondant aux filtres.');
+      await library.getByRole('combobox', { name: 'Classe de la bibliothèque' }).selectOption(classId);
+      await library.getByRole('combobox', { name: 'Source documentaire' }).selectOption('ITALO');
+      await expect(library.getByRole('status')).toHaveText('5 ressource(s) correspondant aux filtres.');
+      await expect(library).toContainText(activity.title);
+      for (const width of [360, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); expect(await library.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true); }
       await page.goto('/#/pedagogy/program');
       await page.getByLabel('Niveau préscolaire ITALO').selectOption(levelId);
       await expect(page.getByTestId('early-years-program')).toContainText(activity.title);
