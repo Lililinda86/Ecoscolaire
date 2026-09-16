@@ -4,12 +4,14 @@ import { secondarySubjectSources } from '../../../../functions/src/pedagogy/seco
 import { minedubDocuments } from './minedubVerified';
 import { minedubSubjectIndex } from './minedubSubjectIndex';
 import { earlyYearsActivities, earlyYearsLevels } from './earlyYearsProgram';
+import { verifiedTeacherGuides } from './verifiedTeacherGuides';
 
 export interface PedagogicalMaterial {
   id: string; title: string; authority: string; type: string; language: string;
   levels: string[]; subjects: string[]; themes: string[]; url: string | null;
   sourceVersion: string; edition: string; locator: string; retrievedAt: string | null;
   provenance: string; applicability: string; rights: string; note: string;
+  preparationOutline?: string[];
 }
 const unique = (values: string[]) => [...new Set(values)];
 const primaryIds: Record<string, string> = { SIL: 'fr-primary-sil', CP: 'fr-primary-cp', CE1: 'fr-primary-ce1', CE2: 'fr-primary-ce2', CM1: 'fr-primary-cm1', CM2: 'fr-primary-cm2', 'Class 1': 'en-primary-1', 'Class 2': 'en-primary-2', 'Class 3': 'en-primary-3', 'Class 4': 'en-primary-4', 'Class 5': 'en-primary-5', 'Class 6': 'en-primary-6' };
@@ -26,12 +28,14 @@ export const materialCatalog: PedagogicalMaterial[] = [
   ...secondaryFiles.files.map(d => {
     const related = secondarySubjectSources.flatMap(level => level.subjects.flatMap(subject => subject.sources.filter(s => s.documentId === 'minesec-' + d.fileId).map(() => ({ level: level.catalogLevelId, subject: subject.officialSubject, language: level.section === 'anglophone' ? 'en' : 'fr' }))));
     const check = (checks as Record<string, { date: string; locator: string; note: string }>)[d.fileId];
+    const guide = verifiedTeacherGuides[d.fileId];
     // A class section is not evidence of the language of a PDF.
-    return { id: 'minesec-' + d.fileId, title: d.title, authority: 'MINESEC', type: /guide/i.test(d.title) ? 'Guide pédagogique' : 'Document secondaire', language: 'À vérifier',
-      levels: unique(related.map(r => r.level)), subjects: unique(related.map(r => r.subject)), themes: d.path,
-      url: d.url, sourceVersion: d.sha256, edition: check?.date || 'Non établie', locator: check?.locator || 'Métadonnées du catalogue ministériel ; contenu à examiner', retrievedAt: d.retrievedAt,
+    return { id: 'minesec-' + d.fileId, title: d.title, authority: 'MINESEC', type: /guide/i.test(d.title) ? 'Guide pédagogique' : 'Document secondaire', language: guide?.language || 'À vérifier',
+      levels: unique([...(guide?.levels || []), ...related.map(r => r.level)]), subjects: unique([...(guide?.subjects || []), ...related.map(r => r.subject)]), themes: d.path,
+      url: d.url, sourceVersion: d.sha256, edition: check?.date || 'Non établie', locator: guide?.locator || check?.locator || 'Métadonnées du catalogue ministériel ; contenu à examiner', retrievedAt: d.retrievedAt,
       provenance: 'MINISTRY_HOSTED_PDF_RETRIEVED', applicability: 'NOT_ESTABLISHED', rights: d.rights,
-      note: (check?.note || 'Aucune correspondance de classe établie.') + ' Les rattachements restent des propositions partielles, pas des disciplines ouvertes à ITALO.',
+      note: (guide?.summary || check?.note || 'Aucune correspondance de classe établie.') + ' Les rattachements restent des propositions partielles, pas des disciplines ouvertes à ITALO.',
+      preparationOutline: guide?.outline,
     };
   }),
   ...earlyYearsLevels.flatMap(level => earlyYearsActivities(level.id).map(a => ({
@@ -48,6 +52,20 @@ export const materialCatalog: PedagogicalMaterial[] = [
   ].map(d => ({ id: d.id, title: d.title, authority: 'GCE BOARD', type: d.type, language: 'en', levels: [], subjects: [d.subject], themes: ['Préparation aux examens'], url: 'https://camgceb.org/wp-content/uploads/' + d.file, sourceVersion: d.hash, edition: d.edition, locator: 'Couverture PDF p. 1 ; catalogue officiel https://camgceb.org/downloads/', retrievedAt: '2026-09-16', provenance: 'OFFICIAL_VERIFIED', applicability: 'EXAM_SCOPE_ONLY_CLASS_REVIEW_REQUIRED', rights: 'LINK_METADATA_ONLY', note: d.note })),
 ];
 export interface MaterialFilters { level?: string; subject?: string; theme?: string; type?: string; language?: string; source?: string; search?: string }
+export function materialProvenance(d: PedagogicalMaterial) {
+  return { ...d, issuer: d.authority === 'MINEDUB' ? 'Ministère de l’Éducation de Base' : d.authority === 'MINESEC' ? 'Ministère des Enseignements Secondaires' : d.authority === 'GCE BOARD' ? 'Cameroon General Certificate of Education Board' : 'ITALO — proposition rédigée avec un assistant',
+    documentType: d.type, level: d.levels, subject: d.subjects, version: d.sourceVersion,
+    publicationDate: null, effectiveDate: null, officialUrl: d.url, retrievalUrl: d.url,
+    checksum: /^[a-f0-9]{64}$/.test(d.sourceVersion) ? d.sourceVersion : null,
+    sourceLocator: d.locator, rightsStatus: d.url ? 'LINK_ONLY' : 'ORIGINAL_PROJECT_CONTENT',
+    verificationStatus: d.provenance === 'MINISTRY_HOSTED_PDF_RETRIEVED' ? 'OFFICIAL_PENDING_VERIFICATION' : d.provenance,
+    pedagogicalApproval: 'NOT_IMPLIED',
+  };
+}
+export function materialPreparationText(d: PedagogicalMaterial) {
+  if (!d.preparationOutline) return null;
+  return ['ITALO_LOCAL — ORIGINAL PREPARATION OUTLINE / CANEVAS LOCAL À COMPLÉTER', 'Teacher remains author / La préparation réelle reste à écrire par l’enseignant.', d.title, d.locator, d.url || '', 'Source version: ' + d.sourceVersion, 'Not an official blank form, adopted curriculum or taught evidence.', ...d.preparationOutline.map(label => label + '\n________________________')].join('\n\n');
+}
 export function filterMaterials(filters: MaterialFilters, catalog = materialCatalog) {
   const query = (filters.search || '').trim().toLocaleLowerCase();
   return catalog.filter(d => (!filters.level || d.levels.includes(filters.level)) && (!filters.subject || d.subjects.includes(filters.subject)) && (!filters.theme || d.themes.includes(filters.theme)) && (!filters.type || d.type === filters.type) && (!filters.language || d.language === filters.language) && (!filters.source || d.authority === filters.source) && (!query || [d.title, d.note, ...d.subjects, ...d.themes].join(' ').toLocaleLowerCase().includes(query)));

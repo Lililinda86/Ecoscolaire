@@ -5,7 +5,8 @@ import { originalTemplates, templateText } from '../resources/originalTemplates'
 import { sourceReferences } from '../resources/sourceReferences';
 import { provenanceRegistry, provenanceBadge } from '../resources/provenanceRegistry';
 import { pedagogicalReviewPackText } from '../resources/pedagogicalReviewPack';
-import { structuredReviewExcerpts } from '../resources/minedubVerified';
+import { structuredReviewExcerpts as baseReviewExcerpts } from '../resources/minedubVerified';
+import { additionalVerifiedUnits } from '../resources/additionalVerifiedUnits';
 import { resourceTaxonomy } from '../resources/resourceTaxonomy';
 import { SyntheticReviewLab } from '../components/SyntheticReviewLab';
 import { EarlyYearsProgramPanel } from '../components/EarlyYearsProgramPanel';
@@ -13,6 +14,7 @@ import { MaterialLibrary } from '../components/MaterialLibrary';
 import type { OriginalTemplate, ResourceCycle } from '../resources/originalTemplates';
 
 const cycleLabels: Record<ResourceCycle, string> = { pre_nursery: 'Prématernelle / Pre-nursery', nursery: 'Maternelle / Nursery', primary: 'Primaire / Primary', secondary: 'Collège / Secondary' };
+const structuredReviewExcerpts = [...baseReviewExcerpts, ...additionalVerifiedUnits];
 export default function PedagogyResources() {
   const [language, setLanguage] = useState(''), [cycle, setCycle] = useState(''), [search, setSearch] = useState('');
   const resources = originalTemplates.filter(item => (!language || item.language === language) && (!cycle || item.cycle === cycle) && (item.title + ' ' + item.objective).toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()));

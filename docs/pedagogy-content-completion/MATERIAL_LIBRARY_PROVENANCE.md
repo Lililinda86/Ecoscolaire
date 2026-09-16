@@ -24,6 +24,12 @@ Liens exacts et locateurs sont conservés dans `materialCatalog.ts`. Droits : m�
 
 ## Lacunes explicites
 
+Quatre guides du cache historique ont été relus et leur SHA-256 recalculé identique au registre : IDs MINESEC 3 (Computer Science Form 1/2, PDF p.6), 7 (Mathematics Form 1/2, PDF p.8), 30 (Informatique 6e/5e, PDF p.7 / imprimée 6), 36 (Sciences 6e/5e, PDF p.9). Pages méthodologiques inspectées visuellement. De courtes paraphrases et quatre canevas locaux non remplis, quinze rubriques chacun, sont consultables ; les canevas sont des aides originales ITALO_LOCAL et non une reproduction des fiches officielles. Les langues et niveaux de ces quatre guides seulement sont explicités à partir de leur couverture et contenu. Les 77 autres notices MINESEC gardent la langue non établie.
+
+La tentative de reprise par les URL publiques du catalogue a renvoyé des pages HTML de présentation : ces octets n’ont pas été traités comme de nouvelles versions PDF. Le cache historique authentifié a été retrouvé et réutilisé, sans nouvelle collecte générale ni remplacement des empreintes. La page de textes OBC est accessible via HTTP direct, mais ses textes techniques ne sont pas assimilés à des curricula généraux. La piste MINSEP 104 n’a pas pu être récupérée ; aucun contenu n’en est importé.
+
+Les 14 extraits MINEDUB de base et les 12 unités scientifiques déjà vérifiées sont désormais tous affichés : 26 paraphrases localisées, toujours partielles, sans heures inventées.
+
 Applicabilité secondaire, série/options et disciplines ITALO ouvertes restent à valider. Aucun corrigé externe authentique n’est annoncé disponible. CEDUC reste séparé et non importé faute d’identité/licence établies. Les documents de l’Office du Baccalauréat ne sont pas une preuve d’autorité sur le BEPC. Aucune donnée de résultats nominatifs n’est nécessaire à cette bibliothèque.
 
 Tests locaux : quatre contrôles du catalogue PASS (effectifs, filtres, droits/statuts, distinction spécimen/annale). Recette navigateur et livraison de cette bibliothèque encore PENDING à ce checkpoint.

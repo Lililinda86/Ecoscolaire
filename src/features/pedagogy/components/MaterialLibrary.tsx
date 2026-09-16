@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
-import { filterMaterials, materialCatalog, type MaterialFilters } from '../resources/materialCatalog';
+import { filterMaterials, materialCatalog, materialProvenance, materialPreparationText, type PedagogicalMaterial, type MaterialFilters } from '../resources/materialCatalog';
 
 export function MaterialLibrary() {
   const { db, currentSchool } = useAppContext();
@@ -11,8 +11,14 @@ export function MaterialLibrary() {
   const resources = classId && !selectedClass?.catalogLevelId ? [] : filterMaterials({ ...filters, level: selectedClass?.catalogLevelId || filters.level });
   const options = (values: string[]) => [...new Set(values)].sort();
   const exportMetadata = () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(materialCatalog, null, 2)], { type: 'application/json' }));
+    const url = URL.createObjectURL(new Blob([JSON.stringify(materialCatalog.map(materialProvenance), null, 2)], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url; link.download = 'PEDAGOGICAL_MATERIAL_METADATA.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const exportOutline = (d: PedagogicalMaterial) => {
+    const text = materialPreparationText(d); if (!text) return;
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = d.id + '-italo-local-outline.txt'; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const select = (key: keyof MaterialFilters, label: string, values: string[]) => <label>{label}<select aria-label={label} value={filters[key] || ''} onChange={e => { setFilters({ ...filters, [key]: e.target.value }); if (key === 'level') setClassId(''); }}><option value="">Tous</option>{options(values).map(v => <option key={v}>{v}</option>)}</select></label>;
@@ -31,7 +37,7 @@ export function MaterialLibrary() {
       <label>Recherche documentaire<input aria-label="Recherche documentaire" value={filters.search || ''} onChange={e => setFilters({ ...filters, search: e.target.value })} /></label>
     </div>
     <p role="status">{resources.length} ressource(s) correspondant aux filtres.</p>
-    {resources.map(d => <details key={d.id}><summary>{d.title} · {d.authority} · {d.type}</summary><p>{d.note}</p><p>Provenance : {d.provenance}. Applicabilité : {d.applicability}. Droits : {d.rights}.</p><p>{d.subjects.join(' · ') || 'Discipline à vérifier'}</p>{d.url && <a href={d.url} target="_blank" rel="noopener noreferrer">Consulter chez l’éditeur</a>}<details><summary>Voir la provenance</summary><p>Édition : {d.edition}. {d.locator}. Récupération : {d.retrievedAt || 'voir le registre source'}.</p><p style={{ overflowWrap: 'anywhere' }}>Version : {d.sourceVersion}</p></details></details>)}
+    {resources.map(d => <details key={d.id}><summary>{d.title} · {d.authority} · {d.type}</summary><p>{d.note}</p>{d.preparationOutline && <div><h3>Canevas local de préparation — à compléter</h3><p>ITALO_LOCAL : aide originale, pas un formulaire officiel ni une préparation déjà rédigée.</p><ul>{d.preparationOutline.map(label => <li key={label}>{label}</li>)}</ul><button onClick={() => exportOutline(d)}>Exporter le canevas local</button></div>}<p>Provenance : {d.provenance}. Applicabilité : {d.applicability}. Droits : {d.rights}.</p><p>{d.subjects.join(' · ') || 'Discipline à vérifier'}</p>{d.url && <a href={d.url} target="_blank" rel="noopener noreferrer">Consulter chez l’éditeur</a>}<details><summary>Voir la provenance</summary><p>Édition : {d.edition}. {d.locator}. Récupération : {d.retrievedAt || 'voir le registre source'}.</p><p style={{ overflowWrap: 'anywhere' }}>Version : {d.sourceVersion}</p></details></details>)}
     {!resources.length && <p>Aucune ressource documentée pour cette combinaison ; aucun contenu n’est inventé.</p>}
   </section>;
 }
