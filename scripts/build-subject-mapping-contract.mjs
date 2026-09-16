@@ -41,7 +41,7 @@ const outputs = {
   'functions/src/pedagogy/secondarySubjectSources.ts': '// Generated from already reviewed MINESEC metadata; no automatic application.\nexport const secondarySubjectSources = ' + JSON.stringify(secondary, null, 2) + ';\n',
 };
 for (const [path, content] of Object.entries(outputs)) {
-  if (process.argv.includes('--check')) assert.equal(readFileSync(path, 'utf8'), content, path);
+  if (process.argv.includes('--check')) assert.equal(readFileSync(path, 'utf8').replace(/\r\n/g, '\n'), content.replace(/\r\n/g, '\n'), path);
   else writeFileSync(path, content);
 }
 console.log('Subject mapping contract: PASS');
