@@ -106,7 +106,7 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 
         await page.getByLabel('Objectif observable, extrait exact du contenu confirmé').fill(activity.observable);
         await page.getByRole('combobox', { name: 'Enseignant déclarant', exact: true }).selectOption(staffId); await page.getByLabel('Date d’observation').fill(date);
         await page.getByRole('checkbox', { name: 'Synthetic pupil 1', exact: true }).check();
-        await page.getByLabel('Observation pour Synthetic pupil 1', { exact: true }).selectOption('developing');
+        await page.getByRole('combobox', { name: 'Observation pour Synthetic pupil 1', exact: true }).selectOption('developing');
         await page.getByLabel('Contexte pour Synthetic pupil 1').fill('Synthetic classroom observation, no diagnosis or score');
         await page.getByRole('checkbox', { name: 'Ces observations m’ont été transmises par l’enseignant sélectionné.' }).check();
         await page.getByRole('button', { name: 'Enregistrer les observations', exact: true }).click(); await expect(page.getByText('Observations enregistrées avec la provenance de l’enseignant.')).toBeVisible();
@@ -115,11 +115,11 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 
       const initial = (await db.collection('pedagogyObservations').where('schoolId', '==', schoolId).get()).docs[0];
       await page.goto('/#/pedagogy/follow-up'); await page.getByText('Proposer une activité ciblée', { exact: true }).click();
       await page.getByRole('combobox', { name: 'Preuve initiale', exact: true }).selectOption('observation:' + initial.id);
-      await page.getByLabel('Activité proposée', { exact: true }).fill('Synthetic familiar activity with support');
+      await page.getByRole('textbox', { name: 'Activité proposée', exact: true }).fill('Synthetic familiar activity with support');
       await page.getByLabel('Motif contextualisé, sans diagnostic').fill('Synthetic observation context only'); await page.getByLabel('Échéance proposée').fill('2026-09-11');
       await page.getByRole('button', { name: 'Enregistrer la proposition', exact: true }).click();
       const support = () => page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Synthetic familiar activity with support', exact: true }) });
-      const declaration = async (label: string) => { const card = support(); await card.getByLabel('Compte rendu reçu de l’enseignant', { exact: true }).fill('Synthetic received declaration only'); await card.getByLabel('Date de la décision ou réalisation').fill('2026-09-10'); await card.getByLabel('Enseignant déclarant', { exact: true }).selectOption(staffId); await card.getByRole('checkbox', { name: 'J’ai reçu cette déclaration de l’enseignant ; je ne la déduis pas des notes.' }).check(); await card.getByRole('button', { name: label, exact: true }).click(); await expect(card.getByRole('button', { name: label, exact: true })).toHaveCount(0); };
+      const declaration = async (label: string) => { const card = support(); await card.getByRole('textbox', { name: 'Compte rendu reçu de l’enseignant', exact: true }).fill('Synthetic received declaration only'); await card.getByLabel('Date de la décision ou réalisation').fill('2026-09-10'); await card.getByRole('combobox', { name: 'Enseignant déclarant', exact: true }).selectOption(staffId); await card.getByRole('checkbox', { name: 'J’ai reçu cette déclaration de l’enseignant ; je ne la déduis pas des notes.' }).check(); await card.getByRole('button', { name: label, exact: true }).click(); await expect(card.getByRole('button', { name: label, exact: true })).toHaveCount(0); };
       await declaration('Consigner l’accord enseignant'); await declaration('Consigner la réalisation');
       await observe('2026-09-10');
       const observations = await db.collection('pedagogyObservations').where('schoolId', '==', schoolId).get(); expect(observations.size).toBe(2); const latest = observations.docs.find(d => d.id !== initial.id)!;
