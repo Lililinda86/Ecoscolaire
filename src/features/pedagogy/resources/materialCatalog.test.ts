@@ -3,12 +3,14 @@ import { filterMaterials, materialCatalog, materialPreparationText, materialProv
 
 describe('documentary material library', () => {
   it('deduplicates canonical documents and keeps the 40 local proposals distinct', () => {
-    expect(materialCatalog).toHaveLength(132);
-    expect(new Set(materialCatalog.map(d => d.id)).size).toBe(132);
+    expect(materialCatalog).toHaveLength(130);
+    expect(new Set(materialCatalog.map(d => d.id)).size).toBe(130);
     expect(filterMaterials({ source: 'MINEDUB' })).toHaveLength(8);
-    expect(filterMaterials({ source: 'MINESEC' })).toHaveLength(81);
+    expect(filterMaterials({ source: 'MINESEC' })).toHaveLength(79);
     expect(filterMaterials({ source: 'ITALO' })).toHaveLength(40);
     expect(filterMaterials({ source: 'GCE BOARD' })).toHaveLength(3);
+    expect(materialCatalog.filter(d => d.sourceAliases!.length > 1).map(d => d.sourceAliases!.map(a => a.id))).toEqual([['minesec-199', 'minesec-17'], ['minesec-49', 'minesec-50']]);
+    expect(materialCatalog.flatMap(d => d.themes)).not.toContain('Italien');
   });
   it('filters local level, language, domain, type, theme and text conjunctively', () => {
     const local = filterMaterials({ level: 'fr-preschool-pre', source: 'ITALO', language: 'fr' });
@@ -20,7 +22,7 @@ describe('documentary material library', () => {
   it('never turns retrieval or a local proposal into adopted curriculum', () => {
     expect(materialCatalog.every(d => !['APPROVED', 'ADOPTED'].includes(d.applicability))).toBe(true);
     expect(filterMaterials({ source: 'MINESEC' }).every(d => d.applicability === 'NOT_ESTABLISHED')).toBe(true);
-    expect(filterMaterials({ source: 'MINESEC', language: 'À vérifier' })).toHaveLength(77);
+    expect(filterMaterials({ source: 'MINESEC', language: 'À vérifier' })).toHaveLength(75);
     const guides = materialCatalog.filter(d => d.preparationOutline);
     expect(guides).toHaveLength(4);
     expect(guides.every(d => d.levels.length === 2 && d.preparationOutline?.length === 15)).toBe(true);

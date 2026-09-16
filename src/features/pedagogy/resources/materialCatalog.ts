@@ -12,10 +12,11 @@ export interface PedagogicalMaterial {
   sourceVersion: string; edition: string; locator: string; retrievedAt: string | null;
   provenance: string; applicability: string; rights: string; note: string;
   preparationOutline?: string[];
+  sourceAliases?: Array<{ id: string; title: string; url: string | null }>;
 }
 const unique = (values: string[]) => [...new Set(values)];
 const primaryIds: Record<string, string> = { SIL: 'fr-primary-sil', CP: 'fr-primary-cp', CE1: 'fr-primary-ce1', CE2: 'fr-primary-ce2', CM1: 'fr-primary-cm1', CM2: 'fr-primary-cm2', 'Class 1': 'en-primary-1', 'Class 2': 'en-primary-2', 'Class 3': 'en-primary-3', 'Class 4': 'en-primary-4', 'Class 5': 'en-primary-5', 'Class 6': 'en-primary-6' };
-export const materialCatalog: PedagogicalMaterial[] = [
+const rawMaterialCatalog: PedagogicalMaterial[] = [
   ...minedubDocuments.filter(d => !d.id.endsWith('-variant')).map(d => ({
     id: d.id, title: d.title, authority: 'MINEDUB', type: 'Curriculum', language: d.language,
     levels: d.id.includes('nursery') ? earlyYearsLevels.filter(l => l.language === d.language).map(l => l.id) : d.levels.map(l => primaryIds[l]).filter(Boolean),
@@ -31,7 +32,7 @@ export const materialCatalog: PedagogicalMaterial[] = [
     const guide = verifiedTeacherGuides[d.fileId];
     // A class section is not evidence of the language of a PDF.
     return { id: 'minesec-' + d.fileId, title: d.title, authority: 'MINESEC', type: /guide/i.test(d.title) ? 'Guide pédagogique' : 'Document secondaire', language: guide?.language || 'À vérifier',
-      levels: unique([...(guide?.levels || []), ...related.map(r => r.level)]), subjects: unique([...(guide?.subjects || []), ...related.map(r => r.subject)]), themes: d.path,
+      levels: unique([...(guide?.levels || []), ...related.map(r => r.level)]), subjects: unique([...(guide?.subjects || []), ...related.map(r => r.subject)]), themes: [guide ? 'Méthodologie de préparation' : 'Référentiel secondaire — contenu à examiner'],
       url: d.url, sourceVersion: d.sha256, edition: check?.date || 'Non établie', locator: guide?.locator || check?.locator || 'Métadonnées du catalogue ministériel ; contenu à examiner', retrievedAt: d.retrievedAt,
       provenance: 'MINISTRY_HOSTED_PDF_RETRIEVED', applicability: 'NOT_ESTABLISHED', rights: d.rights,
       note: (guide?.summary || check?.note || 'Aucune correspondance de classe établie.') + ' Les rattachements restent des propositions partielles, pas des disciplines ouvertes à ITALO.',
@@ -51,6 +52,23 @@ export const materialCatalog: PedagogicalMaterial[] = [
     { id: 'gce-physics-0580-specimen', title: 'GCE Ordinary Level — Physics 0580, paper 2 — spécimen', type: 'Spécimen officiel', subject: 'Physics', edition: 'Copyright 2026 ; session non indiquée', file: '2026/03/Ordinary-Level-Physics-0580-Sample-Question.pdf', hash: 'cb46eddefecc482422d9a4d9d9e59957c7f541942fe43c4ee7d917f6e1ce6311', note: 'SAMPLE et JUNE XXXX sur la couverture. Sujet d’entraînement, pas une annale de juin 2026 ; aucun corrigé authentifié associé.' },
   ].map(d => ({ id: d.id, title: d.title, authority: 'GCE BOARD', type: d.type, language: 'en', levels: [], subjects: [d.subject], themes: ['Préparation aux examens'], url: 'https://camgceb.org/wp-content/uploads/' + d.file, sourceVersion: d.hash, edition: d.edition, locator: 'Couverture PDF p. 1 ; catalogue officiel https://camgceb.org/downloads/', retrievedAt: '2026-09-16', provenance: 'OFFICIAL_VERIFIED', applicability: 'EXAM_SCOPE_ONLY_CLASS_REVIEW_REQUIRED', rights: 'LINK_METADATA_ONLY', note: d.note })),
 ];
+export function deduplicateMaterials(rows: PedagogicalMaterial[]) {
+  const byKey = new Map<string, PedagogicalMaterial>();
+  for (const row of rows) {
+    const key = /^[a-f0-9]{64}$/.test(row.sourceVersion) ? row.authority + ':' + row.sourceVersion : row.id;
+    const existing = byKey.get(key), alias = { id: row.id, title: row.title, url: row.url };
+    if (!existing) byKey.set(key, { ...row, sourceAliases: [alias] });
+    else {
+      existing.levels = unique([...existing.levels, ...row.levels]);
+      existing.subjects = unique([...existing.subjects, ...row.subjects]);
+      existing.themes = unique([...existing.themes, ...row.themes]);
+      existing.sourceAliases!.push(alias);
+      existing.note = unique([existing.note, row.note]).join(' ');
+    }
+  }
+  return [...byKey.values()];
+}
+export const materialCatalog = deduplicateMaterials(rawMaterialCatalog);
 export interface MaterialFilters { level?: string; subject?: string; theme?: string; type?: string; language?: string; source?: string; search?: string }
 export function materialProvenance(d: PedagogicalMaterial) {
   return { ...d, issuer: d.authority === 'MINEDUB' ? 'Ministère de l’Éducation de Base' : d.authority === 'MINESEC' ? 'Ministère des Enseignements Secondaires' : d.authority === 'GCE BOARD' ? 'Cameroon General Certificate of Education Board' : 'ITALO — proposition rédigée avec un assistant',

@@ -1,6 +1,6 @@
 # Bibliothèque documentaire — contrôle du 16 septembre 2026
 
-132 notices consultables, pas 132 programmes adoptés : 8 curricula MINEDUB canoniques (les deux variantes restent au registre source), 81 fichiers MINESEC déjà récupérés, 40 activités originales ITALO pour les huit niveaux préscolaires et 3 documents GCE.
+130 ressources distinctes issues de 132 notices, pas 130 programmes adoptés : 8 curricula MINEDUB canoniques (les deux variantes restent au registre source), 79 fichiers MINESEC distincts issus de 81 notices déjà récupérées, 40 activités originales ITALO pour les huit niveaux préscolaires et 3 documents GCE. Deux paires strictement identiques par SHA-256 sont regroupées : IDs 199/17 et 49/50. Les alias, URL et rattachements sont conservés ; aucun PDF ni historique supprimé. Les noms des dossiers du catalogue, notamment le classement erroné Latin/Grec sous Italien, ne deviennent pas des thèmes pédagogiques.
 
 Les filtres portent sur classe locale, niveau documentaire, matière/domaine, thème, type, langue, source et texte. Les classes sont limitées au tenant courant. Un rattachement de filtre est une proposition documentaire et ne crée aucune adoption, discipline enseignée, affectation, durée ou coefficient. Aucun filtre ne constitue une décision pédagogique.
 
@@ -28,7 +28,7 @@ Quatre guides du cache historique ont été relus et leur SHA-256 recalculé ide
 
 La tentative de reprise par les URL publiques du catalogue a renvoyé des pages HTML de présentation : ces octets n’ont pas été traités comme de nouvelles versions PDF. Le cache historique authentifié a été retrouvé et réutilisé, sans nouvelle collecte générale ni remplacement des empreintes. La page de textes OBC est accessible via HTTP direct, mais ses textes techniques ne sont pas assimilés à des curricula généraux. La piste MINSEP 104 n’a pas pu être récupérée ; aucun contenu n’en est importé.
 
-Les 14 extraits MINEDUB de base et les 12 unités scientifiques déjà vérifiées sont désormais tous affichés : 26 paraphrases localisées, toujours partielles, sans heures inventées.
+Les 14 extraits MINEDUB de base et les 12 unités scientifiques déjà vérifiées sont désormais tous affichés : 26 paraphrases localisées, toujours partielles, sans heures inventées. Après déduplication, 75 des 79 documents MINESEC conservent une langue non établie ; les quatre guides relus ont une langue explicitement vérifiée.
 
 Applicabilité secondaire, série/options et disciplines ITALO ouvertes restent à valider. Aucun corrigé externe authentique n’est annoncé disponible. CEDUC reste séparé et non importé faute d’identité/licence établies. Les documents de l’Office du Baccalauréat ne sont pas une preuve d’autorité sur le BEPC. Aucune donnée de résultats nominatifs n’est nécessaire à cette bibliothèque.
 
