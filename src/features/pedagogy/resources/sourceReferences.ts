@@ -4,7 +4,7 @@ export const sourceReferences = [
     id: 'minesec-programmes-index', title: 'MINESEC — index des programmes FR/EN',
     url: 'https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels',
     publisher: 'MINESEC', host: 'MINESEC', coverage: 'Enseignement secondaire, catalogues francophone et anglophone',
-    checkedOn: '2026-09-08', access: 'Index identifié ; contrôles directs récents expirés (CHECK_FAILED). Fichiers du corpus non authentifiés ni intégrés.',
+    checkedOn: '2026-09-16', access: '79 PDF distincts récupérés depuis le catalogue ministériel (81 notices). Empreintes conservées ; modules et guides localisés dans la bibliothèque. Hébergement authentifié, mais applicabilité et version définitive restent à contrôler individuellement.',
     rights: 'Droits de redistribution des documents non établis.',
   },
   {

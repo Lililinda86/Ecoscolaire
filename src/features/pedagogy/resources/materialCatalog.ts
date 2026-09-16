@@ -5,6 +5,7 @@ import { minedubDocuments } from './minedubVerified';
 import { minedubSubjectIndex } from './minedubSubjectIndex';
 import { earlyYearsActivities, earlyYearsLevels } from './earlyYearsProgram';
 import { verifiedTeacherGuides } from './verifiedTeacherGuides';
+import { structuredModulesFor } from './secondaryStructuredUnits';
 
 export interface PedagogicalMaterial {
   id: string; title: string; authority: string; type: string; language: string;
@@ -77,7 +78,7 @@ export function materialProvenance(d: PedagogicalMaterial) {
     checksum: /^[a-f0-9]{64}$/.test(d.sourceVersion) ? d.sourceVersion : null,
     sourceLocator: d.locator, rightsStatus: d.url ? 'LINK_ONLY' : 'ORIGINAL_PROJECT_CONTENT',
     verificationStatus: d.provenance === 'MINISTRY_HOSTED_PDF_RETRIEVED' ? 'OFFICIAL_PENDING_VERIFICATION' : d.provenance,
-    pedagogicalApproval: 'NOT_IMPLIED',
+    pedagogicalApproval: 'NOT_IMPLIED', documentaryModules: structuredModulesFor(d.id),
   };
 }
 export function materialPreparationText(d: PedagogicalMaterial) {
