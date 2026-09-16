@@ -6,6 +6,7 @@ import { requirePedagogyActor, requireId, audit } from './authorization';
 import { matchOfficialSubjects, primaryDocumentByLevel, MappingSubject, proposeDocumentaryProgression, DocumentaryWeek, documentaryRelationsFor } from './subjectMappingEngine';
 import { subjectMappingSources } from './subjectMappingSources';
 import { secondarySubjectSources } from './secondarySubjectSources';
+import { documentaryEvidenceSnapshot } from './documentaryEvidence';
 
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const readers = ['owner', 'director', 'secretary', 'boardViewer', 'superAdmin'];
@@ -84,6 +85,7 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
         const record = { schoolId, academicYearId, classId: p.row.classId, catalogLevelId: p.row.catalogLevelId,
           officialSubject: p.mapping.officialSubject, subjectId: p.subjectId, matchStatus: p.mapping.status,
           documentaryRelation: p.subjectId ? p.mapping.documentaryRelations.find((relation: { subjectId: string }) => relation.subjectId === p.subjectId) || null : null,
+          documentaryEvidence: documentaryEvidenceSnapshot(p.mapping.documentaryRelations, p.row.sourceVersion, p.row.mappingVersion),
           decision: p.item.decision, decisionNote: p.item.decisionNote.trim(), revision: Number(p.item.expectedRevision) + 1,
           sourceVersion: p.row.sourceVersion, mappingVersion: p.row.mappingVersion, sourceDocumentId: p.row.source.documentId,
           decidedBy: actor.uid, decidedAt: FieldValue.serverTimestamp(), scope: 'OWNER_DOCUMENTARY_SUBJECT_DECISION',
@@ -92,7 +94,7 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
         tx.set(ref, record);
         tx.create(ref.collection('history').doc(String(record.revision)), record);
         audit(tx, actor, schoolId, 'CURRICULUM_SUBJECT_MAPPING_DECIDED', 'curriculumSubjectMapping', p.id,
-          { academicYearId, classId: record.classId, decision: record.decision, revision: record.revision, sourceVersion: record.sourceVersion, mappingVersion: record.mappingVersion });
+          { academicYearId, classId: record.classId, decision: record.decision, revision: record.revision, sourceVersion: record.sourceVersion, mappingVersion: record.mappingVersion, documentaryEvidenceVersion: record.documentaryEvidence.snapshotVersion });
       }
       return { recordedCount: prepared.filter((p: { skip: boolean }) => !p.skip).length, idempotent: prepared.every((p: { skip: boolean }) => p.skip) };
     }
