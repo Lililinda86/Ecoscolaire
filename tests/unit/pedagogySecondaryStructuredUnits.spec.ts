@@ -17,7 +17,11 @@ describe('secondary documentary modules', () => {
       expect(rows.reduce((n,u) => n + u.documentaryHours, 0)).toBe(/form[345]$/.test(level) ? 104 : 100);
     }
   });
-  it('pins source hashes and leaves unsupported detail and pedagogical adoption absent', () => {
+  it('keeps elementary statistics distinct from later probability and follows Form 5 source ordering', () => {
+    expect(structuredModulesFor('minesec-8', 'en-secondary-form1')[3].title).toBe('Elementary statistics');
+    expect(structuredModulesFor('minesec-62', 'en-secondary-form5').map(u => u.competencySourcePage)).toEqual([67, 75, 71]);
+  });
+  it('pins source hashes and scopes competency summaries without inventing activities or adoption', () => {
     const hashes: Record<string,string> = {
       'minesec-35':'1217f04a544a884779c1067037c89bfe57e0b8dbcef06264411d8a35072eedad',
       'minesec-8':'ea6a51e29b09f6fcf8284209b60cf4e850cfb8068fa6f21b7fcfaaa8263ce123',
@@ -27,7 +31,10 @@ describe('secondary documentary modules', () => {
     for (const unit of secondaryStructuredUnits) {
       expect(unit.sourceVersion).toBe(hashes[unit.sourceDocumentId]);
       expect(unit.sourcePage).toBeGreaterThan(0);
-      expect([unit.competency,unit.activity,unit.assessment]).toEqual([null,null,null]);
+      expect(unit.competency.length).toBeGreaterThan(15);
+      expect(unit.competencySourcePage).toBeGreaterThan(unit.sourcePage);
+      expect(unit.competencyScope).toBe('MODULE_OVERVIEW');
+      expect([unit.activity,unit.assessment]).toEqual([null,null]);
       expect(unit.status).toBe('DOCUMENTARY_MODULE_REVIEW_REQUIRED');
       expect(unit.rights).toBe('LINK_METADATA_ONLY');
       expect(unit).not.toHaveProperty('teacherAssignment');

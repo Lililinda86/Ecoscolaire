@@ -10,5 +10,5 @@ it('keeps institutional indexes and third-party copies separate and link-only', 
   }
   expect(sourceReferences.find(source => source.id === 'ebase-curriculum-copies')?.access).toContain('non authentifiées');
   expect(sourceReferences.find(source => source.id === 'minedub-portal')?.access).toContain('Applicabilité actuelle non établie');
-  expect(sourceReferences.find(source => source.id === 'minesec-programmes-index')?.access).toContain('CHECK_FAILED');
+  expect(sourceReferences.find(source => source.id === 'minesec-programmes-index')?.access).toContain('applicabilité et version définitive restent à contrôler individuellement');
 });

@@ -38,3 +38,16 @@ Quatre références supplémentaires provenant de https://camgceb.org/downloads/
 Recherche ciblée : CEDUC.CM se décrit comme Communauté Éducative Camerounaise sur sa page LinkedIn (https://www.linkedin.com/company/ceduc-cm), sans droit de redistribution vérifié ; site direct indisponible via le lecteur web. Piste IFADEM « CM livret 4 » contrôlée : couverture COMORES, donc non importée comme document camerounais. L’IFEF annonce des livrets camerounais mais leur accès exact reste à retrouver ; aucune fausse attribution. Recherche Première officielle ne fournit pas encore de programme suffisamment identifié ; ne pas remplacer par un programme français/technique.
 
 Préflight serveur Staging en lecture seule : zéro configuration vendredi activée, zéro veille activée. Les champs série/option/combinaison des cinq classes du second cycle sont vides. Il reste à vérifier les configurations associées avant de regrouper la question ITALO. L’ancien identifiant strictement synthétique prévu par le garde-fou vendredi n’existe pas actuellement ; un essai isolé reste à préparer et exécuter, pas encore PASS.
+
+
+## Checkpoint 4 — reprise du 17 septembre 2026
+
+Baseline indépendante : Staging 5b4eb6d, backend déployé par 35083384689 ; Preview 6478524527 réussi. Main/Production Ecoscolaire e38ed140, aucun changement. Les deux SHA fournis dans la nouvelle mission ne sont pas des références utilisables de ce dépôt. Le navigateur interactif reste bloqué par Windows ACL ; aucun succès visuel Staging présumé. Les lectures Staging agrégées ont confirmé zéro plan, préparation, évaluation, observation et remédiation ; ces comptes ne signifient pas absence des fonctionnalités.
+
+Reprise de la même branche/PR 253, aucun développement concurrent. Les 22 fichiers générés préexistants sont préservés. Le gate 35273058033 sur 9e46b03 a trouvé une assertion périmée : elle exigeait CHECK_FAILED pour MINESEC malgré les documents récupérés. 884 autres tests unitaires étaient PASS. L’assertion conserve désormais la réserve sur l’applicabilité et la version définitive. Pas de suppression de garde-fou.
+
+Empreintes des 81 PDF du cache MINESEC recalculées : 81 correspondances, zéro différence. Présentations des 36 modules mathématiques lues individuellement ; 36 résumés courts de compétences ajoutés avec page PDF dédiée, portée MODULE_OVERVIEW, aucune activité/évaluation/adoption inventée. Pages 35/p23 et 62/p71 inspectées visuellement. Form 1 : le module 4 devient Elementary statistics, sans lui attribuer la probabilité du niveau suivant. Les sommaires et durées restent des données documentaires, pas un emploi du temps.
+
+Tests locaux : 11 tests bibliothèque/modules PASS, test de réserve documentaire PASS, lint ciblé et types frontend PASS. Nouveau parcours navigateur : 14 routes avec identité secrétaire synthétique, 360/768/1440, captures sans données réelles, blocage des appels de génération/analyse, contrôle d’absence d’adoption et nettoyage exact. Sa présence dans le code ne constitue pas encore une preuve d’exécution ; attendre le prochain gate et la recette Staging.
+
+STATE: IN_PROGRESS. REMAINING: gate du nouveau SHA, intégration Staging, recettes réelles vendredi/veille, inventaire visuel et complétion documentaire utile. OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.
