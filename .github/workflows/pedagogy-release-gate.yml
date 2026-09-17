@@ -152,6 +152,15 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
           VITE_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore,auth,functions "npx playwright test tests/pedagogy-curriculum-review-e2e.spec.ts tests/pedagogy-lot-a-emulator-e2e.spec.ts tests/pedagogy-module-inventory-e2e.spec.ts --workers=1"
+      - name: Preserve synthetic route inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pedagogy-synthetic-route-inventory
+          path: |
+            test-results/**/inventory-*.png
+            test-results/**/module-inventory.json
+          retention-days: 7
       - name: Pedagogy Lot B browser workflow
         env:
           VITE_USE_FIREBASE_EMULATORS: "true"
@@ -198,13 +207,3 @@ jobs:
           npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire
           --only firestore,auth,functions
           "npx playwright test tests/pedagogy-results-emulator-e2e.spec.ts --workers=1"
-
-      - name: Preserve synthetic route inventory
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pedagogy-synthetic-route-inventory
-          path: |
-            test-results/**/inventory-*.png
-            test-results/**/module-inventory.json
-          retention-days: 7
