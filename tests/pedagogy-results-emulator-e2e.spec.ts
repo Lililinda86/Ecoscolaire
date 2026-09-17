@@ -49,6 +49,7 @@ for (const reviewCase of [
     }
     await test.step('Five isolated review examples and responsive resources', async () => {
       await page.goto('/#/pedagogy/resources');
+      await page.getByText('Exemples de parcours — simulation', { exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Cinq parcours de revue synthétiques' })).toBeVisible();
       const review = page.getByRole('region', { name: 'Laboratoire synthétique de revue' });
       for (const id of ['original-nursery-fr-v1', 'original-primary-fr-v1', 'original-primary-en-v1', 'original-secondary-fr-v1', 'original-secondary-en-v1']) {

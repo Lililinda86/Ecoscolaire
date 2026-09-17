@@ -264,14 +264,17 @@ jobs:
           firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:reviewCurriculumSubjectMappings --non-interactive
           test "$(gcloud functions describe reviewCurriculumSubjectMappings --project "$FIREBASE_PROJECT_ID" --region us-central1 --format='value(status)')" = ACTIVE
 
-      - name: Deploy source-watch review (Staging only)
-        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:recordPedagogySourceWatchReview --non-interactive
+      - name: Deploy source-watch functions in a bounded batch (Staging only)
+        run: firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:savePedagogySourceWatch,functions:pedagogySourceWatchScheduler,functions:recordPedagogySourceWatchReview --non-interactive
 
       - name: Deploy preschool qualitative review (Staging only)
         run: |
           test "$FIREBASE_PROJECT_ID" = ecoscolaire-staging
           firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions:managePreschoolWeeklyReview --non-interactive
           test "$(gcloud functions describe managePreschoolWeeklyReview --project "$FIREBASE_PROJECT_ID" --region us-central1 --format='value(status)')" = ACTIVE
+
+      - name: Verify deployed pedagogy source after quota-sensitive updates
+        run: node scripts/verify-staging-pedagogy-source.mjs --project=ecoscolaire-staging
 
       - name: Verify advantage workflow Functions are ACTIVE
         shell: bash
