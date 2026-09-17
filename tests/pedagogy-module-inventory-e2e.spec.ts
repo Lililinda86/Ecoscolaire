@@ -75,7 +75,7 @@ test('secretary: all pedagogy routes, responsive empty states and documentary de
     await module.locator(':scope > summary').click();
     await expect(module.getByRole('region', { name: 'Modules documentaires structurés' })).toBeVisible();
     await module.getByText('Form 5 · Data and probability', { exact: true }).click();
-    await expect(module.getByText('Organise data, interpret results and justify probabilistic conclusions.', { exact: true })).toBeVisible();
+    await expect(module.getByText('Compétence visée — résumé documentaire : Organise data, interpret results and justify probabilistic conclusions.', { exact: true })).toBeVisible();
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
