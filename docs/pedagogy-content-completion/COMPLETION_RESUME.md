@@ -63,3 +63,10 @@ Complément de reprise : lecture indépendante ITALO, 34 classes, 12 décisions 
 - Les captures attendent la fin du mouvement de fermeture du menu mobile après redimensionnement afin de montrer le contenu stable.
 - Le catalogue public GCE a été relu : la page Past Questions and Others ne fournit pas de sujet téléchargeable ; aucun corrigé supplémentaire authentifié. La circulaire officielle Geography du 18 novembre 2023 confirme la première session de juin 2025, cohérente avec la référence existante.
 STATE: IN_PROGRESS. Production inchangée. OPENAI CALLS: 0.
+
+### Contrôle du code déployé et correctif de finalisation
+Le gate du merge4e60c893 (35276993782) est PASS, et le déploiement35276986788 est affiché SUCCESS. Toutefois, une inspection de l’archive réellement active du planificateur de veille révèle l’ancienne sourceWatchPolicy, sans camgceb.org. Le journal de déploiement indique un quota dépassé pour ce planificateur ; son statut ACTIVE ne prouve donc pas la présence du nouveau code.
+La finalisation ajoute un petit lot dédié aux trois fonctions de veille et une comparaison des modules compilés réellement archivés avec ceux du commit, sans journaliser les URL signées ni des identifiants. Trois tests hors réseau vérifient l’acceptation du bon code et le rejet d’un code périmé ou manquant.
+La veille du fichier synthétique, déjà autorisé dans les deux versions, a réellement passé baseline, unchanged, file_changed, revue explicite sans publication et nettoyage. Empreintes: d50677a2a32a7106cc3755966c0c4866bd11be92fe7fdb4144c060a4aced5702 puis9a7345dd2a771f5b7ff79183057cd768e6d23c061be3d7e5cc5442566764ac15.
+La revue tablette a aussi déplacé la bibliothèque avant les exports et simulations ; les détails restent ouvrables. Le premier test adapté avait un double clic qui refermait la provenance : corrigé. Les huit parcours préscolaires de ce gate étaient PASS, pas le gate complet ; attendre la relance.
+STATE: IN_PROGRESS. Staging uniquement. OpenAI0. Production inchangée.

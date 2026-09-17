@@ -87,6 +87,8 @@ jobs:
         run: npx vitest run --config vitest.config.ts
       - name: Functions tests and build
         run: npm run test:functions
+      - name: Reject stale deployed source archives without network
+        run: node --test tests/security/staging-pedagogy-source.spec.mjs
       - name: Verify pinned AI fixtures without provider calls
         run: node scripts/test-pedagogy-synthetic-ai-staging.mjs --check-only
       - name: Frontend build
