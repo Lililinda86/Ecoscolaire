@@ -54,3 +54,12 @@ STATE: IN_PROGRESS. REMAINING: gate du nouveau SHA, intégration Staging, recett
 
 
 Complément de reprise : lecture indépendante ITALO, 34 classes, 12 décisions de niveau approuvées, 22 en attente. Dry-run du manifeste primaire : 94 relations attendues et présentes, 76 sûres, 18 composantes, 86 documents, zéro conflit, idempotent, zéro écriture. Les relations ne sont pas rejouées. Les quatre langues des sources mathématiques inspectées sont désormais utilisables dans les filtres ; les 71 autres documents MINESEC sans langue établie restent explicitement à vérifier. Compteur GCE rendu dynamique. Accueil secrétaire : actions avant les indicateurs, compteurs expliqués dans un détail, liens corrects vers préparation, bilan par classe et observations. Tests ciblés : six catalogue, quatre dashboard PASS ; garde multi-tenant conservée.
+
+### Reprise du 17 septembre — preuve serveur et préparation de la recette finale
+- Staging 5b4eb6d : huit parcours serveur FR/EN réellement exécutés et nettoyés, bilan qualitatif, contenu confirmé seulement, idempotence, refus inter-école, remédiation avec nouvelle observation. Préparation amont synthétique, aucun appel fournisseur.
+- Catalogue MINEDUB Staging contrôlé à blanc : 8 programmes, 24 extraits structurés, 25 matières attendues ; zéro création nécessaire. Les décisions primaires existantes sont conservées.
+- Les 14 routes se rendent à 360/768/1440 dans le gate 35274530114. Le gate complet reste en cours de correction du test de libellé documentaire ; ne pas assimiler le rendu à un parcours fonctionnel complet.
+- Veille Staging réelle : première empreinte et contrôle inchangé PASS. Configuration dédiée désactivée, utilisateur synthétique supprimé entre phases. Le fichier témoin v3 permet le prochain contrôle de changement réel après intégration ; aucune publication/adoption automatique.
+- Les captures attendent la fin du mouvement de fermeture du menu mobile après redimensionnement afin de montrer le contenu stable.
+- Le catalogue public GCE a été relu : la page Past Questions and Others ne fournit pas de sujet téléchargeable ; aucun corrigé supplémentaire authentifié. La circulaire officielle Geography du 18 novembre 2023 confirme la première session de juin 2025, cohérente avec la référence existante.
+STATE: IN_PROGRESS. Production inchangée. OPENAI CALLS: 0.

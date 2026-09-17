@@ -61,8 +61,9 @@ test('secretary: all pedagogy routes, responsive empty states and documentary de
       const widths = [360, 768, 1440];
       for (const width of widths) {
         await page.setViewportSize({ width, height: 1000 });
+        if (width === 360) await expect.poll(() => page.getByTestId('sidebar').evaluate(node => node.getBoundingClientRect().right <= 0)).toBe(true);
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-        await page.screenshot({ path: testInfo.outputPath(`inventory-${route.replaceAll('/', '-') || 'overview'}-${width}.png`), fullPage: false });
+        await page.screenshot({ path: testInfo.outputPath(`inventory-${route.replaceAll('/', '-') || 'overview'}-${width}.png`), fullPage: false, animations: 'disabled' });
       }
       inventory.push({ route: '/pedagogy' + (route ? '/' + route : ''), title, widths, status: 'RENDER_PASS_SYNTHETIC_EMPTY_WORKFLOW' });
     }
@@ -78,6 +79,7 @@ test('secretary: all pedagogy routes, responsive empty states and documentary de
     await expect(module.getByText('Compétence visée — résumé documentaire : Organise data, interpret results and justify probabilistic conclusions.', { exact: true })).toBeVisible();
     for (const width of [360, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
+        if (width === 360) await expect.poll(() => page.getByTestId('sidebar').evaluate(node => node.getBoundingClientRect().right <= 0)).toBe(true);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     }
     expect(providerAttempts).toEqual([]); expect(browserErrors).toEqual([]);
