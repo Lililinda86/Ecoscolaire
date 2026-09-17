@@ -10,6 +10,7 @@ import { additionalVerifiedUnits } from '../resources/additionalVerifiedUnits';
 import { resourceTaxonomy } from '../resources/resourceTaxonomy';
 import { SyntheticReviewLab } from '../components/SyntheticReviewLab';
 import { EarlyYearsProgramPanel } from '../components/EarlyYearsProgramPanel';
+import { materialCatalog } from '../resources/materialCatalog';
 import { MaterialLibrary } from '../components/MaterialLibrary';
 import type { OriginalTemplate, ResourceCycle } from '../resources/originalTemplates';
 
@@ -58,7 +59,7 @@ export default function PedagogyResources() {
       </details>)}
       {!resources.length && <p>Aucun modèle pour ces filtres.</p>}
     </section>
-    <section className="pedagogy-card"><h2>Sources externes et banque d’épreuves</h2><p><Link to="/pedagogy/exam-bank">Consulter la banque interne des évaluations validées de cet établissement</Link>. Ces créations internes ne sont pas des annales officielles ; leur nouvelle utilisation exige une nouvelle relecture.</p><p>La bibliothèque référence les curricula et trois ressources GCE, dont un spécimen ; aucune collection exhaustive d’annales n’est annoncée. Aucun corrigé authentique externe n’est annoncé disponible.</p><p>CEDUC : connexion et droits de réutilisation non vérifiés. Ces modèles restent disponibles indépendamment de ce service. Aucun contenu tiers n’a été copié dans ce fonds.</p></section>
+    <section className="pedagogy-card"><h2>Sources externes et banque d’épreuves</h2><p><Link to="/pedagogy/exam-bank">Consulter la banque interne des évaluations validées de cet établissement</Link>. Ces créations internes ne sont pas des annales officielles ; leur nouvelle utilisation exige une nouvelle relecture.</p><p>La bibliothèque référence les curricula et {materialCatalog.filter(item => item.authority === 'GCE BOARD').length} ressources GCE, dont un spécimen ; aucune collection exhaustive d’annales n’est annoncée. Aucun corrigé authentique externe n’est annoncé disponible.</p><p>CEDUC : connexion et droits de réutilisation non vérifiés. Ces modèles restent disponibles indépendamment de ce service. Aucun contenu tiers n’a été copié dans ce fonds.</p></section>
     <section className="pedagogy-card"><h2>Références documentaires — liens uniquement</h2><p>Ces métadonnées ne sont pas des documents intégrés. Une page accessible, une copie ou un nom de domaine ne prouvent ni authenticité, ni version actuelle, ni droits de réutilisation. Aucun contenu de ces liens ne sert automatiquement aux cours.</p>
       {sourceReferences.map(source => <article key={source.id}><h3><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a></h3><p>Émetteur : {source.publisher}. Hébergement : {source.host}.</p><p>{source.coverage}</p><p>Contrôle du {source.checkedOn} : {source.access}</p><p>{source.rights}</p></article>)}
     </section>

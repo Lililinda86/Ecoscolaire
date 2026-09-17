@@ -5,6 +5,7 @@ import { minedubDocuments } from './minedubVerified';
 import { minedubSubjectIndex } from './minedubSubjectIndex';
 import { earlyYearsActivities, earlyYearsLevels } from './earlyYearsProgram';
 import { verifiedTeacherGuides } from './verifiedTeacherGuides';
+import { structuredModulesFor } from './secondaryStructuredUnits';
 
 export interface PedagogicalMaterial {
   id: string; title: string; authority: string; type: string; language: string;
@@ -30,8 +31,9 @@ const rawMaterialCatalog: PedagogicalMaterial[] = [
     const related = secondarySubjectSources.flatMap(level => level.subjects.flatMap(subject => subject.sources.filter(s => s.documentId === 'minesec-' + d.fileId).map(() => ({ level: level.catalogLevelId, subject: subject.officialSubject, language: level.section === 'anglophone' ? 'en' : 'fr' }))));
     const check = (checks as Record<string, { date: string; locator: string; note: string }>)[d.fileId];
     const guide = verifiedTeacherGuides[d.fileId];
+    const moduleLanguages = unique(structuredModulesFor('minesec-' + d.fileId).map(unit => unit.language));
     // A class section is not evidence of the language of a PDF.
-    return { id: 'minesec-' + d.fileId, title: d.title, authority: 'MINESEC', type: /guide/i.test(d.title) ? 'Guide pédagogique' : 'Document secondaire', language: guide?.language || 'À vérifier',
+    return { id: 'minesec-' + d.fileId, title: d.title, authority: 'MINESEC', type: /guide/i.test(d.title) ? 'Guide pédagogique' : 'Document secondaire', language: guide?.language || (moduleLanguages.length === 1 ? moduleLanguages[0] : 'À vérifier'),
       levels: unique([...(guide?.levels || []), ...related.map(r => r.level)]), subjects: unique([...(guide?.subjects || []), ...related.map(r => r.subject)]), themes: [guide ? 'Méthodologie de préparation' : 'Référentiel secondaire — contenu à examiner'],
       url: d.url, sourceVersion: d.sha256, edition: check?.date || 'Non établie', locator: guide?.locator || check?.locator || 'Métadonnées du catalogue ministériel ; contenu à examiner', retrievedAt: d.retrievedAt,
       provenance: 'MINISTRY_HOSTED_PDF_RETRIEVED', applicability: 'NOT_ESTABLISHED', rights: d.rights,
@@ -47,10 +49,14 @@ const rawMaterialCatalog: PedagogicalMaterial[] = [
     note: a.objective + ' Acquis observable : ' + a.observable + ' Activité : ' + a.activity + ' Soutien : ' + a.support,
   }))),
   ...[
+    { id: 'gce-logic-0590-2024', title: 'GCE Ordinary Level — Logic 0590', type: 'Syllabus d’examen', subject: 'Logic', edition: 'Mars 2024', file: '2024/03/0590-LOGIC-Syllabus-Review.pdf', hash: 'd7941336bfb50cc4c000a2bb9c809c400a718f239ab70f00463fb6dea85a8e08', note: 'Première session annoncée : juin 2025. Référentiel d’examen, pas une épreuve passée. Discipline et classe ITALO à confirmer.' },
+    { id: 'gce-ol-report-2023', title: 'GCE Ordinary Level — Subject Report 2023', type: 'Rapport d’examinateurs', subject: 'Accounting · Biology · Chemistry · Commerce · Economics · English Language · Literature in English · Food and Nutrition · French · Special Bilingual Education French · Geography · Geology · History · Citizenship Education · Human Biology · Mathematics · Additional Mathematics · Physics · Logic · Computer Science', language: 'fr/en', edition: 'Session 2023', file: '2023/11/2023-OL-Subject-Report.pdf', hash: 'be00227126d233eff6f97174d87030ed6d48f68344a15ce642f354e550638e9c', note: 'Rapport disciplinaire référencé par le catalogue officiel ; sommaire PDF p.1. Retour d’examinateurs, pas un sujet ni un corrigé intégral. Aucun résultat individuel importé.' },
+    { id: 'gce-al-report-2023', title: 'GCE Advanced Level — Subject Report 2023', type: 'Rapport d’examinateurs', subject: 'Accounting · Biology · Chemistry · Economics · English Language · Literature in English · Food Science and Nutrition · French · Special Bilingual Education French · Geography · Geology · History · Pure Mathematics with Mechanics · Pure Mathematics with Statistics · Further Mathematics · Physics · Religious Studies · Philosophy · Computer Science · Information and Communication Technologies', language: 'fr/en', edition: 'Session 2023', file: '2023/11/2023-AL-subject-Report.pdf', hash: '0afd33b752f74ebe7c6ccdbdb87ddb15e323505901d2398adafdc66ff13ce2a6', note: 'Couverture p.1, sommaire p.2. Retour d’examinateurs, ni syllabus actuel ni corrigé officiel complet. Combinaison ITALO non déduite ; aucun résultat individuel importé.' },
+    { id: 'gce-al-report-2024', title: 'GCE Advanced Level — Subject Report 2024', type: 'Rapport d’examinateurs', subject: 'Accounting · Biology · Chemistry · Economics · English Language · Literature in English · Food Science and Nutrition · French · Special Bilingual Education French · Geography · Geology · History · Pure Mathematics with Mechanics · Pure Mathematics with Statistics · Further Mathematics · Physics · Religious Studies · Philosophy · Computer Science · Information and Communication Technologies', language: 'fr/en', edition: 'Session 2024', file: '2024/10/2024-Subject-Report-ALG.pdf', hash: 'bc44a3b20275c20250e99c12ea3cdea43abc7a15aaf671d7f46ecd1a968895a5', note: 'Sommaire p.1 : Advanced Level General Subjects. Retour d’examinateurs, pas un sujet ni un corrigé intégral. Options ITALO à confirmer ; aucun résultat individuel importé.' },
     { id: 'gce-english-0730-2023', title: 'GCE Advanced Level — English Language 0730', type: 'Syllabus d’examen', subject: 'English Language', edition: 'Avril 2023', file: '2023/11/0730-ENGLISH-LANGUAGE-REVIEWED-SYLLABUS.pdf', hash: '3c0cacdedc62b3916667cc2a555d604333bb9b9961e1721579b530961f93c683', note: 'Couverture : premier enseignement septembre 2023, première évaluation juin 2025. Complément de préparation à l’examen, ne remplace pas automatiquement le curriculum MINESEC.' },
     { id: 'gce-geography-0550-2023', title: 'GCE Ordinary Level — Geography 0550', type: 'Syllabus d’examen', subject: 'Geography', edition: 'Novembre 2023', file: '2023/11/0550-GEOGRAPHY-SYLLABUS-REVIEW-2022.pdf', hash: '43f7925ed45059d5b6e11887d69bf4e69fb9e9222f2e2c89d388f998e2b4c3c1', note: 'Couverture : première session juin 2025. L’édition est novembre 2023, malgré le nom du fichier contenant 2022.' },
     { id: 'gce-physics-0580-specimen', title: 'GCE Ordinary Level — Physics 0580, paper 2 — spécimen', type: 'Spécimen officiel', subject: 'Physics', edition: 'Copyright 2026 ; session non indiquée', file: '2026/03/Ordinary-Level-Physics-0580-Sample-Question.pdf', hash: 'cb46eddefecc482422d9a4d9d9e59957c7f541942fe43c4ee7d917f6e1ce6311', note: 'SAMPLE et JUNE XXXX sur la couverture. Sujet d’entraînement, pas une annale de juin 2026 ; aucun corrigé authentifié associé.' },
-  ].map(d => ({ id: d.id, title: d.title, authority: 'GCE BOARD', type: d.type, language: 'en', levels: [], subjects: [d.subject], themes: ['Préparation aux examens'], url: 'https://camgceb.org/wp-content/uploads/' + d.file, sourceVersion: d.hash, edition: d.edition, locator: 'Couverture PDF p. 1 ; catalogue officiel https://camgceb.org/downloads/', retrievedAt: '2026-09-16', provenance: 'OFFICIAL_VERIFIED', applicability: 'EXAM_SCOPE_ONLY_CLASS_REVIEW_REQUIRED', rights: 'LINK_METADATA_ONLY', note: d.note })),
+  ].map(d => ({ id: d.id, title: d.title, authority: 'GCE BOARD', type: d.type, language: d.language || 'en', levels: [], subjects: d.subject.split(' · '), themes: ['Préparation aux examens'], url: 'https://camgceb.org/wp-content/uploads/' + d.file, sourceVersion: d.hash, edition: d.edition, locator: 'Couverture ou sommaire PDF p. 1 ; catalogue officiel https://camgceb.org/downloads/', retrievedAt: '2026-09-16', provenance: 'OFFICIAL_VERIFIED', applicability: 'EXAM_SCOPE_ONLY_CLASS_REVIEW_REQUIRED', rights: 'LINK_METADATA_ONLY', note: d.note })),
 ];
 export function deduplicateMaterials(rows: PedagogicalMaterial[]) {
   const byKey = new Map<string, PedagogicalMaterial>();
@@ -77,7 +83,7 @@ export function materialProvenance(d: PedagogicalMaterial) {
     checksum: /^[a-f0-9]{64}$/.test(d.sourceVersion) ? d.sourceVersion : null,
     sourceLocator: d.locator, rightsStatus: d.url ? 'LINK_ONLY' : 'ORIGINAL_PROJECT_CONTENT',
     verificationStatus: d.provenance === 'MINISTRY_HOSTED_PDF_RETRIEVED' ? 'OFFICIAL_PENDING_VERIFICATION' : d.provenance,
-    pedagogicalApproval: 'NOT_IMPLIED',
+    pedagogicalApproval: 'NOT_IMPLIED', documentaryModules: structuredModulesFor(d.id),
   };
 }
 export function materialPreparationText(d: PedagogicalMaterial) {

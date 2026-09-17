@@ -12,7 +12,7 @@ const db = admin.firestore(), schoolId = 'early-' + randomBytes(8).toString('hex
 const context = role => ({ auth: { uid: schoolId + '-' + role, token: {} } });
 const put = (c, id, data) => db.doc(c + '/' + id).create(data);
 const deny = (promise, code) => assert.rejects(promise, e => e.code === code);
-const levels = ['fr-preschool-pre', 'fr-preschool-ps', 'en-nursery-pre', 'en-nursery-1'];
+const levels = ['fr-preschool-pre', 'fr-preschool-ps', 'fr-preschool-ms', 'fr-preschool-gs', 'en-nursery-pre', 'en-nursery-1', 'en-nursery-2', 'en-nursery-3'];
 const load = scope => review.run({ ...scope, operation: 'read' }, context('secretary'));
 (async () => { try {
   await put('schools', schoolId, { activeAcademicYearId: academicYearId, isActive: true });
@@ -21,22 +21,23 @@ const load = scope => review.run({ ...scope, operation: 'read' }, context('secre
   for (const role of ['owner', 'secretary', 'teacher', 'boardViewer']) await put('users', schoolId + '-' + role, { schoolId, role, isActive: true });
   const scopes = [];
   for (const [i, catalogLevelId] of levels.entries()) {
+    const french = catalogLevelId.startsWith('fr-');
     const classId = schoolId + '-class-' + i, teacherStaffId = schoolId + '-teacher-' + i, subjectId = schoolId + '-domain-' + i, preparationId = schoolId + '-prep-' + i, studentId = schoolId + '-pupil-' + i;
     const scope = { schoolId, academicYearId, classId, weekId }; scopes.push(scope);
-    await put('classes', classId, { schoolId, academicYearId, catalogLevelId, name: catalogLevelId, section: i < 2 ? 'francophone' : 'anglophone', isActive: true });
+    await put('classes', classId, { schoolId, academicYearId, catalogLevelId, name: catalogLevelId, section: french ? 'francophone' : 'anglophone', isActive: true });
     await put('staff', teacherStaffId, { schoolId, role: 'teacher', isActive: true });
     await put('teacherAssignments', schoolId + '-assignment-' + i, { ...scope, subjectId, teacherStaffId, status: 'active', isActive: true });
     await put('students', studentId, { ...scope, name: 'Synthetic preschool pupil', isActive: true });
-    const objective = i < 2 ? 'Nommer la tasse' : 'Name the cup';
+    const objective = french ? 'Nommer la tasse' : 'Name the cup';
     // Reviewed upload is an upstream synthetic fixture, not a real provider test.
-    await put('lessonPreparations', preparationId, { ...scope, teacherStaffId, subjectId, subjectName: i < 2 ? 'Communication' : 'Literacy', version: 1, status: 'validated', currentUploadId: 'synthetic-upload', reviewData: { lessonTitle: objective, objective, lessonSteps: objective + '. Unconfirmed extension excluded.' } });
+    await put('lessonPreparations', preparationId, { ...scope, teacherStaffId, subjectId, subjectName: french ? 'Communication' : 'Literacy', version: 1, status: 'validated', currentUploadId: 'synthetic-upload', reviewData: { lessonTitle: objective, objective, lessonSteps: objective + '. Unconfirmed extension excluded.' } });
     await deny(review.run({ ...scope, operation: 'generate' }, context('secretary')), 'failed-precondition');
     for (const role of ['teacher', 'boardViewer']) await deny(review.run(scope, context(role)), 'permission-denied');
     await deny(review.run({ ...scope, schoolId: 'other-school' }, context('secretary')), 'permission-denied');
     await recordTeachingConfirmations.run({ ...scope, requestId: 'confirm-' + i, declarations: [{ preparationId, teacherStaffId, expectedVersion: 1, status: 'partially_taught', effectiveDate: '2026-09-01', excerpts: [objective], note: 'Synthetic teacher declaration only' }] }, context('secretary'));
     const generated = await review.run({ ...scope, operation: 'generate', expectedVersion: 0 }, context('secretary'));
     let current = (await load(scope)).review;
-    assert.equal(current.language, i < 2 ? 'fr' : 'en'); assert.equal(current.totalPoints, null); assert.equal(current.teacherValidated, false);
+    assert.equal(current.language, french ? 'fr' : 'en'); assert.equal(current.totalPoints, null); assert.equal(current.teacherValidated, false);
     assert.equal(current.activities[0].confirmedContent, objective); assert(!JSON.stringify(current).includes('Unconfirmed extension'));
     assert.equal((await review.run({ ...scope, operation: 'generate' }, context('secretary'))).idempotent, true);
     const decision = { ...scope, operation: 'record_teacher_agreement', expectedVersion: 1, sourceChecksum: current.sourceChecksum, subjectId, teacherStaffId, note: 'Synthetic agreement received', declarationReceived: true };
@@ -63,12 +64,13 @@ const load = scope => review.run({ ...scope, operation: 'read' }, context('secre
   }
   await savePedagogyFridayConfiguration.run({ schoolId, academicYearId, expectedVersion: 0, policy: { enabled: true, localTime: '10:00', classIds: scopes.map(s => s.classId) } }, context('owner'));
   assert.equal((await runPedagogyFriday(new Date('2026-09-04T09:00:00Z'))).attempts, 3);
-  assert.equal((await runPedagogyFriday(new Date('2026-09-04T09:00:00Z'))).attempts, 1);
+  assert.equal((await runPedagogyFriday(new Date('2026-09-04T09:00:00Z'))).attempts, 3);
+  assert.equal((await runPedagogyFriday(new Date('2026-09-04T09:00:00Z'))).attempts, 2);
   assert.equal((await runPedagogyFriday(new Date('2026-09-04T09:00:00Z'))).attempts, 0);
-  const runs = await db.collection('pedagogyFridayRuns').where('schoolId', '==', schoolId).get(); assert.equal(runs.size, 4); assert(runs.docs.every(d => d.data().status === 'succeeded'));
+  const runs = await db.collection('pedagogyFridayRuns').where('schoolId', '==', schoolId).get(); assert.equal(runs.size, levels.length); assert(runs.docs.every(d => d.data().status === 'succeeded'));
   for (const name of ['weeklyAssessments', 'assessmentItems', 'grades', 'evaluations', 'pedagogyAiOperations', 'payments']) assert.equal((await db.collection(name).where('schoolId', '==', schoolId).get()).size, 0);
-  const audits = await db.collection('audit_logs').where('schoolId', '==', schoolId).get(); assert.equal(audits.docs.filter(d => d.data().action === 'preschool_weekly_review_proposed').length, 8);
-  console.log('PRESCHOOL_WEEKLY_FUNCTIONS PASS: four FR/EN stages, confirmation, qualitative guide, teacher agreement, observation, support, new evidence, no numeric grade/provider, source revision, tenant/RBAC, scheduler retry');
+  const audits = await db.collection('audit_logs').where('schoolId', '==', schoolId).get(); assert.equal(audits.docs.filter(d => d.data().action === 'preschool_weekly_review_proposed').length, levels.length * 2);
+  console.log('PRESCHOOL_WEEKLY_FUNCTIONS PASS: eight FR/EN stages, confirmation, qualitative guide, teacher agreement, observation, support, new evidence, no numeric grade/provider, source revision, tenant/RBAC, scheduler retry');
 } finally {
   const collections = ['users','academicYears','classes','teachingWeeks','staff','students','teacherAssignments','lessonPreparations','teachingConfirmationBatches','teachingConfirmations','preschoolWeeklyReviews','pedagogyObservations','pedagogyObservationBatches','pedagogyRemediations','pedagogyRemediationRequests','pedagogyFridayConfigurations','pedagogyFridayRuns','audit_logs'];
   for (const name of collections) for (const d of (await db.collection(name).where('schoolId', '==', schoolId).get()).docs) await db.recursiveDelete(d.ref);

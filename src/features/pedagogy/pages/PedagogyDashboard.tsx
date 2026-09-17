@@ -46,6 +46,20 @@ export default function PedagogyDashboard() {
     {!year && <div className="pedagogy-alert">Activez une année scolaire pour commencer.</div>}
     {workspace.error && <div className="pedagogy-alert pedagogy-alert--error">{workspace.error}</div>}
     {(assessmentState.error || preparationState.error) && <p role="alert">{assessmentState.error || preparationState.error} Les compteurs concernés ne sont pas disponibles.</p>}
+    <section className="pedagogy-card" aria-label="Actions prioritaires">
+      <div className="pedagogy-card-title"><div><h2>Que dois-je faire ?</h2><p>Préparer la semaine, recueillir les préparations, puis confirmer les activités réalisées avec l’enseignant.</p></div><div className="pedagogy-row-actions" style={{ flexWrap: 'wrap' }}><Link className="pedagogy-button" to="/pedagogy/planning">Ouvrir la semaine</Link>{currentUser?.role !== 'boardViewer' && <Link className="pedagogy-button pedagogy-button--secondary" to="/pedagogy/preparations">Suivre les préparations</Link>}</div></div>
+      {!workspace.loading && !workspace.error && year && !currentWeek && <p>La semaine actuelle n’est pas encore préparée. Ouvrez la planification pour vérifier le calendrier et choisir la classe.</p>}
+      {preparationsKnown && missingPreparations > 0 && <p><Link to="/pedagogy/preparations/missing">{missingPreparations} préparation(s) attendue(s) : vérifier les documents manquants</Link></p>}
+      {preparationsKnown && reviewPreparations > 0 && <p><Link to="/pedagogy/preparations/import">{reviewPreparations} préparation(s) reçue(s) à relire</Link></p>}
+      {currentUser?.role !== 'boardViewer' && <p>Après confirmation du réalisé : <Link to="/pedagogy/assessments">évaluation ou bilan hebdomadaire selon la classe</Link> · <Link to="/pedagogy/observations">observations préscolaires</Link>.</p>}
+      <div className="pedagogy-list">
+        {workspace.plans.filter(plan => plan.status !== 'archived').slice(0, 6).map(plan => <div className="pedagogy-list-row" key={plan.id}>
+          <div><strong>{db?.classes.find(item => item.id === plan.classId)?.name || plan.classId}</strong><small>Semaine {plan.weekNumber} · {plan.weekStartDate}</small></div>
+          <StatusBadge status={plan.status} />
+        </div>)}
+        {!workspace.loading && !workspace.plans.length && <p className="pedagogy-empty">Aucune planification. Initialisez les semaines puis créez une proposition.</p>}
+      </div>
+    </section>
     <section className="pedagogy-kpis" aria-busy={workspace.loading}>
       <article><strong>{currentWeek ? `S${currentWeek.weekNumber}` : '—'}</strong><span>semaine actuelle</span></article>
       <article><strong>Toutes</strong><span>classes sélectionnées</span></article>
@@ -64,16 +78,7 @@ export default function PedagogyDashboard() {
         <article><strong>{preparationsKnown && preparationState.preparations.length ? Math.round(validatedPreparations * 100 / preparationState.preparations.length) + '%' : '—'}</strong><span>documents validés parmi les préparations chargées</span></article>
       </>}
     </section>
-    <p>Évaluations : {coverage.configuredNumericClasses} classes actives configurées du primaire/collège dans cet établissement ; préscolaire et niveaux non identifiés exclus de ce compteur numérique. Les documents validés ne prouvent pas que les cours ont été enseignés. « — » indique un chargement, une absence de périmètre ou des données indisponibles, pas zéro.</p>
-    <section className="pedagogy-card">
-      <div className="pedagogy-card-title"><div><h2>À traiter</h2><p>Les planifications récentes qui attendent une action.</p></div><div className="pedagogy-row-actions"><Link className="pedagogy-button pedagogy-button--secondary" to="/pedagogy/assessments">Évaluations du vendredi</Link><Link className="pedagogy-button" to="/pedagogy/planning">Ouvrir la semaine</Link></div></div>
-      <div className="pedagogy-list">
-        {workspace.plans.filter(plan => plan.status !== 'archived').slice(0, 6).map(plan => <div className="pedagogy-list-row" key={plan.id}>
-          <div><strong>{db?.classes.find(item => item.id === plan.classId)?.name || plan.classId}</strong><small>Semaine {plan.weekNumber} · {plan.weekStartDate}</small></div>
-          <StatusBadge status={plan.status} />
-        </div>)}
-        {!workspace.loading && !workspace.plans.length && <p className="pedagogy-empty">Aucune planification. Initialisez les semaines puis créez une proposition.</p>}
-      </div>
-    </section>
+    <details><summary>Comprendre les compteurs</summary><p>Évaluations : {coverage.configuredNumericClasses} classes actives configurées du primaire/collège dans cet établissement ; préscolaire et niveaux non identifiés exclus de ce compteur numérique. Les documents validés ne prouvent pas que les cours ont été enseignés. « — » indique un chargement, une absence de périmètre ou des données indisponibles, pas zéro.</p></details>
+
   </main>;
 }

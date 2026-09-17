@@ -11,7 +11,7 @@ afterEach(cleanup);
 it('limits the class selector to the current tenant and filters without making decisions', () => {
   render(<MaterialLibrary />);
   expect(screen.queryByText('Foreign class')).toBeNull();
-  expect(screen.getByRole('status').textContent).toContain('130 ressource');
+  expect(screen.getByRole('status').textContent).toContain('134 ressource');
   fireEvent.change(screen.getByRole('combobox', { name: 'Classe de la bibliothèque' }), { target: { value: 'one' } });
   expect(screen.getByRole('status').textContent).toContain('6 ressource');
   fireEvent.change(screen.getByRole('combobox', { name: 'Source documentaire' }), { target: { value: 'ITALO' } });

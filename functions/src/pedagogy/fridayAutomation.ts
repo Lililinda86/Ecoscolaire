@@ -5,7 +5,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { audit, requireId, requirePedagogyActor } from './authorization';
 import { activePedagogyDocument } from './scopes';
 import { mondayIso } from './ids';
-import { FRIDAY_TIME_ZONE, fridayWindow, fridayTrialClock, parseFridayPolicy } from './fridayPolicy';
+import { FRIDAY_TIME_ZONE, FRIDAY_SYNTHETIC_TRIAL_SCHOOLS, fridayWindow, fridayTrialClock, parseFridayPolicy } from './fridayPolicy';
 import { generateWeeklyAssessmentForActor } from './weeklyAssessments';
 import { localEducationStage } from './pedagogyPolicy';
 import { managePreschoolReviewForActor } from './preschoolWeeklyReviews';
@@ -115,13 +115,16 @@ export async function runPedagogyFriday(now = new Date()) {
 
 export const pedagogyFridayScheduler = functions.runWith({ timeoutSeconds: 540, memory: '512MB' })
   .pubsub.schedule('every 15 minutes').timeZone(FRIDAY_TIME_ZONE).onRun(async context => {
-    const result = await runPedagogyFriday();
+    const now = new Date();
+    const result = await runPedagogyFriday(now);
     // Non-personal proof that distinct real scheduler deliveries completed.
     if (process.env.GCLOUD_PROJECT === 'ecoscolaire-staging') {
-      const trial = await admin.firestore().collection(configurationCollection).doc('pedagogy-ai-validation-20260906').get();
-      if (trial.data()?.enabled === true && trial.data()?.syntheticTrial === 'synthetic-validation-2026-09-06' && trial.data()?.controlledTrialFriday === '2026-09-04T12:00:00Z') {
+      for (const schoolId of FRIDAY_SYNTHETIC_TRIAL_SCHOOLS) {
+      const trial = await admin.firestore().collection(configurationCollection).doc(schoolId).get();
+      if (trial.data()?.enabled === true && fridayTrialClock(now, process.env.GCLOUD_PROJECT, schoolId, trial.data()!) !== now) {
         const eventId = createHash('sha256').update(context.eventId).digest('hex');
-        await trial.ref.collection('trialTicks').doc(eventId).set({ ...result, eventId, completedAt: FieldValue.serverTimestamp(), syntheticTrial: 'synthetic-validation-2026-09-06' });
+        await trial.ref.collection('trialTicks').doc(eventId).set({ ...result, eventId, completedAt: FieldValue.serverTimestamp(), syntheticTrial: trial.data()!.syntheticTrial });
+      }
       }
     }
   });
