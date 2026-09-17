@@ -19,10 +19,15 @@ describe('documentary material library', () => {
     expect(filterMaterials({ level: 'fr-preschool-pre', source: 'ITALO', subject: first.subjects[0], type: first.type, theme: first.themes[0], search: first.title })).toEqual([first]);
     expect(filterMaterials({ level: 'fr-preschool-pre', language: 'en' })).toEqual([]);
   });
+  it('uses inspected module languages without inferring every document language from the class section', () => {
+    for (const id of ['minesec-35', 'minesec-52']) expect(filterMaterials({ source: 'MINESEC', language: 'fr' }).some(d => d.id === id)).toBe(true);
+    for (const id of ['minesec-8', 'minesec-62']) expect(filterMaterials({ source: 'MINESEC', language: 'en' }).some(d => d.id === id)).toBe(true);
+    expect(materialCatalog.find(d => d.id === 'minesec-42')?.language).toBe('À vérifier');
+  });
   it('never turns retrieval or a local proposal into adopted curriculum', () => {
     expect(materialCatalog.every(d => !['APPROVED', 'ADOPTED'].includes(d.applicability))).toBe(true);
     expect(filterMaterials({ source: 'MINESEC' }).every(d => d.applicability === 'NOT_ESTABLISHED')).toBe(true);
-    expect(filterMaterials({ source: 'MINESEC', language: 'À vérifier' })).toHaveLength(75);
+    expect(filterMaterials({ source: 'MINESEC', language: 'À vérifier' })).toHaveLength(71);
     const guides = materialCatalog.filter(d => d.preparationOutline);
     expect(guides).toHaveLength(4);
     expect(guides.every(d => d.levels.length === 2 && d.preparationOutline?.length === 15)).toBe(true);

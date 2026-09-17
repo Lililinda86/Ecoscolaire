@@ -54,7 +54,7 @@ test('secretary: all pedagogy routes, responsive empty states and documentary de
     await loginAs(page, email, password);
     for (const [route, title] of routes) {
       await page.goto('/#/pedagogy' + (route ? '/' + route : ''));
-      const main = page.locator('main.pedagogy-page');
+      const main = page.locator('.pedagogy-page');
       await expect(main.getByRole('heading', { name: title, exact: true })).toBeVisible();
       await expect(main.locator('[aria-busy="true"]')).toHaveCount(0);
       await expect(main.locator('.pedagogy-alert--error')).toHaveCount(0);

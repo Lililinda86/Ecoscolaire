@@ -31,8 +31,9 @@ const rawMaterialCatalog: PedagogicalMaterial[] = [
     const related = secondarySubjectSources.flatMap(level => level.subjects.flatMap(subject => subject.sources.filter(s => s.documentId === 'minesec-' + d.fileId).map(() => ({ level: level.catalogLevelId, subject: subject.officialSubject, language: level.section === 'anglophone' ? 'en' : 'fr' }))));
     const check = (checks as Record<string, { date: string; locator: string; note: string }>)[d.fileId];
     const guide = verifiedTeacherGuides[d.fileId];
+    const moduleLanguages = unique(structuredModulesFor('minesec-' + d.fileId).map(unit => unit.language));
     // A class section is not evidence of the language of a PDF.
-    return { id: 'minesec-' + d.fileId, title: d.title, authority: 'MINESEC', type: /guide/i.test(d.title) ? 'Guide pédagogique' : 'Document secondaire', language: guide?.language || 'À vérifier',
+    return { id: 'minesec-' + d.fileId, title: d.title, authority: 'MINESEC', type: /guide/i.test(d.title) ? 'Guide pédagogique' : 'Document secondaire', language: guide?.language || (moduleLanguages.length === 1 ? moduleLanguages[0] : 'À vérifier'),
       levels: unique([...(guide?.levels || []), ...related.map(r => r.level)]), subjects: unique([...(guide?.subjects || []), ...related.map(r => r.subject)]), themes: [guide ? 'Méthodologie de préparation' : 'Référentiel secondaire — contenu à examiner'],
       url: d.url, sourceVersion: d.sha256, edition: check?.date || 'Non établie', locator: guide?.locator || check?.locator || 'Métadonnées du catalogue ministériel ; contenu à examiner', retrievedAt: d.retrievedAt,
       provenance: 'MINISTRY_HOSTED_PDF_RETRIEVED', applicability: 'NOT_ESTABLISHED', rights: d.rights,
