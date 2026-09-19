@@ -9,7 +9,7 @@ export interface CurriculumProgram {
   cycle: string;
   version: string;
   status: 'draft' | 'published' | 'archived';
-  sourceType: 'official' | 'mock';
+  sourceType: 'official' | 'mock' | 'local';
   checksum?: string;
   authority?: string;
   coverage?: string;
@@ -28,6 +28,11 @@ export interface SchoolCurriculumAdoption {
   status: 'active' | 'archived';
   revision?: number;
   programVersion?: string;
+  programKind?: string;
+  decisionOrigin?: string;
+  decisionRecordedBy?: string;
+  decisionAuthorizedBy?: string;
+  validationDecision?: string;
   decision?: { declarationReceived: boolean; declaredBy: string; effectiveDate: string; reference: string };
 }
 

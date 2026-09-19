@@ -50,3 +50,10 @@ it('shows only configured same-tenant names, no selected consolidation or adopti
   expect(screen.queryByRole('button', { name: /APPROUVER/ })).toBeNull();
   expect(screen.getAllByRole('button', { name: 'Exporter le modèle FR', hidden: true })).toHaveLength(5);
 });
+it.each(['current', 'other-school', 'old-year', 'old-version'])('shows local preschool validation only for the persisted scope: %s', mode => {
+  const adoption = { id: 'adoption', schoolId: mode === 'other-school' ? 'other' : 'school', academicYearId: mode === 'old-year' ? 'old' : 'year', catalogLevelId: 'fr-preschool-pre', curriculumProgramId: 'italo-early-years-v1-fr-preschool-pre', status: 'active' as const, programVersion: mode === 'old-version' ? '0.9' : '1.0', programKind: 'ITALO_EARLY_YEARS_PROGRAM', validationDecision: 'ITALO_LOCAL_PROGRAM_VALIDATED', decisionRecordedBy: 'delegated-validation-workflow' };
+  render(<MemoryRouter><EarlyYearsProgramPanel yearId="year" adoptions={[adoption]} /></MemoryRouter>);
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: 'fr-preschool-pre' } });
+  expect(Boolean(screen.queryByText(/Validation locale enregistrée pour cette école et cette année/))).toBe(mode === 'current');
+  expect(screen.getAllByText(/Équivalence de niveau officiel : non établie/)).toHaveLength(5);
+});

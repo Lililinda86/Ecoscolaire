@@ -1,0 +1,41 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {initializeApp,deleteApp} from 'firebase-admin/app';
+import {initializeFirestore} from 'firebase-admin/firestore';
+import {runValidationGroup,digest,actor} from '../../scripts/lib/delegated-validation-batch.mjs';
+assert(process.env.FIRESTORE_EMULATOR_HOST,'Emulator mandatory');
+const app=initializeApp({projectId:'demo-ecoscolaire'}),db=initializeFirestore(app,{preferRest:false});
+let count=0;
+after(()=>deleteApp(app));
+async function fixture(){
+ const id='dv-'+Date.now()+'-'+(++count),schoolId=id+'-school',academicYearId=id+'-year';
+ await db.doc('schools/'+schoolId).set({activeAcademicYearId:academicYearId,isActive:true});
+ await db.doc('academicYears/'+academicYearId).set({schoolId,status:'active'});
+ const g={id,kind:'SYNTHETIC',writes:[0,1].map(n=>({path:'curriculumSubjectMappings/'+id+'-'+n,data:{schoolId,academicYearId,decisionOrigin:'OWNER_DELEGATED_VALIDATION',decisionAuthorizedBy:'owner',decisionRecordedBy:actor,authorizationReference:'synthetic-auth',decisionBatchId:id,revision:1,reason:'Synthetic source verified',evidence:{relations:[{subjectId:'history'},{subjectId:'geography'}]},sourceVersion:'source1',mappingVersion:'mapping1',decision:'APPROVED'}}))};
+ const m={projectId:'demo-ecoscolaire',schoolId,academicYearId,authorizationReference:'synthetic-auth',guardHashes:{},groups:[g]};
+ const p={projectId:m.projectId,manifestDigest:digest(m),authorizationReference:m.authorizationReference};
+ return {m,p,g};
+}
+const run=(f,mode='dry-run',snapshot)=>runValidationGroup(db,f.p,f.m,f.g,mode,snapshot);
+const repin=f=>f.p.manifestDigest=digest(f.m);
+test('dry run is read only; apply persists history, audit, reload and idempotence',async()=>{
+ const f=await fixture(),dry=await run(f);assert.equal(dry.persisted,0);assert.equal((await db.doc(f.g.writes[0].path).get()).exists,false);
+ const result=await run(f,'apply',dry.snapshot);assert.equal(result.created,2);
+ const again=await run(f);assert.equal(again.persisted,2);assert(again.idempotent);
+ assert.equal((await run(f,'apply',again.snapshot)).created,0);
+ const d=(await db.doc(f.g.writes[0].path).get()).data();assert.equal(d.decisionRecordedBy,actor);assert.equal(d.decisionAuthorizedBy,'owner');assert(d.decidedAt);assert.equal(d.evidence.relations.length,2);
+ assert.deepEqual((await db.doc(f.g.writes[0].path+'/history/1').get()).data(),d);
+});
+test('refuses an existing decision and creates no sibling',async()=>{const f=await fixture();await db.doc(f.g.writes[0].path).set({decision:'OWNER_EXISTING'});await assert.rejects(run(f),/conflict/);assert.equal((await db.doc(f.g.writes[1].path).get()).exists,false);});
+test('requires fresh matching dry run',async()=>{const f=await fixture();await assert.rejects(run(f,'apply','wrong'),/dry run/);});
+test('rejects project and production targets',async()=>{const f=await fixture();f.p.projectId='ecoscolaire-prod';await assert.rejects(run(f),/Staging only/);});
+test('rejects unreviewed manifest changes',async()=>{const f=await fixture();f.g.writes[0].data.reason='changed';await assert.rejects(run(f),/Unreviewed/);});
+test('rejects foreign tenant/year records',async()=>{const f=await fixture();f.g.writes[0].data.schoolId='other';repin(f);await assert.rejects(run(f));});
+test('rejects foreign academic year',async()=>{const f=await fixture();await db.doc('academicYears/'+f.m.academicYearId).update({schoolId:'other'});await assert.rejects(run(f),/Foreign/);});
+test('rejects owner impersonation',async()=>{const f=await fixture();f.g.writes[0].data.decisionRecordedBy='owner-uid';repin(f);await assert.rejects(run(f));});
+test('forbids student or financial target collections',async()=>{const f=await fixture();f.g.writes[0].path='students/synthetic';repin(f);await assert.rejects(run(f),/Forbidden/);});
+test('catalogue guard detects a concurrent change',async()=>{const f=await fixture();f.m.guardHashes={subjects:digest([])};repin(f);const dry=await run(f);await db.collection('subjects').doc(f.g.id).set({schoolId:f.m.schoolId,name:'new'});await assert.rejects(run(f,'apply',dry.snapshot),/changed/);});
+test('source document update blocks the group',async()=>{const f=await fixture(),path='curriculumPrograms/'+f.g.id;await db.doc(path).set({version:'v1'});f.m.sourceDocuments={[path]:digest({id:f.g.id,version:'v1'})};repin(f);await run(f);await db.doc(path).update({version:'v2'});await assert.rejects(run(f),/Source catalogue/);});
+test('changed evidence or missing audit cannot replay',async()=>{const f=await fixture(),dry=await run(f);await run(f,'apply',dry.snapshot);await db.doc(f.g.writes[0].path).update({evidence:{relations:[{subjectId:'history'}]}});await assert.rejects(run(f),/Changed decision/);});
+test('one conflicting group does not prevent independent groups',async()=>{const a=await fixture(),b=await fixture();await db.doc(a.g.writes[0].path).set({decision:'prior'});await assert.rejects(run(a));const dry=await run(b);assert.equal((await run(b,'apply',dry.snapshot)).created,2);});
+test('concurrent applies are serialized without duplicate audit or history',async()=>{const f=await fixture(),dry=await run(f);const r=await Promise.all([run(f,'apply',dry.snapshot),run(f,'apply',dry.snapshot)]);assert.equal(r.reduce((n,x)=>n+x.created,0),2);assert((await run(f)).idempotent);});

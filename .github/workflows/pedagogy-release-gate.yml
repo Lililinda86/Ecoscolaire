@@ -129,7 +129,7 @@ jobs:
       - name: Teaching confirmation Functions authorization and concurrency
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-pedagogy-teaching-emulator.cjs && node tests/functions/test-pedagogy-observations-emulator.cjs && node tests/functions/test-pedagogy-friday-emulator.cjs && node tests/functions/test-pedagogy-results-emulator.cjs && node tests/functions/test-pedagogy-source-watch-emulator.cjs && node tests/functions/test-pedagogy-adoption-emulator.cjs && node tests/functions/test-curriculum-review-emulator.cjs"
       - name: Subject mapping transaction and tenant regression
-        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-subject-mapping-emulator.cjs && node tests/functions/test-delegated-level-batch-emulator.cjs && node tests/functions/test-delegated-subject-batch-emulator.cjs"
+        run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-subject-mapping-emulator.cjs && node tests/functions/test-delegated-level-batch-emulator.cjs && node tests/functions/test-delegated-subject-batch-emulator.cjs && node --test tests/functions/test-delegated-validation-emulator.mjs"
       - name: Preschool qualitative review and four-stage follow-up regression
         run: npx firebase-tools@15.25.0 emulators:exec --project demo-ecoscolaire --only firestore "node tests/functions/test-preschool-weekly-review-emulator.cjs"
       - run: npx playwright install --with-deps chromium

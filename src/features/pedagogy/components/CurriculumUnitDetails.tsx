@@ -19,6 +19,9 @@ export function CurriculumUnitDetails({ schoolId, programId, levelId }: { school
       <p>Objectif : {unit.objective || 'non renseigné'}</p><p>Compétence : {unit.competency || 'non renseignée'}</p>
       <p>Leçon détaillée dans cet extrait : {unit.officialLesson || 'non renseignée'}. Statut de vérification : {unit.verificationStatus || 'non établi'}.</p>
       <p>Volume indicatif sourcé : {Number.isFinite(unit.indicativeHours) && (unit.indicativeHours || 0) > 0 && unit.sourceLocator && curriculumProvenanceLink(unit.sourceUrl) ? `${unit.indicativeHours} h (déclaré, à vérifier)` : 'non établi'}.</p>
+      <p>Activité : {unit.activity || 'non détaillée dans cet extrait'}</p>
+      <p>Méthode : {unit.methodology || 'non renseignée'}. Prérequis : {unit.prerequisites || 'non renseignés'}.</p>
+      <p>Évaluation : {unit.assessment || 'non détaillée dans cet extrait'}</p>
       <p>Localisation dans la source : {unit.sourceLocator || 'non renseignée'}</p>
       {curriculumProvenanceLink(unit.sourceUrl) && <a href={curriculumProvenanceLink(unit.sourceUrl)!} target="_blank" rel="noopener noreferrer">Source déclarée de cette unité</a>}
       <p>Période / semaine : à proposer dans Planification, pas déduite automatiquement du programme.</p>
