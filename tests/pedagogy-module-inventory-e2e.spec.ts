@@ -67,6 +67,16 @@ test('secretary: all pedagogy routes, responsive empty states and documentary de
       }
       inventory.push({ route: '/pedagogy' + (route ? '/' + route : ''), title, widths, status: 'RENDER_PASS_SYNTHETIC_EMPTY_WORKFLOW' });
     }
+    await page.goto('/#/pedagogy/program');
+    const annual = page.getByRole('region', { name: 'Couverture annuelle documentaire', exact: true });
+    await expect(annual).toBeVisible();
+    await expect(annual.getByText(/289 couples documentaires/)).toBeVisible();
+    await annual.getByRole('combobox', { name: 'Niveau de couverture annuelle', exact: true }).selectOption('en-secondary-lower-sixth');
+    await annual.getByText('Consulter la matrice et les contenus localisés', { exact: true }).click();
+    await expect(annual.getByRole('heading', { name: 'Secondary · lower-sixth · English Language', exact: true })).toBeVisible();
+    await expect(annual.getByRole('heading', { name: 'Secondary · lower-sixth · Literature in English', exact: true })).toBeVisible();
+    await expect(annual.getByRole('heading', { name: /Primaire FR/ })).toHaveCount(0);
+    await expect(annual.getByText(/ne sont pas nécessairement enseignées/)).toBeVisible();
     await page.goto('/#/pedagogy/resources');
     const library = page.getByTestId('material-library');
     await expect(library).toBeVisible();
