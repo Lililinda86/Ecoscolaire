@@ -4,7 +4,7 @@ import {initializeApp,deleteApp} from 'firebase-admin/app';
 import {initializeFirestore} from 'firebase-admin/firestore';
 import {runValidationGroup,digest,actor} from '../../scripts/lib/delegated-validation-batch.mjs';
 assert(process.env.FIRESTORE_EMULATOR_HOST,'Emulator mandatory');
-const app=initializeApp({projectId:'demo-ecoscolaire'}),db=initializeFirestore(app,{preferRest:true});
+const app=initializeApp({projectId:'demo-ecoscolaire'}),db=initializeFirestore(app,{preferRest:false});
 let count=0;
 after(()=>deleteApp(app));
 async function fixture(){
