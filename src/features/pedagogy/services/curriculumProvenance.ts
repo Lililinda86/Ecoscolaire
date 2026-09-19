@@ -1,4 +1,5 @@
 export function curriculumProvenanceLabel(sourceType: unknown): string {
+  if (sourceType === 'local') return 'Programme local ITALO — aucune équivalence officielle déduite';
   if (sourceType === 'mock') return 'Démonstration non homologuée';
   if (sourceType === 'official') return 'Origine officielle déclarée ; authentification documentaire à vérifier';
   return 'Provenance non renseignée';

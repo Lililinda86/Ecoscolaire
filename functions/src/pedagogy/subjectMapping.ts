@@ -106,7 +106,8 @@ export const reviewCurriculumSubjectMappings = functions.https.onCall(async (dat
       });
       const decisions = previousSnap.docs.filter(d => d.data().scope === 'OWNER_DOCUMENTARY_SUBJECT_DECISION' && d.data().academicYearId === academicYearId).map(d => ({ ...d.data(), id: d.id }));
       const documentaryDecisions = previousSnap.docs.filter(d => d.data().scope === 'DOCUMENTARY_COMPONENT_RELATIONS' && d.data().academicYearId === academicYearId).map(d => ({ ...d.data(), id: d.id }));
-      return { rows, secondaryRows, decisions, documentaryDecisions, scope: 'PROPOSED_SUBJECT_LINKS_ONLY' };
+      const delegatedDecisions = previousSnap.docs.filter(d => d.data().decisionOrigin === 'OWNER_DELEGATED_VALIDATION' && d.data().academicYearId === academicYearId).map(d => ({ ...d.data(), id: d.id }));
+      return { rows, secondaryRows, decisions, documentaryDecisions, delegatedDecisions, scope: 'PROPOSED_SUBJECT_LINKS_ONLY' };
     }
     const row = rows.find(r => r.classId === classId);
     if (!row) throw new functions.https.HttpsError('failed-precondition', 'Classe primaire compatible requise.');

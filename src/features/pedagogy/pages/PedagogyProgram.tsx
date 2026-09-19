@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
+import { DelegatedValidationPanel } from '../components/DelegatedValidationPanel';
 import { EarlyYearsProgramPanel } from '../components/EarlyYearsProgramPanel';
 import { adoptCurriculumProgram } from '../services/pedagogyService';
 import { usePedagogyWorkspace } from '../hooks/usePedagogyWorkspace';
@@ -51,7 +52,8 @@ function ProgramScope({ yearId }: { yearId?: string }) {
   return <main className="pedagogy-page">
     <PedagogyHeader title="Programme de référence" description="Consignez la décision reçue pour une version du catalogue. Publication et adoption ne prouvent pas son authenticité." />
     <PedagogyNav />
-    <EarlyYearsProgramPanel weeks={workspace.weeks} />
+    <EarlyYearsProgramPanel weeks={workspace.weeks} adoptions={workspace.adoptions} yearId={year?.id} />
+    <DelegatedValidationPanel schoolId={currentSchool?.id} yearId={yearId} />
     <CurriculumProposalReview yearId={yearId} />
     <ClassReferenceBrowser key={currentSchool?.id} />
     <CurriculumCoverage yearId={yearId} programs={workspace.programs} adoptions={workspace.adoptions} unavailable={workspace.loading || Boolean(workspace.error)} />

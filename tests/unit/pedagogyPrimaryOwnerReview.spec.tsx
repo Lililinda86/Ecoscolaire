@@ -6,7 +6,7 @@ import { minedubSubjectIndex } from '../../src/features/pedagogy/resources/mined
 import { matchOfficialSubjects, primaryDocumentByLevel, documentaryRelationsFor } from '../../src/features/pedagogy/services/subjectMapping';
 import { SubjectMappingProvider, type SubjectDecision, type SubjectReviewRow } from '../../src/features/pedagogy/components/SubjectMappingReview';
 import { PrimarySubjectSteps } from '../../src/features/pedagogy/components/PrimarySubjectSteps';
-const state = vi.hoisted(() => ({ call: vi.fn(), decisions: [] as unknown[], documentaryDecisions: [] as unknown[] }));
+const state = vi.hoisted(() => ({ call: vi.fn(), decisions: [] as unknown[], documentaryDecisions: [] as unknown[], delegatedDecisions: [] as unknown[] }));
 vi.mock('../../src/db/firebase', () => ({ functions: {} }));
 vi.mock('firebase/functions', () => ({ httpsCallable: () => state.call }));
 const catalog = DEFAULT_SUBJECT_CATALOG.map(s => ({ ...s, id: s.internalCode, schoolId: 'school', isActive: true }));
@@ -17,12 +17,12 @@ const rows: SubjectReviewRow[] = Object.entries(primaryDocumentByLevel).map(([le
 });
 function mount(owner = true, approvedLevels: string[] = []) {
   state.call.mockImplementation(async (data: { action: string; items?: SubjectDecision[] }) => {
-    if (data.action === 'preview') return { data: { rows, secondaryRows: [], decisions: state.decisions, documentaryDecisions: state.documentaryDecisions } };
+    if (data.action === 'preview') return { data: { rows, secondaryRows: [], decisions: state.decisions, documentaryDecisions: state.documentaryDecisions, delegatedDecisions: state.delegatedDecisions } };
     state.decisions = data.items!.map(i => ({ ...i, revision: 1 })); return { data: {} };
   });
   return render(<SubjectMappingProvider schoolId="school" yearId="year" owner={owner}><PrimarySubjectSteps approvedLevels={approvedLevels} levelsAvailable={12} levelsLoading={false} /></SubjectMappingProvider>);
 }
-afterEach(() => { cleanup(); state.call.mockReset(); state.decisions = []; state.documentaryDecisions = []; });
+afterEach(() => { cleanup(); state.call.mockReset(); state.decisions = []; state.documentaryDecisions = []; state.delegatedDecisions = []; });
 it('shows exactly 76 safe and 44 ambiguous mappings, none selected, no source hashes visible by default', async () => {
   mount(); await screen.findByText('MAPPINGS SÛRS : 0/76 validés');
   expect(screen.getAllByTestId('primary-safe-mapping')).toHaveLength(76);
@@ -77,7 +77,7 @@ it('separates eight persisted documentary resolutions from 36 genuine local case
   expect(state.documentaryDecisions).toHaveLength(10);
   mount(); await screen.findByText('Relations documentaires enregistrées — 8 dossiers');
   expect(screen.getAllByTestId('primary-ambiguous-mapping')).toHaveLength(36);
-  expect(screen.getByText(/36 situations restent à examiner/)).toBeTruthy();
+  expect(screen.getByText(/36 situations sans configuration locale enregistrée/)).toBeTruthy();
   expect(screen.getByText('AMBIGUÏTÉS : 0/44 résolues')).toBeTruthy(); // Human decisions are still separate.
   expect(state.decisions).toHaveLength(0);
   for (const select of screen.getAllByRole('combobox')) expect((select as HTMLSelectElement).value).toBe('');
@@ -87,4 +87,12 @@ it('never hides a case because a component record belongs to an old version', as
   state.documentaryDecisions = rows.flatMap(row => row.mappings.map(mapping => ({ classId: row.classId, officialSubject: mapping.officialSubject, sourceVersion: row.source.sourceVersion, mappingVersion: 'old', relations: documentaryRelationsFor(row.catalogLevelId, mapping), decision: 'DOCUMENTARILY_VERIFIED' })));
   mount(); await screen.findByText('MAPPINGS SÛRS : 0/76 validés');
   expect(screen.getAllByTestId('primary-ambiguous-mapping')).toHaveLength(44);
+});
+
+it.each(['current', 'old-source', 'foreign-year', 'changed-candidate'])('scopes delegated local configuration to current evidence: %s', async mode => {
+  const row = rows[0], mapping = row.mappings.find(m => m.status === 'AMBIGUOUS')!;
+  state.delegatedDecisions = [{ schoolId: 'school', academicYearId: mode === 'foreign-year' ? 'old' : 'year', decisionOrigin: 'OWNER_DELEGATED_VALIDATION', scope: 'ITALO_PEDAGOGICAL_CHOICE', classId: row.classId, officialSubject: mapping.officialSubject, sourceVersion: mode === 'old-source' ? 'old' : row.source.sourceVersion, decision: 'KEEP_LOCAL_SUBJECTS_DISTINCT', evidence: { localSubjects: mode === 'changed-candidate' ? [] : mapping.candidates.map(c => ({id:c.id,name:c.name})) }, reason: 'Conserver les intitulés locaux.' }];
+  mount(); await screen.findByText('MAPPINGS SÛRS : 0/76 validés');
+  expect(Boolean(screen.queryByText(/Décision actuelle : Matières conservées distinctes/))).toBe(mode === 'current');
+  expect(state.call.mock.calls.every(([d]) => d.action === 'preview')).toBe(true);
 });

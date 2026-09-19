@@ -6,6 +6,7 @@ import { useScopedResource } from '../hooks/useScopedResource';
 import type { SubjectMatch, DocumentaryRelation, proposeDocumentaryProgression } from '../services/subjectMapping';
 import type { StructuredReviewExcerpt } from '../resources/minedubVerified';
 import { minedubSubjectIndex } from '../resources/minedubSubjectIndex';
+import type { DelegatedDecision } from './DelegatedValidationPanel';
 import { minedubDocuments } from '../resources/minedubVerified';
 
 export interface SubjectReviewRow {
@@ -17,7 +18,7 @@ export interface SubjectReviewRow {
 export interface SecondaryRow { classId: string; className: string; coverage: string; mappings: SubjectMatch[]; sources: { officialSubject: string; sources: { documentId: string; title: string; sourceUrl: string; sourceVersion: string; locator: string; note: string }[] }[] }
 export interface SubjectDecision { classId: string; officialSubject: string; decision: string; subjectId: string | null; revision: number; sourceVersion: string; mappingVersion: string; decisionNote: string }
 export interface DocumentaryDecision { classId: string; officialSubject: string; sourceVersion: string; mappingVersion: string; relations: DocumentaryRelation[]; decision: 'DOCUMENTARILY_VERIFIED' }
-const empty: { rows: SubjectReviewRow[]; secondaryRows: SecondaryRow[]; decisions?: SubjectDecision[]; documentaryDecisions?: DocumentaryDecision[] } = { rows: [], secondaryRows: [], decisions: [], documentaryDecisions: [] };
+const empty: { rows: SubjectReviewRow[]; secondaryRows: SecondaryRow[]; decisions?: SubjectDecision[]; documentaryDecisions?: DocumentaryDecision[]; delegatedDecisions?: DelegatedDecision[] } = { rows: [], secondaryRows: [], decisions: [], documentaryDecisions: [] };
 export function SubjectMappingProvider({ schoolId, yearId, owner, children }: { schoolId?: string; yearId?: string; owner: boolean; children: ReactNode }) {
   const load = useCallback(async () => {
     if (!schoolId || !yearId) return empty;

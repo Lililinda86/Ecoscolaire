@@ -15,6 +15,7 @@ export interface CurriculumUnitDetail {
   sourceUrl?: string; sourceLocator?: string; indicativeHours?: number;
   verificationStatus?: string;
   officialLesson?: string | null;
+  activity?: string | null; methodology?: string | null; assessment?: string | null; prerequisites?: string | null; contentKind?: string;
 }
 
 export async function loadPublishedCurriculumUnits(programId: string, levelId: string): Promise<CurriculumUnitDetail[]> {
