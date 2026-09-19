@@ -1,0 +1,272 @@
+{
+  "checkedAt": "2026-09-19T22:18:13.296Z",
+  "documents": [
+    {
+      "id": "minedub-fr-primary-1",
+      "sha256": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81",
+      "pages": 135,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minedub-en-primary-1",
+      "sha256": "38a7c7eddea5ede2bc05bf071716e7067fd9fb987cad2d43fd33a9e294baf957",
+      "pages": 86,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minedub-fr-primary-2",
+      "sha256": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2",
+      "pages": 170,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minedub-en-primary-2",
+      "sha256": "1921b9d044f23849c1532f403021e0a8d23a46123d4b225b8b083b827e3fdd1c",
+      "pages": 99,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minedub-fr-primary-3",
+      "sha256": "916bffbda61442b628c42bb8fc74703e145b6f250a51d2b06b74549ae9dcc468",
+      "pages": 193,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minedub-en-primary-3",
+      "sha256": "3d9828312e9e4832cfdf3beb5f79bd0b2fc0bd1a2722c2f0eb5853c6946994bc",
+      "pages": 104,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-40",
+      "sha256": "95a97e1f62675667376b84502c8258565f92e6bcb6c3d7e217b5ec6dc2e11844",
+      "pages": 62,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-39",
+      "sha256": "3a07507c00a8c82977fa8d51a8a8935f44f46c949a3b1140f4c8fe436e3e8ee4",
+      "pages": 53,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-38",
+      "sha256": "0ccc7a55cdb16a94cdef2b495168e1f1e6c592c4e5837958acb0c61a3931f161",
+      "pages": 55,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-55",
+      "sha256": "912c6cf1bf9c4f2587048629c850863ff62aca49f67b0e036e096154ae5e165b",
+      "pages": 54,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-54",
+      "sha256": "648ea882f92b2f7930b8c28c9f81fc2f167c80f35a065defac53491af398a6f4",
+      "pages": 60,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-53",
+      "sha256": "082c3a8803ba6524fe138458044d68c18409df94066802bd6a4169c4ea42f863",
+      "pages": 48,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-43",
+      "sha256": "d9c3725ebf41b9b38bb850754eb5efd8205d0b5aac70d9a32cd3617eb1dafa66",
+      "pages": 36,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-42",
+      "sha256": "9e7e9e6534dd97d0c7d0971c4dca51b74c0e348dfce6b1a91d2d49a30ac383be",
+      "pages": 62,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-44",
+      "sha256": "b854324d1c5506bba6e948dfda4448438d45f1b964d74d47c707db3581dd7411",
+      "pages": 66,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-72",
+      "sha256": "6e18dd1a1cc4d83e7a658309c1a34c8bcdb5dce0b4f332b8a5b594e3319afecb",
+      "pages": 57,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-75",
+      "sha256": "9ff5c6748ea02b702005191b283f49ab692295c8546e64c2c661e2df1b7f57ad",
+      "pages": 62,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-73",
+      "sha256": "ca49603e09aefb77d62d3ea9a1e2457aa00b70cbb5e2affcea1d7523a2dc35c4",
+      "pages": 68,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-74",
+      "sha256": "f67835e8f2d79e316ef88b7bda9327782cff07fb8cb073295473cc90f23f0ac9",
+      "pages": 71,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-69",
+      "sha256": "4d77a1caaccd55a78d3dd831704204732ac8108fb030064bbdda5d305d93ccd5",
+      "pages": 55,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-71",
+      "sha256": "aadb075970d56bbb40f58024e210b7a636fbc4d335f68163b76aa003c8b16e4f",
+      "pages": 47,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-70",
+      "sha256": "f55383d8a59554e60adde5b1d0a87d62a2cfd54d209bc7532f1ed2c9f9b94c8c",
+      "pages": 39,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-2",
+      "sha256": "d10490fa98c15fe4a561408eb3b42726356f87f2f5536232141ba215ba2d2d11",
+      "pages": 30,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-59",
+      "sha256": "ae22083710bf694539c1f37d250435670ffb2dc77a33bf4cd264b3d932d70691",
+      "pages": 40,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-57",
+      "sha256": "9934c5735e1951e6c3a0b101f1e6805423f24798564c68f597d7aafbcfbf4cea",
+      "pages": 69,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-5",
+      "sha256": "81a6f1e193ac0d59b37d655d6a6abdfb1b7b6a93dfc71e5d0a52d2bf4eeada81",
+      "pages": 44,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-10",
+      "sha256": "17704bfd54400210c3e0f591f62dc5d5206eb09b2e2da5a753226abe2c057c06",
+      "pages": 38,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-63",
+      "sha256": "3bb72390b762a074ba06fbc0e422ec247bb1f55aa0cf247fa7a14e8874b6478e",
+      "pages": 58,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-37",
+      "sha256": "6550ff982523ef020ff4d806e4a6645bc57443a7a7532a75ea6545f2fe902d3f",
+      "pages": 36,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-46",
+      "sha256": "d4f6487f30cba9e57b983656729cb09a4555d72ea9c8022d79063950cd667524",
+      "pages": 34,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-47",
+      "sha256": "981102cf58a22c0971e22ba4c2ebc8f4031048ebac852fc17984a1cc17d269b6",
+      "pages": 40,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-48",
+      "sha256": "81a2b14d42e7272a2c731330bed38a9a9f737756ffe32e54e241ccfdf1af45ba",
+      "pages": 51,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-51",
+      "sha256": "6e151d6f478e685de34809b593a34ba38da4496b8267a7185cdd47bcbac03314",
+      "pages": 46,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-49",
+      "sha256": "aa650becea7a0939fe35d4255611c126fdba94216a2823f85f2c35fe470cf388",
+      "pages": 42,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-144",
+      "sha256": "647eb0122908301e49b76ef434af6e24c0d19cedbd5a631a00ab6a897d976a84",
+      "pages": 32,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-146",
+      "sha256": "c37fdb268904e06b19ee956e68cce17cc288fb53ea413e0d9fa3b31f796aa0cd",
+      "pages": 23,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-79",
+      "sha256": "e0227dfa71087e142f686ac96b4c0af42bdb7f64f25deb36e1435310e83587ce",
+      "pages": 5,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-80",
+      "sha256": "8520bb291565e1ab4a543e0497c4911785393b6e08068d175198c445dbd0ee00",
+      "pages": 5,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-195",
+      "sha256": "edd57aa4b50d94fc3f5b516ba48d82cc5c3922ea9e799c355bdf4473dcf30f68",
+      "pages": 18,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-196",
+      "sha256": "e87218788ca22b3f263623114cfdf2b7427f14a39e2f363b12f1e82c6766dbe8",
+      "pages": 17,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-200",
+      "sha256": "645c25956acb2cceee2cef35629348e7dc2363f054acc7e9b7d558be7b28491e",
+      "pages": 18,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-202",
+      "sha256": "7c66c838011881c44d020c8212b57078e00dd3100bfab431ac10032bbacd7fe3",
+      "pages": 18,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-289",
+      "sha256": "e2e4b344e01415b87a34ec96baab90a91e6067cf24ea9802d33ee80f3d36529c",
+      "pages": 30,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    },
+    {
+      "id": "minesec-290",
+      "sha256": "9f4e07834bf396fa134ef57f0f8bb734b9efc81cb8ac648d5f5e43547720a925",
+      "pages": 33,
+      "status": "CACHED_AUTHENTICATED_BYTES_AND_PAGE_BOUNDS_VERIFIED"
+    }
+  ],
+  "entries": 286,
+  "rights": "LINK_METADATA_ONLY; paraphrases and locators; no source PDF redistributed",
+  "limitation": "Hash and page bounds are mechanical checks; content interpretation was reviewed separately."
+}
