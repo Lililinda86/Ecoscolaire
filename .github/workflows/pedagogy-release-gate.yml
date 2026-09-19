@@ -80,7 +80,7 @@ jobs:
       - name: Lint Pedagogy only
         run: npx eslint "functions/src/pedagogy/**/*.ts" "src/features/pedagogy/**/*.{ts,tsx}" "tests/unit/pedagogyDomain.spec.ts" "tests/unit/pedagogyPreparations.spec.ts" "tests/unit/pedagogyWeeklyAssessments.spec.ts" "tests/security/pedagogy-rules.spec.mjs" "tests/security/pedagogy-lot-b-rules.spec.mjs" "tests/security/pedagogy-lot-c-rules.spec.mjs" "tests/security/pedagogy-storage-rules.spec.mjs" "tests/pedagogy-lot-a-emulator-e2e.spec.ts" "tests/pedagogy-lot-b-emulator-e2e.spec.ts" "tests/pedagogy-lot-c-emulator-e2e.spec.ts" --max-warnings=0
       - name: Additional pedagogy regression lint
-        run: node scripts/build-curriculum-review-manifest.mjs --check && node scripts/build-subject-mapping-contract.mjs --check && npx eslint tests/pedagogy-curriculum-review-e2e.spec.ts tests/pedagogy-module-inventory-e2e.spec.ts --max-warnings=0
+        run: node scripts/build-annual-gap-matrix.mjs --check && node scripts/build-curriculum-review-manifest.mjs --check && node scripts/build-subject-mapping-contract.mjs --check && npx eslint tests/pedagogy-curriculum-review-e2e.spec.ts tests/pedagogy-module-inventory-e2e.spec.ts --max-warnings=0
       - name: Existing pedagogy regression lint
         run: npx eslint "tests/unit/pedagogy*.spec.{ts,tsx}" "tests/pedagogy-results-emulator-e2e.spec.ts" --max-warnings=0
       - name: Full unit regression

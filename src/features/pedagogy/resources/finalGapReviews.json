@@ -1,0 +1,1936 @@
+{
+  "version": 1,
+  "configurationReadAt": "2026-09-19T22:01:31.055Z",
+  "configurationWrites": 0,
+  "decisionOrigin": "OWNER_DELEGATED_DOCUMENTARY_REVIEW",
+  "baselineChanged": false,
+  "records": [
+    {
+      "id": "002d4ef3646d8fde6d28faed8d5acbdf81c4d2966420e82e2a2da7fdc0be64a1",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "42dcb5de0348d700e8872af92ae95456b22854ad7a828a1fd25d285c42717e4e",
+      "mappingVersion": "c85626f6e9988bd34d119e7118db8478d46f7e0ecfd92d1fbdc6b9e1800f4262",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Citizenship Education",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 3 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-72",
+          "title": "CIT. EDUC.- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4o/CIT._EDUC.-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "6e18dd1a1cc4d83e7a658309c1a34c8bcdb5dce0b4f332b8a5b594e3319afecb",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Citizenship Education Forms 3/4/5.",
+          "note": "Statut obligatoire local non déduit du nom de matière."
+        }
+      ]
+    },
+    {
+      "id": "0466f17d81cc206c31a6cf56d2425cf37a20fc18f3d1656abc478ddc6613de9e",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "efd2ac165d47e1846345d4c4e702c118803411de7472dba138d714e83f84c1de",
+      "mappingVersion": "e53357053d7991f99b7be7df35cf8c4c125d34de6aa98d9f2891d2a82e5b107e",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Allemand",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-51",
+          "title": "Allemand.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2r/Allemand.pdf",
+          "sourceVersion": "6e151d6f478e685de34809b593a34ba38da4496b8267a7185cdd47bcbac03314",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Allemand 4e/3e.",
+          "note": "Candidat LV2 allemand, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "07ebd41ca4f3630c4eba33c9254c4cfb57026f9fad413b82639e387fcf9fc644",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "e183bf6e957431c03a44d10c07f5cc3a0a61540d37033642e0d5ec778f0d9e14",
+      "mappingVersion": "0bb82accc55e39936b90b5f8d65d20aa299ebaccabe2772781e1325be37e9fd3",
+      "catalogLevelId": "fr-secondary-5e",
+      "subject": "Histoire",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-40",
+          "title": "HISTOIRE 6e 5e ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2g/HISTOIRE_6e_5e_ESG.pdf",
+          "sourceVersion": "95a97e1f62675667376b84502c8258565f92e6bcb6c3d7e217b5ec6dc2e11844",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 ; 6e p.17 ; 5e p.30.",
+          "note": "62 pages physiques ; contenu et guide dans le même fichier."
+        }
+      ]
+    },
+    {
+      "id": "0be93e2e33fda2e314ef93598895794775f48dead75bd9d7bf87fbbec7f362cf",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "efd2ac165d47e1846345d4c4e702c118803411de7472dba138d714e83f84c1de",
+      "mappingVersion": "08d2f2a343ceb7ea3baaeee0d7c99a091a58a23a1230b40c444e617d32792acd",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Allemand",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-51",
+          "title": "Allemand.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2r/Allemand.pdf",
+          "sourceVersion": "6e151d6f478e685de34809b593a34ba38da4496b8267a7185cdd47bcbac03314",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Allemand 4e/3e.",
+          "note": "Candidat LV2 allemand, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "0d99171263ba7a138fdd1d6299c41357db2228f400dfbdfade5650e196aaa2b5",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "667c24d465783804d105908060593a49015019d81f472ed48cca72f2441cd33f",
+      "mappingVersion": "8fa92f66e7e7167a47f850afd1a877175b942e3767445d84bbec863a6c3fc2c8",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "History",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-75",
+          "title": "HIST- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4r/HIST-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "9ff5c6748ea02b702005191b283f49ab692295c8546e64c2c661e2df1b7f57ad",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : History Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "0fb4536a76bd594e29641bcbafdce6cc53ade2757c70767b460067a13bec8482",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "4899bb273c1ceca6a65952399f1bca80e3f701131970121adce998580074a275",
+      "mappingVersion": "c77c71ce192b793458a6fcf5d5409f61d50781246dee7deff8c89c1578610d46",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Anglais",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 4 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-42",
+          "title": "ANGLAIS Syllabus 4e ESG  burnable.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2i/ANGLAIS_Syllabus_4e_ESG__burnable.pdf",
+          "sourceVersion": "9e7e9e6534dd97d0c7d0971c4dca51b74c0e348dfce6b1a91d2d49a30ac383be",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : English to Francophones, 4e ET 3e.",
+          "note": "Le nom de fichier ne cite que 4e, mais le document cite les deux classes."
+        }
+      ]
+    },
+    {
+      "id": "131a03e24b7c19e6a3ae9372cb35e0cdb811473584b982c74dd89a280947fcdf",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "a35af2ac3b554e08d9a403006f40f8df855267e9e776eadb0dc6e1ca2a5a0a62",
+      "mappingVersion": "c609c0a845b5d9490969ee6805067237f3fd0a11ec1e1aa1b8a8be02e0c3b5f2",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Computer Science",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-59",
+          "title": "Computer Science Syllabus F3_4_5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2z/Computer_Science_Syllabus_F3_4_5.pdf",
+          "sourceVersion": "ae22083710bf694539c1f37d250435670ffb2dc77a33bf4cd264b3d932d70691",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Computer Science Forms III/IV/V ; sommaire p.14.",
+          "note": "Le dossier parent Form 3/4 ne limite pas le document à deux niveaux."
+        }
+      ]
+    },
+    {
+      "id": "17a31793b6dc93ef7b474a3b213ab6373ab435d481a23bdeaa77aba5bf76bdff",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "fdbc03277d2f261f9d8c243be9d8573f7655c25f214bbe3103be987c3feadefd",
+      "mappingVersion": "780376e3ac07e7541d6302f423111e2e6b01c7a755703e593eee546bdaa46e91",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Chinois",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-47",
+          "title": "programme_CHINOIS_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2n/programme_CHINOIS_4eme3eme.pdf",
+          "sourceVersion": "981102cf58a22c0971e22ba4c2ebc8f4031048ebac852fc17984a1cc17d269b6",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Chinois 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "193e7459c8e2e8474165481706d6b285255bd5f06e7570b5e2c84edfcb463ad0",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "0eed29e9542a522763f8db49ecafa0feb2b06c93e8673976849beeb390c22880",
+      "mappingVersion": "cc811a72dd317bbaf9fb5ae631d35c04e842f6d74ce7eeded40750697128c385",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Mathematics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "3 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-62",
+          "title": "Math syllabus for forma 3.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4e/Math_syllabus_for_forma_3.pdf",
+          "sourceVersion": "bb223c3a4ca837ba132bc8b766d2c76130c05005be061f6dbcc893dbf56e7676",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Mathematics Forms 3/4/5.",
+          "note": "78 pages physiques ; ne pas suivre seulement le nom « forma 3 »."
+        }
+      ]
+    },
+    {
+      "id": "199f4e10503f3b2e12874db7157976ad459b8fcd64b452ad22253224b1f93960",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "15ceed31be54400bff2b43c26d1b6bbbbd08c39ece752ca53d488684b7830d0c",
+      "mappingVersion": "2038e8c9266499bfa4fc061ed5a147ad2e028c07aefb7b4f00328f3e784770bd",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Economics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 4 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-73",
+          "title": "ECONS- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4p/ECONS-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "ca49603e09aefb77d62d3ea9a1e2457aa00b70cbb5e2affcea1d7523a2dc35c4",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Economics Forms 3/4/5.",
+          "note": "Statut obligatoire local non déduit du nom de matière."
+        }
+      ]
+    },
+    {
+      "id": "19e9428953eda8e79900a3e12dd69a7acdd7a887bbfe19efb04f73373e611957",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "3c3571d351ab2c9ea13d7033c98f357af07f0f00f4f5deccb6a45d6024b6e4ee",
+      "mappingVersion": "386316462fd73a936c8936754bcb91c6378a6449fe125c1d0a668b67e2dd4a98",
+      "catalogLevelId": "en-secondary-form2",
+      "subject": "Computer Science",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-2",
+          "title": "Computer Science  Sylabus Form1_2_11_aout_2014_mbalmayo.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/c/Computer_Science__Sylabus_Form1_2_11_aout_2014_mbalmayo.pdf",
+          "sourceVersion": "d10490fa98c15fe4a561408eb3b42726356f87f2f5536232141ba215ba2d2d11",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Computer Science Form One/Two.",
+          "note": "Correspondance EN ; pas une source FR par traduction automatique."
+        }
+      ]
+    },
+    {
+      "id": "24a6dc1d81e2b79b91ab2e718eb91d0c42cd878b28fe0f4a4be33de2bfd04a6d",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f1f5b8ab0f43e6bebd34458ff017421f84a3911936e884cf0906b0996ba04939",
+      "mappingVersion": "40d3e336ee7c8346e568bcb25a39ca97c0bc2eedeabd5ceb33f9664a39629938",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Latin-Grec",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-49",
+          "title": "Latin_Grec.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2p/Latin_Grec.pdf",
+          "sourceVersion": "aa650becea7a0939fe35d4255611c126fdba94216a2823f85f2c35fe470cf388",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Latin-Grec 4e/3e.",
+          "note": "Langues anciennes conditionnelles ; aucune obligation pour toutes les classes déduite."
+        }
+      ]
+    },
+    {
+      "id": "2663d9251d41de47a71f8a0ae0b4310aece0ec66b7023ce72d60a75ec65d94dd",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f77f8c8508109174e7c8cbf1d805a3d84c8352ccfc0031043013947ee65a3c9c",
+      "mappingVersion": "275c91cb05ccb7174d5df8ede98868c040359e5a2cd8246cd85b48d45dfe05e1",
+      "catalogLevelId": "fr-secondary-5e",
+      "subject": "Géographie",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-39",
+          "title": "GEOGRAPHIE 6e 5e ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2f/GEOGRAPHIE_6e_5e_ESG.pdf",
+          "sourceVersion": "3a07507c00a8c82977fa8d51a8a8935f44f46c949a3b1140f4c8fe436e3e8ee4",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Géographie 6e/5e ; sections de niveau dans le corps.",
+          "note": "53 pages physiques ; les pages imprimées ne sont pas les numéros PDF."
+        }
+      ]
+    },
+    {
+      "id": "28bbbf5e09289160319de0ace9e43e9a929e83ae794b3ca94ddece62d6d8c460",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f74587d4389bda0906a74d58c5d4aa3afb8a0001b4542b3f150bc38b149983eb",
+      "mappingVersion": "81b3c41c9e0ce57e203f81a3872eb7475b36679e5255881737806acbacc6227b",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Espagnol",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-48",
+          "title": "programme_Espagnol_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2o/programme_Espagnol_4eme3eme.pdf",
+          "sourceVersion": "81a2b14d42e7272a2c731330bed38a9a9f737756ffe32e54e241ccfdf1af45ba",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Espagnol 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "28d772ae6be7943ba5e62d87c0700735299d2ff26be3d7e33da090abbe8567a3",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "73749cbcbfcd1b768f8e25a0b09a67e440df3fbe119a4b1a0e1f5eb4750defe4",
+      "mappingVersion": "b733fd021bf8b00eb1aa97b712748443108daf14e9fc847ec519e3c34b8e7d5c",
+      "catalogLevelId": "fr-secondary-terminale",
+      "subject": "Informatique",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-195",
+          "title": "programme Terminales_A_06_08_2020.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/jh/programme_Terminales_A_06_08_2020.pdf",
+          "sourceVersion": "edd57aa4b50d94fc3f5b516ba48d82cc5c3922ea9e799c355bdf4473dcf30f68",
+          "date": "Juillet 2020",
+          "locator": "Couverture PDF p.1 : Informatique Terminale A/ABI/SH/AC.",
+          "note": "La date du fichier août 2020 n’est pas celle de couverture."
+        },
+        {
+          "documentId": "minesec-196",
+          "title": "programme_T CDE_06_08_2020.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/ji/programme_T_CDE_06_08_2020.pdf",
+          "sourceVersion": "e87218788ca22b3f263623114cfdf2b7427f14a39e2f363b12f1e82c6766dbe8",
+          "date": "Juillet 2020",
+          "locator": "Couverture PDF p.1 : Informatique Terminale C/D/E.",
+          "note": "Choix de série réel nécessaire."
+        }
+      ]
+    },
+    {
+      "id": "29852310af7e1cc9e1b630e568d0192e35d9be34355b91be8d12c5ae2c0378bd",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "1b1cec4bc042bac222c6f91e14fded51f36f8ee31aed88af936fc064246b930e",
+      "mappingVersion": "762733efe185554a049fa1115e9c1165f0ff95c4129c9f8bceaad7b77818840d",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "Geography",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-74",
+          "title": "GEOG- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4q/GEOG-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "f67835e8f2d79e316ef88b7bda9327782cff07fb8cb073295473cc90f23f0ac9",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Geography Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "2d01f65a2604f2ae56758bc3ae82e57377ac7db59bafefeed56180777710d210",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "dd40c5c72becf44e05c6e4561fde113a42a1a9e4f52e30488313b7ba35027a3b",
+      "mappingVersion": "56bed3472f8d8e5e42c583a009b917c7dcae4a6336018962a96fbdc89dd2dbcf",
+      "catalogLevelId": "fr-secondary-6e",
+      "subject": "Mathématiques",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "4 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-35",
+          "title": "PROGRAMME MATH 6ème 5ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2b/PROGRAMME_MATH_6ème_5ème.pdf",
+          "sourceVersion": "1217f04a544a884779c1067037c89bfe57e0b8dbcef06264411d8a35072eedad",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Mathématiques 6e/5e.",
+          "note": "49 pages physiques ; pagination interne décalée."
+        }
+      ]
+    },
+    {
+      "id": "37df3baf92348f191de3eaa52d85cef23bb7252617f8e9f9586b8c7fcb8594dc",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "0eed29e9542a522763f8db49ecafa0feb2b06c93e8673976849beeb390c22880",
+      "mappingVersion": "3f7345620facc7f56855aa7cc00d8a491ebf313163ae5069710a71702be5c138",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "Mathematics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "5 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-62",
+          "title": "Math syllabus for forma 3.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4e/Math_syllabus_for_forma_3.pdf",
+          "sourceVersion": "bb223c3a4ca837ba132bc8b766d2c76130c05005be061f6dbcc893dbf56e7676",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Mathematics Forms 3/4/5.",
+          "note": "78 pages physiques ; ne pas suivre seulement le nom « forma 3 »."
+        }
+      ]
+    },
+    {
+      "id": "3e636953289a9fb30d875ede7f16090a34bca17e1bd2f5e0fea48afc964c68d8",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "1a7223490cb936da3dbeb1b515f475084456988461bd2b84f2968c805c36d639",
+      "mappingVersion": "ec53c2bbf6d4dd6b10314d4795f6b9384ae940988c5a40e5110b4d319eea5a33",
+      "catalogLevelId": "en-secondary-form1",
+      "subject": "Biology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-5",
+          "title": "CBA.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/f/CBA.pdf",
+          "sourceVersion": "81a6f1e193ac0d59b37d655d6a6abdfb1b7b6a93dfc71e5d0a52d2bf4eeada81",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Biology Form 1/2.",
+          "note": "Titre générique CBA résolu par la couverture."
+        }
+      ]
+    },
+    {
+      "id": "407a5441a239fa53e96e36e2d71a8088148fe8175061095fad91b6eceaed303c",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "0eed29e9542a522763f8db49ecafa0feb2b06c93e8673976849beeb390c22880",
+      "mappingVersion": "537bda469e06f9df5b3b4fad259118a7ccbcf0a69ac69e9a1791a80441378e73",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Mathematics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "3 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-62",
+          "title": "Math syllabus for forma 3.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4e/Math_syllabus_for_forma_3.pdf",
+          "sourceVersion": "bb223c3a4ca837ba132bc8b766d2c76130c05005be061f6dbcc893dbf56e7676",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Mathematics Forms 3/4/5.",
+          "note": "78 pages physiques ; ne pas suivre seulement le nom « forma 3 »."
+        }
+      ]
+    },
+    {
+      "id": "40ee372718a161a880e841ffac3ec6c89ed8883b96b3ef7860305ba2955a7d61",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "fdbc03277d2f261f9d8c243be9d8573f7655c25f214bbe3103be987c3feadefd",
+      "mappingVersion": "23f048909d5b744b81791ed83ab6b3d755e313e2f958ac661cd9722338d80fdf",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Chinois",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-47",
+          "title": "programme_CHINOIS_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2n/programme_CHINOIS_4eme3eme.pdf",
+          "sourceVersion": "981102cf58a22c0971e22ba4c2ebc8f4031048ebac852fc17984a1cc17d269b6",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Chinois 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "41e3ffdd430211aa644d5781bc5908e333cb9a28e82c35ac047a66be494ffc7b",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "15ceed31be54400bff2b43c26d1b6bbbbd08c39ece752ca53d488684b7830d0c",
+      "mappingVersion": "9fb0283136cb1e4c0d5bb647ac0aa9d93bdf76577bdef4d4b045d7321050e12c",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Economics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 3 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-73",
+          "title": "ECONS- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4p/ECONS-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "ca49603e09aefb77d62d3ea9a1e2457aa00b70cbb5e2affcea1d7523a2dc35c4",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Economics Forms 3/4/5.",
+          "note": "Statut obligatoire local non déduit du nom de matière."
+        }
+      ]
+    },
+    {
+      "id": "45b3a0a84561fb77dd4ec01ec0a2e3de3b1d7702292979180ecdf08690d7921e",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "4899bb273c1ceca6a65952399f1bca80e3f701131970121adce998580074a275",
+      "mappingVersion": "37571bade54809a471b7420a40053ea9f1e252f76e0107f3add487e97df02d88",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Anglais",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 4 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-42",
+          "title": "ANGLAIS Syllabus 4e ESG  burnable.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2i/ANGLAIS_Syllabus_4e_ESG__burnable.pdf",
+          "sourceVersion": "9e7e9e6534dd97d0c7d0971c4dca51b74c0e348dfce6b1a91d2d49a30ac383be",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : English to Francophones, 4e ET 3e.",
+          "note": "Le nom de fichier ne cite que 4e, mais le document cite les deux classes."
+        }
+      ]
+    },
+    {
+      "id": "4b0e2c1d67dc024fb7f35226410fc29bf29215d1ce2b9afa2f8f12f806951d42",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "e667d568e8b214ee0e1400b24b367b5fcfc890ff8fc38522ba8510c4c1e09d1e",
+      "mappingVersion": "d4665d4f4c3357f51d8f186cfdce895318f4b2f200b21b97e227bb9a22e89d6b",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Histoire",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 3 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-55",
+          "title": "Histoire 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2v/Histoire_4ème_et_3ème.pdf",
+          "sourceVersion": "912c6cf1bf9c4f2587048629c850863ff62aca49f67b0e036e096154ae5e165b",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Histoire 4e/3e.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "4bc7e80f9564760c57c5f1f2bff5d623a6bac0d3b2bd6488a4127f1892f24779",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "1a7223490cb936da3dbeb1b515f475084456988461bd2b84f2968c805c36d639",
+      "mappingVersion": "b56a930172d984373cb687a5419578b280e0239b01514e9061fc7d2f3a3de670",
+      "catalogLevelId": "en-secondary-form2",
+      "subject": "Biology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-5",
+          "title": "CBA.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/f/CBA.pdf",
+          "sourceVersion": "81a6f1e193ac0d59b37d655d6a6abdfb1b7b6a93dfc71e5d0a52d2bf4eeada81",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Biology Form 1/2.",
+          "note": "Titre générique CBA résolu par la couverture."
+        }
+      ]
+    },
+    {
+      "id": "4eb46dd9c5d91a5348be0192a2d5a0363c5a62e5bf19d586b6f5d5a6a83adc54",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "667c24d465783804d105908060593a49015019d81f472ed48cca72f2441cd33f",
+      "mappingVersion": "92c7af5fb6f77c8a9d6f9d9aed6b62970cc33a419c8ccc0552d2f5f3d6bfd2a2",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "History",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-75",
+          "title": "HIST- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4r/HIST-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "9ff5c6748ea02b702005191b283f49ab692295c8546e64c2c661e2df1b7f57ad",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : History Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "4ef74e15f415ab0ac593dcdcda3df7bc6184a10a66779f41766a04f5c22d6ba7",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "be5ff57b39c7be066c5ada44eecbcf2db6356de8c67b0b601b7fe22ea7eef71c",
+      "mappingVersion": "69c3edb12ef7cab6a4456f2ea160b61c55141c4dfb5bd44e75e7f0b049ebb591",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Human Biology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-71",
+          "title": "HBIO F 4 &amp; 5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4n/HBIO_F_4_&_5.pdf",
+          "sourceVersion": "aadb075970d56bbb40f58024e210b7a636fbc4d335f68163b76aa003c8b16e4f",
+          "date": "Décembre 2014",
+          "locator": "Couverture Biology Forms 4/5 ; corps Human Biology pp.12–15 ; sections Form 4 p.17 et Form 5 p.35.",
+          "note": "Discipline précisée par le corps ; ne pas confondre avec Biology générale."
+        }
+      ]
+    },
+    {
+      "id": "4f89269ac9b4d3b0019e5eb94c14a9708f93af5042ec0678716e0843a917d44c",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "be5ff57b39c7be066c5ada44eecbcf2db6356de8c67b0b601b7fe22ea7eef71c",
+      "mappingVersion": "b67e650ce86c092c794011d71f05d197f062b86749c2271904ae04494f984b0a",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Human Biology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-71",
+          "title": "HBIO F 4 &amp; 5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4n/HBIO_F_4_&_5.pdf",
+          "sourceVersion": "aadb075970d56bbb40f58024e210b7a636fbc4d335f68163b76aa003c8b16e4f",
+          "date": "Décembre 2014",
+          "locator": "Couverture Biology Forms 4/5 ; corps Human Biology pp.12–15 ; sections Form 4 p.17 et Form 5 p.35.",
+          "note": "Discipline précisée par le corps ; ne pas confondre avec Biology générale."
+        }
+      ]
+    },
+    {
+      "id": "4ff816a410a688fa25cbba3fc210e32a2ecab877c68946a02729ab1dce91b318",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f2c2ca36157b18f47ae7259e1777675b82fbfcf346bd841054a1baf6ece16281",
+      "mappingVersion": "ab91e96a5f6aa4549d69d8c3da14e1cd59f0ed182c9530979c69e401bb7125b3",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Physics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-63",
+          "title": "PHYSICS teaching  SYLLABUS FOR FORM THREE TO FIVE final.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4f/PHYSICS_teaching__SYLLABUS_FOR_FORM_THREE_TO_FIVE_final.pdf",
+          "sourceVersion": "3bb72390b762a074ba06fbc0e422ec247bb1f55aa0cf247fa7a14e8874b6478e",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Physics Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "511b03a1d7e3ef2234c5ca9549188099b8afe70f36d98941bbefbdfdc61515ba",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "ed9d91d46d1ffc4e06b12e4684d88e5d43ec9e9b810aa51cbccc4b912dc7ac32",
+      "mappingVersion": "b932f497d9619fd1b904cb08d0c74daf82f0eee76bcb59eb91c348ba3e4c9546",
+      "catalogLevelId": "fr-secondary-6e",
+      "subject": "Sciences",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-37",
+          "title": "sciences.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2d/sciences.pdf",
+          "sourceVersion": "6550ff982523ef020ff4d806e4a6645bc57443a7a7532a75ea6545f2fe902d3f",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 ; niveaux p.13, tableau des deux classes p.15 et sections pp.17–18.",
+          "note": "36 pages physiques dans le fichier téléchargé, malgré la pagination interne sur 23 ; ne pas reprendre le compte de l’index web."
+        }
+      ]
+    },
+    {
+      "id": "59eb783516492f2033dc464dd2885f93b7289b7eaf354a05cc437bfed6c066c4",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "22c6511a5d73545516752db4ea91d66dee1d307df5b50137b1b7481c9a891fcc",
+      "mappingVersion": "0300f79821b7397bb606a371277ab4e9311c5f321cba7e4ff154651bd6d7bb23",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Éducation artistique et culturelle",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-43",
+          "title": "Programme Education artistique 4e 3e.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2j/Programme_Education_artistique_4e_3e.pdf",
+          "sourceVersion": "d9c3725ebf41b9b38bb850754eb5efd8205d0b5aac70d9a32cd3617eb1dafa66",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Éducation artistique et culturelle 4e/3e.",
+          "note": "Affectation optionnelle/obligatoire locale non présumée."
+        }
+      ]
+    },
+    {
+      "id": "59f422625c2aaeaf00ec53f82b9c7d710c8da469d4e5f91ecf362fb0ab5089e2",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "90e625bb1fd43449620df5f739f0be40e77c458e3db62ebf71ecefcb6d36e42d",
+      "mappingVersion": "819ff89956ac2c29bb97f730804619743b3946933af89b083c5d4d674cbfc326",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Éducation à la citoyenneté",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-53",
+          "title": "ECM 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2t/ECM_4ème_et_3ème.pdf",
+          "sourceVersion": "082c3a8803ba6524fe138458044d68c18409df94066802bd6a4169c4ea42f863",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Éducation à la citoyenneté 4e/3e.",
+          "note": "Ne pas confondre avec la pièce 6e/5e."
+        }
+      ]
+    },
+    {
+      "id": "5e00f1e8b95bf762438e3294e31fdd26943c259fffb22896ba60cf12a76c334e",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "90e625bb1fd43449620df5f739f0be40e77c458e3db62ebf71ecefcb6d36e42d",
+      "mappingVersion": "8e7718a30994c4d8f793ee1a0c84515b310f5c72f60e8089f248e499304676bb",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Éducation à la citoyenneté",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-53",
+          "title": "ECM 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2t/ECM_4ème_et_3ème.pdf",
+          "sourceVersion": "082c3a8803ba6524fe138458044d68c18409df94066802bd6a4169c4ea42f863",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Éducation à la citoyenneté 4e/3e.",
+          "note": "Ne pas confondre avec la pièce 6e/5e."
+        }
+      ]
+    },
+    {
+      "id": "5f3d7420d06f3b2f6dd7b9884d50f4ba90ea79e0c962e9644b789afac731f0c4",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "18d9e489611334f6af3af36206c765a6e74a93358cd74f8037d59c67466b19eb",
+      "mappingVersion": "5bac6a99f24ecfd5f4bee667972a4c60589f75137a365d49e3ca460d661c59be",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Mathématiques",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "4 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-52",
+          "title": "Mathématiques 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2s/Mathématiques_4ème_et_3ème.pdf",
+          "sourceVersion": "05aba9a71ff5165998855a2558ceea1749c0d46ef7b0a71d238c37d851e01a9c",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Mathématiques 4e/3e.",
+          "note": "45 pages physiques."
+        }
+      ]
+    },
+    {
+      "id": "6027ae487e09d5dcdf0d6d832806c807dc2cdcae0739ef54273404278c0662c2",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "5ee4b47345c3a25f5300ea726d609f4700e3926126b768741700ab44f053ffaf",
+      "mappingVersion": "85e02fda661abdfe838082e8a1e3d2f80bca43ba18511e74e488e79c7a0310c1",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Français",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "5 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-44",
+          "title": "programmeFr1erelangue4em3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2k/programmeFr1erelangue4em3eme.pdf",
+          "sourceVersion": "b854324d1c5506bba6e948dfda4448438d45f1b964d74d47c707db3581dd7411",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Français première langue 4e/3e.",
+          "note": "Ne pas substituer au français deuxième langue anglophone."
+        }
+      ]
+    },
+    {
+      "id": "6629e2e4f5959c8852282be9f3c9e4fe5e51b23fca54aff4cc764e2991d5ae5f",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "df1502176ad0046bb7d1451146e7f726cbf24095ded9bc7cf03ac9664c878eb4",
+      "mappingVersion": "96d616b3e4d559998adb6df1b2b3384ff58febdb4ba3a28cadb0facabf2156bd",
+      "catalogLevelId": "fr-secondary-2nde",
+      "subject": "Éducation artistique",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-144",
+          "title": "Programme des arts 2nde.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/is/Programme_des_arts_2nde.pdf",
+          "sourceVersion": "647eb0122908301e49b76ef434af6e24c0d19cedbd5a631a00ab6a897d976a84",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : éducation artistique, Secondes A1/A2/A3/A4.",
+          "note": "Arts plastiques, scéniques et musicaux ; pas de généralisation à toutes les séries."
+        }
+      ]
+    },
+    {
+      "id": "6c4f09c8016719a3ddc47ad35c8293e815c27e654950c8bf78b5eb5c121927a0",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "0bb66e09769913576149923b6f0bc2799376228dde93e39e10642401d9c89338",
+      "mappingVersion": "133fc7edcf6ba75988384b94bdd9b327c3905b5bb26c0b98f90da327775f69d5",
+      "catalogLevelId": "fr-secondary-terminale",
+      "subject": "Histoire",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-200",
+          "title": "PROGRAMME HISTOIRE Tle-ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/jm/PROGRAMME_HISTOIRE_Tle-ESG.pdf",
+          "sourceVersion": "645c25956acb2cceee2cef35629348e7dc2363f054acc7e9b7d558be7b28491e",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : Histoire Terminale ESG.",
+          "note": "Ne pas substituer la version EST."
+        }
+      ]
+    },
+    {
+      "id": "6f20540c3fb72c873f69de3968b421aa2ae3ead4dd20eca2597d13d86a75ef58",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "1b1cec4bc042bac222c6f91e14fded51f36f8ee31aed88af936fc064246b930e",
+      "mappingVersion": "2b74a2a61aa99cf37bc2bab40b8061058280ef225774c6a58a8108e1ce68fe9e",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Geography",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-74",
+          "title": "GEOG- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4q/GEOG-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "f67835e8f2d79e316ef88b7bda9327782cff07fb8cb073295473cc90f23f0ac9",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Geography Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "6f2e8570222af2ffe1ed557f45b799a11ab34cefcf75cbc326eb73926fd9a5b9",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "42dcb5de0348d700e8872af92ae95456b22854ad7a828a1fd25d285c42717e4e",
+      "mappingVersion": "b055440eb0309e500046b26e93455abfa258e7729dc6f7c4642c36c2ee526bd4",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Citizenship Education",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-72",
+          "title": "CIT. EDUC.- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4o/CIT._EDUC.-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "6e18dd1a1cc4d83e7a658309c1a34c8bcdb5dce0b4f332b8a5b594e3319afecb",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Citizenship Education Forms 3/4/5.",
+          "note": "Statut obligatoire local non déduit du nom de matière."
+        }
+      ]
+    },
+    {
+      "id": "6f31c8175d6236e2fedd6bfd0de0beeb36557e203b3f69baf7e666c04f825660",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "2e4b62818c79c09f169727c570c2c0b7e70d892beb974b35f5d8c6345e720a20",
+      "mappingVersion": "cd1886d6522ca237a8a750a6f35eb089228ee2416f3b1e4afea967395215685b",
+      "catalogLevelId": "en-secondary-form2",
+      "subject": "Physics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-10",
+          "title": "NEW FORM ONE AND FORM TWO SYLLABUS1.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/1M/NEW_FORM_ONE_AND_FORM_TWO_SYLLABUS1.pdf",
+          "sourceVersion": "17704bfd54400210c3e0f591f62dc5d5206eb09b2e2da5a753226abe2c057c06",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Physics Form 1/2.",
+          "note": "Discipline explicitée dans le PDF."
+        }
+      ]
+    },
+    {
+      "id": "7fd20ee4d797bf1f32719eb1683a51700cc345a02c0e1ce54756d6423658aa18",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "a35af2ac3b554e08d9a403006f40f8df855267e9e776eadb0dc6e1ca2a5a0a62",
+      "mappingVersion": "7e331815bdca29efed01fdd6abf63d926fcb6b7e4412994a0e681a6663bf1fdc",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Computer Science",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-59",
+          "title": "Computer Science Syllabus F3_4_5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2z/Computer_Science_Syllabus_F3_4_5.pdf",
+          "sourceVersion": "ae22083710bf694539c1f37d250435670ffb2dc77a33bf4cd264b3d932d70691",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Computer Science Forms III/IV/V ; sommaire p.14.",
+          "note": "Le dossier parent Form 3/4 ne limite pas le document à deux niveaux."
+        }
+      ]
+    },
+    {
+      "id": "82f5a913ad49631a30a7407ae05652445e80229396d3253d7e444c3e33a21ba7",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "925f5d958a93be8236c0f35e15d27de216966b557ab957f2e45cefb3d948b950",
+      "mappingVersion": "1d48bcf8500716d271df6a710ec4acea741262a33b951545a73268adf9ed2e5d",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "French",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "5 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-57",
+          "title": "FRENCH AS SECOND LANGUAGE Form 3,  4 et 5 burnable.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2x/FRENCH_AS_SECOND_LANGUAGE_Form_3,__4_et_5_burnable.pdf",
+          "sourceVersion": "9934c5735e1951e6c3a0b101f1e6805423f24798564c68f597d7aafbcfbf4cea",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : Français deuxième langue Forms III/IV/V.",
+          "note": "Ne pas attribuer au français première langue FR."
+        }
+      ]
+    },
+    {
+      "id": "861cb84b1588f9036b1fe150ef5984844230a1d6db57a966ba43705b19862381",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "671e010ce47f766542e560752d4ba9e255014d2bc89e5fada2fa43028ed33cd7",
+      "mappingVersion": "aa6d34176a78987162708aa8f94c29d9158ddfac55150633e5abb7f4fd824255",
+      "catalogLevelId": "en-secondary-form1",
+      "subject": "Mathematics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "4 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-8",
+          "title": "Maths syllabus mbalmayo.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/i/Maths_syllabus_mbalmayo.pdf",
+          "sourceVersion": "ea6a51e29b09f6fcf8284209b60cf4e850cfb8068fa6f21b7fcfaaa8263ce123",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Mathematics Form 1/2.",
+          "note": "Ne pas confondre avec le fichier français 35."
+        }
+      ]
+    },
+    {
+      "id": "88d7ca9b08e88ed94868f2a2f8466a7e34ac904e897be196967fcfe0ff81049a",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f2c2ca36157b18f47ae7259e1777675b82fbfcf346bd841054a1baf6ece16281",
+      "mappingVersion": "ffab6474342ac9e7e2b7e26a4c93f9e406f6ce8b2a9ca6870479c67180d02ada",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Physics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-63",
+          "title": "PHYSICS teaching  SYLLABUS FOR FORM THREE TO FIVE final.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4f/PHYSICS_teaching__SYLLABUS_FOR_FORM_THREE_TO_FIVE_final.pdf",
+          "sourceVersion": "3bb72390b762a074ba06fbc0e422ec247bb1f55aa0cf247fa7a14e8874b6478e",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Physics Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "8b219eb187534b65825c436b8e28f0149523c10227901bbcb8632e9a450d66a1",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "1b1cec4bc042bac222c6f91e14fded51f36f8ee31aed88af936fc064246b930e",
+      "mappingVersion": "3b9d9c6b4eb63ec704cf17d76298b9193f50eaa04600d43a8d1a7d8efd41e9ae",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Geography",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-74",
+          "title": "GEOG- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4q/GEOG-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "f67835e8f2d79e316ef88b7bda9327782cff07fb8cb073295473cc90f23f0ac9",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Geography Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "8ef46722cc0aacdaf1f853e5795cd059b21c746ac5cfa063820e33612d8063eb",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f1f5b8ab0f43e6bebd34458ff017421f84a3911936e884cf0906b0996ba04939",
+      "mappingVersion": "424005e177b41367cab7522294319b53ef5595e7891b05c9ab3209cf9f9fb01e",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Latin-Grec",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-49",
+          "title": "Latin_Grec.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2p/Latin_Grec.pdf",
+          "sourceVersion": "aa650becea7a0939fe35d4255611c126fdba94216a2823f85f2c35fe470cf388",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Latin-Grec 4e/3e.",
+          "note": "Langues anciennes conditionnelles ; aucune obligation pour toutes les classes déduite."
+        }
+      ]
+    },
+    {
+      "id": "8fc4bc53a2aab0fea483541ce913df6ba612b1ec6020edf282084d20408202fb",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "925f5d958a93be8236c0f35e15d27de216966b557ab957f2e45cefb3d948b950",
+      "mappingVersion": "079115177d0156e9bcb4c5a76dea4045fe51572f098abf1650045752db118ca8",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "French",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "5 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-57",
+          "title": "FRENCH AS SECOND LANGUAGE Form 3,  4 et 5 burnable.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2x/FRENCH_AS_SECOND_LANGUAGE_Form_3,__4_et_5_burnable.pdf",
+          "sourceVersion": "9934c5735e1951e6c3a0b101f1e6805423f24798564c68f597d7aafbcfbf4cea",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : Français deuxième langue Forms III/IV/V.",
+          "note": "Ne pas attribuer au français première langue FR."
+        }
+      ]
+    },
+    {
+      "id": "90b43494b5bff46ca8be28749b70c6f87115c662ebd1ae12a7ca65a19b943f75",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "7bc892d47e74ff5c1a2aa944f694d096b58f146375c12d1830e3bac337189762",
+      "mappingVersion": "7b983e540cdd823df994da83b796a45a3b70bbf51c6f29909af39b04ab697078",
+      "catalogLevelId": "en-secondary-upper-sixth",
+      "subject": "English Language",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-289",
+          "title": "ANNEXE 1 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE GENERAL LOWER AND UPPER SIXTH CLASSES.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AV/ANNEXE_1_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+          "sourceVersion": "e2e4b344e01415b87a34ec96baab90a91e6067cf24ea9802d33ee80f3d36529c",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : English Language, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Texte non extractible, pas de faux résultat d’OCR."
+        }
+      ]
+    },
+    {
+      "id": "94f3c4fa8c6bb97998e15af5b7fb45d3e1e99b3cce39720d80ef9171838aeb93",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "67038766bfc02b7b7955cbfe88004758c18ba8edc9126144162c670725d2f955",
+      "mappingVersion": "d86007285f95aae42efe96386fc602237cb320cae499214fe2d5acc09f70f90b",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Géographie",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-54",
+          "title": "Géographie 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2u/Géographie_4ème_et_3ème.pdf",
+          "sourceVersion": "648ea882f92b2f7930b8c28c9f81fc2f167c80f35a065defac53491af398a6f4",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Géographie 4e/3e.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "9505daf63bb09fe27819f2190b3a81690defffbddf3188e9e8519dbb5ddd5e40",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "ad1036a145a5fa151cc1326d23495df8440efdf111bbabcba338db463195151c",
+      "mappingVersion": "e0dcd41fbde0bc8f76425a2894c04c9b4f85794f30422b6b33ddf3e39258419a",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Biology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-69",
+          "title": "BIO F 3-4-5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4l/BIO_F_3-4-5.pdf",
+          "sourceVersion": "4d77a1caaccd55a78d3dd831704204732ac8108fb030064bbdda5d305d93ccd5",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Biology Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "9657b0bc842910b028214f8268e726fba8f752e9eaf25dbbeeb6c9039947f66a",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "01f02fdb630467c674f3c6acc682b88d9e4c1859636ec9c5aff958d9dd9b8dcf",
+      "mappingVersion": "5ab58df0280073aed127b718543d9f6061cb5a6874fb8e6e967a76aee515900e",
+      "catalogLevelId": "en-secondary-upper-sixth",
+      "subject": "Literature in English",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-290",
+          "title": "ANNEXE 2 Arrêté 90-22 PROG LITTERATURE IN ENGLISH SYLLABUS ANGLOPHONE GENERAL LOWER AND UPPER SIXTH.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AW/ANNEXE_2_Arrêté_90-22_PROG_LITTERATURE_IN_ENGLISH_SYLLABUS_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH.pdf",
+          "sourceVersion": "9f4e07834bf396fa134ef57f0f8bb734b9efc81cb8ac648d5f5e43547720a925",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : Literature in English, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Aucune extrapolation vers le technique."
+        }
+      ]
+    },
+    {
+      "id": "96ad599a1de166e6a33c675444bf1361ff8fb694c54aa9386bf317a8037eea79",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "e667d568e8b214ee0e1400b24b367b5fcfc890ff8fc38522ba8510c4c1e09d1e",
+      "mappingVersion": "07f784dafae45dd51033a84571af6b683a37283adcdb966807d2a0fec4e9147d",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Histoire",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 3 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-55",
+          "title": "Histoire 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2v/Histoire_4ème_et_3ème.pdf",
+          "sourceVersion": "912c6cf1bf9c4f2587048629c850863ff62aca49f67b0e036e096154ae5e165b",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Histoire 4e/3e.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "992a9b36f035bfd463ef86ec208db132efae7cd4cc12b6602cb37724e0227100",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "091a7449f378370a08028a5abf39241db635391df35399aa4ad55482a87f3e65",
+      "mappingVersion": "ad8b3528ac99d7af1005d5cf90a52a17053c8428b78bcda987fcf2c46364ba53",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Arabe",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-46",
+          "title": "programme_Arabe_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2m/programme_Arabe_4eme3eme.pdf",
+          "sourceVersion": "d4f6487f30cba9e57b983656729cb09a4555d72ea9c8022d79063950cd667524",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Arabe 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "9a41e9b37dcf736452b31b282acc6ef2fb005bf26ac87ab53647f9884de795b4",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "33dc6bcbb2fbe3d49db1563cc1c484f1a6efe1cab28f594cca7597705eb29be7",
+      "mappingVersion": "9d18a63f58295fd825bf9837d4b2c1f955e7439d0123e2a9dee98d26b22541bd",
+      "catalogLevelId": "fr-secondary-5e",
+      "subject": "Éducation à la citoyenneté",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-38",
+          "title": "ECM 6E 5E ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2e/ECM_6E_5E_ESG.pdf",
+          "sourceVersion": "0ccc7a55cdb16a94cdef2b495168e1f1e6c592c4e5837958acb0c61a3931f161",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Éducation à la citoyenneté 6e/5e.",
+          "note": "Programme accompagné de contenus complémentaires ; pas de transposition d’horaire entre niveaux."
+        }
+      ]
+    },
+    {
+      "id": "9c0dcb5fe62e1913084178d52bd0df1633a0082c79ae0aeef36c87f186150802",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "18d9e489611334f6af3af36206c765a6e74a93358cd74f8037d59c67466b19eb",
+      "mappingVersion": "b1b2ab8e96ba710982469bf3f2ddb51a2cd1342b72c9eca9705650d35441c905",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Mathématiques",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "4 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-52",
+          "title": "Mathématiques 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2s/Mathématiques_4ème_et_3ème.pdf",
+          "sourceVersion": "05aba9a71ff5165998855a2558ceea1749c0d46ef7b0a71d238c37d851e01a9c",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Mathématiques 4e/3e.",
+          "note": "45 pages physiques."
+        }
+      ]
+    },
+    {
+      "id": "9e28ce7d66af07d685d07b540a5bf9ce55311385e0047c8565c527dc0382919e",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "15ceed31be54400bff2b43c26d1b6bbbbd08c39ece752ca53d488684b7830d0c",
+      "mappingVersion": "ce98f2f62c7efc1d5f6a38720753915462408fa1219827908e7328f1767fc3ff",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "Economics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-73",
+          "title": "ECONS- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4p/ECONS-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "ca49603e09aefb77d62d3ea9a1e2457aa00b70cbb5e2affcea1d7523a2dc35c4",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Economics Forms 3/4/5.",
+          "note": "Statut obligatoire local non déduit du nom de matière."
+        }
+      ]
+    },
+    {
+      "id": "a175e939a3d7fcf1c48c5bd472b519a7f74f8fdb94cd1ad67651f15acf330b4a",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "80e0896a72d150d4013e8b75c966165d8ca10592107b811bc7bc728a63c65e52",
+      "mappingVersion": "e161eec6708f5380c8e58f8a726c860f036b771bf5d577ed55124371f76f8293",
+      "catalogLevelId": "fr-secondary-2nde",
+      "subject": "SVTEEHB",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-146",
+          "title": "Programme de  SVTEEHB Classe de 2nde.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/iu/Programme_de__SVTEEHB_Classe_de_2nde.pdf",
+          "sourceVersion": "c37fdb268904e06b19ee956e68cce17cc288fb53ea413e0d9fa3b31f796aa0cd",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : SVTEEHB Seconde C.",
+          "note": "La classe C est explicite ; ne pas attribuer à Seconde A."
+        }
+      ]
+    },
+    {
+      "id": "a2423e081e0976857f68a6249cc91bdd2598da2dd98b7e959657a2462ca9cfda",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "33dc6bcbb2fbe3d49db1563cc1c484f1a6efe1cab28f594cca7597705eb29be7",
+      "mappingVersion": "9219d9fbca483215c298ec67b59a43d6c30813963bc8391864b7528bad9bf3d4",
+      "catalogLevelId": "fr-secondary-6e",
+      "subject": "Éducation à la citoyenneté",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-38",
+          "title": "ECM 6E 5E ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2e/ECM_6E_5E_ESG.pdf",
+          "sourceVersion": "0ccc7a55cdb16a94cdef2b495168e1f1e6c592c4e5837958acb0c61a3931f161",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Éducation à la citoyenneté 6e/5e.",
+          "note": "Programme accompagné de contenus complémentaires ; pas de transposition d’horaire entre niveaux."
+        }
+      ]
+    },
+    {
+      "id": "a24dc83a4c2b718bd99b3a4d6fb57526071ce971b913b4a2aafc450b1887df71",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "e183bf6e957431c03a44d10c07f5cc3a0a61540d37033642e0d5ec778f0d9e14",
+      "mappingVersion": "456e530469a69e6d7965c95ba5ac07feba7ef9dee8ab1d5391e01bdf43c4ab8c",
+      "catalogLevelId": "fr-secondary-6e",
+      "subject": "Histoire",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-40",
+          "title": "HISTOIRE 6e 5e ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2g/HISTOIRE_6e_5e_ESG.pdf",
+          "sourceVersion": "95a97e1f62675667376b84502c8258565f92e6bcb6c3d7e217b5ec6dc2e11844",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 ; 6e p.17 ; 5e p.30.",
+          "note": "62 pages physiques ; contenu et guide dans le même fichier."
+        }
+      ]
+    },
+    {
+      "id": "ac067417dcdaac1a4d486a8010bb2a6910eb7ea9f21123937c533de0543970ab",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f77f8c8508109174e7c8cbf1d805a3d84c8352ccfc0031043013947ee65a3c9c",
+      "mappingVersion": "61f13830435c5f86abecc076abaa0673ab86036669bbcd9a757159ccb0954cce",
+      "catalogLevelId": "fr-secondary-6e",
+      "subject": "Géographie",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-39",
+          "title": "GEOGRAPHIE 6e 5e ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2f/GEOGRAPHIE_6e_5e_ESG.pdf",
+          "sourceVersion": "3a07507c00a8c82977fa8d51a8a8935f44f46c949a3b1140f4c8fe436e3e8ee4",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Géographie 6e/5e ; sections de niveau dans le corps.",
+          "note": "53 pages physiques ; les pages imprimées ne sont pas les numéros PDF."
+        }
+      ]
+    },
+    {
+      "id": "ac8417c24822e753c3990eb29521ac576639f4c46ccebf00faee4de6b43891e6",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "ad1036a145a5fa151cc1326d23495df8440efdf111bbabcba338db463195151c",
+      "mappingVersion": "9d1766977d8551419ea742420b0b46e07484d0298837a34d4356e9139a9dc0f2",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "Biology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-69",
+          "title": "BIO F 3-4-5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4l/BIO_F_3-4-5.pdf",
+          "sourceVersion": "4d77a1caaccd55a78d3dd831704204732ac8108fb030064bbdda5d305d93ccd5",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Biology Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "b40d860d5f54ba7d395eecee133057d8f2763ac0cf23ec45045148d987cc670a",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "925f5d958a93be8236c0f35e15d27de216966b557ab957f2e45cefb3d948b950",
+      "mappingVersion": "ac2959d0fd0ff9624ea55aea8362108562eb75e2b5d5063264a65e595127ae70",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "French",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "5 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-57",
+          "title": "FRENCH AS SECOND LANGUAGE Form 3,  4 et 5 burnable.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2x/FRENCH_AS_SECOND_LANGUAGE_Form_3,__4_et_5_burnable.pdf",
+          "sourceVersion": "9934c5735e1951e6c3a0b101f1e6805423f24798564c68f597d7aafbcfbf4cea",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : Français deuxième langue Forms III/IV/V.",
+          "note": "Ne pas attribuer au français première langue FR."
+        }
+      ]
+    },
+    {
+      "id": "b6b94affc39e79f7c0dd45fc220bee0f67432d35457c96026d9b86b30825eaf8",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "5ee4b47345c3a25f5300ea726d609f4700e3926126b768741700ab44f053ffaf",
+      "mappingVersion": "57306151fa6eabd10f457584e11211dad7a487e0640d652e58c8e58367d1d8c4",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Français",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "5 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-44",
+          "title": "programmeFr1erelangue4em3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2k/programmeFr1erelangue4em3eme.pdf",
+          "sourceVersion": "b854324d1c5506bba6e948dfda4448438d45f1b964d74d47c707db3581dd7411",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Français première langue 4e/3e.",
+          "note": "Ne pas substituer au français deuxième langue anglophone."
+        }
+      ]
+    },
+    {
+      "id": "b9e42127a2cf8f5a8d0a78a0094ed6fe46ca98facb923026d28dbcc3da59f4be",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "72f219a2dace40f6bd3380e568293eb0642729a093864740a723101d1fd45396",
+      "mappingVersion": "5e559c02a919fa1ebddfd498524a214b872cb9de73949758af4b69951b13e9d9",
+      "catalogLevelId": "en-secondary-form4",
+      "subject": "Geology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-70",
+          "title": "GEOL F3 &amp; 4.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4m/GEOL_F3_&_4.pdf",
+          "sourceVersion": "f55383d8a59554e60adde5b1d0a87d62a2cfd54d209bc7532f1ed2c9f9b94c8c",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 Forms 4/5 ; tableau p.15 ; sections Form 4 p.17 et Form 5 p.29.",
+          "note": "Nom de fichier F3 & 4 erroné ; ne pas attribuer à Form 3."
+        }
+      ]
+    },
+    {
+      "id": "ba55596bfb832f07a886f44aa5ca48762e023fbbcc3f2d14586bd10899c856b5",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "dd40c5c72becf44e05c6e4561fde113a42a1a9e4f52e30488313b7ba35027a3b",
+      "mappingVersion": "5e48bcef4001fc4ebf52611d403701d41a2a0638685ba5b46b3d2b1c207657ab",
+      "catalogLevelId": "fr-secondary-5e",
+      "subject": "Mathématiques",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "4 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-35",
+          "title": "PROGRAMME MATH 6ème 5ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2b/PROGRAMME_MATH_6ème_5ème.pdf",
+          "sourceVersion": "1217f04a544a884779c1067037c89bfe57e0b8dbcef06264411d8a35072eedad",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Mathématiques 6e/5e.",
+          "note": "49 pages physiques ; pagination interne décalée."
+        }
+      ]
+    },
+    {
+      "id": "bf57b2764ac602555527bf58993f163c33b1d3dd9bb7990e9b0d69e4530c850c",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "091a7449f378370a08028a5abf39241db635391df35399aa4ad55482a87f3e65",
+      "mappingVersion": "ce6363cf919394d950bbaf1fe9350b7dc49f6f151b4488d5cdffccd86a4ca384",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Arabe",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-46",
+          "title": "programme_Arabe_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2m/programme_Arabe_4eme3eme.pdf",
+          "sourceVersion": "d4f6487f30cba9e57b983656729cb09a4555d72ea9c8022d79063950cd667524",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Arabe 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "c1dafbd90e728dddf62bb5a76c7fbabf7b87c6c93c8fbe941e05027b71e6bf0a",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "01f02fdb630467c674f3c6acc682b88d9e4c1859636ec9c5aff958d9dd9b8dcf",
+      "mappingVersion": "742a2f4a21ea6d8f776d77c2f6f5af08faa8227f2106470fa11aceb3552e96f6",
+      "catalogLevelId": "en-secondary-lower-sixth",
+      "subject": "Literature in English",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-290",
+          "title": "ANNEXE 2 Arrêté 90-22 PROG LITTERATURE IN ENGLISH SYLLABUS ANGLOPHONE GENERAL LOWER AND UPPER SIXTH.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AW/ANNEXE_2_Arrêté_90-22_PROG_LITTERATURE_IN_ENGLISH_SYLLABUS_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH.pdf",
+          "sourceVersion": "9f4e07834bf396fa134ef57f0f8bb734b9efc81cb8ac648d5f5e43547720a925",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : Literature in English, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Aucune extrapolation vers le technique."
+        }
+      ]
+    },
+    {
+      "id": "cbd23c664c1d804f02d768f4842ce264d2e66fc4dead068f8eee83de2ec03c44",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f74587d4389bda0906a74d58c5d4aa3afb8a0001b4542b3f150bc38b149983eb",
+      "mappingVersion": "10fbdfabb03f80c5a6198063081ea0e03e3dfb07c6e36fadaa47f69df1382a2d",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Espagnol",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-48",
+          "title": "programme_Espagnol_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2o/programme_Espagnol_4eme3eme.pdf",
+          "sourceVersion": "81a2b14d42e7272a2c731330bed38a9a9f737756ffe32e54e241ccfdf1af45ba",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Espagnol 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "id": "cee0a8d34f5357ed36cb0da8f4132958bdf7ca5c4bff9786718907947449f37c",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "7bc892d47e74ff5c1a2aa944f694d096b58f146375c12d1830e3bac337189762",
+      "mappingVersion": "b000089f144b8ffbce085d978646a8c47cd9855437c9f632ca8f0bc95828f663",
+      "catalogLevelId": "en-secondary-lower-sixth",
+      "subject": "English Language",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-289",
+          "title": "ANNEXE 1 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE GENERAL LOWER AND UPPER SIXTH CLASSES.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AV/ANNEXE_1_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+          "sourceVersion": "e2e4b344e01415b87a34ec96baab90a91e6067cf24ea9802d33ee80f3d36529c",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : English Language, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Texte non extractible, pas de faux résultat d’OCR."
+        }
+      ]
+    },
+    {
+      "id": "d162f92cd4aeb6c836f4136a35da5ccfe91672b1b70c4fd47d5447243e9e1896",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "2e4b62818c79c09f169727c570c2c0b7e70d892beb974b35f5d8c6345e720a20",
+      "mappingVersion": "4d5d718a6c8299a931394e51bd4fc0833c5c37b68f6614912a75e229824c2895",
+      "catalogLevelId": "en-secondary-form1",
+      "subject": "Physics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-10",
+          "title": "NEW FORM ONE AND FORM TWO SYLLABUS1.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/1M/NEW_FORM_ONE_AND_FORM_TWO_SYLLABUS1.pdf",
+          "sourceVersion": "17704bfd54400210c3e0f591f62dc5d5206eb09b2e2da5a753226abe2c057c06",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Physics Form 1/2.",
+          "note": "Discipline explicitée dans le PDF."
+        }
+      ]
+    },
+    {
+      "id": "d96cc0b5a9306cf8979a7343c29883c6f216dc3f93f041f959adb25de5969f3c",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "f2c2ca36157b18f47ae7259e1777675b82fbfcf346bd841054a1baf6ece16281",
+      "mappingVersion": "1494d08fca2bd7d1f0bcdc25005803de3bd5cc026ad170d9f4ed75dac65cbdfd",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "Physics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-63",
+          "title": "PHYSICS teaching  SYLLABUS FOR FORM THREE TO FIVE final.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4f/PHYSICS_teaching__SYLLABUS_FOR_FORM_THREE_TO_FIVE_final.pdf",
+          "sourceVersion": "3bb72390b762a074ba06fbc0e422ec247bb1f55aa0cf247fa7a14e8874b6478e",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Physics Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "d9f5b128f5192d482874fc47c1b112b37deb951568ef73e25ebbc6ee0d8f95b2",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "42dcb5de0348d700e8872af92ae95456b22854ad7a828a1fd25d285c42717e4e",
+      "mappingVersion": "1873547f609347357f63a2f56e7ac742552d36a8ef01d1ce954fa8f99fe6a1a1",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "Citizenship Education",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-72",
+          "title": "CIT. EDUC.- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4o/CIT._EDUC.-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "6e18dd1a1cc4d83e7a658309c1a34c8bcdb5dce0b4f332b8a5b594e3319afecb",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Citizenship Education Forms 3/4/5.",
+          "note": "Statut obligatoire local non déduit du nom de matière."
+        }
+      ]
+    },
+    {
+      "id": "dca9a989684b141c44eefa41ac54f6387dbf40c21a4710c7668f5f8d054acb6f",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "ed9d91d46d1ffc4e06b12e4684d88e5d43ec9e9b810aa51cbccc4b912dc7ac32",
+      "mappingVersion": "2698ff529cbddf4d73b883f801bdf3e450c80eec51e8faae2837126d14002525",
+      "catalogLevelId": "fr-secondary-5e",
+      "subject": "Sciences",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-37",
+          "title": "sciences.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2d/sciences.pdf",
+          "sourceVersion": "6550ff982523ef020ff4d806e4a6645bc57443a7a7532a75ea6545f2fe902d3f",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 ; niveaux p.13, tableau des deux classes p.15 et sections pp.17–18.",
+          "note": "36 pages physiques dans le fichier téléchargé, malgré la pagination interne sur 23 ; ne pas reprendre le compte de l’index web."
+        }
+      ]
+    },
+    {
+      "id": "e41f8037422cbded0838799888a3303a6b8d19eda579caa62b82a9c76b5b74d8",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "ad1036a145a5fa151cc1326d23495df8440efdf111bbabcba338db463195151c",
+      "mappingVersion": "f09616baa5100d75a49d6101d9a23c7ab58a431a1983f6cc61caf4c2ba6a8020",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Biology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-69",
+          "title": "BIO F 3-4-5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4l/BIO_F_3-4-5.pdf",
+          "sourceVersion": "4d77a1caaccd55a78d3dd831704204732ac8108fb030064bbdda5d305d93ccd5",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Biology Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "e69f5fdd1a2f96d8d5ee4c28bab94574306f7de48d07db45879a759a23950a64",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "a35af2ac3b554e08d9a403006f40f8df855267e9e776eadb0dc6e1ca2a5a0a62",
+      "mappingVersion": "50f9fead103aa1394302d1e9df9b52db0284c79ade2fa8c4c50d1eb426354b9a",
+      "catalogLevelId": "en-secondary-form3",
+      "subject": "Computer Science",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-59",
+          "title": "Computer Science Syllabus F3_4_5.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2z/Computer_Science_Syllabus_F3_4_5.pdf",
+          "sourceVersion": "ae22083710bf694539c1f37d250435670ffb2dc77a33bf4cd264b3d932d70691",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Computer Science Forms III/IV/V ; sommaire p.14.",
+          "note": "Le dossier parent Form 3/4 ne limite pas le document à deux niveaux."
+        }
+      ]
+    },
+    {
+      "id": "ee5521ff42f63c1a28329edfb35ba49705580333131353e304f792e06850aefe",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "b6fd542697718a424e15d969b3ae5fb28281eed2e9e3d3e4683eb48421aead15",
+      "mappingVersion": "af8a5f083bff6e75b273c13e6babfff51267511f8408ff82779fca888ada7ebe",
+      "catalogLevelId": "fr-secondary-2nde",
+      "subject": "Informatique",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-79",
+          "title": "programme seconde A.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4v/programme_seconde_A.pdf",
+          "sourceVersion": "e0227dfa71087e142f686ac96b4c0af42bdb7f64f25deb36e1435310e83587ce",
+          "date": "Non établie dans l’extrait consulté",
+          "locator": "PDF p.1 : Programme informatique Seconde A, tableau du module 1 ; cinq pages de tableaux.",
+          "note": "Ne pas utiliser pour Seconde C ; aucune page d’arrêté dans cet extrait."
+        },
+        {
+          "documentId": "minesec-80",
+          "title": "programme seconde C.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4w/programme_seconde_C.pdf",
+          "sourceVersion": "8520bb291565e1ab4a543e0497c4911785393b6e08068d175198c445dbd0ee00",
+          "date": "Non établie dans l’extrait consulté",
+          "locator": "PDF p.1 : Programme informatique Seconde C, tableau du module 1 ; cinq pages de tableaux.",
+          "note": "Ne pas utiliser pour Seconde A ; aucune page d’arrêté dans cet extrait."
+        }
+      ]
+    },
+    {
+      "id": "ef4deb9b5e46473b6d8f8a733955048355819ae39e82f2c6d63335df724f2740",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "67038766bfc02b7b7955cbfe88004758c18ba8edc9126144162c670725d2f955",
+      "mappingVersion": "c4c25a47825a77111792dfb2bccb5c343d1189652eb25fe3f84e2961d157a5df",
+      "catalogLevelId": "fr-secondary-3e",
+      "subject": "Géographie",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 4 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-54",
+          "title": "Géographie 4ème et 3ème.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2u/Géographie_4ème_et_3ème.pdf",
+          "sourceVersion": "648ea882f92b2f7930b8c28c9f81fc2f167c80f35a065defac53491af398a6f4",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Géographie 4e/3e.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "f003288833dbfe5c6256b21900e20dfc1738bb122bf14e9c905f5ccd160600a6",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "72f219a2dace40f6bd3380e568293eb0642729a093864740a723101d1fd45396",
+      "mappingVersion": "37ec22a32f23001f59ac6ad46ce0b192bde0a23eb117e9c1c70e9af2507dfaea",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "Geology",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-70",
+          "title": "GEOL F3 &amp; 4.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4m/GEOL_F3_&_4.pdf",
+          "sourceVersion": "f55383d8a59554e60adde5b1d0a87d62a2cfd54d209bc7532f1ed2c9f9b94c8c",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 Forms 4/5 ; tableau p.15 ; sections Form 4 p.17 et Form 5 p.29.",
+          "note": "Nom de fichier F3 & 4 erroné ; ne pas attribuer à Form 3."
+        }
+      ]
+    },
+    {
+      "id": "f0a06fb239a599e99a2b6a7fd363ab450fa80cc54b305f0cf98555ee54c4fb71",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "671e010ce47f766542e560752d4ba9e255014d2bc89e5fada2fa43028ed33cd7",
+      "mappingVersion": "e0fd3b34fbedf39e7b8b648d2facfb9ddb5af4dd63333e9d48836215593250ab",
+      "catalogLevelId": "en-secondary-form2",
+      "subject": "Mathematics",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "5 synthèse(s)/unité(s), 0 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-8",
+          "title": "Maths syllabus mbalmayo.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/i/Maths_syllabus_mbalmayo.pdf",
+          "sourceVersion": "ea6a51e29b09f6fcf8284209b60cf4e850cfb8068fa6f21b7fcfaaa8263ce123",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Mathematics Form 1/2.",
+          "note": "Ne pas confondre avec le fichier français 35."
+        }
+      ]
+    },
+    {
+      "id": "f4686bc6833fbff6f74cbf2c807a1a81e2842c1e38e3c99aecb187d384efab41",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "667c24d465783804d105908060593a49015019d81f472ed48cca72f2441cd33f",
+      "mappingVersion": "8e1cc496a975acc6370b7bd94d4aa619b5aae5020bba33d2e1cb563234dce154",
+      "catalogLevelId": "en-secondary-form5",
+      "subject": "History",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-75",
+          "title": "HIST- FORMS 3-5_ GENERAL EDUCATION (COMPLETE).pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4r/HIST-_FORMS_3-5__GENERAL_EDUCATION_(COMPLETE).pdf",
+          "sourceVersion": "9ff5c6748ea02b702005191b283f49ab692295c8546e64c2c661e2df1b7f57ad",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : History Forms 3/4/5.",
+          "note": "Niveaux explicites."
+        }
+      ]
+    },
+    {
+      "id": "fb3cdc1db12c38190ff15145f330eca5dfbc069db140784f34a5604466d59490",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "3c3571d351ab2c9ea13d7033c98f357af07f0f00f4f5deccb6a45d6024b6e4ee",
+      "mappingVersion": "14e0bb63779b98bcecbe70dbac18b22672aafe837b74111e5b46cd4fecc8366c",
+      "catalogLevelId": "en-secondary-form1",
+      "subject": "Computer Science",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 1 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-2",
+          "title": "Computer Science  Sylabus Form1_2_11_aout_2014_mbalmayo.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/c/Computer_Science__Sylabus_Form1_2_11_aout_2014_mbalmayo.pdf",
+          "sourceVersion": "d10490fa98c15fe4a561408eb3b42726356f87f2f5536232141ba215ba2d2d11",
+          "date": "Août 2014",
+          "locator": "Couverture PDF p.1 : Computer Science Form One/Two.",
+          "note": "Correspondance EN ; pas une source FR par traduction automatique."
+        }
+      ]
+    },
+    {
+      "id": "fcba9dc554a0be211a3d5c327af8482f086edc232e240f91df72eb68d2d85108",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "22c6511a5d73545516752db4ea91d66dee1d307df5b50137b1b7481c9a891fcc",
+      "mappingVersion": "9d97ce50d56d3c52313012a22a5a7fbc8d0e64ebe14e67e5c9c8f665a8b04bc1",
+      "catalogLevelId": "fr-secondary-4e",
+      "subject": "Éducation artistique et culturelle",
+      "previousDecision": "DOCUMENTARY_SOURCE_VALIDATED_WITH_RESERVE",
+      "status": "OFFICIAL_PARTIAL",
+      "reason": "1 synthèse(s)/unité(s), 2 module(s) indexé(s). Synthèses et objectifs partiels ; les leçons et ressources détaillées restent à structurer. La provenance documentaire est établie ; l’actualité réglementaire et l’enseignement local ne sont pas certifiés.",
+      "sources": [
+        {
+          "documentId": "minesec-43",
+          "title": "Programme Education artistique 4e 3e.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2j/Programme_Education_artistique_4e_3e.pdf",
+          "sourceVersion": "d9c3725ebf41b9b38bb850754eb5efd8205d0b5aac70d9a32cd3617eb1dafa66",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Éducation artistique et culturelle 4e/3e.",
+          "note": "Affectation optionnelle/obligatoire locale non présumée."
+        }
+      ]
+    },
+    {
+      "id": "ffe4fca64c943f574e44aa7cf02157d98cd5f5335ebc955f20df2ec8783b8472",
+      "schoolId": "school-italo-official",
+      "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+      "sourceVersion": "87bbf4b628f192de82c739f08f6000074f9db67424ffea3ee4082008edadc970",
+      "mappingVersion": "50166872d5ffbda6fcf4d9d96711a685ee66d5acb6f937b3d05a9190c5445bad",
+      "catalogLevelId": "fr-secondary-terminale",
+      "subject": "Géographie",
+      "previousDecision": "PENDING_OWNER_DECISION",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "reason": "Les configurations de classe, programmes, matières et spécialités ne prouvent pas l’enseignement ni la série ou combinaison ouverte. La documentation est conservée sans activer la matière.",
+      "sources": [
+        {
+          "documentId": "minesec-202",
+          "title": "PROGRAMME GEO Tle-ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/jo/PROGRAMME_GEO_Tle-ESG.pdf",
+          "sourceVersion": "7c66c838011881c44d020c8212b57078e00dd3100bfab431ac10032bbacd7fe3",
+          "date": "Août 2020",
+          "locator": "Couverture PDF p.1 : Géographie Terminale ESG.",
+          "note": "Ne pas substituer la version EST."
+        }
+      ]
+    }
+  ]
+}

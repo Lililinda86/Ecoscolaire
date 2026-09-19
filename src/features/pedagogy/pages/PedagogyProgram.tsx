@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
+import { AnnualCoveragePanel } from '../components/AnnualCoveragePanel';
 import { DelegatedValidationPanel } from '../components/DelegatedValidationPanel';
 import { EarlyYearsProgramPanel } from '../components/EarlyYearsProgramPanel';
 import { adoptCurriculumProgram } from '../services/pedagogyService';
@@ -54,6 +55,7 @@ function ProgramScope({ yearId }: { yearId?: string }) {
     <PedagogyNav />
     <EarlyYearsProgramPanel weeks={workspace.weeks} adoptions={workspace.adoptions} yearId={year?.id} />
     <DelegatedValidationPanel schoolId={currentSchool?.id} yearId={yearId} />
+    <AnnualCoveragePanel key={JSON.stringify([currentSchool?.id, yearId])} levelIds={levels} />
     <CurriculumProposalReview yearId={yearId} />
     <ClassReferenceBrowser key={currentSchool?.id} />
     <CurriculumCoverage yearId={yearId} programs={workspace.programs} adoptions={workspace.adoptions} unavailable={workspace.loading || Boolean(workspace.error)} />

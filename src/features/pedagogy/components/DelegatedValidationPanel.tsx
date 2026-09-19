@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { finalGapReview } from '../resources/finalGapReview';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../../db/firebase';
 import { useScopedResource } from '../hooks/useScopedResource';
@@ -27,8 +28,8 @@ export function DelegatedValidationPanel({ schoolId, yearId }: { schoolId?: stri
    <p>{pedagogical.length} décisions pédagogiques et réserves enregistrées · {resource.data.length-pedagogical.length} classifications de ressources.</p>
    <p>Autorisation du propriétaire, enregistrement par le workflow délégué. Les choix locaux ne constituent pas des obligations ministérielles. Une validation documentaire ne prouve ni l’ouverture ni l’enseignement d’une matière.</p>
    {!resource.data.length&&<p>Aucune validation déléguée supplémentaire enregistrée pour cette école et cette année.</p>}
-   <details><summary>Consulter décisions, réserves et blocages</summary>
-    {pedagogical.map(d=><article key={d.id}><h3>{d.catalogLevelId||'Source documentaire'} — {d.officialSubject||'Réserve documentaire'}</h3><p>{d.decision} · catégorie {d.classification}</p><p>{d.reason}</p>{d.unresolvedCoverage&&<p>Couverture réelle : {d.unresolvedCoverage}</p>}<details><summary>Traçabilité de cette décision</summary><p>Autorisation : {d.decisionAuthorizedBy}. Enregistrement : {d.decisionRecordedBy}. Provenance : {d.decisionOrigin}.</p><p style={{overflowWrap:'anywhere'}}>Lot : {d.decisionBatchId}<br/>Source : {d.sourceVersion}<br/>Mapping : {d.mappingVersion}</p></details></article>)}
+   <p>La revue documentaire complémentaire précise les réserves sans modifier les décisions initiales. Elle ne confirme aucun enseignement local.</p><details><summary>Consulter décisions, réserves et blocages</summary>
+    {pedagogical.map(d=><article key={d.id}><h3>{d.catalogLevelId||'Source documentaire'} — {d.officialSubject||'Réserve documentaire'}</h3><p>{finalGapReview(d)?.status||d.decision} · catégorie initiale {d.classification}</p><p>{finalGapReview(d)?.reason||d.reason}</p>{d.unresolvedCoverage&&<p>Couverture réelle : {d.unresolvedCoverage}</p>}<details><summary>Traçabilité de cette décision</summary><p>Autorisation : {d.decisionAuthorizedBy}. Enregistrement : {d.decisionRecordedBy}. Provenance : {d.decisionOrigin}.</p><p style={{overflowWrap:'anywhere'}}>Lot : {d.decisionBatchId}<br/>Source : {d.sourceVersion}<br/>Mapping : {d.mappingVersion}</p></details></article>)}
    </details>
   </>}
  </section>;
