@@ -10,7 +10,9 @@ export async function loginAs(page: Page, email: string, password: string) {
     const appOrigin = new URL(appUrl).origin;
     await page.route(`${appOrigin}/**`, async route => {
       await route.continue({
-        headers: { ...route.request().headers(), 'x-vercel-protection-bypass': vercelBypassSecret },
+        // Vercel documents this header for automated Preview tests.
+        // Keep application errors visible; only omit the injected collaboration toolbar.
+        headers: { ...route.request().headers(), 'x-vercel-protection-bypass': vercelBypassSecret, 'x-vercel-skip-toolbar': '1' },
       });
     });
   }

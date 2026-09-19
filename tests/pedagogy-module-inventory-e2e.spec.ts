@@ -33,7 +33,7 @@ test('secretary: all pedagogy routes, responsive empty states and documentary de
   const put = async (path: string, value: Record<string, unknown>) => {
     await db.doc(path).create({ ...value, syntheticFixture: prefix }); paths.push(path);
   };
-  page.on('pageerror', error => browserErrors.push(error.name));
+  page.on('pageerror', error => browserErrors.push(error.name + ': ' + error.message.replace(/https?:\/\/\S+/g, url => url.split(/[?#]/)[0]).slice(0, 1200)));
   // Fail closed if navigation ever attempts a generation or document-analysis call.
   await page.route(/\/(?:generateWeeklyAssessment|startLessonPreparationAnalysis|pedagogySyntheticAiGateway)(?:\?|$)/, async route => {
     providerAttempts.push(new URL(route.request().url()).pathname); await route.abort();
