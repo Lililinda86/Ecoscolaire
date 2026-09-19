@@ -47,7 +47,7 @@ Ressources : 134 au départ et à l’arrivée ; 0 ajout ; 0 nouveau doublon. Dr
 
 ## Validation
 
-7 tests ciblés PASS : comptage honnête, sources/version, isolation école/année, disciplines distinctes, absence de fausse équivalence, pièces litigieuses exclues. Le bilan de livraison précisera SHA final, URL, PR et gate consolidé après déploiement.
+9 tests ciblés PASS : comptage honnête, sources/version, isolation école/année, disciplines distinctes, absence de fausse équivalence, pièces litigieuses exclues. Le bilan de livraison précisera SHA final, URL, PR et gate consolidé après déploiement.
 
 Les revues sont livrées dans le catalogue versionné, sans nouvelle adoption Firestore.
 OPENAI CALLS: 0. PRODUCTION TOUCHED: NO.

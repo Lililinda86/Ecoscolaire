@@ -11,7 +11,7 @@ export function AnnualCoveragePanel({levelIds}:{levelIds:string[]}) {
  return <section className="pedagogy-card" aria-label="Couverture annuelle documentaire">
   <h2>Couverture annuelle documentaire</h2>
   <p>Catalogue de référence pour les niveaux de l’établissement. Les options documentées ne sont pas nécessairement enseignées. Une synthèse ou un index ne constitue pas un programme annuel complet.</p>
-  <label>Niveau <select aria-label="Niveau de couverture annuelle" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Tous les niveaux affichés</option>{[...new Set(levelIds)].map(l=><option key={l} value={l}>{levelLabel(l)}</option>)}</select></label>
+  <label>Filtrer la couverture par niveau <select aria-label="Niveau de couverture annuelle" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Tous les niveaux affichés</option>{[...new Set(levelIds)].map(l=><option key={l} value={l}>{levelLabel(l)}</option>)}</select></label>
   <p>{totals.expectedDocumentaryScopes} couples documentaires · {totals.COMPLETE} complets · {totals.PARTIAL} partiels · {totals.SOURCE_MISSING} sans source exploitable · {totals.STRUCTURING_PENDING} à structurer · {totals.NOT_APPLICABLE} non applicables.</p>
   <p>Les séries et combinaisons inconnues empêchent de certifier le total des matières réellement attendues. Les périodes restent « Année » : aucun calendrier ministériel hebdomadaire n’est déduit.</p>
   {!rows.length&&<p>Aucun périmètre documentaire connu pour les niveaux affichés.</p>}
