@@ -74,3 +74,7 @@ STATE: IN_PROGRESS. Staging uniquement. OpenAI0. Production inchangée.
 
 ## Staging browser isolation — 2026-09-18
 The exact f1ad164 Staging build receipt and backend passed. Both inventory attempts rendered 14 routes and cleaned their fixtures, but each captured a SecurityError. Do not claim these attempts passed. The Preview-injected Vercel collaboration toolbar was present in screenshots. Apply the documented x-vercel-skip-toolbar header only to test requests and retain strict application pageerror assertions, now with sanitized error details. This is a test-harness correction, not a change to pedagogy behavior or tenant permissions. Source: https://vercel.com/docs/vercel-toolbar/managing-toolbar#disable-toolbar-for-automation . Final exact Staging rerun remains required.
+
+
+## Root cause confirmed — protected Preview service worker
+The detailed 14099a4 error identifies sw.js registration: its request receives a forbidden redirect behind Preview protection. The toolbar was not the root cause. Persist the documented bypass cookie on the existing same-origin authenticated request, so browser-owned service-worker fetches are authenticated too. Keep service workers enabled and all pageerror assertions strict. No product/backend changes. Previous route fixtures cleaned, provider calls zero. Documentation: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation .
