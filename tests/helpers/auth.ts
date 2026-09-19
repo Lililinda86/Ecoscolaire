@@ -11,8 +11,9 @@ export async function loginAs(page: Page, email: string, password: string) {
     await page.route(`${appOrigin}/**`, async route => {
       await route.continue({
         // Vercel documents this header for automated Preview tests.
-        // Keep application errors visible; only omit the injected collaboration toolbar.
-        headers: { ...route.request().headers(), 'x-vercel-protection-bypass': vercelBypassSecret, 'x-vercel-skip-toolbar': '1' },
+        // Persist the scoped bypass cookie so the browser can also fetch sw.js.
+        // Service-worker script fetches do not use the page route interceptor.
+        headers: { ...route.request().headers(), 'x-vercel-protection-bypass': vercelBypassSecret, 'x-vercel-skip-toolbar': '1', 'x-vercel-set-bypass-cookie': 'true' },
       });
     });
   }
