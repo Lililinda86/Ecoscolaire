@@ -70,3 +70,7 @@ La finalisation ajoute un petit lot dédié aux trois fonctions de veille et une
 La veille du fichier synthétique, déjà autorisé dans les deux versions, a réellement passé baseline, unchanged, file_changed, revue explicite sans publication et nettoyage. Empreintes: d50677a2a32a7106cc3755966c0c4866bd11be92fe7fdb4144c060a4aced5702 puis9a7345dd2a771f5b7ff79183057cd768e6d23c061be3d7e5cc5442566764ac15.
 La revue tablette a aussi déplacé la bibliothèque avant les exports et simulations ; les détails restent ouvrables. Le premier test adapté avait un double clic qui refermait la provenance : corrigé. Les huit parcours préscolaires de ce gate étaient PASS, pas le gate complet ; attendre la relance.
 STATE: IN_PROGRESS. Staging uniquement. OpenAI0. Production inchangée.
+
+
+## Staging browser isolation — 2026-09-18
+The exact f1ad164 Staging build receipt and backend passed. Both inventory attempts rendered 14 routes and cleaned their fixtures, but each captured a SecurityError. Do not claim these attempts passed. The Preview-injected Vercel collaboration toolbar was present in screenshots. Apply the documented x-vercel-skip-toolbar header only to test requests and retain strict application pageerror assertions, now with sanitized error details. This is a test-harness correction, not a change to pedagogy behavior or tenant permissions. Source: https://vercel.com/docs/vercel-toolbar/managing-toolbar#disable-toolbar-for-automation . Final exact Staging rerun remains required.
