@@ -1,4 +1,5 @@
-import { annualVerifiedUnits } from "../src/features/pedagogy/resources/annualVerifiedUnits";
+import { createRequire } from "node:module";
+const { annualReadinessRegistry } = createRequire(import.meta.url)("../functions/lib/pedagogy/annualReadinessRegistry.js") as typeof import("../functions/src/pedagogy/annualReadinessRegistry");
 import { expect, test, type Page } from "@playwright/test";
 import { deleteApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -13,7 +14,8 @@ if (stagingRun && projectId !== "ecoscolaire-staging") {
     "PRODUCTION_GUARD: staging E2E requires ecoscolaire-staging.",
   );
 }
-const verifiedUnit = annualVerifiedUnits.find(u => u.catalogLevelId === "fr-primary-ce1" && u.subjectName === "Éducation physique et sportive")!;
+const verifiedScope = annualReadinessRegistry.find(u => u.catalogLevelId === "fr-primary-ce1" && u.subjectName === "Éducation physique et sportive")!;
+const verifiedUnit = {...verifiedScope.reviewedUnits![0],subjectName:verifiedScope.subjectName};
 const fixture = {
   uid: "pedagogy-e2e-secretary",
   email: "pedagogy.secretary@emulator.test",
