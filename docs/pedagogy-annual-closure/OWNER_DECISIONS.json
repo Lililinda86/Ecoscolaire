@@ -1,0 +1,528 @@
+{
+  "readAt": "2026-09-20T16:29:20.845Z",
+  "initial": 20,
+  "resolvedFromExistingConfig": 0,
+  "delegatedResolved": 0,
+  "remaining": 20,
+  "contexts": 6,
+  "decisions": [
+    {
+      "level": "fr-secondary-4e",
+      "subject": "Allemand",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-51",
+          "title": "Allemand.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2r/Allemand.pdf",
+          "sourceVersion": "6e151d6f478e685de34809b593a34ba38da4496b8267a7185cdd47bcbac03314",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Allemand 4e/3e.",
+          "note": "Candidat LV2 allemand, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "Allemand",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-51",
+          "title": "Allemand.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2r/Allemand.pdf",
+          "sourceVersion": "6e151d6f478e685de34809b593a34ba38da4496b8267a7185cdd47bcbac03314",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Allemand 4e/3e.",
+          "note": "Candidat LV2 allemand, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "Chinois",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-47",
+          "title": "programme_CHINOIS_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2n/programme_CHINOIS_4eme3eme.pdf",
+          "sourceVersion": "981102cf58a22c0971e22ba4c2ebc8f4031048ebac852fc17984a1cc17d269b6",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Chinois 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "Latin-Grec",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-49",
+          "title": "Latin_Grec.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2p/Latin_Grec.pdf",
+          "sourceVersion": "aa650becea7a0939fe35d4255611c126fdba94216a2823f85f2c35fe470cf388",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Latin-Grec 4e/3e.",
+          "note": "Langues anciennes conditionnelles ; aucune obligation pour toutes les classes déduite."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "Espagnol",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-48",
+          "title": "programme_Espagnol_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2o/programme_Espagnol_4eme3eme.pdf",
+          "sourceVersion": "81a2b14d42e7272a2c731330bed38a9a9f737756ffe32e54e241ccfdf1af45ba",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Espagnol 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-terminale",
+      "subject": "Informatique",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-195",
+          "title": "programme Terminales_A_06_08_2020.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/jh/programme_Terminales_A_06_08_2020.pdf",
+          "sourceVersion": "edd57aa4b50d94fc3f5b516ba48d82cc5c3922ea9e799c355bdf4473dcf30f68",
+          "date": "Juillet 2020",
+          "locator": "Couverture PDF p.1 : Informatique Terminale A/ABI/SH/AC.",
+          "note": "La date du fichier août 2020 n’est pas celle de couverture."
+        },
+        {
+          "documentId": "minesec-196",
+          "title": "programme_T CDE_06_08_2020.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/ji/programme_T_CDE_06_08_2020.pdf",
+          "sourceVersion": "e87218788ca22b3f263623114cfdf2b7427f14a39e2f363b12f1e82c6766dbe8",
+          "date": "Juillet 2020",
+          "locator": "Couverture PDF p.1 : Informatique Terminale C/D/E.",
+          "note": "Choix de série réel nécessaire."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "Chinois",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-47",
+          "title": "programme_CHINOIS_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2n/programme_CHINOIS_4eme3eme.pdf",
+          "sourceVersion": "981102cf58a22c0971e22ba4c2ebc8f4031048ebac852fc17984a1cc17d269b6",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Chinois 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-2nde",
+      "subject": "Éducation artistique",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-144",
+          "title": "Programme des arts 2nde.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/is/Programme_des_arts_2nde.pdf",
+          "sourceVersion": "647eb0122908301e49b76ef434af6e24c0d19cedbd5a631a00ab6a897d976a84",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : éducation artistique, Secondes A1/A2/A3/A4.",
+          "note": "Arts plastiques, scéniques et musicaux ; pas de généralisation à toutes les séries."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-terminale",
+      "subject": "Histoire",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-200",
+          "title": "PROGRAMME HISTOIRE Tle-ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/jm/PROGRAMME_HISTOIRE_Tle-ESG.pdf",
+          "sourceVersion": "645c25956acb2cceee2cef35629348e7dc2363f054acc7e9b7d558be7b28491e",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : Histoire Terminale ESG.",
+          "note": "Ne pas substituer la version EST."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "Latin-Grec",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-49",
+          "title": "Latin_Grec.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2p/Latin_Grec.pdf",
+          "sourceVersion": "aa650becea7a0939fe35d4255611c126fdba94216a2823f85f2c35fe470cf388",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Latin-Grec 4e/3e.",
+          "note": "Langues anciennes conditionnelles ; aucune obligation pour toutes les classes déduite."
+        }
+      ]
+    },
+    {
+      "level": "en-secondary-upper-sixth",
+      "subject": "English Language",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-289",
+          "title": "ANNEXE 1 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE GENERAL LOWER AND UPPER SIXTH CLASSES.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AV/ANNEXE_1_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+          "sourceVersion": "e2e4b344e01415b87a34ec96baab90a91e6067cf24ea9802d33ee80f3d36529c",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : English Language, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Texte non extractible, pas de faux résultat d’OCR."
+        }
+      ]
+    },
+    {
+      "level": "en-secondary-upper-sixth",
+      "subject": "Literature in English",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-290",
+          "title": "ANNEXE 2 Arrêté 90-22 PROG LITTERATURE IN ENGLISH SYLLABUS ANGLOPHONE GENERAL LOWER AND UPPER SIXTH.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AW/ANNEXE_2_Arrêté_90-22_PROG_LITTERATURE_IN_ENGLISH_SYLLABUS_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH.pdf",
+          "sourceVersion": "9f4e07834bf396fa134ef57f0f8bb734b9efc81cb8ac648d5f5e43547720a925",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : Literature in English, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Aucune extrapolation vers le technique."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "Arabe",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-46",
+          "title": "programme_Arabe_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2m/programme_Arabe_4eme3eme.pdf",
+          "sourceVersion": "d4f6487f30cba9e57b983656729cb09a4555d72ea9c8022d79063950cd667524",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Arabe 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-2nde",
+      "subject": "SVTEEHB",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-146",
+          "title": "Programme de  SVTEEHB Classe de 2nde.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/iu/Programme_de__SVTEEHB_Classe_de_2nde.pdf",
+          "sourceVersion": "c37fdb268904e06b19ee956e68cce17cc288fb53ea413e0d9fa3b31f796aa0cd",
+          "date": "Non établie sur couverture consultée",
+          "locator": "Couverture PDF p.1 : SVTEEHB Seconde C.",
+          "note": "La classe C est explicite ; ne pas attribuer à Seconde A."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "Arabe",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-46",
+          "title": "programme_Arabe_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2m/programme_Arabe_4eme3eme.pdf",
+          "sourceVersion": "d4f6487f30cba9e57b983656729cb09a4555d72ea9c8022d79063950cd667524",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Arabe 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "en-secondary-lower-sixth",
+      "subject": "Literature in English",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-290",
+          "title": "ANNEXE 2 Arrêté 90-22 PROG LITTERATURE IN ENGLISH SYLLABUS ANGLOPHONE GENERAL LOWER AND UPPER SIXTH.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AW/ANNEXE_2_Arrêté_90-22_PROG_LITTERATURE_IN_ENGLISH_SYLLABUS_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH.pdf",
+          "sourceVersion": "9f4e07834bf396fa134ef57f0f8bb734b9efc81cb8ac648d5f5e43547720a925",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : Literature in English, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Aucune extrapolation vers le technique."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "Espagnol",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-48",
+          "title": "programme_Espagnol_4eme3eme.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/2o/programme_Espagnol_4eme3eme.pdf",
+          "sourceVersion": "81a2b14d42e7272a2c731330bed38a9a9f737756ffe32e54e241ccfdf1af45ba",
+          "date": "Décembre 2014",
+          "locator": "Couverture PDF p.1 : Espagnol 4e/3e.",
+          "note": "Candidat LV2, choix local non fait."
+        }
+      ]
+    },
+    {
+      "level": "en-secondary-lower-sixth",
+      "subject": "English Language",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-289",
+          "title": "ANNEXE 1 Arrêté 90-22 PROG ENGLISH LANGUAGE ANGLOPHONE GENERAL LOWER AND UPPER SIXTH CLASSES.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/AV/ANNEXE_1_Arrêté_90-22_PROG_ENGLISH_LANGUAGE_ANGLOPHONE_GENERAL_LOWER_AND_UPPER_SIXTH_CLASSES.pdf",
+          "sourceVersion": "e2e4b344e01415b87a34ec96baab90a91e6067cf24ea9802d33ee80f3d36529c",
+          "date": "Annexe de l’arrêté 90/22 du 7 mars 2022",
+          "locator": "PDF scanné pp.1–2 inspectées visuellement : English Language, Lower et Upper Sixth, enseignement général.",
+          "note": "Visa visible du 10 mars 2022 ; actualité/non-abrogation non certifiée. Texte non extractible, pas de faux résultat d’OCR."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-2nde",
+      "subject": "Informatique",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-79",
+          "title": "programme seconde A.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4v/programme_seconde_A.pdf",
+          "sourceVersion": "e0227dfa71087e142f686ac96b4c0af42bdb7f64f25deb36e1435310e83587ce",
+          "date": "Non établie dans l’extrait consulté",
+          "locator": "PDF p.1 : Programme informatique Seconde A, tableau du module 1 ; cinq pages de tableaux.",
+          "note": "Ne pas utiliser pour Seconde C ; aucune page d’arrêté dans cet extrait."
+        },
+        {
+          "documentId": "minesec-80",
+          "title": "programme seconde C.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/4w/programme_seconde_C.pdf",
+          "sourceVersion": "8520bb291565e1ab4a543e0497c4911785393b6e08068d175198c445dbd0ee00",
+          "date": "Non établie dans l’extrait consulté",
+          "locator": "PDF p.1 : Programme informatique Seconde C, tableau du module 1 ; cinq pages de tableaux.",
+          "note": "Ne pas utiliser pour Seconde A ; aucune page d’arrêté dans cet extrait."
+        }
+      ]
+    },
+    {
+      "level": "fr-secondary-terminale",
+      "subject": "Géographie",
+      "status": "TRUE_OWNER_DECISION_REQUIRED",
+      "openingStatus": "UNKNOWN_OWNER_DECISION",
+      "configuration": {
+        "classPrograms": 0,
+        "classSubjects": 0,
+        "teacherAssignments": 0,
+        "teacherAssignmentSlots": 0
+      },
+      "specialties": 0,
+      "reason": "Aucune affectation de matière, publication ni série/combinaison n’établit l’ouverture. La présence au catalogue et les classes par défaut ne prouvent pas l’enseignement.",
+      "sources": [
+        {
+          "documentId": "minesec-202",
+          "title": "PROGRAMME GEO Tle-ESG.pdf",
+          "sourceUrl": "https://files.minesec.gov.cm/jo/PROGRAMME_GEO_Tle-ESG.pdf",
+          "sourceVersion": "7c66c838011881c44d020c8212b57078e00dd3100bfab431ac10032bbacd7fe3",
+          "date": "Août 2020",
+          "locator": "Couverture PDF p.1 : Géographie Terminale ESG.",
+          "note": "Ne pas substituer la version EST."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "existingConflictRecords": 8,
+  "distinctDocuments": 5,
+  "resolved": 0,
+  "unresolved": 8,
+  "comparisons": [
+    {
+      "existingDecisionId": "0075bfcbfcb86ae2786f100fc817eb31e9d728955b4d43252b19c17cb4ede571",
+      "catalogLevelId": null,
+      "sourceA": {
+        "documentId": "minedub-en-primary-2",
+        "authority": "MINEDUB",
+        "date": "2018",
+        "version": "1921b9d044f23849c1532f403021e0a8d23a46123d4b225b8b083b827e3fdd1c",
+        "locator": "Cellules de savoirs, pages 49, 51"
+      },
+      "sourceB": {
+        "documentId": "minedub-en-primary-2",
+        "authority": "MINEDUB",
+        "date": "2018",
+        "version": "1921b9d044f23849c1532f403021e0a8d23a46123d4b225b8b083b827e3fdd1c",
+        "locator": "Cellules de savoir-faire et terminologie, mêmes pages 49, 51"
+      },
+      "difference": "Class 3 numerical bounds vary between cells; 4 D shapes and the quadrilateral/pentagon grouping are not adopted. Only unambiguous outcomes are summarised.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    },
+    {
+      "existingDecisionId": "280787ae1869c0b0c34e01284ddd47845bbc51c09da16f843fd2197961642a9d",
+      "catalogLevelId": null,
+      "sourceA": {
+        "documentId": "minedub-fr-primary-2",
+        "authority": "MINEDUB",
+        "date": "2018",
+        "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2",
+        "locator": "Cellules de savoirs, pages 74, 77"
+      },
+      "sourceB": {
+        "documentId": "minedub-fr-primary-2",
+        "authority": "MINEDUB",
+        "date": "2018",
+        "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2",
+        "locator": "Cellules de savoir-faire et terminologie, mêmes pages 74, 77"
+      },
+      "difference": "Certaines bornes numériques varient entre colonnes de savoirs et savoir-faire ; aucune harmonisation déduite.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    },
+    {
+      "existingDecisionId": "60d3d22b1db6257fa2abcce02ccf7ca8645b4363f5231af7d84a2292e95fad8e",
+      "catalogLevelId": "fr-secondary-6e",
+      "sourceA": {
+        "documentId": "minesec-31",
+        "authority": "MINESEC",
+        "date": "Août 2014 sur couverture ; anomalie linguistique",
+        "version": "e5c68ffdbe2b4518bfdca278385407134d55ca54b40deda12dca47870984ef4d",
+        "locator": "Couverture PDF p.1 : EN Forms 1/2"
+      },
+      "sourceB": {
+        "documentId": "minesec-31",
+        "authority": "MINESEC",
+        "date": "Août 2014 sur couverture ; anomalie linguistique",
+        "version": "e5c68ffdbe2b4518bfdca278385407134d55ca54b40deda12dca47870984ef4d",
+        "locator": "Corps français : PDF pp.15,18,24 : 6e/5e"
+      },
+      "difference": "PDF p.1 EN Form One/Two, mais p.13 sommaire FR, p.15 niveaux 6e/5e ; sections 6e p.18 et 5e p.24.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    },
+    {
+      "existingDecisionId": "773c215e33d58c7d779bd90b125eb039519b31cb2c82819a50ab98ad5fddf683",
+      "catalogLevelId": "en-secondary-form5",
+      "sourceA": {
+        "documentId": "minesec-64",
+        "authority": "MINESEC",
+        "date": "Décembre 2014",
+        "version": "b654814a359c3bdb72457884e2d3514b010308a0fe6ebbf13942480c66048443",
+        "locator": "Couverture PDF p.1 : Forms 1/2 et Forms 3/4/5"
+      },
+      "sourceB": {
+        "documentId": "minesec-64",
+        "authority": "MINESEC",
+        "date": "Décembre 2014",
+        "version": "b654814a359c3bdb72457884e2d3514b010308a0fe6ebbf13942480c66048443",
+        "locator": "Matrices PDF pp.14–15 : Forms 3/4/5"
+      },
+      "difference": "Couverture contradictoire p.1 ; matrices Forms 3–5 pp.14–15, modules p.17.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    },
+    {
+      "existingDecisionId": "87057149d5daab611860472029593f3f009179a81ed1489c760173b230a5a9b8",
+      "catalogLevelId": "en-secondary-form4",
+      "sourceA": {
+        "documentId": "minesec-64",
+        "authority": "MINESEC",
+        "date": "Décembre 2014",
+        "version": "b654814a359c3bdb72457884e2d3514b010308a0fe6ebbf13942480c66048443",
+        "locator": "Couverture PDF p.1 : Forms 1/2 et Forms 3/4/5"
+      },
+      "sourceB": {
+        "documentId": "minesec-64",
+        "authority": "MINESEC",
+        "date": "Décembre 2014",
+        "version": "b654814a359c3bdb72457884e2d3514b010308a0fe6ebbf13942480c66048443",
+        "locator": "Matrices PDF pp.14–15 : Forms 3/4/5"
+      },
+      "difference": "Couverture contradictoire p.1 ; matrices Forms 3–5 pp.14–15, modules p.17.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    },
+    {
+      "existingDecisionId": "88c0491ad21e2285b9c58f3a0299593f1ec931fdab16366881f504381fbb9a0f",
+      "catalogLevelId": "en-secondary-form3",
+      "sourceA": {
+        "documentId": "minesec-64",
+        "authority": "MINESEC",
+        "date": "Décembre 2014",
+        "version": "b654814a359c3bdb72457884e2d3514b010308a0fe6ebbf13942480c66048443",
+        "locator": "Couverture PDF p.1 : Forms 1/2 et Forms 3/4/5"
+      },
+      "sourceB": {
+        "documentId": "minesec-64",
+        "authority": "MINESEC",
+        "date": "Décembre 2014",
+        "version": "b654814a359c3bdb72457884e2d3514b010308a0fe6ebbf13942480c66048443",
+        "locator": "Matrices PDF pp.14–15 : Forms 3/4/5"
+      },
+      "difference": "Couverture contradictoire p.1 ; matrices Forms 3–5 pp.14–15, modules p.17.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    },
+    {
+      "existingDecisionId": "ac0ce1a1ff7b405705f1caf198a7394c9d5181b2a65f62f077401cdeabbbdc59",
+      "catalogLevelId": null,
+      "sourceA": {
+        "documentId": "minedub-en-primary-3",
+        "authority": "MINEDUB",
+        "date": "2018",
+        "version": "3d9828312e9e4832cfdf3beb5f79bd0b2fc0bd1a2722c2f0eb5853c6946994bc",
+        "locator": "Cellules de savoirs, pages 52"
+      },
+      "sourceB": {
+        "documentId": "minedub-en-primary-3",
+        "authority": "MINEDUB",
+        "date": "2018",
+        "version": "3d9828312e9e4832cfdf3beb5f79bd0b2fc0bd1a2722c2f0eb5853c6946994bc",
+        "locator": "Cellules de savoir-faire et terminologie, mêmes pages 52"
+      },
+      "difference": "Isosceles is listed among angle types and 4 D shapes is unspecified. These cells are excluded, not silently corrected.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    },
+    {
+      "existingDecisionId": "d44e0cdfc49a5567ccaf5d3e46baa65fe3ac13f0e5bcdca8200f88bb4ab3f719",
+      "catalogLevelId": "fr-secondary-5e",
+      "sourceA": {
+        "documentId": "minesec-31",
+        "authority": "MINESEC",
+        "date": "Août 2014 sur couverture ; anomalie linguistique",
+        "version": "e5c68ffdbe2b4518bfdca278385407134d55ca54b40deda12dca47870984ef4d",
+        "locator": "Couverture PDF p.1 : EN Forms 1/2"
+      },
+      "sourceB": {
+        "documentId": "minesec-31",
+        "authority": "MINESEC",
+        "date": "Août 2014 sur couverture ; anomalie linguistique",
+        "version": "e5c68ffdbe2b4518bfdca278385407134d55ca54b40deda12dca47870984ef4d",
+        "locator": "Corps français : PDF pp.15,18,24 : 6e/5e"
+      },
+      "difference": "PDF p.1 EN Form One/Two, mais p.13 sommaire FR, p.15 niveaux 6e/5e ; sections 6e p.18 et 5e p.24.",
+      "status": "UNRESOLVED",
+      "explanation": "Comparaison interne à la même pièce, pas deux éditions datées. Aucun erratum authentifié ne permet de déclarer une substitution ou de corriger silencieusement la source.",
+      "action": "Exclure les cellules ou le document litigieux de la validation définitive ; poursuivre les contenus non ambigus."
+    }
+  ],
+  "scopeComparisons": [
+    {
+      "sourceA": "minesec-79 : Seconde A",
+      "sourceB": "minesec-80 : Seconde C",
+      "status": "DIFFERENT_SCOPE",
+      "effect": "Conserver les deux variantes ; aucune série ITALO déduite."
+    },
+    {
+      "sourceA": "minesec-195 : Terminales A/ABI/SH/AC",
+      "sourceB": "minesec-196 : Terminales C/D/E",
+      "status": "DIFFERENT_SCOPE",
+      "effect": "Ne pas fusionner ; aucune des huit contradictions initiales résolue par cette distinction."
+    }
+  ],
+  "recheckedAt": "2026-09-20",
+  "officialSearches": [
+    "site:minedub.cm curriculum 2018 erratum corrigendum niveau 2 mathématiques",
+    "site:minedub.cm curriculum primary class 3 4 5 6 errata 2018",
+    "site:files.minesec.gov.cm informatique 6ème 5ème programme corrigé",
+    "site:files.minesec.gov.cm Chemistry syllabus Forms 1 2 3 4 5 corrigendum"
+  ],
+  "result": "Aucun erratum ou texte de remplacement authentifié. Les huit conflits restent UNRESOLVED. Aucune nouvelle promotion COMPLETE à partir de ces cinq documents. Les trois sous-domaines approuvés de la baseline sont conservés.",
+  "additionalReservations": [
+    "CE2 English, health: 351–400 oral/lecture contre 350–400 écrit.",
+    "CE2 English, communications: 451–500 oral/écrit contre 450–500 lecture.",
+    "CE1 géographie : ancienne classification raciale du document non transformée en activité pédagogique."
+  ]
+}

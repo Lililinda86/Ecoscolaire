@@ -110,11 +110,235 @@ export const annualReadinessRegistry = [
   {
     "catalogLevelId": "fr-primary-cp",
     "subjectName": "English language",
-    "coverageStatus": "PARTIAL_BLOCKING",
+    "coverageStatus": "COMPLETE",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-cp-subject-1"
+      "annual-closure-fr-primary-cp-english-1",
+      "annual-closure-fr-primary-cp-english-2",
+      "annual-closure-fr-primary-cp-english-3",
+      "annual-closure-fr-primary-cp-english-4",
+      "annual-closure-fr-primary-cp-english-5",
+      "annual-closure-fr-primary-cp-english-6",
+      "annual-closure-fr-primary-cp-english-7",
+      "annual-closure-fr-primary-cp-english-8",
+      "annual-closure-fr-primary-cp-english-9",
+      "annual-closure-fr-primary-cp-english-10",
+      "annual-closure-fr-primary-cp-english-11",
+      "annual-closure-fr-primary-cp-english-12",
+      "annual-closure-fr-primary-cp-english-13",
+      "annual-closure-fr-primary-cp-english-14",
+      "annual-closure-fr-primary-cp-english-15",
+      "annual-closure-fr-primary-cp-english-16",
+      "annual-closure-fr-primary-cp-english-17",
+      "annual-closure-fr-primary-cp-english-18",
+      "annual-closure-fr-primary-cp-english-19",
+      "annual-closure-fr-primary-cp-english-20",
+      "annual-closure-fr-primary-cp-english-21",
+      "annual-closure-fr-primary-cp-english-22",
+      "annual-closure-fr-primary-cp-english-23",
+      "annual-closure-fr-primary-cp-english-24",
+      "annual-closure-fr-primary-cp-english-25",
+      "annual-closure-fr-primary-cp-english-26",
+      "annual-closure-fr-primary-cp-english-27",
+      "annual-closure-fr-primary-cp-english-28",
+      "annual-closure-fr-primary-cp-english-29",
+      "annual-closure-fr-primary-cp-english-30",
+      "annual-closure-fr-primary-cp-english-31",
+      "annual-closure-fr-primary-cp-english-32"
     ],
-    "reviewedUnits": []
+    "reviewedUnits": [
+      {
+        "id": "annual-closure-fr-primary-cp-english-1",
+        "title": "Écouter et parler : maison",
+        "objective": "Saluer et répondre, nommer les parties de la maison et leurs usages, se présenter et présenter une autre personne.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-2",
+        "title": "Écouter et parler : ville",
+        "objective": "Nommer les éléments de la ville et décrire les activités qui s’y déroulent.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-3",
+        "title": "Écouter et parler : école",
+        "objective": "Se présenter et présenter ses parents, échanger des salutations, former et prononcer des mots à partir des sons, décrire les activités de la semaine et suivre une consigne.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-4",
+        "title": "Écouter et parler : métiers",
+        "objective": "Décrire oralement une profession et ses activités.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-5",
+        "title": "Écouter et parler : voyage",
+        "objective": "Réciter une comptine et compter des objets ou personnes de 21 à 40.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-6",
+        "title": "Écouter et parler : santé",
+        "objective": "Décrire une maladie dans une activité de langue et compter de 41 à 60.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-7",
+        "title": "Écouter et parler : jeux",
+        "objective": "Nommer et décrire les activités d’un jeu ; compter de 61 à 80.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-8",
+        "title": "Écouter et parler : communication",
+        "objective": "Nommer les moyens de communication et expliquer leur usage ; compter de 81 à 100.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-9",
+        "title": "Lire : maison",
+        "objective": "Interpréter une image d’objets domestiques puis lire à voix haute le texte qui la décrit.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-10",
+        "title": "Lire : ville",
+        "objective": "Lire des phrases sur la ville ou le village, reconnaître les lettres, lire mots fréquents et courts textes, épeler des mots.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-11",
+        "title": "Lire : école",
+        "objective": "Lire des phrases sur la classe, des mots fréquents, les jours et une description des activités de la semaine ; répondre aux questions.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-12",
+        "title": "Lire : métiers",
+        "objective": "Lire une description de métier, des mots fréquents et un court texte ; épeler les mots rencontrés.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-13",
+        "title": "Lire : voyage",
+        "objective": "Lire les moyens de déplacement et le récit d’un court voyage ; lire les nombres de 20 à 40.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-14",
+        "title": "Lire : santé",
+        "objective": "Lire le nom et la description d’une maladie, les mots fréquents et les nombres de 41 à 60.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-15",
+        "title": "Lire : jeux",
+        "objective": "Lire le nom et une courte description d’un jeu ainsi que les nombres de 61 à 80.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-16",
+        "title": "Lire : communication",
+        "objective": "Lire les moyens de communication et les nombres de 81 à 100.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-17",
+        "title": "Écrire : maison",
+        "objective": "Tracer lisiblement les lettres de l’alphabet et copier des phrases simples.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-18",
+        "title": "Écrire : ville",
+        "objective": "Copier les noms d’éléments de la ville et des phrases simples.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-19",
+        "title": "Écrire : école",
+        "objective": "Écrire le nom des objets utilisés à l’école.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-20",
+        "title": "Écrire : métiers",
+        "objective": "Copier le nom de différentes professions.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-21",
+        "title": "Écrire : voyage",
+        "objective": "Écrire les nombres de 20 à 40, les objets du voyage et copier des phrases relatives à un déplacement.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-22",
+        "title": "Écrire : santé",
+        "objective": "Écrire lisiblement les nombres de 41 à 60 et le nom des maladies étudiées en langue.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-23",
+        "title": "Écrire : jeux",
+        "objective": "Écrire les nombres de 61 à 80 et les noms de jeux.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-24",
+        "title": "Écrire : communication",
+        "objective": "Écrire les nombres de 81 à 100 et les moyens de communication.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-25",
+        "title": "Langue : maison",
+        "objective": "Employer les contraires de mots d’une ou deux syllabes et les pluriels des noms en s et es.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-26",
+        "title": "Langue : ville",
+        "objective": "Employer en contexte les contraires de mots d’une ou deux syllabes.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-27",
+        "title": "Langue : école",
+        "objective": "Employer les contraires ; construire des phrases au présent, au passé simple anglais et au futur simple avec des verbes réguliers.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-28",
+        "title": "Langue : métiers",
+        "objective": "Employer les contraires et décrire personnes, lieux et objets avec des adjectifs d’une syllabe ; repérer les comparatifs mentionnés dans la cellule de connaissances.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-29",
+        "title": "Langue : voyage",
+        "objective": "Employer les contraires et décrire un mouvement avec des adverbes.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-30",
+        "title": "Langue : santé",
+        "objective": "Employer les contraires et des pronoms démonstratifs pour indiquer la proximité.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-31",
+        "title": "Langue : jeux",
+        "objective": "Employer les contraires, situer des objets avec des prépositions et relier mots, groupes et phrases par coordination.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-english-32",
+        "title": "Langue : communication",
+        "objective": "Employer les contraires et utiliser les interjections de salutation en contexte.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      }
+    ]
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -171,11 +395,81 @@ export const annualReadinessRegistry = [
   {
     "catalogLevelId": "fr-primary-cp",
     "subjectName": "Éducation artistique",
-    "coverageStatus": "PARTIAL_BLOCKING",
+    "coverageStatus": "COMPLETE",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-cp-subject-7"
+      "annual-closure-fr-primary-cp-arts-1",
+      "annual-closure-fr-primary-cp-arts-2",
+      "annual-closure-fr-primary-cp-arts-3",
+      "annual-closure-fr-primary-cp-arts-4",
+      "annual-closure-fr-primary-cp-arts-5",
+      "annual-closure-fr-primary-cp-arts-6",
+      "annual-closure-fr-primary-cp-arts-7",
+      "annual-closure-fr-primary-cp-arts-8",
+      "annual-closure-fr-primary-cp-arts-9",
+      "annual-closure-fr-primary-cp-arts-10"
     ],
-    "reviewedUnits": []
+    "reviewedUnits": [
+      {
+        "id": "annual-closure-fr-primary-cp-arts-1",
+        "title": "Arts visuels : couleurs et outils",
+        "objective": "Colorier une figure et choisir différents outils de dessin pour réaliser une production plastique.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-2",
+        "title": "Arts visuels : patrimoine",
+        "objective": "Comparer des objets artistiques appartenant à un même registre.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-3",
+        "title": "Arts visuels : lignes",
+        "objective": "Tracer des lignes droites, courbes et brisées.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-4",
+        "title": "Arts visuels : formes",
+        "objective": "Dessiner des formes régulières et irrégulières.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-5",
+        "title": "Musique : instruments et artistes",
+        "objective": "Produire des sons avec des instruments locaux et nommer des artistes de sa localité ou du pays.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-6",
+        "title": "Musique : cadence et notes",
+        "objective": "Marquer une cadence avec le corps et représenter les sept notes avec les clés.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-7",
+        "title": "Musique : mesure",
+        "objective": "Identifier les temps dans la mesure d’un chant.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-8",
+        "title": "Théâtre : imitation",
+        "objective": "Imiter voix et gestes et interpréter un personnage dans une courte scène.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-9",
+        "title": "Théâtre : coopération",
+        "objective": "Coopérer avec les autres dans une pièce ou une saynète.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      },
+      {
+        "id": "annual-closure-fr-primary-cp-arts-10",
+        "title": "Danse",
+        "objective": "Distinguer une danse traditionnelle d’une danse moderne et en exécuter une.",
+        "sourceVersion": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+      }
+    ]
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -200,7 +494,14 @@ export const annualReadinessRegistry = [
     "subjectName": "Français et littérature",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce1-subject-0"
+      "annual-gap-v1-fr-primary-ce1-subject-0",
+      "annual-closure-ce1-located-17",
+      "annual-closure-ce1-located-19",
+      "annual-closure-ce1-located-21",
+      "annual-closure-ce1-located-23",
+      "annual-closure-ce1-located-25",
+      "annual-closure-ce1-located-27",
+      "annual-closure-ce1-located-29"
     ],
     "reviewedUnits": []
   },
@@ -209,7 +510,15 @@ export const annualReadinessRegistry = [
     "subjectName": "English language",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce1-subject-1"
+      "annual-gap-v1-fr-primary-ce1-subject-1",
+      "annual-closure-ce1-located-1",
+      "annual-closure-ce1-located-3",
+      "annual-closure-ce1-located-5",
+      "annual-closure-ce1-located-7",
+      "annual-closure-ce1-located-9",
+      "annual-closure-ce1-located-11",
+      "annual-closure-ce1-located-13",
+      "annual-closure-ce1-located-15"
     ],
     "reviewedUnits": []
   },
@@ -261,7 +570,15 @@ export const annualReadinessRegistry = [
     "subjectName": "Sciences humaines et sociales",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce1-subject-6"
+      "annual-gap-v1-fr-primary-ce1-subject-6",
+      "annual-closure-ce1-located-38",
+      "annual-closure-ce1-located-39",
+      "annual-closure-ce1-located-40",
+      "annual-closure-ce1-located-41",
+      "annual-closure-ce1-located-42",
+      "annual-closure-ce1-located-43",
+      "annual-closure-ce1-located-44",
+      "annual-closure-ce1-located-45"
     ],
     "reviewedUnits": []
   },
@@ -270,7 +587,11 @@ export const annualReadinessRegistry = [
     "subjectName": "Éducation artistique",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce1-subject-7"
+      "annual-gap-v1-fr-primary-ce1-subject-7",
+      "annual-closure-ce1-located-31",
+      "annual-closure-ce1-located-32",
+      "annual-closure-ce1-located-33",
+      "annual-closure-ce1-located-34"
     ],
     "reviewedUnits": []
   },
@@ -365,7 +686,8 @@ export const annualReadinessRegistry = [
     "subjectName": "Développement personnel",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce1-subject-9"
+      "annual-gap-v1-fr-primary-ce1-subject-9",
+      "annual-closure-ce1-located-46"
     ],
     "reviewedUnits": []
   },
@@ -374,7 +696,14 @@ export const annualReadinessRegistry = [
     "subjectName": "Français et littérature",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce2-subject-0"
+      "annual-gap-v1-fr-primary-ce2-subject-0",
+      "annual-closure-ce2-located-18",
+      "annual-closure-ce2-located-20",
+      "annual-closure-ce2-located-22",
+      "annual-closure-ce2-located-24",
+      "annual-closure-ce2-located-26",
+      "annual-closure-ce2-located-28",
+      "annual-closure-ce2-located-30"
     ],
     "reviewedUnits": []
   },
@@ -383,7 +712,15 @@ export const annualReadinessRegistry = [
     "subjectName": "English language",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce2-subject-1"
+      "annual-gap-v1-fr-primary-ce2-subject-1",
+      "annual-closure-ce2-located-2",
+      "annual-closure-ce2-located-4",
+      "annual-closure-ce2-located-6",
+      "annual-closure-ce2-located-8",
+      "annual-closure-ce2-located-10",
+      "annual-closure-ce2-located-12",
+      "annual-closure-ce2-located-14",
+      "annual-closure-ce2-located-16"
     ],
     "reviewedUnits": []
   },
@@ -435,7 +772,10 @@ export const annualReadinessRegistry = [
     "subjectName": "Sciences humaines et sociales",
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
-      "annual-gap-v1-fr-primary-ce2-subject-6"
+      "annual-gap-v1-fr-primary-ce2-subject-6",
+      "annual-closure-ce2-located-35",
+      "annual-closure-ce2-located-36",
+      "annual-closure-ce2-located-37"
     ],
     "reviewedUnits": []
   },

@@ -1,3 +1,5 @@
+import { closurePartialUnits } from './annualClosurePartial';
+import { classifyAnnualPartial, annualCauseExplanation, type AnnualPartialCause } from './annualClosureClassification';
 import { annualVerifiedScopes, annualVerifiedUnits } from './annualVerifiedUnits';
 import { subjectMappingSources } from '../../../../functions/src/pedagogy/subjectMappingSources';
 import { secondarySubjectSources } from '../../../../functions/src/pedagogy/secondarySubjectSources';
@@ -8,13 +10,14 @@ import { secondaryStructuredUnits } from './secondaryStructuredUnits';
 import { earlyYearsAnnualPlans } from './earlyYearsAnnualPlans';
 export type AnnualCoverageStatus='COMPLETE'|'ITALO_VALIDATED'|'PARTIAL_BLOCKING'|'PENDING_SOURCE'|'NOT_APPLICABLE';
 export interface AnnualScope {
+ partialCause?:AnnualPartialCause|null; structuredAnnual?:boolean;
  id:string; catalogLevelId:string; subjectName:string; period:'YEAR';
  officialSource:Array<{id:string;url:string;version:string}>; structuredContent:string[];
  themes:string[]; units:number; lessonsActivities:number; objectives:number; competencies:number;
  coverageStatus:AnnualCoverageStatus; missingReason:string; applicability:string;
  validatedFor?:{schoolId:string;academicYearId:string;version:string}; moduleIndexCount:number; expectedBasis:string; documentaryUsable:boolean; assessmentGuidance:string[]; locators:string[];
 }
-export const annualGapUnits:AnnualGapUnit[]=[...primaryGapUnits,...secondaryGapUnits];
+export const annualGapUnits:AnnualGapUnit[]=[...primaryGapUnits,...secondaryGapUnits,...closurePartialUnits];
 const slug=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const scopes:AnnualScope[]=[];
 function add(level:string,subject:string,sources:AnnualScope['officialSource'],status:AnnualCoverageStatus,reason:string,basis:string,applicability='DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED'){
@@ -58,12 +61,25 @@ for(const verified of annualVerifiedScopes){
  const units=annualVerifiedUnits.filter(u=>u.catalogLevelId===verified.catalogLevelId&&u.subjectName===verified.subjectName);const first=units[0];
  let row=scopes.find(r=>r.catalogLevelId===verified.catalogLevelId&&r.subjectName===verified.subjectName);
  if(!row){add(verified.catalogLevelId,verified.subjectName,[{id:first.documentId,url:first.sourceUrl,version:first.sourceVersion}],'COMPLETE','', 'PUBLISHED_LOCAL_SUBJECT_OFFICIAL_SUBDOMAIN');row=scopes.at(-1)!;}
- Object.assign(row,{coverageStatus:'COMPLETE',documentaryUsable:true,structuredContent:units.map(u=>u.id),themes:[...new Set(units.map(u=>u.theme))],units:units.length,lessonsActivities:units.length,objectives:units.length,competencies:units.length,moduleIndexCount:0,assessmentGuidance:[...new Set(units.map(u=>u.assessment))],locators:units.map(u=>u.sourceLocator),missingReason:'Tableaux de cette discipline ou sous-discipline structurés intégralement pour la colonne de classe, avec objectifs, compétences, activités et critères d’évaluation. Calendrier et séances détaillées à préparer localement ; aucune équivalence avec le domaine sciences entier.'});
+ Object.assign(row,{coverageStatus:'COMPLETE',documentaryUsable:true,structuredContent:units.map(u=>u.id),themes:[...new Set(units.map(u=>u.theme))],units:units.length,lessonsActivities:units.length,objectives:units.length,competencies:units.length,moduleIndexCount:0,assessmentGuidance:[...new Set(units.map(u=>u.assessment))],locators:units.map(u=>u.sourceLocator),missingReason:'Tableaux de cette discipline ou sous-discipline structurés intégralement pour la colonne de classe, avec objectifs, compétences, activités et critères d’évaluation. Calendrier et séances détaillées à préparer localement ; aucune équivalence déduite avec un domaine plus large.'});
+}
+for(const row of scopes){
+ row.partialCause=classifyAnnualPartial(row);
+ row.structuredAnnual=row.coverageStatus==='COMPLETE'||row.coverageStatus==='ITALO_VALIDATED';
+ if(row.partialCause)row.missingReason=annualCauseExplanation[row.partialCause]+' '+row.missingReason;
+ const added=closurePartialUnits.filter(u=>u.catalogLevelId===row.catalogLevelId&&u.subjectName===row.subjectName);
+ if(added.length){
+  row.missingReason='Nouvelle structuration de '+added.length+' sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. '+annualCauseExplanation.CONTRADICTION;
+  // Entire subject outlines are represented only for these exact class columns.
+  // SHS and personal development additions cover components, not their full domains.
+  row.structuredAnnual=['English language','Français et littérature','Éducation artistique'].includes(row.subjectName);
+ }
 }
 export const annualCoverageScopes=scopes;
 export const unenumeratedAnnualScopes=[{catalogLevelId:'fr-secondary-1re',reason:'Aucune série locale ni liste disciplinaire exploitable : les couples attendus ne peuvent pas être inventés.'},{catalogLevelId:'SECOND_CYCLE',reason:'Les combinaisons réellement ouvertes restent inconnues. Le nombre documentaire est exact, le total des matières obligatoires ITALO ne peut pas être certifié.'}];
 export function summarizeAnnualCoverage(rows:AnnualScope[]){
  const counts:Record<AnnualCoverageStatus,number>={COMPLETE:0,ITALO_VALIDATED:0,PARTIAL_BLOCKING:0,PENDING_SOURCE:0,NOT_APPLICABLE:0};
  for(const row of rows)counts[row.coverageStatus]++;
- return {expectedDocumentaryScopes:rows.length,...counts,completeScopePercentage:rows.length?100*counts.COMPLETE/rows.length:0,scopesWithPedagogicalContentPercentage:rows.length?100*(counts.COMPLETE+counts.ITALO_VALIDATED+counts.PARTIAL_BLOCKING)/rows.length:0,documentaryUsable:rows.filter(r=>r.documentaryUsable).length,documentaryCoveragePercentage:rows.length?100*rows.filter(r=>r.documentaryUsable).length/rows.length:0,UNCLASSIFIED:rows.filter(r=>!Object.hasOwn(counts,r.coverageStatus)).length,GENERIC_PARTIAL:0,mandatoryLocalDenominatorEstablished:false};
+ const structuredAnnual=rows.filter(r=>r.structuredAnnual??(r.coverageStatus==='COMPLETE'||r.coverageStatus==='ITALO_VALIDATED')).length;
+ return {structuredAnnual,structuredAnnualCoveragePercentage:rows.length?100*structuredAnnual/rows.length:0,expectedDocumentaryScopes:rows.length,...counts,completeScopePercentage:rows.length?100*counts.COMPLETE/rows.length:0,scopesWithPedagogicalContentPercentage:rows.length?100*(counts.COMPLETE+counts.ITALO_VALIDATED+counts.PARTIAL_BLOCKING)/rows.length:0,documentaryUsable:rows.filter(r=>r.documentaryUsable).length,documentaryCoveragePercentage:rows.length?100*rows.filter(r=>r.documentaryUsable).length/rows.length:0,UNCLASSIFIED:rows.filter(r=>!Object.hasOwn(counts,r.coverageStatus)).length,GENERIC_PARTIAL:0,mandatoryLocalDenominatorEstablished:false};
 }

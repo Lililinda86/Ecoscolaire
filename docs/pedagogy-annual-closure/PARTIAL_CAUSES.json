@@ -1,0 +1,37 @@
+[
+  {
+    "cause": "STRUCTURE_INCOMPLETE",
+    "before": 133,
+    "after": 131
+  },
+  {
+    "cause": "SOURCE_PARTIAL",
+    "before": 0,
+    "after": 0
+  },
+  {
+    "cause": "LOCAL_SCOPE_UNKNOWN",
+    "before": 10,
+    "after": 10
+  },
+  {
+    "cause": "CONTRADICTION",
+    "before": 58,
+    "after": 58
+  },
+  {
+    "cause": "VERSION_UNCERTAIN",
+    "before": 0,
+    "after": 0
+  },
+  {
+    "cause": "RIGHTS_LIMITATION",
+    "before": 0,
+    "after": 0
+  },
+  {
+    "cause": "OTHER",
+    "before": 0,
+    "after": 0
+  }
+]

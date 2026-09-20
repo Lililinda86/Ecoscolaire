@@ -1,0 +1,216 @@
+{
+  "readAt": "2026-09-20T16:29:20.845Z",
+  "projectId": "ecoscolaire-staging",
+  "counts": {
+    "ACTIVE_CONFIRMED": 3,
+    "LEGACY_UNKNOWN": 15,
+    "INACTIVE": 0,
+    "CONFIGURATION_MISSING": 16
+  },
+  "classes": [
+    {
+      "level": "fr-primary-ce1",
+      "className": "CE1",
+      "status": "ACTIVE_CONFIRMED",
+      "reason": "Une révision publiée exploitable pour cette année."
+    },
+    {
+      "level": "en-primary-3",
+      "className": "Class 3",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "en-nursery-3",
+      "className": "Nursery 3",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "en-primary-1",
+      "className": "Class 1",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "en-nursery-1",
+      "className": "Nursery 1",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-primary-cm2",
+      "className": "CM2",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-primary-ce2",
+      "className": "CE2",
+      "status": "ACTIVE_CONFIRMED",
+      "reason": "Une révision publiée exploitable pour cette année."
+    },
+    {
+      "level": "en-primary-5",
+      "className": "Class 5",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-preschool-ps",
+      "className": "Maternelle 1",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "en-primary-6",
+      "className": "Class 6",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-primary-cp",
+      "className": "CP",
+      "status": "ACTIVE_CONFIRMED",
+      "reason": "Une révision publiée exploitable pour cette année."
+    },
+    {
+      "level": "en-nursery-2",
+      "className": "Nursery 2",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-primary-cm1",
+      "className": "CM1",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-primary-sil",
+      "className": "SIL",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-preschool-gs",
+      "className": "Maternelle 3",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "en-primary-4",
+      "className": "Class 4",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "fr-preschool-ms",
+      "className": "Maternelle 2",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "en-primary-2",
+      "className": "Class 2",
+      "status": "LEGACY_UNKNOWN",
+      "reason": "Classe héritée sans indicateur explicite d’activité ni liste publiée exploitable."
+    },
+    {
+      "level": "en-nursery-pre",
+      "className": "Pre-Nursery",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "en-secondary-form1",
+      "className": "Form 1",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "en-secondary-form2",
+      "className": "Form 2",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "en-secondary-form3",
+      "className": "Form 3",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "en-secondary-form4",
+      "className": "Form 4",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "en-secondary-form5",
+      "className": "Form 5",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "en-secondary-lower-sixth",
+      "className": "Lower Sixth",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "en-secondary-upper-sixth",
+      "className": "Upper Sixth",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-preschool-pre",
+      "className": "Pré-maternelle",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-secondary-1re",
+      "className": "1re",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-secondary-2nde",
+      "className": "2nde",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-secondary-3e",
+      "className": "3e",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-secondary-4e",
+      "className": "4e",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-secondary-5e",
+      "className": "5e",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-secondary-6e",
+      "className": "6e",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    },
+    {
+      "level": "fr-secondary-terminale",
+      "className": "Terminale",
+      "status": "CONFIGURATION_MISSING",
+      "reason": "Classe activée dans la configuration, sans liste publiée exploitable ; ouverture réelle non établie."
+    }
+  ]
+}
