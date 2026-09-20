@@ -1,0 +1,619 @@
+{
+  "searchedAt": "2026-09-20",
+  "method": "Recherches web ciblées sur minesec.gov.cm et files.minesec.gov.cm ; index officiel puis comparaison des documents déjà collectés. Les résultats voisins, manuels, critères d’examen et copies tierces ne constituent pas une source annuelle applicable.",
+  "initial": 46,
+  "found": 0,
+  "remaining": 46,
+  "rows": [
+    {
+      "level": "fr-secondary-6e",
+      "subject": "Informatique",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/27/Programme_informatique_6ème_et_5ème.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Informatique fr-secondary-6e programme syllabus final corrigendum",
+      "result": "Le document collecté conserve la divergence couverture/corps ; aucun remplacement ou erratum officiel authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-5e",
+      "subject": "Informatique",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/27/Programme_informatique_6ème_et_5ème.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Informatique fr-secondary-5e programme syllabus final corrigendum",
+      "result": "Le document collecté conserve la divergence couverture/corps ; aucun remplacement ou erratum officiel authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-2nde",
+      "subject": "Anglais",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/4s/ANGLAIS_SYLLABUS_2DE_edited.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Anglais fr-secondary-2nde programme syllabus final corrigendum",
+      "result": "La pièce collectée ne prouve pas un texte définitif applicable ; aucun remplacement officiel exploitable authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-2nde",
+      "subject": "Chimie",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/iv/Projet_de_programme_de_chimie_2nde_C-_Final.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Chimie fr-secondary-2nde programme syllabus final corrigendum",
+      "result": "La pièce collectée ne prouve pas un texte définitif applicable ; aucun remplacement officiel exploitable authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-2nde",
+      "subject": "Physique",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/iw/Projet_de_programme_de_Physique_2nde_C_-_Final.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Physique fr-secondary-2nde programme syllabus final corrigendum",
+      "result": "La pièce collectée ne prouve pas un texte définitif applicable ; aucun remplacement officiel exploitable authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form3",
+      "subject": "Chemistry",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/4g/Syllabus_anglophone_chemistry.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Chemistry en-secondary-form3 programme syllabus final corrigendum",
+      "result": "Le document collecté conserve la divergence couverture/corps ; aucun remplacement ou erratum officiel authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form4",
+      "subject": "Chemistry",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/4g/Syllabus_anglophone_chemistry.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Chemistry en-secondary-form4 programme syllabus final corrigendum",
+      "result": "Le document collecté conserve la divergence couverture/corps ; aucun remplacement ou erratum officiel authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form5",
+      "subject": "Chemistry",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/4g/Syllabus_anglophone_chemistry.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Chemistry en-secondary-form5 programme syllabus final corrigendum",
+      "result": "Le document collecté conserve la divergence couverture/corps ; aucun remplacement ou erratum officiel authentifié.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-lower-sixth",
+      "subject": "Computer Science",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/1R/CS_Syllabus_Working_Draft_25-082020.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Computer Science en-secondary-lower-sixth programme syllabus final corrigendum",
+      "result": "Les working drafts Computer Science / ICT d’août 2020 restent des projets ; aucune version finale applicable authentifiée.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-lower-sixth",
+      "subject": "Information and Communication Technology",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/1S/ICT_Syllabus_Working_Draft_25-082020.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Information and Communication Technology en-secondary-lower-sixth programme syllabus final corrigendum",
+      "result": "Les working drafts Computer Science / ICT d’août 2020 restent des projets ; aucune version finale applicable authentifiée.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-upper-sixth",
+      "subject": "Computer Science",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/1R/CS_Syllabus_Working_Draft_25-082020.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Computer Science en-secondary-upper-sixth programme syllabus final corrigendum",
+      "result": "Les working drafts Computer Science / ICT d’août 2020 restent des projets ; aucune version finale applicable authentifiée.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-upper-sixth",
+      "subject": "Information and Communication Technology",
+      "authority": "MINESEC",
+      "whatIsMissing": "Source définitive exploitable absente, contradictoire ou projet : voir le registre des pièces.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/",
+        "https://files.minesec.gov.cm/1S/ICT_Syllabus_Working_Draft_25-082020.pdf"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Information and Communication Technology en-secondary-upper-sixth programme syllabus final corrigendum",
+      "result": "Les working drafts Computer Science / ICT d’août 2020 restent des projets ; aucune version finale applicable authentifiée.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-6e",
+      "subject": "Français",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Français fr-secondary-6e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-6e",
+      "subject": "Anglais",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Anglais fr-secondary-6e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-6e",
+      "subject": "Éducation physique et sportive",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Éducation physique et sportive fr-secondary-6e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-6e",
+      "subject": "Travail manuel",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Travail manuel fr-secondary-6e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-5e",
+      "subject": "Français",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Français fr-secondary-5e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-5e",
+      "subject": "Anglais",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Anglais fr-secondary-5e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-5e",
+      "subject": "Éducation physique et sportive",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Éducation physique et sportive fr-secondary-5e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-5e",
+      "subject": "Travail manuel",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Travail manuel fr-secondary-5e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "PCT",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm PCT fr-secondary-4e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "SVT",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm SVT fr-secondary-4e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "Informatique",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Informatique fr-secondary-4e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-4e",
+      "subject": "Éducation physique et sportive",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Éducation physique et sportive fr-secondary-4e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "PCT",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm PCT fr-secondary-3e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "SVT",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm SVT fr-secondary-3e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "Informatique",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Informatique fr-secondary-3e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "fr-secondary-3e",
+      "subject": "Éducation physique et sportive",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Éducation physique et sportive fr-secondary-3e programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form1",
+      "subject": "Chemistry",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Chemistry en-secondary-form1 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form1",
+      "subject": "English Language",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm English Language en-secondary-form1 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form1",
+      "subject": "French",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm French en-secondary-form1 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form1",
+      "subject": "Geography",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Geography en-secondary-form1 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form1",
+      "subject": "History",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm History en-secondary-form1 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form1",
+      "subject": "Citizenship",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Citizenship en-secondary-form1 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form2",
+      "subject": "Chemistry",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Chemistry en-secondary-form2 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form2",
+      "subject": "English Language",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm English Language en-secondary-form2 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form2",
+      "subject": "French",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm French en-secondary-form2 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form2",
+      "subject": "Geography",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Geography en-secondary-form2 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form2",
+      "subject": "History",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm History en-secondary-form2 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form2",
+      "subject": "Citizenship",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Citizenship en-secondary-form2 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form3",
+      "subject": "English Language",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm English Language en-secondary-form3 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form3",
+      "subject": "Literature in English",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Literature in English en-secondary-form3 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form4",
+      "subject": "English Language",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm English Language en-secondary-form4 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form4",
+      "subject": "Literature in English",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Literature in English en-secondary-form4 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form5",
+      "subject": "English Language",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm English Language en-secondary-form5 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    },
+    {
+      "level": "en-secondary-form5",
+      "subject": "Literature in English",
+      "authority": "MINESEC",
+      "whatIsMissing": "Lacune du bilan documentaire : programme exact authentifié non retrouvé. Ni un manuel, ni une progression tierce ne remplace le syllabus.",
+      "searchedOfficialLocations": [
+        "https://www.minesec.gov.cm/web/index.php/fr/systeme-educatif/progammes-officiels",
+        "https://files.minesec.gov.cm/"
+      ],
+      "searchTargetNotVerbatimQuery": "site:minesec.gov.cm OR site:files.minesec.gov.cm Literature in English en-secondary-form5 programme syllabus final corrigendum",
+      "result": "Aucun programme annuel officiel du niveau et de la discipline authentifié dans les résultats consultés. Les documents de niveau voisin et les listes de manuels ne sont pas substitués.",
+      "status": "PENDING_SOURCE"
+    }
+  ]
+}

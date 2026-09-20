@@ -1,3 +1,4 @@
+import { closureVerifiedUnits, closureVerifiedScopes } from './annualClosurePrimary';
 import { subjectMappingSources } from '../../../../functions/src/pedagogy/subjectMappingSources';
 const source=subjectMappingSources.find(s=>s.documentId==='minedub-fr-primary-2')!;
 const themes=['La maison','Le village, la ville','L’école','Les métiers','Les voyages','La santé','Les jeux','Les communications'];
@@ -26,3 +27,6 @@ const environmentalRows:Array<[number,string,string]>=[
 ];
 export const annualVerifiedUnits:AnnualVerifiedUnit[]=[...eps('fr-primary-ce1'),...eps('fr-primary-ce2'),...environmentalRows.map(([page,title,objective],i)=>({id:`annual-verified-fr-primary-ce1-environment-${i+1}`,catalogLevelId:'fr-primary-ce1',subjectName:'Éducation à l’environnement et au développement durable',title,theme:themes[i],objective,competency:'Mobiliser ses observations pour préserver les milieux de vie.',activity:objective,assessment:'Examiner la pertinence de la démarche, des explications et du vocabulaire, l’adéquation à la consigne, la sécurité et la coopération.',methodology:'Partir d’une situation observée, recueillir les idées, conduire une recherche ou investigation puis confronter les résultats ; alterner travail individuel et collectif.',sourcePages:[page,93,94,105],sourceLocator:`PDF p. ${page}, tableau 28, unité ${i+1}, colonne CE1. Sous-domaine 3.5.6 pp. 105–107 ; section suivante p. 108. Évaluation p. 93, démarche pp. 94 et 105.`,sourceVersion:source.sourceVersion,sourceUrl:source.sourceUrl,documentId:source.documentId,officialLesson:null,calendarPeriod:null}))];
 export const annualVerifiedScopes=[{catalogLevelId:'fr-primary-ce1',subjectName:'Éducation physique et sportive'},{catalogLevelId:'fr-primary-ce2',subjectName:'Éducation physique et sportive'},{catalogLevelId:'fr-primary-ce1',subjectName:'Éducation à l’environnement et au développement durable'}];
+
+annualVerifiedUnits.push(...closureVerifiedUnits);
+annualVerifiedScopes.push(...closureVerifiedScopes);

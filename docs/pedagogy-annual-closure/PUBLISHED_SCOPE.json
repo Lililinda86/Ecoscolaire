@@ -1,0 +1,1004 @@
+{
+  "readAt": "2026-09-20T16:29:20.845Z",
+  "applicableScopes": 13,
+  "readyScopes": 3,
+  "coverage": 23.076923076923077,
+  "wholeSchoolDenominatorEstablished": false,
+  "rows": [
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Anglais",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Nouvelle structuration de 8 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-english-language",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "English language",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce1-subject-1",
+            "annual-closure-ce1-located-1",
+            "annual-closure-ce1-located-3",
+            "annual-closure-ce1-located-5",
+            "annual-closure-ce1-located-7",
+            "annual-closure-ce1-located-9",
+            "annual-closure-ce1-located-11",
+            "annual-closure-ce1-located-13",
+            "annual-closure-ce1-located-15"
+          ],
+          "themes": [
+            "Listening and speaking",
+            "Reading",
+            "Writing",
+            "Grammar and vocabulary",
+            "Home",
+            "Village and town",
+            "School",
+            "Occupations",
+            "Travelling",
+            "Health",
+            "Games",
+            "Communications"
+          ],
+          "units": 9,
+          "lessonsActivities": 8,
+          "objectives": 9,
+          "competencies": 9,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 8 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 51 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 54, 57, 59, 61, colonne CE1, section Home. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 54, 57, 59, 61, colonne CE1, section Village and town. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 55, 57, 59, 62, colonne CE1, section School. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 55, 57, 59, 62, colonne CE1, section Occupations. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 55, 58, 60, 62, colonne CE1, section Travelling. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 56, 58, 60, 63, colonne CE1, section Health. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 56, 58, 60, 63, colonne CE1, section Games. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 56, 58, 60, 63, colonne CE1, section Communications. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Arts et culture",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-education-artistique",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Éducation artistique",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce1-subject-7",
+            "annual-closure-ce1-located-31",
+            "annual-closure-ce1-located-32",
+            "annual-closure-ce1-located-33",
+            "annual-closure-ce1-located-34"
+          ],
+          "themes": [
+            "Arts visuels",
+            "Musique",
+            "Arts dramatiques",
+            "Danse"
+          ],
+          "units": 5,
+          "lessonsActivities": 4,
+          "objectives": 5,
+          "competencies": 5,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 4 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 140 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 142, 143, colonne CE1, section Arts visuels. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 144, 145, colonne CE1, section Musique. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 146, colonne CE1, section Arts dramatiques. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 147, colonne CE1, section Danse. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Éducation à la citoyenneté et morale",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-sciences-humaines-et-sociales",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Sciences humaines et sociales",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce1-subject-6",
+            "annual-closure-ce1-located-38",
+            "annual-closure-ce1-located-39",
+            "annual-closure-ce1-located-40",
+            "annual-closure-ce1-located-41",
+            "annual-closure-ce1-located-42",
+            "annual-closure-ce1-located-43",
+            "annual-closure-ce1-located-44",
+            "annual-closure-ce1-located-45"
+          ],
+          "themes": [
+            "Vie collective",
+            "Droits et devoirs",
+            "Citoyenneté",
+            "Paix et sécurité",
+            "Histoire",
+            "Géographie",
+            "Géographie physique",
+            "Géographie économique",
+            "Géographie humaine : réserve explicite",
+            "Morale",
+            "Règles collectives"
+          ],
+          "units": 9,
+          "lessonsActivities": 8,
+          "objectives": 9,
+          "competencies": 9,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 8 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 117 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 136, 137, 138, colonne CE1, section Géographie physique. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 138, 139, colonne CE1, section Géographie économique. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 139, 140, colonne CE1, section Géographie humaine : réserve explicite. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 120, 121, 122, 123, colonne CE1, section Morale. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 124, 125, colonne CE1, section Droits et devoirs. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 126, 127, colonne CE1, section Paix et sécurité. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 128, 129, colonne CE1, section Citoyenneté. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 130, 131, 132, colonne CE1, section Règles collectives. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": false
+        },
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-developpement-personnel",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Développement personnel",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce1-subject-9",
+            "annual-closure-ce1-located-46"
+          ],
+          "themes": [
+            "Artisanat",
+            "Activités agropastorales",
+            "Vie domestique",
+            "Hygiène et vie domestique : composante"
+          ],
+          "units": 2,
+          "lessonsActivities": 1,
+          "objectives": 2,
+          "competencies": 2,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 1 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 157 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 164, 165, 166, colonne CE1, section Hygiène et vie domestique : composante. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": false
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Éducation à l’environnement et au développement durable",
+      "status": "COMPLETE",
+      "ready": true,
+      "missingReason": "",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-education-a-l-environnement-et-au-developpement-durable",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Éducation à l’environnement et au développement durable",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-verified-fr-primary-ce1-environment-1",
+            "annual-verified-fr-primary-ce1-environment-2",
+            "annual-verified-fr-primary-ce1-environment-3",
+            "annual-verified-fr-primary-ce1-environment-4",
+            "annual-verified-fr-primary-ce1-environment-5"
+          ],
+          "themes": [
+            "La maison",
+            "Le village, la ville",
+            "L’école",
+            "Les métiers",
+            "Les voyages"
+          ],
+          "units": 5,
+          "lessonsActivities": 5,
+          "objectives": 5,
+          "competencies": 5,
+          "coverageStatus": "COMPLETE",
+          "missingReason": "Tableaux de cette discipline ou sous-discipline structurés intégralement pour la colonne de classe, avec objectifs, compétences, activités et critères d’évaluation. Calendrier et séances détaillées à préparer localement ; aucune équivalence déduite avec un domaine plus large.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Examiner la pertinence de la démarche, des explications et du vocabulaire, l’adéquation à la consigne, la sécurité et la coopération."
+          ],
+          "locators": [
+            "PDF p. 106, tableau 28, unité 1, colonne CE1. Sous-domaine 3.5.6 pp. 105–107 ; section suivante p. 108. Évaluation p. 93, démarche pp. 94 et 105.",
+            "PDF p. 106, tableau 28, unité 2, colonne CE1. Sous-domaine 3.5.6 pp. 105–107 ; section suivante p. 108. Évaluation p. 93, démarche pp. 94 et 105.",
+            "PDF p. 107, tableau 28, unité 3, colonne CE1. Sous-domaine 3.5.6 pp. 105–107 ; section suivante p. 108. Évaluation p. 93, démarche pp. 94 et 105.",
+            "PDF p. 107, tableau 28, unité 4, colonne CE1. Sous-domaine 3.5.6 pp. 105–107 ; section suivante p. 108. Évaluation p. 93, démarche pp. 94 et 105.",
+            "PDF p. 107, tableau 28, unité 5, colonne CE1. Sous-domaine 3.5.6 pp. 105–107 ; section suivante p. 108. Évaluation p. 93, démarche pp. 94 et 105."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "PUBLISHED_LOCAL_SUBJECT_OFFICIAL_SUBDOMAIN",
+          "partialCause": null,
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Éducation physique et sportive",
+      "status": "COMPLETE",
+      "ready": true,
+      "missingReason": "",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-education-physique-et-sportive",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Éducation physique et sportive",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-verified-fr-primary-ce1-eps-1",
+            "annual-verified-fr-primary-ce1-eps-2",
+            "annual-verified-fr-primary-ce1-eps-3",
+            "annual-verified-fr-primary-ce1-eps-4",
+            "annual-verified-fr-primary-ce1-eps-5",
+            "annual-verified-fr-primary-ce1-eps-6",
+            "annual-verified-fr-primary-ce1-eps-7",
+            "annual-verified-fr-primary-ce1-eps-8",
+            "annual-verified-fr-primary-ce1-eps-9",
+            "annual-verified-fr-primary-ce1-eps-10",
+            "annual-verified-fr-primary-ce1-eps-11"
+          ],
+          "themes": [
+            "La maison",
+            "Le village, la ville",
+            "L’école",
+            "Les métiers",
+            "Les voyages",
+            "La santé",
+            "Les jeux",
+            "Les communications"
+          ],
+          "units": 11,
+          "lessonsActivities": 11,
+          "objectives": 11,
+          "competencies": 11,
+          "coverageStatus": "COMPLETE",
+          "missingReason": "Tableaux de cette discipline ou sous-discipline structurés intégralement pour la colonne de classe, avec objectifs, compétences, activités et critères d’évaluation. Calendrier et séances détaillées à préparer localement ; aucune équivalence déduite avec un domaine plus large.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Observer le respect des consignes et des autres, la pertinence des actions, les gestes de communication et le vocabulaire utilisé ; valoriser la coopération."
+          ],
+          "locators": [
+            "PDF p. 152, tableau 51, unité 1, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 153, tableau 51, unité 2, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 153, tableau 51, unité 3, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 154, tableau 52, unité 4, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 154, tableau 52, unité 5, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 155, tableau 52, unité 6, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 155, tableau 52, unité 7, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 155, tableau 52, unité 8, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 156, tableau 53, unité 1, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 156, tableau 53, unité 2, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157.",
+            "PDF p. 156, tableau 53, unité 3, colonne CE1 ; démarche et évaluation p. 151. Section complète pp. 149–156, section suivante p. 157."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": null,
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Français",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-francais-et-litterature",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Français et littérature",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce1-subject-0",
+            "annual-closure-ce1-located-17",
+            "annual-closure-ce1-located-19",
+            "annual-closure-ce1-located-21",
+            "annual-closure-ce1-located-23",
+            "annual-closure-ce1-located-25",
+            "annual-closure-ce1-located-27",
+            "annual-closure-ce1-located-29"
+          ],
+          "themes": [
+            "Expression orale",
+            "Lecture et littérature",
+            "Écriture",
+            "Étude de la langue",
+            "Écriture et production",
+            "Grammaire",
+            "Vocabulaire",
+            "Orthographe",
+            "Conjugaison"
+          ],
+          "units": 8,
+          "lessonsActivities": 7,
+          "objectives": 8,
+          "competencies": 8,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 7 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 22 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 24, 25, 26, 27, 28, 29, colonne CE1, section Expression orale. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 30, 31, 32, colonne CE1, section Écriture et production. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 33, 34, 35, colonne CE1, section Lecture et littérature. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 36, 37, 38, 39, 40, colonne CE1, section Grammaire. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 41, 42, 43, 44, colonne CE1, section Vocabulaire. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 45, 46, 47, colonne CE1, section Orthographe. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 48, 49, 50, colonne CE1, section Conjugaison. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Géographie",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-sciences-humaines-et-sociales",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Sciences humaines et sociales",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce1-subject-6",
+            "annual-closure-ce1-located-38",
+            "annual-closure-ce1-located-39",
+            "annual-closure-ce1-located-40",
+            "annual-closure-ce1-located-41",
+            "annual-closure-ce1-located-42",
+            "annual-closure-ce1-located-43",
+            "annual-closure-ce1-located-44",
+            "annual-closure-ce1-located-45"
+          ],
+          "themes": [
+            "Vie collective",
+            "Droits et devoirs",
+            "Citoyenneté",
+            "Paix et sécurité",
+            "Histoire",
+            "Géographie",
+            "Géographie physique",
+            "Géographie économique",
+            "Géographie humaine : réserve explicite",
+            "Morale",
+            "Règles collectives"
+          ],
+          "units": 9,
+          "lessonsActivities": 8,
+          "objectives": 9,
+          "competencies": 9,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 8 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 117 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 136, 137, 138, colonne CE1, section Géographie physique. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 138, 139, colonne CE1, section Géographie économique. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 139, 140, colonne CE1, section Géographie humaine : réserve explicite. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 120, 121, 122, 123, colonne CE1, section Morale. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 124, 125, colonne CE1, section Droits et devoirs. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 126, 127, colonne CE1, section Paix et sécurité. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 128, 129, colonne CE1, section Citoyenneté. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 130, 131, 132, colonne CE1, section Règles collectives. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": false
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce1",
+      "subject": "Éducation à la santé, à l’hygiène et à la sécurité",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce1-developpement-personnel",
+          "catalogLevelId": "fr-primary-ce1",
+          "subjectName": "Développement personnel",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce1-subject-9",
+            "annual-closure-ce1-located-46"
+          ],
+          "themes": [
+            "Artisanat",
+            "Activités agropastorales",
+            "Vie domestique",
+            "Hygiène et vie domestique : composante"
+          ],
+          "units": 2,
+          "lessonsActivities": 1,
+          "objectives": 2,
+          "competencies": 2,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 1 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 157 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 164, 165, 166, colonne CE1, section Hygiène et vie domestique : composante. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": false
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce2",
+      "subject": "Anglais",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Nouvelle structuration de 8 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce2-english-language",
+          "catalogLevelId": "fr-primary-ce2",
+          "subjectName": "English language",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce2-subject-1",
+            "annual-closure-ce2-located-2",
+            "annual-closure-ce2-located-4",
+            "annual-closure-ce2-located-6",
+            "annual-closure-ce2-located-8",
+            "annual-closure-ce2-located-10",
+            "annual-closure-ce2-located-12",
+            "annual-closure-ce2-located-14",
+            "annual-closure-ce2-located-16"
+          ],
+          "themes": [
+            "Listening and speaking",
+            "Reading",
+            "Writing",
+            "Grammar and vocabulary",
+            "Home",
+            "Village and town",
+            "School",
+            "Occupations",
+            "Travelling",
+            "Health",
+            "Games",
+            "Communications"
+          ],
+          "units": 9,
+          "lessonsActivities": 8,
+          "objectives": 9,
+          "competencies": 9,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 8 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 51 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 54, 57, 59, 61, colonne CE2, section Home. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 54, 57, 59, 61, colonne CE2, section Village and town. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 55, 57, 59, 62, colonne CE2, section School. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 55, 57, 59, 62, colonne CE2, section Occupations. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 55, 58, 60, 62, colonne CE2, section Travelling. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 56, 58, 60, 63, colonne CE2, section Health. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 56, 58, 60, 63, colonne CE2, section Games. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 56, 58, 60, 63, colonne CE2, section Communications. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce2",
+      "subject": "Français",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce2-francais-et-litterature",
+          "catalogLevelId": "fr-primary-ce2",
+          "subjectName": "Français et littérature",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce2-subject-0",
+            "annual-closure-ce2-located-18",
+            "annual-closure-ce2-located-20",
+            "annual-closure-ce2-located-22",
+            "annual-closure-ce2-located-24",
+            "annual-closure-ce2-located-26",
+            "annual-closure-ce2-located-28",
+            "annual-closure-ce2-located-30"
+          ],
+          "themes": [
+            "Expression orale",
+            "Lecture et littérature",
+            "Écriture",
+            "Étude de la langue",
+            "Écriture et production",
+            "Grammaire",
+            "Vocabulaire",
+            "Orthographe",
+            "Conjugaison"
+          ],
+          "units": 8,
+          "lessonsActivities": 7,
+          "objectives": 8,
+          "competencies": 8,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 7 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 22 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 24, 25, 26, 27, 28, 29, colonne CE2, section Expression orale. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 30, 31, 32, colonne CE2, section Écriture et production. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 33, 34, 35, colonne CE2, section Lecture et littérature. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 36, 37, 38, 39, 40, colonne CE2, section Grammaire. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 41, 42, 43, 44, colonne CE2, section Vocabulaire. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 45, 46, 47, colonne CE2, section Orthographe. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 48, 49, 50, colonne CE2, section Conjugaison. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-ce2",
+      "subject": "Histoire",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-ce2-sciences-humaines-et-sociales",
+          "catalogLevelId": "fr-primary-ce2",
+          "subjectName": "Sciences humaines et sociales",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-2",
+              "url": "https://www.minedub.cm/download/350/archives/5868/02-programme-niveau-02-2019.pdf",
+              "version": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+            }
+          ],
+          "structuredContent": [
+            "annual-gap-v1-fr-primary-ce2-subject-6",
+            "annual-closure-ce2-located-35",
+            "annual-closure-ce2-located-36",
+            "annual-closure-ce2-located-37"
+          ],
+          "themes": [
+            "Vie collective",
+            "Droits et devoirs",
+            "Citoyenneté",
+            "Paix et sécurité",
+            "Histoire",
+            "Géographie",
+            "Histoire : temps, famille et localité",
+            "Histoire : origines et migrations",
+            "Histoire : contacts et colonisation"
+          ],
+          "units": 4,
+          "lessonsActivities": 3,
+          "objectives": 4,
+          "competencies": 4,
+          "coverageStatus": "PARTIAL_BLOCKING",
+          "missingReason": "Nouvelle structuration de 3 sections de la colonne de classe ; réserves documentaires et périmètre local maintenus. Le document comporte une réserve non résolue ; la nouvelle structuration ne vaut pas résolution. Les sous-domaines approuvés dans la baseline sont conservés séparément.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche.",
+            "Évaluer la pertinence de la réponse, le vocabulaire, la cohérence avec la consigne et la capacité à expliquer sa démarche ; critères à adapter au sous-domaine et à la tâche."
+          ],
+          "locators": [
+            "PDF 117 — introduction/attentes disciplinaires du niveau 2; objectifs communs au niveau, pas une attribution des cellules de l’autre classe",
+            "PDF pp. 132, 133, colonne CE2, section Histoire : temps, famille et localité. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 134, colonne CE2, section Histoire : origines et migrations. Réserve documentaire maintenue ; rapprochement local à confirmer.",
+            "PDF pp. 134, 135, colonne CE2, section Histoire : contacts et colonisation. Réserve documentaire maintenue ; rapprochement local à confirmer."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": "CONTRADICTION",
+          "structuredAnnual": false
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-cp",
+      "subject": "Anglais",
+      "status": "COMPLETE",
+      "ready": true,
+      "missingReason": "",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-cp-english-language",
+          "catalogLevelId": "fr-primary-cp",
+          "subjectName": "English language",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-1",
+              "url": "https://www.minedub.cm/download/350/archives/5872/01-programme-niveau-01-2019.pdf",
+              "version": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+            }
+          ],
+          "structuredContent": [
+            "annual-closure-fr-primary-cp-english-1",
+            "annual-closure-fr-primary-cp-english-2",
+            "annual-closure-fr-primary-cp-english-3",
+            "annual-closure-fr-primary-cp-english-4",
+            "annual-closure-fr-primary-cp-english-5",
+            "annual-closure-fr-primary-cp-english-6",
+            "annual-closure-fr-primary-cp-english-7",
+            "annual-closure-fr-primary-cp-english-8",
+            "annual-closure-fr-primary-cp-english-9",
+            "annual-closure-fr-primary-cp-english-10",
+            "annual-closure-fr-primary-cp-english-11",
+            "annual-closure-fr-primary-cp-english-12",
+            "annual-closure-fr-primary-cp-english-13",
+            "annual-closure-fr-primary-cp-english-14",
+            "annual-closure-fr-primary-cp-english-15",
+            "annual-closure-fr-primary-cp-english-16",
+            "annual-closure-fr-primary-cp-english-17",
+            "annual-closure-fr-primary-cp-english-18",
+            "annual-closure-fr-primary-cp-english-19",
+            "annual-closure-fr-primary-cp-english-20",
+            "annual-closure-fr-primary-cp-english-21",
+            "annual-closure-fr-primary-cp-english-22",
+            "annual-closure-fr-primary-cp-english-23",
+            "annual-closure-fr-primary-cp-english-24",
+            "annual-closure-fr-primary-cp-english-25",
+            "annual-closure-fr-primary-cp-english-26",
+            "annual-closure-fr-primary-cp-english-27",
+            "annual-closure-fr-primary-cp-english-28",
+            "annual-closure-fr-primary-cp-english-29",
+            "annual-closure-fr-primary-cp-english-30",
+            "annual-closure-fr-primary-cp-english-31",
+            "annual-closure-fr-primary-cp-english-32"
+          ],
+          "themes": [
+            "La maison",
+            "Le village, la ville",
+            "L’école",
+            "Les métiers",
+            "Les voyages",
+            "La santé",
+            "Les jeux",
+            "Les communications"
+          ],
+          "units": 32,
+          "lessonsActivities": 32,
+          "objectives": 32,
+          "competencies": 32,
+          "coverageStatus": "COMPLETE",
+          "missingReason": "Tableaux de cette discipline ou sous-discipline structurés intégralement pour la colonne de classe, avec objectifs, compétences, activités et critères d’évaluation. Calendrier et séances détaillées à préparer localement ; aucune équivalence déduite avec un domaine plus large.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Vérifier séparément écoute et expression, lecture et écriture : sens de la réponse, intelligibilité, fluidité, lisibilité et usage des formes étudiées."
+          ],
+          "locators": [
+            "PDF p. 44, tableau 9, unité 1, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 44, tableau 9, unité 2, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 45, tableau 9, unité 3, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 45, tableau 9, unité 4, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 46, tableau 9, unité 5, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 46, tableau 9, unité 6, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 46, tableau 9, unité 7, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 46, tableau 9, unité 8, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 47, tableau 10, unité 1, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 47, tableau 10, unité 2, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 48, tableau 10, unité 3, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 48, tableau 10, unité 4, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 48, tableau 10, unité 5, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 49, tableau 10, unité 6, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 49, tableau 10, unité 7, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 49, tableau 10, unité 8, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 50, tableau 11, unité 1, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 50, tableau 11, unité 2, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 50, tableau 11, unité 3, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 50, tableau 11, unité 4, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 51, tableau 11, unité 5, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 51, tableau 11, unité 6, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 51, tableau 11, unité 7, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 51, tableau 11, unité 8, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 52, tableau 12, unité 1, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 52, tableau 12, unité 2, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 52, tableau 12, unité 3, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 53, tableau 12, unité 4, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 53, tableau 12, unité 5, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 53, tableau 12, unité 6, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 54, tableau 12, unité 7, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55.",
+            "PDF p. 54, tableau 12, unité 8, colonne CP. Section complète pp. 41–54 ; évaluation et démarche pp. 42–43 ; section suivante p. 55."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": null,
+          "structuredAnnual": true
+        }
+      ]
+    },
+    {
+      "level": "fr-primary-cp",
+      "subject": "Arts et culture",
+      "status": "PARTIAL_BLOCKING",
+      "ready": false,
+      "missingReason": "Composante ou rapprochement documentaire : le périmètre local ne constitue pas une équivalence annuelle.",
+      "documentaryScopes": [
+        {
+          "id": "annual-scope-v1-fr-primary-cp-education-artistique",
+          "catalogLevelId": "fr-primary-cp",
+          "subjectName": "Éducation artistique",
+          "period": "YEAR",
+          "officialSource": [
+            {
+              "id": "minedub-fr-primary-1",
+              "url": "https://www.minedub.cm/download/350/archives/5872/01-programme-niveau-01-2019.pdf",
+              "version": "38f57980080bbfddb5fd5d4ca83b553ced3ed36ef9447eb333b9deea76b9fe81"
+            }
+          ],
+          "structuredContent": [
+            "annual-closure-fr-primary-cp-arts-1",
+            "annual-closure-fr-primary-cp-arts-2",
+            "annual-closure-fr-primary-cp-arts-3",
+            "annual-closure-fr-primary-cp-arts-4",
+            "annual-closure-fr-primary-cp-arts-5",
+            "annual-closure-fr-primary-cp-arts-6",
+            "annual-closure-fr-primary-cp-arts-7",
+            "annual-closure-fr-primary-cp-arts-8",
+            "annual-closure-fr-primary-cp-arts-9",
+            "annual-closure-fr-primary-cp-arts-10"
+          ],
+          "themes": [
+            "La maison",
+            "Le village, la ville",
+            "L’école",
+            "Les jeux",
+            "Les métiers"
+          ],
+          "units": 10,
+          "lessonsActivities": 10,
+          "objectives": 10,
+          "competencies": 10,
+          "coverageStatus": "COMPLETE",
+          "missingReason": "Tableaux de cette discipline ou sous-discipline structurés intégralement pour la colonne de classe, avec objectifs, compétences, activités et critères d’évaluation. Calendrier et séances détaillées à préparer localement ; aucune équivalence déduite avec un domaine plus large.",
+          "applicability": "DOCUMENTARY_ONLY_LOCAL_TEACHING_NOT_ESTABLISHED",
+          "documentaryUsable": true,
+          "assessmentGuidance": [
+            "Observer le respect de la consigne, le choix des outils, la créativité, la qualité de la réalisation et la coopération."
+          ],
+          "locators": [
+            "PDF p. 114, tableau 35, unité 1, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 114, tableau 35, unité 2, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 114, tableau 35, unité 3, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 114, tableau 35, unité 7, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 115, tableau 36, unité 2, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 116, tableau 36, unité 3, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 116, tableau 36, unité 4, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 117, tableau 37, unité 3, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 117, tableau 37, unité 7, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118.",
+            "PDF p. 117, tableau 38, unité 7, colonne CP. Section complète pp. 112–117 ; évaluation p. 113 ; section suivante p. 118."
+          ],
+          "moduleIndexCount": 0,
+          "expectedBasis": "MINEDUB_DISCIPLINE_INDEX",
+          "partialCause": null,
+          "structuredAnnual": true
+        }
+      ]
+    }
+  ]
+}
