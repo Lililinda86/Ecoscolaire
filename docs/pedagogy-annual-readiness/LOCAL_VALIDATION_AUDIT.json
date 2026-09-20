@@ -1,0 +1,705 @@
+{
+  "schemaVersion": 1,
+  "decision": "ITALO_PEDAGOGICAL_CHOICE",
+  "version": "local-annual-2026-09-20-v1",
+  "authorizedBy": "Mission utilisateur : clôture du corpus annuel, délégation des choix pédagogiques raisonnables et réversibles",
+  "reviewedAt": "2026-09-20",
+  "scope": "Annual local content only; no class adoption, no subject creation, no hours, no coefficients",
+  "baselinePreserved": {
+    "programs": 8,
+    "anchorActivities": 40,
+    "validationGroups": 59,
+    "validationRecords": 448
+  },
+  "criteria": {
+    "domains": "Five existing MINEDUB-referenced domains in each local stage; no official equivalence.",
+    "annualBreadth": "Six distinct extensions per domain in addition to the original anchor: language, exploration and early mathematics, daily life, arts, movement.",
+    "adaptation": "Four supported developmental stages; no fixed performance or age threshold.",
+    "assessment": "Contextual observation and support recorded, revisiting and remediation; no diagnostic score.",
+    "scheduling": "Flexible repeated workshops; no ministerial weekly calendar inferred."
+  },
+  "reversible": true,
+  "writeEffect": "Repository content only; baseline validation receipts untouched",
+  "programs": [
+    {
+      "id": "annual-scope-v1-fr-preschool-pre-langues-et-communication",
+      "level": "fr-preschool-pre",
+      "domain": "Langues et communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-pre-eveil-scientifique-et-technologique",
+      "level": "fr-preschool-pre",
+      "domain": "Éveil scientifique et technologique",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-pre-vie-courante",
+      "level": "fr-preschool-pre",
+      "domain": "Vie courante",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-pre-creation-artistique-et-activites-manuelles",
+      "level": "fr-preschool-pre",
+      "domain": "Création artistique et activités manuelles",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-pre-motricite-generale",
+      "level": "fr-preschool-pre",
+      "domain": "Motricité générale",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ps-langues-et-communication",
+      "level": "fr-preschool-ps",
+      "domain": "Langues et communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ps-eveil-scientifique-et-technologique",
+      "level": "fr-preschool-ps",
+      "domain": "Éveil scientifique et technologique",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ps-vie-courante",
+      "level": "fr-preschool-ps",
+      "domain": "Vie courante",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ps-creation-artistique-et-activites-manuelles",
+      "level": "fr-preschool-ps",
+      "domain": "Création artistique et activités manuelles",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ps-motricite-generale",
+      "level": "fr-preschool-ps",
+      "domain": "Motricité générale",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ms-langues-et-communication",
+      "level": "fr-preschool-ms",
+      "domain": "Langues et communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ms-eveil-scientifique-et-technologique",
+      "level": "fr-preschool-ms",
+      "domain": "Éveil scientifique et technologique",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ms-vie-courante",
+      "level": "fr-preschool-ms",
+      "domain": "Vie courante",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ms-creation-artistique-et-activites-manuelles",
+      "level": "fr-preschool-ms",
+      "domain": "Création artistique et activités manuelles",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-ms-motricite-generale",
+      "level": "fr-preschool-ms",
+      "domain": "Motricité générale",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-gs-langues-et-communication",
+      "level": "fr-preschool-gs",
+      "domain": "Langues et communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-gs-eveil-scientifique-et-technologique",
+      "level": "fr-preschool-gs",
+      "domain": "Éveil scientifique et technologique",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-gs-vie-courante",
+      "level": "fr-preschool-gs",
+      "domain": "Vie courante",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-gs-creation-artistique-et-activites-manuelles",
+      "level": "fr-preschool-gs",
+      "domain": "Création artistique et activités manuelles",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-fr-preschool-gs-motricite-generale",
+      "level": "fr-preschool-gs",
+      "domain": "Motricité générale",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-pre-literacy-and-communication",
+      "level": "en-nursery-pre",
+      "domain": "Literacy and Communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-pre-science-and-technological-skills-development",
+      "level": "en-nursery-pre",
+      "domain": "Science and Technological Skills Development",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-pre-practical-life-skills",
+      "level": "en-nursery-pre",
+      "domain": "Practical Life Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-pre-arts-and-crafts",
+      "level": "en-nursery-pre",
+      "domain": "Arts and Crafts",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-pre-motor-skills",
+      "level": "en-nursery-pre",
+      "domain": "Motor Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-1-literacy-and-communication",
+      "level": "en-nursery-1",
+      "domain": "Literacy and Communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-1-science-and-technological-skills-development",
+      "level": "en-nursery-1",
+      "domain": "Science and Technological Skills Development",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-1-practical-life-skills",
+      "level": "en-nursery-1",
+      "domain": "Practical Life Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-1-arts-and-crafts",
+      "level": "en-nursery-1",
+      "domain": "Arts and Crafts",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-1-motor-skills",
+      "level": "en-nursery-1",
+      "domain": "Motor Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-2-literacy-and-communication",
+      "level": "en-nursery-2",
+      "domain": "Literacy and Communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-2-science-and-technological-skills-development",
+      "level": "en-nursery-2",
+      "domain": "Science and Technological Skills Development",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-2-practical-life-skills",
+      "level": "en-nursery-2",
+      "domain": "Practical Life Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-2-arts-and-crafts",
+      "level": "en-nursery-2",
+      "domain": "Arts and Crafts",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-2-motor-skills",
+      "level": "en-nursery-2",
+      "domain": "Motor Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-3-literacy-and-communication",
+      "level": "en-nursery-3",
+      "domain": "Literacy and Communication",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-3-science-and-technological-skills-development",
+      "level": "en-nursery-3",
+      "domain": "Science and Technological Skills Development",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-3-practical-life-skills",
+      "level": "en-nursery-3",
+      "domain": "Practical Life Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-3-arts-and-crafts",
+      "level": "en-nursery-3",
+      "domain": "Arts and Crafts",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    },
+    {
+      "id": "annual-scope-v1-en-nursery-3-motor-skills",
+      "level": "en-nursery-3",
+      "domain": "Motor Skills",
+      "status": "ITALO_VALIDATED",
+      "validation": {
+        "kind": "ITALO_PEDAGOGICAL_CHOICE",
+        "version": "local-annual-2026-09-20-v1",
+        "schoolId": "school-italo-official",
+        "academicYearId": "ay_school-italo-official_2026-2027_er0p",
+        "authority": "Mission explicite de validation pédagogique déléguée",
+        "reversible": true,
+        "scope": "LOCAL_ANNUAL_CONTENT_NOT_CLASS_ADOPTION"
+      },
+      "units": 7,
+      "missingReason": "Programme local annuel : activité initiale et six ateliers complémentaires, reprises guidées par observation. Validation déléguée du contenu uniquement ; adoption de classe et calendrier non présumés. Aucun score de complétude MINEDUB."
+    }
+  ]
+}

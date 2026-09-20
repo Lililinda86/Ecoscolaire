@@ -70,7 +70,7 @@ test('secretary: all pedagogy routes, responsive empty states and documentary de
     await page.goto('/#/pedagogy/program');
     const annual = page.getByRole('region', { name: 'Couverture annuelle documentaire', exact: true });
     await expect(annual).toBeVisible();
-    await expect(annual.getByText(/289 couples documentaires/)).toBeVisible();
+    await expect(annual.getByText(/290 couples documentaires/)).toBeVisible();
     await annual.getByRole('combobox', { name: 'Niveau de couverture annuelle', exact: true }).selectOption('en-secondary-lower-sixth');
     await annual.getByText('Consulter la matrice et les contenus localisés', { exact: true }).click();
     await expect(annual.getByRole('heading', { name: 'Secondary · lower-sixth · English Language', exact: true })).toBeVisible();

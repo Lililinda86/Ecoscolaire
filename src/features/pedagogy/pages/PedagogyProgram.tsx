@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { PedagogyHeader, PedagogyNav } from '../components/PedagogyNav';
+import { actualAnnualReadiness } from '../services/annualReadiness';
 import { AnnualCoveragePanel } from '../components/AnnualCoveragePanel';
 import { DelegatedValidationPanel } from '../components/DelegatedValidationPanel';
 import { EarlyYearsProgramPanel } from '../components/EarlyYearsProgramPanel';
@@ -55,7 +56,7 @@ function ProgramScope({ yearId }: { yearId?: string }) {
     <PedagogyNav />
     <EarlyYearsProgramPanel weeks={workspace.weeks} adoptions={workspace.adoptions} yearId={year?.id} />
     <DelegatedValidationPanel schoolId={currentSchool?.id} yearId={yearId} />
-    <AnnualCoveragePanel key={JSON.stringify([currentSchool?.id, yearId])} levelIds={levels} />
+    <AnnualCoveragePanel key={JSON.stringify([currentSchool?.id, yearId])} levelIds={levels} actual={currentSchool?.id && yearId ? actualAnnualReadiness(currentSchool.id,yearId,db?.classes||[],db?.classPrograms||[],db?.classSubjects||[],db?.subjects||[]) : undefined} />
     <CurriculumProposalReview yearId={yearId} />
     <ClassReferenceBrowser key={currentSchool?.id} />
     <CurriculumCoverage yearId={yearId} programs={workspace.programs} adoptions={workspace.adoptions} unavailable={workspace.loading || Boolean(workspace.error)} />

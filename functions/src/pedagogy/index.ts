@@ -1,3 +1,5 @@
+import { annualPlanningBlockers, annualPlanningUnitMatches, AnnualPlanningScope } from './annualReadiness';
+import { annualReadinessRegistry } from './annualReadinessRegistry';
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -132,7 +134,7 @@ export const generateTeachingPlanProposal = functions.https.onCall(async (data, 
   const adoption = schoolData(await db().collection('schoolCurriculumAdoptions').doc(adoptionId(schoolId, plan.academicYearId, catalogLevelId)).get(), schoolId, 'Adoption du programme');
   if (adoption.status !== 'active') throw new functions.https.HttpsError('failed-precondition', 'Adoption inactive.');
   const programs = await db().collection('classPrograms').where('schoolId', '==', schoolId).where('academicYearId', '==', plan.academicYearId).where('classId', '==', plan.classId).limit(1).get();
-  if (programs.empty || programs.docs[0].data().status !== 'published') throw new functions.https.HttpsError('failed-precondition', 'Programme de classe non publié.');
+  if (programs.empty || programs.docs[0].data().status !== 'published' || !programs.docs[0].data().publishedRevisionId) throw new functions.https.HttpsError('failed-precondition', 'Programme de classe non publié.');
   const publishedRevisionId = programs.docs[0].data().publishedRevisionId;
   const [subjectsSnap, assignmentsSnap, unitsSnap] = await Promise.all([
     db().collection('classSubjects').where('revisionId', '==', publishedRevisionId).get(),
@@ -144,9 +146,14 @@ export const generateTeachingPlanProposal = functions.https.onCall(async (data, 
     const subject = doc.data();
     const assignment = assignmentBySubject.get(subject.subjectId);
     if (!assignment?.teacherStaffId) throw new functions.https.HttpsError('failed-precondition', `Enseignant manquant pour ${subject.subjectNameSnapshot}.`);
-    return { subjectId: subject.subjectId, subjectName: subject.subjectNameSnapshot, teacherStaffId: assignment.teacherStaffId, weeklyHours: subject.weeklyHours || 1 };
+    if (typeof subject.weeklyHours !== 'number' || !Number.isFinite(subject.weeklyHours) || subject.weeklyHours <= 0) throw new functions.https.HttpsError('failed-precondition', 'Horaire local confirmé requis pour générer une proposition.');
+    return { subjectId: subject.subjectId, subjectName: subject.subjectNameSnapshot, teacherStaffId: assignment.teacherStaffId, weeklyHours: subject.weeklyHours };
   });
-  const units: GeneratorUnit[] = unitsSnap.docs.map(doc => ({ id: doc.id, subjectId: doc.data().subjectId, title: doc.data().title, objective: doc.data().objective, sequence: doc.data().sequence || 0 }));
+  const annualBlockers = annualPlanningBlockers(catalogLevelId, subjects.map(s => s.subjectName), annualReadinessRegistry as AnnualPlanningScope[], schoolId, plan.academicYearId);
+  if (!subjects.length || annualBlockers.length) throw new functions.https.HttpsError('failed-precondition', 'PLANIFICATION PARTIELLE / VALIDATION REQUISE : couverture annuelle insuffisante ou non établie pour les matières publiées.');
+  const compatibleUnits = unitsSnap.docs.filter(doc => subjects.some(subject => subject.subjectId === doc.data().subjectId && annualPlanningUnitMatches(catalogLevelId, subject.subjectName, adoption.curriculumProgramId, {id: doc.id, title: doc.data().title, objective: doc.data().objective, sourceVersion: doc.data().sourceVersion}, annualReadinessRegistry as AnnualPlanningScope[])));
+  if (subjects.some(subject => !compatibleUnits.some(doc => doc.data().subjectId === subject.subjectId))) throw new functions.https.HttpsError('failed-precondition', 'PLANIFICATION PARTIELLE / VALIDATION REQUISE : unités annuelles validées absentes du programme adopté.');
+  const units: GeneratorUnit[] = compatibleUnits.map(doc => ({ id: doc.id, subjectId: doc.data().subjectId, title: doc.data().title, objective: doc.data().objective, sequence: doc.data().sequence || 0 }));
   const items = deterministicPlanningGenerator.generate({ planId, weekNumber: plan.weekNumber, subjects, units });
   if (!items.length) throw new functions.https.HttpsError('failed-precondition', 'Aucune unité de programme compatible.');
   await db().runTransaction(async transaction => {

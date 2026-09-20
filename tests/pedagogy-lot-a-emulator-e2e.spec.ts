@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+const { annualReadinessRegistry } = createRequire(import.meta.url)("../functions/lib/pedagogy/annualReadinessRegistry.js") as typeof import("../functions/src/pedagogy/annualReadinessRegistry");
 import { expect, test, type Page } from "@playwright/test";
 import { deleteApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -12,6 +14,8 @@ if (stagingRun && projectId !== "ecoscolaire-staging") {
     "PRODUCTION_GUARD: staging E2E requires ecoscolaire-staging.",
   );
 }
+const verifiedScope = annualReadinessRegistry.find(u => u.catalogLevelId === "fr-primary-ce1" && u.subjectName === "Éducation physique et sportive")!;
+const verifiedUnit = {...verifiedScope.reviewedUnits![0],subjectName:verifiedScope.subjectName};
 const fixture = {
   uid: "pedagogy-e2e-secretary",
   email: "pedagogy.secretary@emulator.test",
@@ -22,10 +26,10 @@ const fixture = {
   classId: "pedagogy-e2e-class-primary-1",
   periodId: "pedagogy-e2e-period-1",
   programId: "pedagogy-e2e-curriculum-v1",
-  unitId: "pedagogy-e2e-curriculum-v1__primary-1__math__01",
+  unitId: "pedagogy-e2e-curriculum-v1__" + verifiedUnit.id,
   classProgramId: "pedagogy-e2e-class-program",
   revisionId: "pedagogy-e2e-class-program__v1",
-  subjectId: "math",
+  subjectId: "eps",
   staffId: "pedagogy-e2e-teacher",
   assignmentId: "pedagogy-e2e-assignment",
 };
@@ -265,11 +269,11 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
       });
       set("classes", fixture.classId, {
         schoolId: fixture.schoolId,
-        name: "SIL E2E",
+        name: "CE1 E2E",
         type: "francophone",
         section: "francophone",
         cycle: "primary",
-        catalogLevelId: "primary-1",
+        catalogLevelId: "fr-primary-ce1",
         isActive: true,
       });
       set("classPrograms", fixture.classProgramId, {
@@ -315,7 +319,7 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
         version: 1,
       });
       set("curriculumPrograms", fixture.programId, {
-        title: "Programme mock E2E",
+        title: "Copie synthétique du périmètre EPS annuel vérifié",
         countryCode: "CM",
         section: "francophone",
         cycle: "primary",
@@ -326,21 +330,22 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
       });
       set("curriculumUnits", fixture.unitId, {
         programId: fixture.programId,
-        catalogLevelId: "primary-1",
+        catalogLevelId: "fr-primary-ce1",
         subjectId: fixture.subjectId,
-        title: "Numération E2E",
-        objective: "Comparer des nombres",
+        title: verifiedUnit.title,
+        objective: verifiedUnit.objective,
+        sourceVersion: verifiedUnit.sourceVersion,
         sequence: 1,
         status: "published",
         sourceType: "mock",
       });
       set(
         "schoolCurriculumAdoptions",
-        `${fixture.schoolId}__${fixture.yearId}__primary-1`,
+        `${fixture.schoolId}__${fixture.yearId}__fr-primary-ce1`,
         {
           schoolId: fixture.schoolId,
           academicYearId: fixture.yearId,
-          catalogLevelId: "primary-1",
+          catalogLevelId: "fr-primary-ce1",
           curriculumProgramId: fixture.programId,
           status: "active",
         },
@@ -415,6 +420,11 @@ test.describe("Lot A — parcours secrétaire sécurisé", () => {
       await expect(page.getByText("Semaines prêtes.")).toBeVisible();
       await page.getByLabel("Semaine").selectOption({ index: 1 });
       await page.getByRole("button", { name: "Créer la proposition" }).click();
+      await expect(page.getByText(/PLANIFICATION PARTIELLE \/ VALIDATION REQUISE/)).toBeVisible();
+      expect((await firestore.collection("teachingPlanItems").where("schoolId", "==", fixture.schoolId).get()).size).toBe(0);
+      // Switch this synthetic fixture to the reviewed annual EPS scope. No bypass.
+      await firestore.collection("classSubjects").doc(`${fixture.revisionId}__${fixture.subjectId}`).update({subjectNameSnapshot: verifiedUnit.subjectName});
+      await page.getByRole("button", {name: /^(Créer|Regénérer) la proposition$/}).click();
       await expect(page.getByText("Proposition générée.")).toBeVisible();
       const planSnapshot = await firestore
         .collection("teachingPlans")
