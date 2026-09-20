@@ -7,7 +7,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -15,7 +16,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-1"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -23,7 +25,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -38,7 +41,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-fr-primary-sil-6",
       "annual-math-v1-fr-primary-sil-7",
       "annual-math-v1-fr-primary-sil-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -46,7 +50,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -54,7 +59,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -62,7 +68,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -70,7 +77,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -78,7 +86,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-sil",
@@ -86,7 +95,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-sil-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -94,7 +104,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -102,7 +113,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-1"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -110,7 +122,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -125,7 +138,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-fr-primary-cp-6",
       "annual-math-v1-fr-primary-cp-7",
       "annual-math-v1-fr-primary-cp-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -133,7 +147,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -141,7 +156,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -149,7 +165,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -157,7 +174,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -165,7 +183,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cp",
@@ -173,7 +192,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cp-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -181,7 +201,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -189,7 +210,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-1"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -197,7 +219,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -212,7 +235,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-fr-primary-ce1-6",
       "annual-math-v1-fr-primary-ce1-7",
       "annual-math-v1-fr-primary-ce1-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -220,7 +244,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -228,7 +253,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -236,7 +262,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -244,7 +271,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -262,6 +290,74 @@ export const annualReadinessRegistry = [
       "annual-verified-fr-primary-ce1-eps-9",
       "annual-verified-fr-primary-ce1-eps-10",
       "annual-verified-fr-primary-ce1-eps-11"
+    ],
+    "reviewedUnits": [
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-1",
+        "title": "Course et récupération",
+        "objective": "Travailler le départ sur 20 m, adapter une allure aisée sur 50 à 70 m et récupérer entre deux passages.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-2",
+        "title": "Lancer et franchissement",
+        "objective": "Prendre en main un engin adapté, orienter sa trajectoire et respecter le règlement ; coordonner élan, impulsion des jambes et mouvement des bras au saut.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-3",
+        "title": "Gymnastique au sol",
+        "objective": "Varier les appuis des mains et des pieds et composer un enchaînement de trois ou quatre éléments.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-4",
+        "title": "Football",
+        "objective": "Situer l’origine et les principes du jeu ; se placer, conserver, passer, recevoir et récupérer le ballon selon les règles élémentaires.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-5",
+        "title": "Handball",
+        "objective": "Situer l’origine et les principes du jeu ; adapter placement, conservation, réception, récupération et passe aux règles élémentaires.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-6",
+        "title": "Basketball",
+        "objective": "Expliquer les principes et l’origine du jeu, ajuster placement et déplacements, passer et recevoir, protéger ou récupérer le ballon dans le respect des règles.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-7",
+        "title": "Volleyball",
+        "objective": "Identifier origine, principes et règles de base ; adapter placement, déplacements, passes, réception et récupération du ballon au jeu collectif.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-8",
+        "title": "Communication sportive",
+        "objective": "Expliquer les échanges utiles avec les partenaires et l’encadrant ; coopérer et respecter les autres pendant l’activité.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-9",
+        "title": "Autodéfense : mise en situation",
+        "objective": "Reconnaître une feinte dans une simulation et découvrir les principes de dégagement d’une main et de protection. Préparation encadrée indispensable.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-10",
+        "title": "Autodéfense : mise en situation",
+        "objective": "Reconnaître une feinte dans une simulation et découvrir les principes de dégagement d’une main et de protection. Préparation encadrée indispensable.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-eps-11",
+        "title": "Autodéfense : mise en situation",
+        "objective": "Reconnaître une feinte dans une simulation et découvrir les principes de dégagement d’une main et de protection. Préparation encadrée indispensable.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      }
     ]
   },
   {
@@ -270,7 +366,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce1-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -278,7 +375,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -286,7 +384,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-1"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -294,7 +393,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -309,7 +409,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-fr-primary-ce2-6",
       "annual-math-v1-fr-primary-ce2-7",
       "annual-math-v1-fr-primary-ce2-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -317,7 +418,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -325,7 +427,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -333,7 +436,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -341,7 +445,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce2",
@@ -359,6 +464,74 @@ export const annualReadinessRegistry = [
       "annual-verified-fr-primary-ce2-eps-9",
       "annual-verified-fr-primary-ce2-eps-10",
       "annual-verified-fr-primary-ce2-eps-11"
+    ],
+    "reviewedUnits": [
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-1",
+        "title": "Course et récupération",
+        "objective": "Travailler le départ sur 40 m, maintenir la vitesse sur 5 secondes, varier une allure aisée et récupérer entre deux passages.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-2",
+        "title": "Lancer et franchissement",
+        "objective": "Prendre en main un engin adapté, orienter sa trajectoire et respecter le règlement ; coordonner élan, impulsion des jambes et mouvement des bras au saut.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-3",
+        "title": "Gymnastique au sol",
+        "objective": "Varier les appuis des mains et des pieds et composer un enchaînement de trois ou quatre éléments. Maintenir des postures stables.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-4",
+        "title": "Football",
+        "objective": "Situer l’origine et les principes du jeu ; se placer, conserver, passer, recevoir et récupérer le ballon selon les règles élémentaires.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-5",
+        "title": "Handball",
+        "objective": "Situer l’origine et les principes du jeu ; adapter placement, conservation, réception, récupération et passe aux règles élémentaires.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-6",
+        "title": "Basketball",
+        "objective": "Expliquer les principes et l’origine du jeu, ajuster placement et déplacements, passer et recevoir, protéger ou récupérer le ballon dans le respect des règles.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-7",
+        "title": "Volleyball",
+        "objective": "Identifier origine, principes et règles de base ; adapter placement, déplacements, passes, réception et récupération du ballon au jeu collectif.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-8",
+        "title": "Communication sportive",
+        "objective": "Expliquer les échanges utiles avec les partenaires et l’encadrant ; coopérer et respecter les autres pendant l’activité.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-9",
+        "title": "Autodéfense : mise en situation",
+        "objective": "Reconnaître une feinte dans une simulation et découvrir les principes de dégagement d’une main et de protection. Préparation encadrée indispensable.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-10",
+        "title": "Autodéfense : mise en situation",
+        "objective": "Reconnaître une feinte dans une simulation et découvrir les principes de dégagement d’une main et de protection. Préparation encadrée indispensable.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce2-eps-11",
+        "title": "Autodéfense : mise en situation",
+        "objective": "Reconnaître une feinte dans une simulation et découvrir les principes de dégagement d’une main et de protection. Préparation encadrée indispensable.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      }
     ]
   },
   {
@@ -367,7 +540,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-ce2-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -375,7 +549,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -383,7 +558,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-1"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -391,7 +567,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -405,7 +582,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-fr-primary-cm1-5",
       "annual-math-v1-fr-primary-cm1-7",
       "annual-math-v1-fr-primary-cm1-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -413,7 +591,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -421,7 +600,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -429,7 +609,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -437,7 +618,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -445,7 +627,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm1",
@@ -453,7 +636,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm1-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -461,7 +645,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -469,7 +654,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-1"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -477,7 +663,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -491,7 +678,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-fr-primary-cm2-5",
       "annual-math-v1-fr-primary-cm2-7",
       "annual-math-v1-fr-primary-cm2-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -499,7 +687,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -507,7 +696,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -515,7 +705,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -523,7 +714,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -531,7 +723,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-cm2",
@@ -539,7 +732,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-primary-cm2-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -547,7 +741,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -559,7 +754,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-en-primary-1-3",
       "annual-math-v1-en-primary-1-4",
       "annual-math-v1-en-primary-1-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -567,7 +763,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -575,7 +772,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -583,7 +781,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -591,7 +790,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -599,7 +799,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -607,7 +808,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -615,7 +817,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-1",
@@ -623,7 +826,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-1-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -631,7 +835,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -643,7 +848,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-en-primary-2-3",
       "annual-math-v1-en-primary-2-4",
       "annual-math-v1-en-primary-2-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -651,7 +857,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -659,7 +866,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -667,7 +875,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -675,7 +884,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -683,7 +893,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -691,7 +902,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -699,7 +911,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-2",
@@ -707,7 +920,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-2-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -715,7 +929,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -727,7 +942,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-en-primary-3-3",
       "annual-math-v1-en-primary-3-4",
       "annual-math-v1-en-primary-3-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -735,7 +951,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -743,7 +960,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -751,7 +969,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -759,7 +978,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -767,7 +987,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -775,7 +996,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -783,7 +1005,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-3",
@@ -791,7 +1014,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-3-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -799,7 +1023,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -811,7 +1036,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-en-primary-4-3",
       "annual-math-v1-en-primary-4-4",
       "annual-math-v1-en-primary-4-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -819,7 +1045,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -827,7 +1054,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -835,7 +1063,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -843,7 +1072,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -851,7 +1081,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -859,7 +1090,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -867,7 +1099,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-4",
@@ -875,7 +1108,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-4-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -883,7 +1117,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -895,7 +1130,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-en-primary-5-3",
       "annual-math-v1-en-primary-5-4",
       "annual-math-v1-en-primary-5-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -903,7 +1139,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -911,7 +1148,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -919,7 +1157,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -927,7 +1166,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -935,7 +1175,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -943,7 +1184,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -951,7 +1193,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-5",
@@ -959,7 +1202,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-5-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -967,7 +1211,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-0"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -979,7 +1224,8 @@ export const annualReadinessRegistry = [
       "annual-math-v1-en-primary-6-3",
       "annual-math-v1-en-primary-6-4",
       "annual-math-v1-en-primary-6-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -987,7 +1233,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -995,7 +1242,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -1003,7 +1251,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -1011,7 +1260,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -1019,7 +1269,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-6"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -1027,7 +1278,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-7"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -1035,7 +1287,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-8"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-primary-6",
@@ -1043,7 +1296,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-primary-6-subject-9"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-preschool-pre",
@@ -1053,6 +1307,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-pre-d1",
       "annual-plan-v1-fr-preschool-pre-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1071,6 +1326,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-pre-d2",
       "annual-plan-v1-fr-preschool-pre-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1089,6 +1345,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-pre-d3",
       "annual-plan-v1-fr-preschool-pre-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1107,6 +1364,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-pre-d4",
       "annual-plan-v1-fr-preschool-pre-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1125,6 +1383,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-pre-d5",
       "annual-plan-v1-fr-preschool-pre-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1143,6 +1402,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ps-d1",
       "annual-plan-v1-fr-preschool-ps-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1161,6 +1421,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ps-d2",
       "annual-plan-v1-fr-preschool-ps-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1179,6 +1440,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ps-d3",
       "annual-plan-v1-fr-preschool-ps-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1197,6 +1459,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ps-d4",
       "annual-plan-v1-fr-preschool-ps-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1215,6 +1478,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ps-d5",
       "annual-plan-v1-fr-preschool-ps-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1233,6 +1497,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ms-d1",
       "annual-plan-v1-fr-preschool-ms-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1251,6 +1516,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ms-d2",
       "annual-plan-v1-fr-preschool-ms-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1269,6 +1535,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ms-d3",
       "annual-plan-v1-fr-preschool-ms-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1287,6 +1554,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ms-d4",
       "annual-plan-v1-fr-preschool-ms-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1305,6 +1573,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-ms-d5",
       "annual-plan-v1-fr-preschool-ms-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1323,6 +1592,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-gs-d1",
       "annual-plan-v1-fr-preschool-gs-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1341,6 +1611,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-gs-d2",
       "annual-plan-v1-fr-preschool-gs-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1359,6 +1630,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-gs-d3",
       "annual-plan-v1-fr-preschool-gs-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1377,6 +1649,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-gs-d4",
       "annual-plan-v1-fr-preschool-gs-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1395,6 +1668,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-fr-preschool-gs-d5",
       "annual-plan-v1-fr-preschool-gs-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1413,6 +1687,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-pre-d1",
       "annual-plan-v1-en-nursery-pre-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1431,6 +1706,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-pre-d2",
       "annual-plan-v1-en-nursery-pre-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1449,6 +1725,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-pre-d3",
       "annual-plan-v1-en-nursery-pre-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1467,6 +1744,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-pre-d4",
       "annual-plan-v1-en-nursery-pre-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1485,6 +1763,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-pre-d5",
       "annual-plan-v1-en-nursery-pre-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1503,6 +1782,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-1-d1",
       "annual-plan-v1-en-nursery-1-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1521,6 +1801,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-1-d2",
       "annual-plan-v1-en-nursery-1-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1539,6 +1820,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-1-d3",
       "annual-plan-v1-en-nursery-1-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1557,6 +1839,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-1-d4",
       "annual-plan-v1-en-nursery-1-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1575,6 +1858,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-1-d5",
       "annual-plan-v1-en-nursery-1-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1593,6 +1877,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-2-d1",
       "annual-plan-v1-en-nursery-2-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1611,6 +1896,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-2-d2",
       "annual-plan-v1-en-nursery-2-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1629,6 +1915,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-2-d3",
       "annual-plan-v1-en-nursery-2-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1647,6 +1934,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-2-d4",
       "annual-plan-v1-en-nursery-2-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1665,6 +1953,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-2-d5",
       "annual-plan-v1-en-nursery-2-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1683,6 +1972,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-3-d1",
       "annual-plan-v1-en-nursery-3-d1"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1701,6 +1991,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-3-d2",
       "annual-plan-v1-en-nursery-3-d2"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1719,6 +2010,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-3-d3",
       "annual-plan-v1-en-nursery-3-d3"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1737,6 +2029,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-3-d4",
       "annual-plan-v1-en-nursery-3-d4"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1755,6 +2048,7 @@ export const annualReadinessRegistry = [
       "italo-early-v1-en-nursery-3-d5",
       "annual-plan-v1-en-nursery-3-d5"
     ],
+    "reviewedUnits": [],
     "validatedFor": {
       "kind": "ITALO_PEDAGOGICAL_CHOICE",
       "version": "local-annual-2026-09-20-v1",
@@ -1774,13 +2068,15 @@ export const annualReadinessRegistry = [
       "minesec-35-fr-secondary-6e-module-2",
       "minesec-35-fr-secondary-6e-module-3",
       "minesec-35-fr-secondary-6e-module-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
     "subjectName": "Informatique",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
@@ -1788,7 +2084,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-6e-37-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
@@ -1798,7 +2095,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-6e-38-1",
       "annual-gap-v1-fr-secondary-6e-38-2",
       "annual-gap-v1-fr-secondary-6e-38-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
@@ -1808,7 +2106,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-6e-39-1",
       "annual-gap-v1-fr-secondary-6e-39-2",
       "annual-gap-v1-fr-secondary-6e-39-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
@@ -1818,7 +2117,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-6e-40-1",
       "annual-gap-v1-fr-secondary-6e-40-2",
       "annual-gap-v1-fr-secondary-6e-40-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
@@ -1829,13 +2129,15 @@ export const annualReadinessRegistry = [
       "minesec-35-fr-secondary-5e-module-2",
       "minesec-35-fr-secondary-5e-module-3",
       "minesec-35-fr-secondary-5e-module-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
     "subjectName": "Informatique",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
@@ -1843,7 +2145,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-5e-37-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
@@ -1853,7 +2156,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-5e-38-1",
       "annual-gap-v1-fr-secondary-5e-38-2",
       "annual-gap-v1-fr-secondary-5e-38-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
@@ -1862,7 +2166,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-fr-secondary-5e-39-1",
       "annual-gap-v1-fr-secondary-5e-39-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
@@ -1872,7 +2177,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-5e-40-1",
       "annual-gap-v1-fr-secondary-5e-40-2",
       "annual-gap-v1-fr-secondary-5e-40-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1884,7 +2190,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-4e-44-3",
       "annual-gap-v1-fr-secondary-4e-44-4",
       "annual-gap-v1-fr-secondary-4e-44-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1895,7 +2202,8 @@ export const annualReadinessRegistry = [
       "minesec-52-fr-secondary-4e-module-2",
       "minesec-52-fr-secondary-4e-module-3",
       "minesec-52-fr-secondary-4e-module-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1904,7 +2212,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-fr-secondary-4e-53-1",
       "annual-gap-v1-fr-secondary-4e-53-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1914,7 +2223,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-4e-54-1",
       "annual-gap-v1-fr-secondary-4e-54-2",
       "annual-gap-v1-fr-secondary-4e-54-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1925,7 +2235,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-4e-55-2",
       "annual-gap-v1-fr-secondary-4e-55-3",
       "annual-gap-v1-fr-secondary-4e-55-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1935,7 +2246,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-4e-43-1",
       "annual-gap-v1-fr-secondary-4e-43-2",
       "annual-gap-v1-fr-secondary-4e-43-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1947,7 +2259,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-4e-42-3",
       "annual-gap-v1-fr-secondary-4e-42-4",
       "annual-gap-v1-fr-secondary-4e-42-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1955,7 +2268,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-4e-51-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1963,7 +2277,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-4e-46-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1971,7 +2286,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-4e-48-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1979,7 +2295,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-4e-47-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
@@ -1987,7 +2304,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-4e-49-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -1999,7 +2317,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-3e-44-3",
       "annual-gap-v1-fr-secondary-3e-44-4",
       "annual-gap-v1-fr-secondary-3e-44-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2010,7 +2329,8 @@ export const annualReadinessRegistry = [
       "minesec-52-fr-secondary-3e-module-2",
       "minesec-52-fr-secondary-3e-module-3",
       "minesec-52-fr-secondary-3e-module-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2020,7 +2340,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-3e-53-1",
       "annual-gap-v1-fr-secondary-3e-53-2",
       "annual-gap-v1-fr-secondary-3e-53-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2032,7 +2353,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-3e-54-3",
       "annual-gap-v1-fr-secondary-3e-54-4",
       "annual-gap-v1-fr-secondary-3e-54-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2043,7 +2365,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-3e-55-2",
       "annual-gap-v1-fr-secondary-3e-55-3",
       "annual-gap-v1-fr-secondary-3e-55-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2053,7 +2376,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-3e-43-1",
       "annual-gap-v1-fr-secondary-3e-43-2",
       "annual-gap-v1-fr-secondary-3e-43-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2065,7 +2389,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-fr-secondary-3e-42-3",
       "annual-gap-v1-fr-secondary-3e-42-4",
       "annual-gap-v1-fr-secondary-3e-42-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2073,7 +2398,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-3e-51-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2081,7 +2407,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-3e-46-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2089,7 +2416,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-3e-48-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2097,7 +2425,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-3e-47-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
@@ -2105,13 +2434,15 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-3e-49-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-2nde",
     "subjectName": "Anglais",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-2nde",
@@ -2120,7 +2451,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-fr-secondary-2nde-79-conditional",
       "annual-gap-v1-fr-secondary-2nde-80-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-2nde",
@@ -2128,7 +2460,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-2nde-146-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-2nde",
@@ -2136,19 +2469,22 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-2nde-144-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-2nde",
     "subjectName": "Chimie",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-2nde",
     "subjectName": "Physique",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-terminale",
@@ -2156,7 +2492,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-terminale-200-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-terminale",
@@ -2164,7 +2501,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-fr-secondary-terminale-202-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-terminale",
@@ -2173,7 +2511,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-fr-secondary-terminale-195-conditional",
       "annual-gap-v1-fr-secondary-terminale-196-conditional"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
@@ -2182,7 +2521,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-en-secondary-form1-2-1",
       "annual-gap-v1-en-secondary-form1-2-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
@@ -2193,7 +2533,8 @@ export const annualReadinessRegistry = [
       "minesec-8-en-secondary-form1-module-2",
       "minesec-8-en-secondary-form1-module-3",
       "minesec-8-en-secondary-form1-module-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
@@ -2201,7 +2542,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form1-5-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
@@ -2209,7 +2551,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form1-10-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
@@ -2218,7 +2561,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-en-secondary-form2-2-1",
       "annual-gap-v1-en-secondary-form2-2-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
@@ -2230,7 +2574,8 @@ export const annualReadinessRegistry = [
       "minesec-8-en-secondary-form2-module-3",
       "minesec-8-en-secondary-form2-module-4",
       "minesec-8-en-secondary-form2-module-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
@@ -2238,7 +2583,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form2-5-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
@@ -2246,7 +2592,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form2-10-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2258,7 +2605,8 @@ export const annualReadinessRegistry = [
       "minesec-62-en-secondary-form3-module-3",
       "minesec-62-en-secondary-form3-module-4",
       "minesec-62-en-secondary-form3-module-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2267,7 +2615,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-en-secondary-form3-59-1",
       "annual-gap-v1-en-secondary-form3-59-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2279,7 +2628,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form3-57-3",
       "annual-gap-v1-en-secondary-form3-57-4",
       "annual-gap-v1-en-secondary-form3-57-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2287,13 +2637,15 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form3-63-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
     "subjectName": "Chemistry",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2303,7 +2655,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form3-69-1",
       "annual-gap-v1-en-secondary-form3-69-2",
       "annual-gap-v1-en-secondary-form3-69-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2313,7 +2666,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form3-72-1",
       "annual-gap-v1-en-secondary-form3-72-2",
       "annual-gap-v1-en-secondary-form3-72-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2323,7 +2677,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form3-73-1",
       "annual-gap-v1-en-secondary-form3-73-2",
       "annual-gap-v1-en-secondary-form3-73-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2333,7 +2688,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form3-74-1",
       "annual-gap-v1-en-secondary-form3-74-2",
       "annual-gap-v1-en-secondary-form3-74-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
@@ -2342,7 +2698,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-en-secondary-form3-75-1",
       "annual-gap-v1-en-secondary-form3-75-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2352,7 +2709,8 @@ export const annualReadinessRegistry = [
       "minesec-62-en-secondary-form4-module-1",
       "minesec-62-en-secondary-form4-module-2",
       "minesec-62-en-secondary-form4-module-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2361,7 +2719,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-en-secondary-form4-59-1",
       "annual-gap-v1-en-secondary-form4-59-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2373,7 +2732,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form4-57-3",
       "annual-gap-v1-en-secondary-form4-57-4",
       "annual-gap-v1-en-secondary-form4-57-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2381,13 +2741,15 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form4-63-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
     "subjectName": "Chemistry",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2397,7 +2759,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form4-69-1",
       "annual-gap-v1-en-secondary-form4-69-2",
       "annual-gap-v1-en-secondary-form4-69-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2407,7 +2770,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form4-72-1",
       "annual-gap-v1-en-secondary-form4-72-2",
       "annual-gap-v1-en-secondary-form4-72-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2418,7 +2782,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form4-73-2",
       "annual-gap-v1-en-secondary-form4-73-3",
       "annual-gap-v1-en-secondary-form4-73-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2427,7 +2792,8 @@ export const annualReadinessRegistry = [
     "structuredContent": [
       "annual-gap-v1-en-secondary-form4-74-1",
       "annual-gap-v1-en-secondary-form4-74-2"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2437,7 +2803,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form4-75-1",
       "annual-gap-v1-en-secondary-form4-75-2",
       "annual-gap-v1-en-secondary-form4-75-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2447,7 +2814,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form4-71-1",
       "annual-gap-v1-en-secondary-form4-71-2",
       "annual-gap-v1-en-secondary-form4-71-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
@@ -2457,7 +2825,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form4-70-1",
       "annual-gap-v1-en-secondary-form4-70-2",
       "annual-gap-v1-en-secondary-form4-70-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2467,7 +2836,8 @@ export const annualReadinessRegistry = [
       "minesec-62-en-secondary-form5-module-1",
       "minesec-62-en-secondary-form5-module-2",
       "minesec-62-en-secondary-form5-module-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2477,7 +2847,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-59-1",
       "annual-gap-v1-en-secondary-form5-59-2",
       "annual-gap-v1-en-secondary-form5-59-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2489,7 +2860,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-57-3",
       "annual-gap-v1-en-secondary-form5-57-4",
       "annual-gap-v1-en-secondary-form5-57-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2497,13 +2869,15 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form5-63-opening"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
     "subjectName": "Chemistry",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2513,7 +2887,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-69-1",
       "annual-gap-v1-en-secondary-form5-69-2",
       "annual-gap-v1-en-secondary-form5-69-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2524,7 +2899,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-72-2",
       "annual-gap-v1-en-secondary-form5-72-3",
       "annual-gap-v1-en-secondary-form5-72-4"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2536,7 +2912,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-73-3",
       "annual-gap-v1-en-secondary-form5-73-4",
       "annual-gap-v1-en-secondary-form5-73-5"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2544,7 +2921,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-form5-74-1"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2554,7 +2932,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-75-1",
       "annual-gap-v1-en-secondary-form5-75-2",
       "annual-gap-v1-en-secondary-form5-75-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2564,7 +2943,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-71-1",
       "annual-gap-v1-en-secondary-form5-71-2",
       "annual-gap-v1-en-secondary-form5-71-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
@@ -2574,7 +2954,8 @@ export const annualReadinessRegistry = [
       "annual-gap-v1-en-secondary-form5-70-1",
       "annual-gap-v1-en-secondary-form5-70-2",
       "annual-gap-v1-en-secondary-form5-70-3"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-lower-sixth",
@@ -2582,7 +2963,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-lower-sixth-289-shared"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-lower-sixth",
@@ -2590,19 +2972,22 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-lower-sixth-290-shared"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-lower-sixth",
     "subjectName": "Computer Science",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-lower-sixth",
     "subjectName": "Information and Communication Technology",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-upper-sixth",
@@ -2610,7 +2995,8 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-upper-sixth-289-shared"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-upper-sixth",
@@ -2618,223 +3004,260 @@ export const annualReadinessRegistry = [
     "coverageStatus": "PARTIAL_BLOCKING",
     "structuredContent": [
       "annual-gap-v1-en-secondary-upper-sixth-290-shared"
-    ]
+    ],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-upper-sixth",
     "subjectName": "Computer Science",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-upper-sixth",
     "subjectName": "Information and Communication Technology",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
     "subjectName": "Français",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
     "subjectName": "Anglais",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
     "subjectName": "Éducation physique et sportive",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-6e",
     "subjectName": "Travail manuel",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
     "subjectName": "Français",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
     "subjectName": "Anglais",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
     "subjectName": "Éducation physique et sportive",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-5e",
     "subjectName": "Travail manuel",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
     "subjectName": "PCT",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
     "subjectName": "SVT",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
     "subjectName": "Informatique",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-4e",
     "subjectName": "Éducation physique et sportive",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
     "subjectName": "PCT",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
     "subjectName": "SVT",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
     "subjectName": "Informatique",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-secondary-3e",
     "subjectName": "Éducation physique et sportive",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
     "subjectName": "Chemistry",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
     "subjectName": "English Language",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
     "subjectName": "French",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
     "subjectName": "Geography",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
     "subjectName": "History",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form1",
     "subjectName": "Citizenship",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
     "subjectName": "Chemistry",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
     "subjectName": "English Language",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
     "subjectName": "French",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
     "subjectName": "Geography",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
     "subjectName": "History",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form2",
     "subjectName": "Citizenship",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
     "subjectName": "English Language",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form3",
     "subjectName": "Literature in English",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
     "subjectName": "English Language",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form4",
     "subjectName": "Literature in English",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
     "subjectName": "English Language",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "en-secondary-form5",
     "subjectName": "Literature in English",
     "coverageStatus": "PENDING_SOURCE",
-    "structuredContent": []
+    "structuredContent": [],
+    "reviewedUnits": []
   },
   {
     "catalogLevelId": "fr-primary-ce1",
@@ -2846,6 +3269,38 @@ export const annualReadinessRegistry = [
       "annual-verified-fr-primary-ce1-environment-3",
       "annual-verified-fr-primary-ce1-environment-4",
       "annual-verified-fr-primary-ce1-environment-5"
+    ],
+    "reviewedUnits": [
+      {
+        "id": "annual-verified-fr-primary-ce1-environment-1",
+        "title": "Énergie à la maison",
+        "objective": "Expliquer comment limiter la consommation d’énergie des appareils domestiques.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-environment-2",
+        "title": "Milieux, pollution et saisons",
+        "objective": "Distinguer les habitats des êtres vivants, reconnaître des facteurs de pollution et comparer les arbres selon la saison.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-environment-3",
+        "title": "Comprendre le réchauffement",
+        "objective": "Décrire le réchauffement climatique et identifier ses causes.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-environment-4",
+        "title": "Activités humaines et environnement",
+        "objective": "Analyser les effets des activités humaines sur le milieu et relier certaines actions aux causes du réchauffement.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      },
+      {
+        "id": "annual-verified-fr-primary-ce1-environment-5",
+        "title": "Aires protégées",
+        "objective": "Expliquer ce qu’est une aire protégée, les raisons de sa protection et les moyens employés.",
+        "sourceVersion": "6dc059638d59463d55f12d6c9488bf04fa1ae9c00e1d51891f80702108dce6a2"
+      }
     ]
   }
 ] as AnnualPlanningScope[];

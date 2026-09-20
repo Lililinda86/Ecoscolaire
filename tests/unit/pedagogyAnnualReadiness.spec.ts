@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {actualAnnualReadiness} from '../../src/features/pedagogy/services/annualReadiness';
 import {annualCoverageScopes} from '../../src/features/pedagogy/resources/annualCoverage';
-import {annualPlanningBlockers,annualPlanningUnitIds,type AnnualPlanningScope} from '../../functions/src/pedagogy/annualReadiness';
+import {annualPlanningBlockers,annualPlanningUnitIds,annualPlanningUnitMatches,type AnnualPlanningScope} from '../../functions/src/pedagogy/annualReadiness';
 import {earlyYearsAnnualPlans} from '../../src/features/pedagogy/resources/earlyYearsAnnualPlans';
 import {annualVerifiedUnits} from '../../src/features/pedagogy/resources/annualVerifiedUnits';
 const classes=[{id:'c',schoolId:'a',catalogLevelId:'fr-primary-ce1'}];
@@ -19,5 +19,6 @@ describe('annual readiness decisions',()=>{
  it('does not confuse the two sixth form disciplines or inherit a nearby level',()=>{const registry:AnnualPlanningScope[]=[{catalogLevelId:'lower',subjectName:'English Language',coverageStatus:'COMPLETE'}];expect(annualPlanningBlockers('lower',['Literature in English'],registry,'a','y')).toEqual(['Literature in English']);expect(annualPlanningBlockers('upper',['English Language'],registry,'a','y')).toEqual(['English Language']);});
  it('keeps local annual extensions separate from official lessons and calendars',()=>{expect(earlyYearsAnnualPlans).toHaveLength(40);expect(earlyYearsAnnualPlans.every(p=>p.annualExtensions.length===6&&p.validation.reversible&&p.officialLevelEquivalent===null)).toBe(true);expect(earlyYearsAnnualPlans.flatMap(p=>p.annualExtensions).every(u=>u.assessment&&u.adaptation&&u.calendarPeriod===null&&u.officialLesson===null)).toBe(true);});
  it('selects only reviewed unit identifiers for the exact subject and level',()=>{const registry:AnnualPlanningScope[]=[{catalogLevelId:'l',subjectName:'s',coverageStatus:'COMPLETE',structuredContent:['reviewed']}];expect(annualPlanningUnitIds('l','s',registry)).toEqual(['reviewed']);expect(annualPlanningUnitIds('l','other',registry)).toEqual([]);expect(annualPlanningUnitIds('other','s',registry)).toEqual([]);});
+ it('rejects a forged reviewed ID, altered content, wrong version or other program namespace',()=>{const u={id:'reviewed',title:'Title',objective:'Objective',sourceVersion:'hash'};const registry:AnnualPlanningScope[]=[{catalogLevelId:'l',subjectName:'s',coverageStatus:'COMPLETE',reviewedUnits:[u]}];expect(annualPlanningUnitMatches('l','s','p',{...u,id:'p__reviewed'},registry)).toBe(true);for(const bad of [{...u,title:'wrong'},{...u,sourceVersion:'old'},{...u,id:'other__reviewed'}])expect(annualPlanningUnitMatches('l','s','p',bad,registry)).toBe(false);});
  it('retains complete class-column locators including the official subdomain boundary',()=>{expect(annualVerifiedUnits).toHaveLength(27);expect(annualVerifiedUnits.every(u=>u.sourcePages.length>1&&u.sourceVersion.length===64&&u.sourceLocator.includes('colonne')&&u.assessment&&u.methodology)).toBe(true);});
 });
