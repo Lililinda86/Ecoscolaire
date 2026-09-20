@@ -38,11 +38,12 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'fr-preschool-ms',
       put('students', pupilId, { ...scope, name: 'Synthetic pupil 1', firstName: 'Synthetic', lastName: 'pupil 1', isActive: true, schoolingStatus: 'active', status: 'active' });
       put('teacherAssignments', prefix + '-assignment', { ...scope, subjectId, teacherStaffId: staffId, status: 'active', isActive: true });
       put('classPrograms', prefix + '-class-program', { ...scope, status: 'published', publishedRevisionId: revisionId, publishedRevisionNumber: 1 });
-      put('classSubjects', prefix + '-class-subject', { ...scope, revisionId, subjectId, subjectNameSnapshot: activity.domain, isActive: true, displayOrder: 1 });
+      put('classSubjects', prefix + '-class-subject', { ...scope, revisionId, subjectId, subjectNameSnapshot: activity.domain, weeklyHours: 1, isActive: true, displayOrder: 1 });
       put('curriculumPrograms', programId, { title: 'Synthetic ITALO local preschool program', countryCode: 'CM', section: en ? 'anglophone' : 'francophone', cycle: 'nursery', version: 'synthetic-v1', status: 'published', sourceType: 'mock', checksum: 'synthetic-only' });
       put('curriculumUnits', unitId, { programId, catalogLevelId: levelId, subjectId, title: activity.title, objective: activity.objective, sequence: 1, status: 'published', sourceType: 'mock' });
       // Upstream local program adoption/assignment are fixture prerequisites,
-      // never genuine owner decisions. Planning onward uses real UI/Functions.
+      // never genuine owner decisions. Annual generation is refused for this other school;
+      // a manual synthetic plan is supplied before the remaining real UI/Functions pathway.
       const adoptionId = [schoolId, yearId, levelId].join('__');
       put('schoolCurriculumAdoptions', adoptionId, { academicYearId: yearId, catalogLevelId: levelId, curriculumProgramId: programId, status: 'active', revision: 1 });
       await batch.commit();
@@ -63,7 +64,22 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'fr-preschool-ms',
       await page.getByRole('button', { name: 'Initialiser les semaines', exact: true }).click(); await expect(page.getByText('Semaines prêtes.')).toBeVisible();
       await page.getByRole('combobox', { name: 'Classe', exact: true }).selectOption(classId);
       await page.getByRole('combobox', { name: 'Semaine', exact: true }).selectOption('2026-09-07');
-      await page.getByRole('button', { name: 'Créer la proposition', exact: true }).click(); await expect(page.getByText('Proposition générée.')).toBeVisible();
+      await page.getByRole('button', { name: 'Créer la proposition', exact: true }).click();
+      await expect(page.getByText(/PLANIFICATION PARTIELLE \/ VALIDATION REQUISE/)).toBeVisible();
+      expect((await db.collection('teachingPlanItems').where('schoolId', '==', schoolId).get()).empty).toBe(true);
+      const draftPlans = await db.collection('teachingPlans').where('schoolId', '==', schoolId).get();
+      expect(draftPlans.size).toBe(1);
+      const manualPlan = draftPlans.docs[0];
+      // Fixture prerequisite only: a teacher's manually prepared plan, not an
+      // automatic proposal or a transferable ITALO annual validation.
+      const manualBatch = db.batch();
+      manualBatch.update(manualPlan.ref, {status:'adjusted',itemCount:1,syntheticFixture:prefix,provenance:'SYNTHETIC_MANUAL_TEACHER_PLAN'});
+      manualBatch.create(db.collection('teachingPlanItems').doc(prefix+'-manual-item'), {id:prefix+'-manual-item',...scope,planId:manualPlan.id,weekStartDate:'2026-09-07',subjectId,subjectName:activity.domain,teacherStaffId:staffId,curriculumUnitId:unitId,lessonTitle:activity.title,objective:activity.objective,dayIndex:1,slotIndex:1,status:'adjusted',syntheticFixture:prefix,provenance:'SYNTHETIC_MANUAL_TEACHER_PLAN'});
+      await manualBatch.commit();
+      await page.reload();
+      await page.getByRole('combobox', { name: 'Classe', exact: true }).selectOption(classId);
+      await page.getByRole('combobox', { name: 'Semaine', exact: true }).selectOption('2026-09-07');
+      await expect(page.getByLabel(/^Leçon /).first()).toHaveValue(activity.title);
       await page.getByLabel('Enseignant ayant validé').selectOption(staffId);
       await page.getByRole('button', { name: 'Consigner sa validation', exact: true }).click(); await expect(page.getByText('Validation enseignant enregistrée.', { exact: true })).toBeVisible();
       await page.goto('/#/pedagogy/preparations');
@@ -136,7 +152,7 @@ for (const levelId of ['fr-preschool-pre', 'fr-preschool-ps', 'fr-preschool-ms',
       await declaration('Consigner la réévaluation');
       expect((await db.collection('pedagogyRemediations').where('schoolId', '==', schoolId).get()).docs[0].data().status).toBe('reviewed');
       for (const collection of ['grades','evaluations','weeklyAssessments','assessmentItems','pedagogyAiOperations','payments','expenses','buses']) expect((await db.collection(collection).where('schoolId', '==', schoolId).get()).empty).toBe(true);
-      console.log('PRESCHOOL_COMPLETE_PASS: ' + levelId + '; real synthetic workflow, manual review, no provider claim, responsive and A4');
+      console.log('PRESCHOOL_COMPLETE_PASS: ' + levelId + '; annual cross-school generation refused; manual plan fixture; real preparation/review workflow, no provider claim, responsive and A4');
     } finally {
       for (const collection of collections) for (const d of (await db.collection(collection).where('schoolId', '==', schoolId).get()).docs) await db.recursiveDelete(d.ref);
       await bucket.deleteFiles({ prefix: 'schools/' + schoolId + '/pedagogy/preparations/' });
