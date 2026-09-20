@@ -1,3 +1,5 @@
+import { annualPlanningBlockers, annualPlanningUnitIds, AnnualPlanningScope } from './annualReadiness';
+import { annualReadinessRegistry } from './annualReadinessRegistry';
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -146,7 +148,11 @@ export const generateTeachingPlanProposal = functions.https.onCall(async (data, 
     if (!assignment?.teacherStaffId) throw new functions.https.HttpsError('failed-precondition', `Enseignant manquant pour ${subject.subjectNameSnapshot}.`);
     return { subjectId: subject.subjectId, subjectName: subject.subjectNameSnapshot, teacherStaffId: assignment.teacherStaffId, weeklyHours: subject.weeklyHours || 1 };
   });
-  const units: GeneratorUnit[] = unitsSnap.docs.map(doc => ({ id: doc.id, subjectId: doc.data().subjectId, title: doc.data().title, objective: doc.data().objective, sequence: doc.data().sequence || 0 }));
+  const annualBlockers = annualPlanningBlockers(catalogLevelId, subjects.map(s => s.subjectName), annualReadinessRegistry as AnnualPlanningScope[], schoolId, plan.academicYearId);
+  if (!subjects.length || annualBlockers.length) throw new functions.https.HttpsError('failed-precondition', 'PLANIFICATION PARTIELLE / VALIDATION REQUISE : couverture annuelle insuffisante ou non établie pour les matières publiées.');
+  const compatibleUnits = unitsSnap.docs.filter(doc => subjects.some(subject => subject.subjectId === doc.data().subjectId && annualPlanningUnitIds(catalogLevelId, subject.subjectName, annualReadinessRegistry as AnnualPlanningScope[]).includes(doc.id)));
+  if (subjects.some(subject => !compatibleUnits.some(doc => doc.data().subjectId === subject.subjectId))) throw new functions.https.HttpsError('failed-precondition', 'PLANIFICATION PARTIELLE / VALIDATION REQUISE : unités annuelles validées absentes du programme adopté.');
+  const units: GeneratorUnit[] = compatibleUnits.map(doc => ({ id: doc.id, subjectId: doc.data().subjectId, title: doc.data().title, objective: doc.data().objective, sequence: doc.data().sequence || 0 }));
   const items = deterministicPlanningGenerator.generate({ planId, weekNumber: plan.weekNumber, subjects, units });
   if (!items.length) throw new functions.https.HttpsError('failed-precondition', 'Aucune unité de programme compatible.');
   await db().runTransaction(async transaction => {
